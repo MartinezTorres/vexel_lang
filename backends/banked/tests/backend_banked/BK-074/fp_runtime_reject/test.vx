@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Any residual runtime FP expression triggers a diagnostic | Runtime FP triggers diagnostic
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-fn^ compute(x: f32) -> f32 { x * 2.0 }
-fn^ test() -> f32 { compute(3.5) }

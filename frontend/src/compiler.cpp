@@ -3,6 +3,7 @@
 #include "parser.h"
 #include "typechecker.h"
 #include "codegen.h"
+#include "backend_registry.h"
 #include "constants.h"
 #include "lowered_printer.h"
 #include <unordered_map>
@@ -74,7 +75,6 @@ Compiler::OutputPaths Compiler::compile() {
             }
             write_file(lowered_path.string(), lowered);
         }
-        using BackendKind = Options::BackendKind;
         std::unordered_set<std::string> non_reentrant_funcs;
         for (const auto& stmt : mod.top_level) {
             if (stmt->kind == Stmt::Kind::FuncDecl && stmt->is_exported) {
@@ -86,44 +86,19 @@ Compiler::OutputPaths Compiler::compile() {
                 if (!has_annotation(stmt->annotations, "reentrant")) {
                     non_reentrant_funcs.insert(name);
                 }
-                // Honor explicit [[reentrant]] for banked backend alternation when implemented
+                // Keep explicit [[reentrant]] out of the non-reentrant set for backend policies.
             }
         }
 
-        switch (options.backend) {
-            case BackendKind::C: {
-                if (options.verbose) {
-                    std::cout << "Generating C x86 code..." << std::endl;
-                }
-                CodeGenerator codegen;
-                codegen.set_non_reentrant(non_reentrant_funcs);
-                CCodegenResult result = codegen.generate(mod, &checker);
-
-                std::filesystem::path header_path = paths.dir / (paths.stem + ".h");
-                std::filesystem::path source_path = paths.dir / (paths.stem + ".c");
-
-                if (options.verbose) {
-                    std::cout << "Writing header: " << header_path << std::endl;
-                    std::cout << "Writing source: " << source_path << std::endl;
-                }
-
-                write_file(header_path.string(), result.header);
-                std::string source_with_include =
-                    "#include \"" + header_path.filename().string() + "\"\n\n" + result.source;
-                write_file(source_path.string(), source_with_include);
-                break;
-            }
-            case BackendKind::Banked: {
-                if (options.verbose) {
-                    std::cout << "Generating banked code..." << std::endl;
-                }
-                CodeGenerator codegen;
-                codegen.set_non_reentrant(non_reentrant_funcs);
-                CCodegenResult result = codegen.generate(mod, &checker);
-                emit_banked_backend(mod, checker, codegen, result, paths);
-                break;
-            }
+        const Backend* backend = find_backend(options.backend);
+        if (!backend) {
+            throw CompileError("Unknown backend: " + options.backend, SourceLocation());
         }
+        if (options.verbose) {
+            std::cout << "Generating backend: " << backend->info.name << std::endl;
+        }
+        BackendContext ctx{mod, checker, options, paths, non_reentrant_funcs};
+        backend->emit(ctx);
 
         if (options.verbose) {
             std::cout << "Compilation successful!" << std::endl;

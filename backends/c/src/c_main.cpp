@@ -1,3 +1,4 @@
+#include "c_backend.h"
 #include "compiler.h"
 #include "lexer.h"
 #include "parser.h"
@@ -14,7 +15,7 @@ static void print_usage(const char* prog) {
     std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
     std::cout << "Options:\n";
     std::cout << "  -o <path>    Output path (base name for generated files, default: out)\n";
-    std::cout << "  -b <name>    Backend (optional compatibility flag: accepts c/c only)\n";
+    std::cout << "  -b <name>    Backend (optional compatibility flag: accepts c only)\n";
     std::cout << "  -L           Emit lowered Vexel subset alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
     std::cout << "  -v           Verbose output\n";
@@ -22,9 +23,11 @@ static void print_usage(const char* prog) {
 }
 
 int main(int argc, char** argv) {
+    vexel::register_backend_c();
+
     vexel::Compiler::Options opts;
     opts.output_file = "out";
-    opts.backend = vexel::Compiler::Options::BackendKind::C;
+    opts.backend = "c";
 
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
@@ -46,7 +49,7 @@ int main(int argc, char** argv) {
         } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--backend") == 0) {
             if (i + 1 < argc) {
                 const char* backend = argv[++i];
-                if (std::strcmp(backend, "c") != 0 && std::strcmp(backend, "c") != 0) {
+                if (std::strcmp(backend, "c") != 0) {
                     std::cerr << "Error: c CLI only supports backend=c\n";
                     return 1;
                 }

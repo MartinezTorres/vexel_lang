@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Purity checks are identical to the portable C backend | Purity violations detected
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-var GLOBAL: i32 = 0;
-pure fn bad() -> i32 { GLOBAL = 1; GLOBAL }

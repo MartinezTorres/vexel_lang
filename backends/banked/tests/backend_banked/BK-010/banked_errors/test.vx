@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: This backend raises additional errors exclusively for banked-architecture restrictions | Backend raises banked-specific errors
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-struct Point { x: i32, y: i32 }
-fn^ pass_struct(p: Point) -> Point { p }  // Should error or rewrite

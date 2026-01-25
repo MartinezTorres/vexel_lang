@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Calls issued from _pageB bodies use the analogous ML_REQUEST_B / ML_LOAD_MODULE_B / ML_RESTORE_B sequence | pageB uses ML_*_B macros
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^f() -> #i32 { 0 }
-&^g() -> #i32 { f() }

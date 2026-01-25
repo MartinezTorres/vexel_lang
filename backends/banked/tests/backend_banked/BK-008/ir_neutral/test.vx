@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: IR construction remains backend-neutral; divergence happens only during final code emission | IR construction is backend-neutral
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&double(x:#i32) -> #i32 { x * 2 }
-&quad(x:#i32) -> #i32 { double(double(x)) }

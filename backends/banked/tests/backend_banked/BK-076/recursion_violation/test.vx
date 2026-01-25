@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Recursion that violates alternation constraints triggers compilation failure with an explanatory error | Invalid recursion triggers error
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-fn^ invalid_a() -> i32 { invalid_a() }  // Self-recursion
-fn^ main() -> i32 { invalid_a() }

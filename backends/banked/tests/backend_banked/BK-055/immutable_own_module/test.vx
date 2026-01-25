@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Immutable globals (strings, lookup tables, etc.) each receive their own module | Immutable globals get own module
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-TABLE:#i32[5] = [1, 2, 3, 4, 5];

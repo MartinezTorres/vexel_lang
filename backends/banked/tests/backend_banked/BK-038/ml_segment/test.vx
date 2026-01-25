@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The backend emits ML_SEGMENT_A(foo_pageA_module) to materialise the page identifier | Emit ML_SEGMENT_A to get page ID
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The backend emits ML_REQUEST_A(foo_pageA_module) preceding any use | Emit ML_REQUEST_A before use
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^callee() -> #i32 { 0 }
-&^caller() -> #i32 { callee() }

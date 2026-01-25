@@ -38,7 +38,7 @@ frontend-clean:
 	+$(MAKE) -C frontend clean
 
 # Backends
-BACKENDS := $(wildcard backends/*/.)
+BACKENDS := $(filter-out backends/common/. backends/_template/.,$(wildcard backends/*/.))
 BACKENDS_TARGETS := $(patsubst backends/%/.,backend-%,$(BACKENDS))
 BACKENDS_TEST_TARGETS := $(patsubst backends/%/.,backend-%-test,$(BACKENDS))
 BACKENDS_CLEAN_TARGETS := $(patsubst backends/%/.,backend-%-clean,$(BACKENDS))
@@ -49,11 +49,7 @@ backends: $(BACKENDS_TARGETS)
 backend-%: $(BUILD_DIR)/vexel-%
 	@:
 
-backend-c: backend-banked
-
-$(BUILD_DIR)/vexel-c: $(BUILD_DIR)/vexel-banked
-
-$(BUILD_DIR)/backends/banked/libvexel-banked.a $(BUILD_DIR)/backends/c/libvexel-c.a: FORCE
+$(BUILD_DIR)/backends/c/libvexel-c.a: FORCE
 	+$(MAKE) -C backends/$(patsubst libvexel-%.a,%,$(notdir $@))
 
 $(BUILD_DIR)/vexel-%: backends/% frontend FORCE

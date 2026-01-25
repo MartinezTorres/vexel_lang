@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The backend emits ML_LOAD_MODULE_A(foo_pageA_module) / ML_RESTORE_A(previous) to wrap calls | Wrap calls with ML_LOAD/ML_RESTORE
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^callee() -> #i32 { 42 }
-&^caller() -> #i32 { callee() }

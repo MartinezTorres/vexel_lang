@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Macro expansion mirrors ML_EXECUTE_A usage documented by Megalinker | Macro expansion mirrors ML_EXECUTE_A
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^callee() -> #i32 { 1 }
-&^caller() -> #i32 { callee() }

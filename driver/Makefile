@@ -2,13 +2,10 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 BUILD_DIR ?= $(abspath ../build)
 
-space := $(empty) $(empty)
-comma := ,
-BACKEND_DIRS := $(filter-out common,$(notdir $(wildcard ../backends/*)))
-BACKEND_LIST := $(subst $(space),$(comma),$(BACKEND_DIRS))
+BACKEND_DIRS := $(filter-out common _template,$(notdir $(wildcard ../backends/*)))
 BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I../backends/$(dir)/src)
 
-CXXFLAGS += -DBACKENDS=\"$(BACKEND_LIST)\" -Isrc -I../frontend/src $(BACKEND_INCLUDES)
+CXXFLAGS += -Isrc -I../frontend/src $(BACKEND_INCLUDES)
 
 BIN = $(BUILD_DIR)/vexel
 FRONTEND_LIB = $(BUILD_DIR)/lib/libvexelfrontend.a

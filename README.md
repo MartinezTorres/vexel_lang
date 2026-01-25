@@ -1,8 +1,8 @@
 # Vexel Compiler
 
-C++ implementation of the Vexel language front-end plus multiple backends (portable C/x86 and an experimental SDCC banked target).
+C++ implementation of the Vexel language front-end plus the portable C backend. The SDCC banked backend is currently out-of-tree.
 
-**Status**: Language RFC v0.2.1 is implemented for the c backend. The banked backend is experimental (see `backends/banked/README.md`).
+**Status**: Language RFC v0.2.1 is implemented for the c backend.
 
 ## Quick Start
 
@@ -15,20 +15,18 @@ gcc out.c -o simple -lm
 
 ## Components & Layout
 
-- `frontend/` – lexer/parser/typechecker/evaluator/AST/codegen (`libvexelfrontend.a`, `bin/vexel-frontend`, tests).
-- `backends/c/` – portable C backend (`libvexel-c.a`, `bin/vexel-c`, tests).
-- `backends/banked/` – SDCC banked backend (`libvexel-banked.a`, `bin/vexel-banked`, tests, `include/megalinker.h`).
-- `driver/` – unified `bin/vexel` CLI that auto-discovers backends under `backends/*`.
-- `doc/` – language docs (`doc/vexel-rfc.md`, `doc/frontend/*`). Backend docs in respective backend directories.
-- `examples/` – sample programs plus `examples/lib/` helper modules; smoke tests in `examples/tests/`.
+- `frontend/` - lexer/parser/typechecker/evaluator/AST/codegen (`libvexelfrontend.a`, `bin/vexel-frontend`, tests).
+- `backends/c/` - portable C backend (`libvexel-c.a`, `bin/vexel-c`, tests).
+- `driver/` - unified `bin/vexel` CLI that lists registered backends.
+- `doc/` - language docs (`doc/vexel-rfc.md`, `doc/frontend.md`, `doc/frontend-lowered.md`, `doc/backends.md`).
+- `examples/` - sample programs plus `examples/lib/` helper modules; smoke tests in `examples/tests/`.
 
 ## Usage
 
 ```bash
 ./bin/vexel input.vx                    # unified driver (defaults to c when available)
-./bin/vexel -b banked input.vx          # pick a backend explicitly
-./bin/vexel-c input.vx               # backend-specific CLI (portable C)
-./bin/vexel-banked input.vx             # backend-specific CLI (SDCC banked)
+./bin/vexel -b c input.vx               # pick a backend explicitly
+./bin/vexel-c input.vx                  # backend-specific CLI (portable C)
 ./bin/vexel-frontend -L input.vx        # frontend only: emit lowered IR
 ./bin/vexel-frontend --allow-process foo.vx # opt in to process expressions (executes host commands)
 ```
@@ -42,8 +40,8 @@ Process expressions execute host commands. They are **disabled by default**; pas
 ## Requirements & Testing
 
 - Suites live under `frontend/tests`, `backends/*/tests`, `core/tests`, `examples/tests`.
-- Each test directory has a `run.sh` describing the RFC reference and expected behaviour; the shared harness runs the command and (optionally) compiles/executes generated C.
-- Command: `make test` (builds and runs the full suite; Make finds all `run.sh` tests)
+- Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
+- Command: `make test` (builds and runs the full suite)
 
 See `doc/testing.md` for the `run.sh` format and harness details.
 
@@ -51,12 +49,12 @@ See `doc/testing.md` for the `run.sh` format and harness details.
 
 - Builds require a C++17 compiler. The Makefiles honor `CXX`, so you can run `CXX=clang++ make` to select a toolchain.
 - Generated C is compiled with a host C11 toolchain during runtime tests; defaults assume `gcc -std=c11 -O2 -lm`.
-- Backends: c (portable C) is stable; banked (SDCC + Megalinker) is experimental.
+- Backends: c (portable C) is stable.
 
 ## Licensing & Releases
 
 - License: MIT (see `LICENSE`).
-- Status: RFC v0.2.1 implemented for c; banked backend remains experimental. Publish release notes in `CHANGELOG.md` as features land.
+- Status: RFC v0.2.1 implemented for c. Publish release notes in `CHANGELOG.md` as features land.
 
 ## Examples
 

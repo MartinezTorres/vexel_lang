@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Mutable globals live in ram.c | Mutable globals in ram.c
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-mut X:#i32 = 1;
-mut Y:#i32 = 2;

@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Page constants (e.g., foo_page_symbol) are emitted as extern references resolved by Megalinker | Page constants are extern references
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-DATA:#i32 = 42;

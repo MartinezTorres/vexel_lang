@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: RAM support files are marked __nonbanked | RAM files marked __nonbanked
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-mut X:#i32 = 0;

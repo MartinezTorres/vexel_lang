@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: _pageB forms are internal to satisfy the alternation rule | _pageB forms are internal
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&internal() -> #i32 { 0 }

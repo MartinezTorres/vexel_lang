@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Filenames double as module names to align with Megalinker expectations | Filenames = module names
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

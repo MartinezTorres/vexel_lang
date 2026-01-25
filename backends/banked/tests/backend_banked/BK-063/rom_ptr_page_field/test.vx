@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The rom_ptr_t typedef includes a page field of type uint8_t | rom_ptr_t has uint8_t page field
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

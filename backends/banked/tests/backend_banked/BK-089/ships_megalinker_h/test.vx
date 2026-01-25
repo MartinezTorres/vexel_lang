@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The project ships a copy of megalinker.h matching the required interface | Project ships megalinker.h
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

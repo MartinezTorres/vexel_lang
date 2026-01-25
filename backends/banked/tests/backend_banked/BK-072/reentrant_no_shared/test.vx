@@ -1,9 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Functions proven reentrant must avoid shared mutable state | Reentrant avoid shared mutable state
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^reentrant(x:#i32) -> #i32 { x * 2 }
-&^a() -> #i32 { reentrant(1) }
-&^b() -> #i32 { reentrant(2) }

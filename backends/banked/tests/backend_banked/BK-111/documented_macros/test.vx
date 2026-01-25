@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Generated code relies solely on the documented macros, preserving compatibility with upstream Megalinker updates | Code uses only documented macros
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Entry-point exports are marked non-reentrant | Entry-point exports marked non-reentrant
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^main() -> #i32 { 0 }

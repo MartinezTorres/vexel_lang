@@ -9,13 +9,13 @@
 // Logical operations via operators
 
 &^main() -> #i32 {
-    x #i32 = 15
-    y #i32 = 30
+    x:#i32 = 15
+    y:#i32 = 30
 
     // Boolean operators
-    a #b = x < 20 && y > 10
-    b #b = x > 20 || y < 50
-    c #b = !a
+    a:#b = x < 20 && y > 10
+    b:#b = x > 20 || y < 50
+    c:#b = !a
 
     // Result based on operator expressions
     a ? 1 : (b ? 2 : 3)

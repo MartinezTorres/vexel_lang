@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: For each immutable global BAR, emit banked/BAR.rom.c | Emit banked/BAR.rom.c for immutable globals
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-BAR:#i32 = 100;

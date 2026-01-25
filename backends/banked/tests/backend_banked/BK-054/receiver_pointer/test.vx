@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Receiver functions lower to C functions whose first parameter is a pointer to the receiver; only pointer arguments cross the ABI | Receiver functions take pointer
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^get_x() -> #i32 { 0 }

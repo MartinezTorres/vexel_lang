@@ -8,9 +8,9 @@
 // RT-044: Equality uses value-based deep comparison
 
 &^main() -> #i32 {
-    a [3]#i32 = [1, 2, 3]
-    b [3]#i32 = [1, 2, 3]
-    c [3]#i32 = [1, 2, 4]
+    a:#i32[3] = [1, 2, 3];
+    b:#i32[3] = [1, 2, 3];
+    c:#i32[3] = [1, 2, 4];
 
     // a and b should be equal (same values)
     // a and c should not be equal

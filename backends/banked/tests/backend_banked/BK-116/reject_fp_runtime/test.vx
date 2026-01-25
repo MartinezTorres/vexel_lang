@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Backend-specific regression tests verify compile-time rejection of floating-point operations | Reject runtime floating-point
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-fn^ compute(x: f32) -> f32 { x + 1.0 }
-fn^ test() -> f32 { compute(2.5) }

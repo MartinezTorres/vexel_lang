@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Structs cannot be passed by value | Structs cannot be passed by value
-// @expect-exit: 1
-// @command: {VEXEL_BANKED} test.vx
-
-
-struct Point { x: i32, y: i32 }
-fn^ pass(p: Point) -> i32 { p.x }

@@ -4,9 +4,8 @@ The test suite is entirely self-describing: every test directory contains a `run
 
 ## Layout
 
-- `frontend/tests/` – lexer/parser/typechecker/evaluator
-- `backends/c/tests/` – portable C backend (codegen + runtime)
-- `backends/banked/tests/` – SDCC banked backend
+- `frontend/tests/` – lexer/parser/typechecker/evaluator (frontend Makefile harness)
+- `backends/c/tests/` – portable C backend (annotated `test.vx` + backend harness)
 - `backends/common/tests/` – shared backend plumbing
 - `core/tests/` – core utilities
 - `examples/tests/` – smoke tests for sample programs
@@ -32,13 +31,27 @@ RUN_GENERATED=0
 Fields:
 - `RFC_REF`: RFC section that defines the behaviour.
 - `DESC`: short description of what the test checks.
-- `CMD`: command to run; tool macros (`{VEXEL}`, `{VEXEL_FRONTEND}`, `{VEXEL_C}`, `{VEXEL_BANKED}`) expand to the built binaries.
+- `CMD`: command to run; tool macros (`{VEXEL}`, `{VEXEL_FRONTEND}`, `{VEXEL_C}`) expand to the built binaries.
 - `EXPECT_EXIT`: expected exit code (default 0).
 - `EXPECT_STDOUT` / `EXPECT_STDERR`: substring checks (blank means no check).
 - `RUN_GENERATED`: set to `1` to compile and run the emitted C with `gcc -std=c11 -O2 -lm` after a successful compile.
 
+## Backend C Test Metadata (`test.vx`)
+
+Backend C tests use metadata headers inside `test.vx` files:
+
+```
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Example description
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+```
+
+The backend harness runs the command, optionally compiles and executes the generated C, and validates exit codes and any expected stderr.
+
 ## Running Tests
 
-- Full suite: `make test` (Make finds every `run.sh` under the test directories and executes them in sorted order).
+- Full suite: `make test`.
 
 All suites run together; there is no draft/active filtering. A non-zero exit means at least one test failed; see the emitted diagnostics for details.

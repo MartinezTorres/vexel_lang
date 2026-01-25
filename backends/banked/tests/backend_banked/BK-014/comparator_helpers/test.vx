@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: @@ loops reuse the shared comparator helpers | @@ loops use shared comparator helpers
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^sort1() -> #i32 { arr:#i32[3] = [3, 1, 4]; arr @@ { 0 }; 0 }
-&^sort2() -> #i32 { arr:#i32[3] = [2, 7, 1]; arr @@ { 0 }; 0 }

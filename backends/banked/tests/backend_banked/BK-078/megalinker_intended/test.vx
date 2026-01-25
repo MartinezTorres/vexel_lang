@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Generated sources are intended to link with Megalinker (https://github.com/MartinezTorres/megalinker) | Intended for Megalinker
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

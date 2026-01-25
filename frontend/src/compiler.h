@@ -14,7 +14,7 @@ namespace vexel {
 // 3. Generic monomorphization
 // 4. Compile-time evaluation
 // 5. Dead code elimination
-// 6. Backend-specific code generation (C x86 or Banked)
+// 6. Backend-specific code generation (registered backend)
 class Compiler {
 public:
     struct Options {
@@ -24,13 +24,9 @@ public:
         std::string project_root;     // Root directory for module resolution
         bool emit_lowered;            // Emit lowered Vexel subset alongside backend output
         bool allow_process = false;   // Process expressions execute host commands; keep disabled by default
-        enum class BackendKind {
-            C,       // Portable C11 code generator
-            Banked   // MSX-style banked memory code generator for SDCC
-        };
-        BackendKind backend;
+        std::string backend; // Backend name (registered via backend registry)
 
-        Options() : verbose(false), project_root("."), emit_lowered(false), allow_process(false), backend(BackendKind::C) {}
+        Options() : verbose(false), project_root("."), emit_lowered(false), allow_process(false), backend("c") {}
     };
 
     struct OutputPaths {
@@ -50,9 +46,6 @@ private:
 
     OutputPaths resolve_output_paths(const std::string& output_file);
 
-    void emit_banked_backend(const Module& mod, TypeChecker& checker,
-                             CodeGenerator& codegen, const CCodegenResult& result,
-                             const OutputPaths& paths);
     std::string build_param_list(CodeGenerator& codegen, StmtPtr func, bool with_types);
     std::string build_arg_list(CodeGenerator& codegen, StmtPtr func);
     std::string build_return_type(CodeGenerator& codegen, StmtPtr func);

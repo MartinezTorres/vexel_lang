@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The runtime must provide load_page inline wrappers used in generated code | Runtime provides load_page wrappers
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

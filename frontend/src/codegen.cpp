@@ -1120,6 +1120,25 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
 std::string CodeGenerator::gen_binary(ExprPtr expr) {
     std::string left = gen_expr(expr->left);
     std::string right = gen_expr(expr->right);
+    if (expr->op == "==" || expr->op == "!=") {
+        TypePtr cmp_type = expr->left ? expr->left->type : nullptr;
+        if (!cmp_type && type_checker && expr->left && expr->left->kind == Expr::Kind::Identifier) {
+            Symbol* sym = type_checker->get_scope()->lookup(expr->left->name);
+            if (sym) {
+                cmp_type = sym->type;
+            }
+        }
+        if (!cmp_type && expr->right) {
+            cmp_type = expr->right->type;
+        }
+        if (cmp_type &&
+            (cmp_type->kind == Type::Kind::Array ||
+             cmp_type->kind == Type::Kind::Named ||
+             (cmp_type->kind == Type::Kind::Primitive && cmp_type->primitive == PrimitiveType::String))) {
+            std::string cmp_name = ensure_comparator(cmp_type);
+            return "(" + cmp_name + "(" + left + ", " + right + ") " + expr->op + " 0)";
+        }
+    }
     return "(" + left + " " + expr->op + " " + right + ")";
 }
 

@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The public header declares inline helpers used by generated sources | Header declares inline helpers
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 0 }

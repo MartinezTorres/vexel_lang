@@ -1,7 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Generates a single public header banked/<module>.h | Generates single public header banked/<module>.h
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^test() -> #i32 { 42 }

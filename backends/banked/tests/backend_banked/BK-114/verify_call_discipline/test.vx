@@ -1,9 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Backend-specific regression tests verify alternating call discipline and emitted ML_* macros | Verify alternating call discipline
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^a() -> #i32 { b() }
-&^b() -> #i32 { c() }
-&^c() -> #i32 { 0 }

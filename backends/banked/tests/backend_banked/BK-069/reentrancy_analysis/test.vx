@@ -1,9 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The call graph is analysed for reentrancy | Call graph analyzed for reentrancy
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^reentrant() -> #i32 { 0 }
-&^caller1() -> #i32 { reentrant() }
-&^caller2() -> #i32 { reentrant() }

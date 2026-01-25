@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: Each generated .c file forms a distinct SDCC module | Each .c file is distinct SDCC module
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^foo() -> #i32 { 1 }
-&^bar() -> #i32 { 2 }

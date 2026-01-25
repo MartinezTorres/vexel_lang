@@ -1,8 +1,0 @@
-// @rfc: backends/banked/README.md
-// @desc: The backend writes the call pattern; the runtime may inline it via ML_EXECUTE_A | Call pattern may inline via ML_EXECUTE_A
-// @expect-exit: 0
-// @command: {VEXEL_BANKED} test.vx
-
-
-&^f() -> #i32 { 0 }
-&^g() -> #i32 { f() }
