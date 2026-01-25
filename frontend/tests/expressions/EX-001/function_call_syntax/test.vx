@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Function calls use syntax fname(args) for both internal and external functions | Function calls use syntax fname(args) for both internal and external functions
+
+
+// EX-001: Function calls use syntax fname(args) for both internal and external functions
+&!external_add(a:#i32, b:#i32) -> #i32;
+
+&add(a:#i32, b:#i32) -> #i32 {
+    -> a + b;
+}
+
+&^main() -> #i32 {
+    x:#i32 = add(3, 4);
+    y:#i32 = external_add(5, 6);
+    -> x + y;
+}

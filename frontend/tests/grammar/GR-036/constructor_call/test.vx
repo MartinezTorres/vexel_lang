@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Constructor calls have the form qname '"'"'('"'"' [ arglist ] '"'"')'"'"' | Constructor call with no arguments
+
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+  p:#Point = Point(1, 2)
+  p.x
+}

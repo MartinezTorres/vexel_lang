@@ -1,0 +1,5 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Type declarations use the form '"'"'#'"'"' ident '"'"'('"'"' [ fields ] '"'"')'"'"' '"'"';'"'"' | Type declaration with fields
+
+
+#Point(x: #i32, y: #i32);

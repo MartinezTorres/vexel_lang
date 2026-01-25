@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: String type #s represents immutable byte sequences | String type #s represents immutable byte sequences
+
+
+&^main() -> #i32 {
+    s:#s = "Hello, World!";
+    (#i32)|s|
+}

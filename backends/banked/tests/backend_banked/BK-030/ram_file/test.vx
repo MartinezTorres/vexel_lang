@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: Emits a single banked/ram.c that aggregates mutable globals | Emit single banked/ram.c for mutable globals
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+mut X:#i32 = 1;
+mut Y:#i32 = 2;

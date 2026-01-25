@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Repeat loops do not bind _ variable | Repeat loops do not bind _ variable
+
+
+// EX-047: Repeat loop has no _ binding
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    i:#i32 = 0;
+    (i < 3)@{
+        print(i);
+        i = i + 1;
+        // No _ variable in repeat loops
+    };
+    -> 0;
+}

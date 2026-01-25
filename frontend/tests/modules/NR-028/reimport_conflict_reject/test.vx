@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Re-importing same module with non-identical definitions is compile-time error | Re-importing with non-identical definitions is error
+
+
+// NR-028: Re-importing same module with non-identical definitions is compile-time error
+// This test simulates the conflict by manually redefining after import
+
+::changing;
+
+// Manually redefine changing::func with different implementation
+// This should cause a conflict if the compiler checks for this
+&changing::func() -> #i32 { 2 }
+
+&^main() -> #i32 {
+    0
+}

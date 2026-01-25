@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: All paths in compile-time execution must be deterministic (no runtime-dependent branches) | All paths in compile-time execution must be deterministic (no runtime-dependent branches)
+// @expect-exit: 14
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-020: All paths in compile-time execution must be deterministic
+// This is a positive test showing deterministic compile-time execution
+
+&compute(x:#i32) -> #i32 {
+    // All branches are deterministic (depend only on compile-time value)
+    x > 5 ? x * 2 : x + 10;
+}
+
+value:#i32 = compute(7);
+
+&^main() -> #i32 {
+    value  // Should be 14
+}

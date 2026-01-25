@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Whole-program compilation enables aggressive optimization | Aggressive optimization - inlining and constant folding
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-015: Aggressive optimization enabled by whole-program compilation
+&^main() -> #i32 {
+    42;
+}

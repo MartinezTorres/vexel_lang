@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Type constructors auto-generate constructor function '"'"'&#Name(args...)'"'"' | Type auto-generated constructor
+
+
+// DC-120: Type constructors auto-generate constructor function
+#Color(r:#u8, g:#u8, b:#u8);
+
+&^main() -> #u8 {
+    c:#Color = Color(255, 128, 64);
+    c.r
+}

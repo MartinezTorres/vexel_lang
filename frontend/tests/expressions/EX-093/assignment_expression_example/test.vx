@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Assignment y = (x = 5) + 1 assigns 5 to x and 6 to y | Assignment y = (x = 5) + 1 assigns 5 to x and 6 to y
+
+
+// EX-093: Assignment expression example
+&^main() -> #i32 {
+    x:#i32 = 0;
+    y:#i32 = (x = 5) + 1;
+    -> x * 10 + y;  // 5 * 10 + 6 = 56
+}

@@ -1,0 +1,54 @@
+// Dynamic vector using fixed-size backing array
+
+#Vec(data, len, cap);
+
+&#Vec(capacity) -> {
+  Vec(data, 0, capacity)
+}
+
+&(v)#Vec::push(item) {
+  v.len < v.cap ? {
+    v.data[v.len] = item;
+    v.len = v.len + 1
+  } : 0
+}
+
+&(v)#Vec::pop() -> {
+  v.len > 0 ? {
+    v.len = v.len - 1;
+    v.data[v.len]
+  } : v.data[0]
+}
+
+&(v)#Vec::get(idx) -> {
+  v.data[idx]
+}
+
+&(v)#Vec::set(idx, val) {
+  idx < v.len ? {
+    v.data[idx] = val
+  } : 0
+}
+
+&(v)#Vec::clear() {
+  v.len = 0
+}
+
+&(v)#Vec::size() -> {
+  v.len
+}
+
+&(v)#Vec::is_empty() -> {
+  v.len == 0
+}
+
+&(v)#Vec::is_full() -> {
+  v.len == v.cap
+}
+
+&(v)#Vec::each($expr) {
+  0..v.len@{
+    item = v.data[_];
+    $expr
+  }
+}

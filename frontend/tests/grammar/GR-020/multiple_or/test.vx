@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Logical OR expressions consist of one or more logic_and terms separated by '"'"'||'"'"' | Multiple logical OR expressions chained
+
+
+&^main() -> #i32 {
+  result:#b = false || false || true || false
+  result ? 1 : 0
+}

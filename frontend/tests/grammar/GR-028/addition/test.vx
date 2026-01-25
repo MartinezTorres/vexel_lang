@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Additive expressions consist of one or more prod terms separated by '"'"'+'"'"' or '"'"'-'"'"' | Addition expression (+)
+
+
+&add(a: #i32, b: #i32) {
+  result = a + b;
+}

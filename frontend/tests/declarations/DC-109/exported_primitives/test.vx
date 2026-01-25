@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions accept only primitive types: #i8, #i16, #i32, #i64, #u8, #u16, #u32, #u64, #f32, #f64, #b | Exported functions use primitive types
+
+
+// DC-109: Exported functions accept only primitive types
+&^compute(a:#i32, b:#f64, flag:#b) -> #i32 {
+    flag ? a : (#i32)0
+}
+
+&^main() -> #i32 {
+    compute(100, 3.14, (#b)1)
+}

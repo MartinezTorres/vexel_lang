@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Constructor calls use syntax TypeName(args) to create instances of user-defined types | Constructor calls use syntax TypeName(args) to create instances of user-defined types
+
+
+// EX-008: Constructor call syntax
+#Point(
+    x:#i32,
+    y:#i32
+);
+
+&^main() -> #i32 {
+    p:#Point = Point(10, 20);
+    -> p.x + p.y;
+}

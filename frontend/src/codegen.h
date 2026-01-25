@@ -1,0 +1,118 @@
+#pragma once
+#include "ast.h"
+#include "evaluator.h"
+#include <sstream>
+#include <unordered_set>
+#include <unordered_map>
+#include <vector>
+#include <stack>
+#include <optional>
+
+namespace vexel {
+
+class TypeChecker;
+
+struct CCodegenResult {
+    std::string header;
+    std::string source;
+};
+
+struct GeneratedFunctionInfo {
+    StmtPtr declaration;
+    std::string qualified_name;  // e.g., Vec::push
+    std::string c_name;          // mangled C symbol
+    std::string storage;         // "" or "static "
+    std::string code;            // complete function definition text
+};
+
+struct GeneratedVarInfo {
+    StmtPtr declaration;
+    std::string code;
+};
+
+// CodeGenerator translates the type-checked AST into C code.
+// Generates both header (.h) and source (.c) files with:
+// - Type declarations and forward declarations
+// - Function definitions with name mangling
+// - Compile-time constant evaluation and dead branch elimination
+// - Temporary variable management and reuse optimization
+class CodeGenerator {
+    std::ostringstream header;
+    std::ostringstream body;
+    std::vector<GeneratedFunctionInfo> generated_functions;
+    std::vector<GeneratedVarInfo> generated_vars;
+    int temp_counter;
+    std::stack<std::string> available_temps;
+    std::unordered_set<std::string> live_temps;
+    std::unordered_set<std::string> declared_temps;
+    std::unordered_map<std::string, std::string> type_map;
+    TypeChecker* type_checker;
+    std::stack<std::ostringstream*> output_stack;
+    std::unordered_map<std::string, std::string> comparator_cache;
+    std::vector<std::string> comparator_definitions;
+    bool in_function = false;
+
+public:
+    CodeGenerator();
+    CCodegenResult generate(const Module& mod, TypeChecker* tc = nullptr);
+    const std::unordered_set<std::string>& reachable() const { return reachable_functions; }
+    const std::vector<GeneratedFunctionInfo>& functions() const { return generated_functions; }
+    const std::vector<GeneratedVarInfo>& variables() const { return generated_vars; }
+    std::string type_to_c(TypePtr type) { return gen_type(type); }
+    std::string mangle(const std::string& name) { return mangle_name(name); }
+    void set_non_reentrant(const std::unordered_set<std::string>& names) { non_reentrant = names; }
+
+private:
+    std::unordered_set<std::string> reachable_functions;
+    std::unordered_set<std::string> current_ref_params;  // Track reference parameters in current function
+    std::unordered_map<std::string, std::vector<TypePtr>> tuple_types;  // Track tuple types: name -> element types
+    std::unordered_map<std::string, ExprPtr> expr_param_substitutions;  // Maps $param names to their expressions
+    std::unordered_map<std::string, std::string> value_param_replacements;  // Maps value params when inlining
+    std::string underscore_var;  // Current loop underscore variable name (empty when not in iteration)
+    std::unordered_set<std::string> non_reentrant;
+    bool current_function_non_reentrant = false;
+
+    void analyze_reachability(const Module& mod);
+    void mark_reachable(const std::string& func_name, const Module& mod);
+    void collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls);
+
+    void gen_module(const Module& mod);
+    void gen_stmt(StmtPtr stmt);
+    void gen_func_decl(StmtPtr stmt);
+    void gen_type_decl(StmtPtr stmt);
+    void gen_var_decl(StmtPtr stmt);
+
+    std::string gen_expr(ExprPtr expr);
+    std::string gen_binary(ExprPtr expr);
+    std::string gen_unary(ExprPtr expr);
+    std::string gen_call(ExprPtr expr);
+    std::string gen_index(ExprPtr expr);
+    std::string gen_member(ExprPtr expr);
+    std::string gen_array_literal(ExprPtr expr);
+    std::string gen_tuple_literal(ExprPtr expr);
+    std::string gen_block(ExprPtr expr);
+    std::string gen_block_optimized(ExprPtr expr);
+    std::string gen_call_optimized_with_evaluator(ExprPtr expr, CompileTimeEvaluator& evaluator);
+    std::string gen_conditional(ExprPtr expr);
+    std::string gen_cast(ExprPtr expr);
+    std::string gen_assignment(ExprPtr expr);
+    std::string gen_range(ExprPtr expr);
+    std::string gen_length(ExprPtr expr);
+    std::string gen_iteration(ExprPtr expr);
+    std::string gen_repeat(ExprPtr expr);
+
+    std::string gen_type(TypePtr type);
+    std::string mangle_name(const std::string& name);
+    std::string fresh_temp();
+    void release_temp(const std::string& temp);
+
+    std::optional<std::pair<int64_t, int64_t>> evaluate_range(ExprPtr range_expr);
+    std::string storage_prefix() const;
+    std::string ensure_comparator(TypePtr type);
+    int64_t resolve_array_length(TypePtr type, const SourceLocation& loc);
+
+    void emit(const std::string& code);
+    void emit_header(const std::string& code);
+};
+
+}

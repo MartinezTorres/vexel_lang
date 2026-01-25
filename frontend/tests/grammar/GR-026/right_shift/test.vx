@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Shift expressions consist of one or more range terms separated by shift operators ('"'"'<<'"'"', '"'"'>>'"'"') | Right shift expression (>>)
+
+
+&^main() -> #i32 {
+  result:#u8 = (#u8)4 >> (#u8)1;
+  (result != (#u8)0) ? 1 : 0
+}

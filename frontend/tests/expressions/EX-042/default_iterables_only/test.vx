@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Without an iteration method override, only arrays and ranges are accepted as iterables | Without an iteration method override, only arrays and ranges are accepted as iterables
+
+
+// EX-042: Non-iterable type error
+#Point(
+    x:#i32,
+    y:#i32
+);
+
+&^main() -> #i32 {
+    p:#Point = Point(1, 2);
+    // ERROR: Point is not iterable
+    p@{};
+    -> 0;
+}

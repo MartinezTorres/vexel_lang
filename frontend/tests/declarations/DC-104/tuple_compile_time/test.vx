@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Tuple returns can be compile-time evaluated | Tuple compile-time evaluation
+
+
+// DC-104: Tuple returns can be compile-time evaluated
+&constants() -> (#i32, #i32) {
+    (1, 2)
+}
+
+&^main() -> #i32 {
+    a:#i32;
+    b:#i32;
+    a, b = constants();
+    a + b
+}

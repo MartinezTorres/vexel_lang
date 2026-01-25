@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Iteration accepts arrays and ranges as iterable values | Iteration accepts arrays and ranges as iterable values
+
+
+// EX-029: Arrays and ranges as iterables
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [10, 20, 30];
+    arr@print(_);
+    0..5@print(_);
+    -> 0;
+}

@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: foo_pageB may only call _pageA variants of other functions | foo_pageB calls only _pageA variants
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^f() -> #i32 { 0 }
+&^g() -> #i32 { f() }

@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Float type #f32 must map to C float. | Float type #f32 must map to C float
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    x: #f32 = 3.14
+    0
+}

@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Integer overflow wraps using two'"'"'s complement arithmetic | Integer overflow wraps using two'"'"'s complement (i8 positive overflow)
+
+
+&^main() -> #i32 {
+    x:#i8 = 127;
+    y:#i8 = x + 1;
+    y;
+}

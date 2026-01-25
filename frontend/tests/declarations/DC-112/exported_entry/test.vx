@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions serve as entry points for executables or library exports | Exported functions as entry points
+
+
+// DC-112: Exported functions serve as entry points
+&^main() -> #i32 {
+    0
+}
+
+&^lib_function(val:#i32) -> #i32 {
+    val * 10
+}

@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Name resolution failures are reported as compile-time errors | Name resolution failure: undefined function
+
+
+&^main() -> #i32 {
+    foo(5)
+}

@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Character literals are delimited by single quotes ('"'"'a'"'"') and support the same escape sequences as strings. | Accept character literals with single quotes and escape sequences
+
+
+&^main() -> #i32 {
+    c1: #u8 = 'a'
+    c2: #u8 = '\n'
+    c3: #u8 = '\\'
+    c4: #u8 = '\x41'
+    0
+}

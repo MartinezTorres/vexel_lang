@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Vexel is a minimal language with no keywords | No keywords - while, for, class can be used as identifiers
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-002: Vexel is a minimal language with no keywords
+// "while" is not a keyword - can be used as identifier
+
+&^main() -> #i32 {
+    while:#i32 = 100
+    for:#i32 = 200
+    class:#i32 = 300
+
+    while + for - class
+}

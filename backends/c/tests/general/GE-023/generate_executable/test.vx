@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The compiler can generate executables as output | Compiler generates executables - program runs
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-023: The compiler can generate executables as output
+// Compilation produces an executable that runs
+
+&^main() -> #i32 {
+    42
+}

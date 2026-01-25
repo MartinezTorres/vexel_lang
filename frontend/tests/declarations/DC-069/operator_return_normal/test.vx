@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Operator method return types follow normal rules | Operator return types follow normal rules
+
+
+// DC-069: Operator return types follow normal rules
+#Result(r:#i32);
+
+&(a)#Result::+(b:#Result) -> #Result {
+    Result(a.r + b.r)
+}
+
+&^main() -> #i32 {
+    0
+}

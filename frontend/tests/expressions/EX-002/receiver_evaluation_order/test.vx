@@ -1,0 +1,26 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Function call receiver expressions evaluate left-to-right before the argument list | Function call receiver expressions evaluate left-to-right before the argument list
+
+
+// EX-002: Receiver evaluates before argument list
+&!print(arg0:#i32);
+
+&get_func_id() -> #i32 {
+    print(1);
+    10
+}
+
+&get_arg() -> #i32 {
+    print(2);
+    20
+}
+
+&process(x:#i32) -> #i32 {
+    x
+}
+
+&^main() -> #i32 {
+    // get_func_id() should print 1, then get_arg() should print 2
+    result:#i32 = process(get_arg());
+    0
+}

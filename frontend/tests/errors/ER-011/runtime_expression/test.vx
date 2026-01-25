@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Division by zero traps at runtime | Runtime division by zero expression compiles
+
+
+&^compute_zero() -> #i32 {
+    0
+}
+
+&^main() -> #i32 {
+    10 / compute_zero()
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Function calls use the syntax fname(...) for internal or external functions | Internal function call fname(...)
+
+
+&helper() -> #i32 {
+  -> 42;
+}
+
+&main() {
+  x = helper();
+  y = helper() + helper();
+}

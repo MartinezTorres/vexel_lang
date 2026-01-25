@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters are type-checked at instantiation site | Expression parameters type-checked at instantiation
+
+
+// DC-046: Expression parameters type-checked at instantiation
+&process($val) {
+    x:#i32 = $val;
+}
+
+&^main() -> #i32 {
+    process(42);
+    0
+}

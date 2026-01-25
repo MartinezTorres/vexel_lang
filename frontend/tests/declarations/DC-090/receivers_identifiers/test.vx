@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Each receiver in multi-receiver method must be an identifier | Multi-receiver parameters are identifiers
+
+
+// DC-090: Each receiver must be identifier
+&(first, second)sum() -> #i32 {
+    first + second
+}
+
+&^main() -> #i32 {
+    a:#i32 = 100;
+    b:#i32 = 200;
+    (a, b).sum()
+}

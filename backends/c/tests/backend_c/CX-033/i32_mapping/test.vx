@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Integral type #i32 must map to C int32_t. | Integral type #i32 must map to C int32_t
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    x: #i32 = 100000
+    0
+}

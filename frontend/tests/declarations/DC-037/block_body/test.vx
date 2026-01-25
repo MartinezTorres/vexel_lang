@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions require block body (cannot be expression-only) | Internal functions require block body
+
+
+// DC-037: Internal functions require block body
+&valid() -> #i32 {
+    42
+}
+
+&^main() -> #i32 {
+    valid()
+}

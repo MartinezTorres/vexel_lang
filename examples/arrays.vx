@@ -1,0 +1,17 @@
+// Vexel Example: Arrays and ranges
+
+// Array literal
+arr:#i32[3] = [1, 2, 3]
+
+// Range operator (should expand to array)
+rng:#i32[5] = [0, 1, 2, 3, 4]
+
+// Access array elements
+&sum_array(a:#i32[3]) -> #i32 {
+    a[0] + a[1] + a[2]
+}
+
+// Entry point
+&^main() -> #i32 {
+    sum_array(arr)
+}

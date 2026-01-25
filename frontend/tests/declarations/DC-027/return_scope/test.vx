@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Return exits only the current function (not enclosing functions) | Return exits only current function
+
+
+// DC-027: Return exits only current function
+&outer() -> #i32 {
+    &inner() -> #i32 {
+        -> 10;
+    }
+    inner() + 20
+}
+
+&^main() -> #i32 {
+    outer()
+}

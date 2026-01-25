@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Postfix expressions consist of a primary expression followed by zero or more postfix operations (call, index, or member access) | Postfix member access operation (.ident)
+
+
+#Inner(v:#i32);
+#Outer(inner:#Inner);
+
+&^main() -> #i32 {
+  o:#Outer = Outer(Inner(5))
+  value:#i32 = o.inner.v
+  value
+}

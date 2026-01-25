@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Unary expressions are either postfix expressions, prefix operations ('"'"'-'"'"', '"'"'!'"'"', '"'"'~'"'"' followed by unary), length/absolute ('"'"'|'"'"' unary '"'"'|'"'"'), or cast ('"'"'('"'"' type '"'"')'"'"' unary) | Logical NOT unary expression (!)
+
+
+&logicalNot(x: #i32) {
+  result = !x;
+}

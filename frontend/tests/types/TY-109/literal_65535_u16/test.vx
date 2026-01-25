@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer literals 256-65535 infer to #u16 | Integer literal 65535 infers to #u16
+
+
+&^main() -> #i32 {
+    x = 65535;
+    0
+}

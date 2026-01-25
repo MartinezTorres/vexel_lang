@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: Floating-point operations must be fully resolved at compile time | FP must resolve at compile time
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+VALUE:#i32 = 42;
+
+&^get_value() -> #i32 {
+    VALUE
+}

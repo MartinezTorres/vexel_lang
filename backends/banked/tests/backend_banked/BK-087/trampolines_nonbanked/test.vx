@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Trampolines for inter-module dispatch are optional and placed in __nonbanked memory | Trampolines placed in __nonbanked
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

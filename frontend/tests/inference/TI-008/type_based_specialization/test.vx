@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Specialization semantics are pure language behavior - implementations may inline, share, or eliminate copies | Type-based specialization works correctly
+
+
+&process(data) {
+    data
+}
+
+&^main() -> #i32 {
+    x:#i32 = process(42)
+    y:#i32 = process(100)
+    x + y
+}

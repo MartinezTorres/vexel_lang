@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Resource expressions ::A::B::file.ext in expression context load the referenced resource at compile time | Resource expressions load files at compile time
+
+
+// NR-003: Resource expressions ::A::B::file.ext in expression context load the referenced resource at compile time
+content:#s = ::data.txt;
+
+&^main() -> #i32 {
+    // If content is loaded, it should be non-empty
+    result:#i32 = (content == "") ? (#i32)1 : (#i32)0;
+    -> result;
+}

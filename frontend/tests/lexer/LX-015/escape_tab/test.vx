@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: String escape sequence \t represents tab (0x09). | Accept \t escape sequence for tab
+
+
+&^main() -> #i32 {
+    s: #s = "col1\tcol2\tcol3"
+    0
+}

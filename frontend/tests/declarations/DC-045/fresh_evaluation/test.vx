@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Each expression parameter reference is evaluated fresh (can reference variables modified by previous evaluation) | Expression parameters evaluated fresh each use
+
+
+// DC-045: Each expression parameter reference evaluated fresh
+&use_twice($expr) -> #i32 {
+    a:#i32 = $expr;
+    b:#i32 = $expr;
+    a + b
+}
+
+&^main() -> #i32 {
+    count:#i32 = 0;
+    result:#i32 = use_twice(count = count + 1);
+    result  // count incremented twice
+}

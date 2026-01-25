@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Methods and functions have separate namespaces (no conflict between '"'"'&TypeName::push'"'"' and '"'"'&push'"'"') | Methods and functions separate namespaces
+
+
+// DC-056: Methods and functions have separate namespaces
+#Stack(top:#i32);
+
+&(s)#Stack::push() { s.top = s.top + 1; }
+&push() -> #i32 { 42 }
+
+&^main() -> #i32 {
+    push()
+}

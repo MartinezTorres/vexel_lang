@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver method receivers bind as mutable aliases for the call | Multi-receiver mutable aliases
+
+
+// DC-089: Multi-receiver receivers bind as mutable aliases
+&(p, q)increment_both() {
+    p = p + 1;
+    q = q + 1;
+}
+
+&^main() -> #i32 {
+    x:#i32 = 5;
+    y:#i32 = 10;
+    (x, y).increment_both();
+    x + y
+}

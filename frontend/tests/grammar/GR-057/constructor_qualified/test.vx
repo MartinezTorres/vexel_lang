@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Constructor calls use the syntax TypeName(...) to create instances of type constructors | Qualified constructor call with namespace
+
+
+#File(name:#s);
+#Rectangle(x:#i32, y:#i32, w:#i32, h:#i32);
+
+&^main() -> #i32 {
+  file:#File = File("input.txt")
+  rect:#Rectangle = Rectangle(0, 0, 100, 100)
+  rect.w
+}

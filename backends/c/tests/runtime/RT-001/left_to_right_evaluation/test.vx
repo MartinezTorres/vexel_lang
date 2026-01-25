@@ -1,0 +1,23 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Evaluation is strict left-to-right for all expressions | Evaluation is strict left-to-right for all expressions
+// @expect-exit: 33
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-001: Evaluation is strict left-to-right for all expressions
+// Test that function calls happen in left-to-right order
+
+mut counter #i32 = 0;
+
+&increment(val:#i32) -> #i32 {
+    counter = counter + 1;
+    val + counter;
+}
+
+&^main() -> #i32 {
+    // Left-to-right: first increment(10) -> counter=1, returns 11
+    // Then increment(20) -> counter=2, returns 22
+    // Result should be 11 + 22 = 33
+    increment(10) + increment(20);
+}

@@ -1,0 +1,11 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: Internal helper passes (IR construction) must be reusable by other backends. | IR construction passes are reusable by other backends
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    x: #i32 = 10
+    y: #i32 = x + 5
+    y
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Ambiguous expressions require explicit parentheses | Ambiguous expressions require explicit parentheses
+
+
+// EX-096: Explicit parentheses for clarity
+&^main() -> #i32 {
+    // Clear precedence with parentheses
+    result:#b = (true || false) && true
+    result ? 1 : 0
+}

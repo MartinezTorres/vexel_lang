@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Comparison expressions consist of one or more shift terms separated by comparison operators ('"'"'=='"'"', '"'"'!='"'"', '"'"'<'"'"', '"'"'<='"'"', '"'"'>'"'"', '"'"'>='"'"') | All comparison operators (==, !=, <, <=, >, >=)
+
+
+&compare(a: #i32, b: #i32) {
+  eq = a == b;
+  ne = a != b;
+  lt = a < b;
+  le = a <= b;
+  gt = a > b;
+  ge = a >= b;
+}

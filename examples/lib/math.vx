@@ -1,0 +1,8 @@
+# Simple math module for testing
+add :: (a #i32, b #i32) -> #i32 {
+    a + b
+};
+
+sub :: (a #i32, b #i32) -> #i32 {
+    a - b
+};

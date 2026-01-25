@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Vexel is a strongly typed language | Strongly typed language - type mismatches caught at compile time
+// @expect-exit: 1
+// @expect-stderr: Type mismatch
+// @command: {VEXEL_C} test.vx
+
+
+// GE-001: Vexel is a strongly typed language
+// Type mismatches are caught at compile time
+
+&^main() -> #i32 {
+    mut x #i32 = 42;
+    y:#s = "hello";
+
+    // This should fail: cannot assign string to integer
+    x = y;
+
+    x;
+}

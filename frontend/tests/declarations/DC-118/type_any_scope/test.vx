@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Type constructors can be defined at module level or within any scope | Type constructors defined in any scope
+
+
+// DC-118: Type constructors in any scope
+&^main() -> #i32 {
+    #Local(value:#i32);
+    obj:#Local = Local(42);
+    obj.value
+}

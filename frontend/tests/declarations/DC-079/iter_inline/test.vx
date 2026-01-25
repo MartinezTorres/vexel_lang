@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Compiler expands iteration methods inline (never emitted as functions) | Iteration methods expanded inline
+
+
+// DC-079: Iteration methods expanded inline
+#Counter(limit:#i32);
+
+&(c)#Counter::@($loop) {
+    _:#i32 = c.limit;
+    $loop;
+}
+
+&^main() -> #i32 {
+    ctr:#Counter = Counter(3);
+    total:#i32 = 0;
+    ctr@{ total = total + _; }
+    total
+}

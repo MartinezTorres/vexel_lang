@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: String length |str| yields compile-time constant integer (number of bytes) | String length |str| yields compile-time constant
+
+
+&^main() -> #i32 {
+    s:#s = "hello";
+    (#i32)|s|
+}

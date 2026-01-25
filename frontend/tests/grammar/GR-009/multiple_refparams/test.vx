@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Reference parameters (for reference-taking functions) consist of one or more comma-separated identifiers | Multiple comma-separated reference parameters
+
+
+&(a, b, c, d)initialize() {
+  a = 1;
+  b = 2;
+  c = 3;
+  d = 4;
+}

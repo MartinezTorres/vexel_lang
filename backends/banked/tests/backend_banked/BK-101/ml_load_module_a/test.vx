@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_LOAD_MODULE_A is defined to call ML_LOAD_SEGMENT_A with ML_SEGMENT_A(module) | ML_LOAD_MODULE_A calls ML_LOAD_SEGMENT_A
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

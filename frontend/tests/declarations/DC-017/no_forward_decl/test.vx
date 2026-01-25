@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: No forward declarations needed for functions (whole-program compilation) | Functions callable without forward declaration
+
+
+// DC-017: No forward declarations needed for functions
+&^main() -> #i32 {
+    helper()
+}
+
+&helper() -> #i32 {
+    42
+}

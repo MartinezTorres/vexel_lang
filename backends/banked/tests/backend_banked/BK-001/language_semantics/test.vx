@@ -1,0 +1,13 @@
+// @rfc: backends/banked/README.md
+// @desc: The backend implements the language semantics of vexel-rfc.md (v0.2.1) | Verify basic language semantics match vexel-rfc.md
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^add(x:#i32, y:#i32) -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    add(40, 2)
+}

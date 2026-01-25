@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Constants cannot be used before definition (forward references not allowed) | Constants cannot be used before definition
+
+
+// NR-042: Constants cannot be used before definition (forward references not allowed)
+FIRST:#i32 = SECOND + 1;  // This should fail - SECOND not yet defined
+SECOND:#i32 = 10;
+
+&^main() -> #i32 {
+    FIRST
+}

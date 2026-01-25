@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Break statement uses syntax ->|; to exit the innermost enclosing loop | Break statement uses syntax ->|; to exit the innermost enclosing loop
+
+
+// EX-049: Break statement
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    i:#i32 = 0;
+    (i < 10)@{
+        i == 5 ? ->|;
+        print(i);
+        i = i + 1;
+    };
+    -> 0;
+}

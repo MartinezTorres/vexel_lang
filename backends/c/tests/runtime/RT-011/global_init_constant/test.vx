@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Global initializers must be compile-time constants | Global initializers must be compile-time constants
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-011: Global initializers must be compile-time constants
+
+&get_value() -> #i32 {
+    42;
+}
+
+// This is OK - function result is compile-time constant
+value:#i32 = get_value();
+
+&^main() -> #i32 {
+    value
+}

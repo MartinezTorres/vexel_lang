@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Repeat loop condition re-evaluates before every iteration | Repeat loop condition re-evaluates before every iteration
+
+
+// EX-046: Condition re-evaluates
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    count:#i32 = 0;
+    (count < 3)@{
+        print(count);
+        count = count + 1;
+        // Condition checked again after count incremented
+    };
+    -> count;  // Should be 3
+}

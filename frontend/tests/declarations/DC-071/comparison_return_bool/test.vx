@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Comparison operator methods typically return #b | Comparison operators return bool
+
+
+// DC-071: Comparison operators typically return #b
+#Comparable(v:#i32);
+
+&(a)#Comparable::==(b:#Comparable) -> #b {
+    a.v == b.v
+}
+
+&(a)#Comparable::<(b:#Comparable) -> #b {
+    a.v < b.v
+}
+
+&^main() -> #i32 {
+    0
+}

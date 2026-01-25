@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Captured variables remain accessible throughout nested function'"'"'s lifetime | Captured variables remain accessible
+
+
+// DC-032: Captured variables accessible throughout nested function lifetime
+&test() -> #i32 {
+    x:#i32 = 5;
+    &use_x() -> #i32 {
+        x
+    }
+    use_x()
+}
+
+&^main() -> #i32 {
+    test()
+}

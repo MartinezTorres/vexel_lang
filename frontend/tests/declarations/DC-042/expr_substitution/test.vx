@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters are substituted as expression at each use site | Expression parameters substituted at use site
+
+
+// DC-042: Expression parameters substituted at each use
+&triple($expr) {
+    $expr;
+    $expr;
+    $expr;
+}
+
+&^main() -> #i32 {
+    count:#i32 = 0;
+    triple(count = count + 1);
+    count  // Should be 3
+}

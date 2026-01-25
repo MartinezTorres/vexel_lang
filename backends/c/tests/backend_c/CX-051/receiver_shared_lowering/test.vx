@@ -1,0 +1,13 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: Receiver function implementations must reuse the shared lowering used by other backends. | Receiver function implementations reuse shared lowering
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&double_x(x:#i32) -> #i32 {
+    x * 2
+}
+
+&^main() -> #i32 {
+    double_x(5)
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Directory resource evaluates to array of tuples (__0:#s, __1:#s) for each regular file | Directory resource evaluates to array of tuples with __0 and __1 fields
+
+
+// NR-006: Directory resource evaluates to array of tuples (__0:#s, __1:#s) for each regular file
+files = ::assets;
+
+&^main() -> #i32 {
+    // files should be an array of tuples with __0 (name) and __1 (content) fields
+    result:#i32 = (files[0].__0 == "" || files[0].__1 == "") ? (#i32)1 : (#i32)0;
+    -> result;
+}

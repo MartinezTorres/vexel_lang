@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Import statements use the form '"'"'::'"'"' qname '"'"';'"'"' | Qualified import statement with multiple components
+
+
+::pkg::io;
+
+&^main() -> #i32 {
+    0
+}

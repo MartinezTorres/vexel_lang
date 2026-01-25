@@ -1,0 +1,14 @@
+// Module that maintains state
+state:#i32;
+
+&reset() {
+    state = 0;
+}
+
+&increment() {
+    state = state + 1;
+}
+
+&getState() -> #i32 {
+    state
+}

@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Primitives are passed and stored by value | Primitives are passed and stored by value
+// @expect-exit: 10
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-034: Primitives are passed and stored by value
+
+&modify(x:#i32) -> #i32 {
+    x + 10;
+}
+
+&^main() -> #i32 {
+    a:#i32 = 5;
+    b:#i32 = modify(a);
+    // a should still be 5, b should be 15
+    b - a  // Should be 10
+}

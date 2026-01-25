@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Observable semantics must match a concrete instantiation regardless of implementation optimizations | Semantics consistent regardless of implementation optimization
+
+
+&increment(val) {
+    val + 1
+}
+
+&^main() -> #i32 {
+    a:#i32 = increment(10)
+    b:#i32 = increment(20)
+    c:#i32 = increment(30)
+    a + b + c
+}

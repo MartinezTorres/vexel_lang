@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Parser requires explicit parentheses to disambiguate ambiguous expressions | Parentheses disambiguate mixed operators (positive test)
+
+
+&^main() -> #i32 {
+    total:#i32 = (1 + (2 * 3)) + ((4 * 5) + 6);
+    total;
+}

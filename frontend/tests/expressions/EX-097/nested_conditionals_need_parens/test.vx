@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Nested conditionals must be explicitly parenthesized to avoid ambiguity | Nested conditionals must be explicitly parenthesized to avoid ambiguity
+
+
+// EX-097: Nested conditionals need parens - ERROR
+&^main() -> #i32 {
+    // ERROR: ambiguous nesting
+    result:#i32 = 1 ? 1 : 0 ? 2 : 3;
+    -> result;
+}

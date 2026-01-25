@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Unsigned integer types include u8, u16, u32, u64 | Unsigned integer type u32 is available
+
+
+&^main() -> #i32 {
+    x:#u32 = 100;
+    0
+}

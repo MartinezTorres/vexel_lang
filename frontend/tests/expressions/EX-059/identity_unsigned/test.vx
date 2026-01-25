@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: For unsigned integers, |expr| returns identity (|x| = x) | For unsigned integers, |expr| returns identity (|x| = x)
+
+
+// EX-059: Identity for unsigned
+&^main() -> #i32 {
+    x:#u32 = (#u32)42;
+    abs_x:#i32 = |x|;
+    -> abs_x;  // Should be 42 (identity)
+}

@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Specialization semantics are pure language behavior - implementations may inline, share, or eliminate copies | Multiple calls may share or create distinct specializations
+
+
+&combine(a, b) {
+    a + b
+}
+
+&^main() -> #i32 {
+    combine(1, 2) + combine(10, 20) + combine(100, 200)
+}

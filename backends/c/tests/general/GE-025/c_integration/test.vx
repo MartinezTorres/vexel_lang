@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The compiler can generate C source code for integration with existing C codebases | C source generation for C integration
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-025: Generate C source for integration with C codebases
+// Uses C standard library functions
+
+&!printf(msg:#s) -> #i32;
+
+&compute(x:#i32, y:#i32) -> #i32 {
+    x + y;
+}
+
+&^main() -> #i32 {
+    result:#i32 = compute(30, 12);
+    result;
+}

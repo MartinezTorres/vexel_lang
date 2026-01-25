@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Float overflow behavior follows IEEE 754 standard | Float overflow behavior follows IEEE 754 standard
+
+
+&^main() -> #i32 {
+    x:#f64 = 1.7976931348623157e308;
+    y:#f64 = x * 2.0;
+    0
+}

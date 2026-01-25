@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression 0..10@print(_) prints 0 through 9 | Expression 0..10@print(_) prints 0 through 9
+
+
+// EX-037: Range iteration example
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    0..10@print(_);  // Prints 0, 1, 2, ..., 9
+    -> 0;
+}

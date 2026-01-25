@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: The megalinker.h header includes #include <stdint.h> | megalinker.h includes stdint.h
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

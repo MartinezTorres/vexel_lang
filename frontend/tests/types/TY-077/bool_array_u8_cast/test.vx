@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: #b[8] can cast to/from #u8 | #b[8] can cast to/from #u8
+
+
+&^main() -> #i32 {
+    b:#b[8] = [1,1,1,1,0,0,0,0];
+    u:#u8 = (#u8)b;
+    (#i32)u
+}

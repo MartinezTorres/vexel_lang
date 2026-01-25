@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Method calls have the form (ident | '"'"'('"'"' ident { '"'"','"'"' ident } '"'"')'"'"') '"'"'.'"'"' ident '"'"'('"'"' [ arglist ] '"'"')'"'"' for single or multi-receiver methods | Multi-receiver method call
+
+
+&(x, y)swap_with(delta:#i32) -> #i32 {
+    x + y + delta;
+}
+
+&^main() -> #i32 {
+    a:#i32 = 1;
+    b:#i32 = 2;
+    (a, b).swap_with(3);
+}

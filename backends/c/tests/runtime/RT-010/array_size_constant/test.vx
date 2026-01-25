@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Array sizes must be compile-time constants | Array sizes must be compile-time constants
+// @expect-exit: 1
+// @expect-stderr: constant
+// @command: {VEXEL_C} test.vx
+
+
+// RT-010: Array sizes must be compile-time constants
+// This should fail because size depends on runtime parameter
+
+&^main(n:#i32) -> #i32 {
+    // This should fail - array size must be compile-time constant
+    arr:#i32[n];
+    0
+}

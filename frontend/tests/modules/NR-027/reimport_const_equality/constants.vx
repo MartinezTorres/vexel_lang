@@ -1,0 +1,3 @@
+// Constants evaluated at compile time
+PI:#i32 = 3;  // Simplified for testing
+ANSWER:#i32 = 21 + 21;  // Will evaluate to 42

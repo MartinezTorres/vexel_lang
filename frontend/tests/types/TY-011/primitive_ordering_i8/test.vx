@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: All primitive types (#i*, #u*, #f*, #b, #s) support numeric or lexicographic ordering | Primitive type i8 supports numeric ordering
+
+
+&^main() -> #i32 {
+    a:#i8 = -5;
+    b:#i8 = 10;
+    (a < b) ? 1 : 0
+}

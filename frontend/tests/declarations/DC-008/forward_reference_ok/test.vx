@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable globals can only reference globals defined earlier in the file | Immutable global references earlier global
+
+
+// DC-008: Immutable globals can only reference earlier definitions
+FIRST = 10;
+SECOND = FIRST + 5;
+
+&^main() -> #i32 {
+    SECOND
+}

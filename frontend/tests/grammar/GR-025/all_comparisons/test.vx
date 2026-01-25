@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Comparison expressions consist of one or more shift terms separated by comparison operators ('"'"'=='"'"', '"'"'!='"'"', '"'"'<'"'"', '"'"'<='"'"', '"'"'>'"'"', '"'"'>='"'"') | Chained comparison expressions
+
+
+&^main() -> #i32 {
+  c1:#b = 1 < 2
+  c2:#b = 3 <= 4
+  c3:#b = 5 > 4
+  c4:#b = 6 >= 6
+  c5:#b = 7 == 7
+  c6:#b = 8 != 9
+  0
+}

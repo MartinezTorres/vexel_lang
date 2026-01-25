@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Function calls have the form qname '"'"'('"'"' [ arglist ] '"'"')'"'"' | Function call with arguments
+
+
+&calculate(a:#i32, b:#i32, c:#i32) -> #i32 { a + b + c }
+
+&^main() -> #i32 {
+  result:#i32 = calculate(10, 20, 30)
+  result
+}

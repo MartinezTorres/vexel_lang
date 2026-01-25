@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Function references only exist through generic instantiation | Function references exist through generic instantiation
+
+
+&identity(x) -> #i32 {
+    x
+}
+
+&^main() -> #i32 {
+    identity(42)
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Integer literals are either decimal ([0-9]+) or hexadecimal ('"'"'0x'"'"' [0-9A-Fa-f]+) | Hexadecimal integer literals 0x[0-9A-Fa-f]+
+
+
+&test() {
+  h1 = 0x0;
+  h2 = 0xFF;
+  h3 = 0xDeadBeef;
+  h4 = 0x12345ABCDEF;
+}

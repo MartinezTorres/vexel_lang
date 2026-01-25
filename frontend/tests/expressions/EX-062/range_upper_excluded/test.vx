@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Range 0..5 is equivalent to [0,1,2,3,4] with upper bound excluded | Range 0..5 is equivalent to [0,1,2,3,4] with upper bound excluded
+
+
+// EX-062: Range upper bound excluded
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    0..5@print(_);  // Prints: 0, 1, 2, 3, 4
+    -> 0;
+}

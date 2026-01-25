@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Boolean type #b has values 0 or 1 only, no true/false literals | Boolean type #b accepts value 0
+
+
+&^main() -> #i32 {
+    x:#b = 0;
+    (#i32)x
+}

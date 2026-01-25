@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Mismatched array lengths form distinct instantiations in generic functions | Generic function specialized for different array lengths
+
+
+&sum_pair(values:#i32[2]) -> #i32 {
+    values[0] + values[1];
+}
+
+&sum_triple(values:#i32[3]) -> #i32 {
+    values[0] + values[1] + values[2];
+}
+
+&^main() -> #i32 {
+    sum_pair([1, 2]) + sum_triple([3, 4, 5]);
+}

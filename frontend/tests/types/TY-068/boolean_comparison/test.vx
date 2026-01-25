@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Boolean comparison: 0 < 1 | Boolean comparison: 0 < 1
+
+
+&^main() -> #i32 {
+    a:#b = 0;
+    b:#b = 1;
+    (a < b) ? 1 : 0
+}

@@ -1,0 +1,4 @@
+// Module to be imported
+&helper() -> #i32 {
+    42
+}

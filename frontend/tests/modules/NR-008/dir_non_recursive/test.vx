@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Directory resource is non-recursive (only lists immediate files, not subdirectories) | Directory resource is non-recursive
+
+
+// NR-008: Directory resource is non-recursive (only lists immediate files, not subdirectories)
+files = ::root;
+
+&^main() -> #i32 {
+    // Should only contain top.txt, not nested.txt from subdir
+    // Array length should be 1
+    len:#i32 = |files|;
+    result:#i32 = (len == 1 && files[0].__0 == "top.txt") ? (#i32)0 : (#i32)1;
+    -> result;
+}

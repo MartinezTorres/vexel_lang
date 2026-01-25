@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Unary operators (-, !, ~, |) have second highest precedence after postfix | Unary operators (-, !, ~, |) have second highest precedence after postfix
+
+
+// EX-069: Unary operators
+&^main() -> #i32 {
+    arr:#i32[3] = [1, 2, 3];
+    // -arr[1] is -(arr[1]), not (-arr)[1]
+    result:#i32 = -arr[1];
+    -> result;  // -2
+}

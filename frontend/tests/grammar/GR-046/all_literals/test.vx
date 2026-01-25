@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Literals include integer literals, floating-point literals, string literals, and character literals | All literal types: integer, float, string, character
+
+
+&test() {
+  i = 42;
+  h = 0xFF;
+  f = 3.14;
+  s = "hello";
+  c = 'x';
+}

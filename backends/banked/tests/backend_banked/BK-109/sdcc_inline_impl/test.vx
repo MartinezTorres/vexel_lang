@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: When __SDCC is defined, inline implementations of __ML_LOAD_SEGMENT_A/B/C/D and __ML_RESTORE_A/B/C/D are provided that manipulate segment variables | When __SDCC, provide inline implementations
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

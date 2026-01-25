@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Method non-receiver parameters are passed by value | Method non-receiver parameters by value
+
+
+// DC-053: Method non-receiver parameters passed by value
+#Calculator(result:#i32);
+
+&(c)#Calculator::add(val:#i32) {
+    c.result = c.result + val;
+}
+
+&^main() -> #i32 {
+    calc:#Calculator = Calculator(0);
+    calc.add(10);
+    calc.result
+}

@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Statements include expression statements (expr '"'"';'"'"'), return statements ('"'"'->'"'"' [ expr ] '"'"';'"'"'), break ('"'"'->|'"'"' '"'"';'"'"'), continue ('"'"'->>'"'"' '"'"';'"'"'), iteration (expr '"'"'@'"'"' expr or '"'"'('"'"' expr '"'"')'"'"' '"'"'@'"'"' expr), conditional statements (expr '"'"'?'"'"' stmt), type declarations, imports, and function declarations | Break statement (->|)
+
+
+&^main() -> #i32 {
+  0..10 @ { ->|; }
+  0
+}

@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: The $ sigil marks expression parameters in function declarations. | Accept $ sigil for expression parameters
+
+
+&^foo($x: #i32) -> #i32 { x }
+
+&^main() -> #i32 {
+    foo(42)
+}

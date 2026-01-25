@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: All syntax is expressed via sigils and operators rather than reserved words | Syntax via sigils and operators - ternary instead of if/else
+// @expect-exit: 20
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-003: All syntax is expressed via sigils and operators rather than reserved words
+// Function export: &^
+// Type annotation: #
+// Conditional: ?:
+// Assignment: =
+
+&^main() -> #i32 {
+    x:#i32 = 10;
+    y:#i32 = 20;
+
+    // Ternary operator instead of if/else keyword
+    result:#i32 = x > y ? x : y;
+
+    result;
+}

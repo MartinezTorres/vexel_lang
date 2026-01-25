@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Repeat loops use the (cond)@ form distinct from iterable@ form | Repeat loops use the (cond)@ form distinct from iterable@ form
+
+
+// EX-048: Distinct forms
+&print(arg0:#i32) { }
+
+&^main() -> #i32 {
+    // Repeat loop form
+    i:#i32 = 0;
+    (i < 3)@{
+        print(i);
+        i = i + 1;
+    };
+
+    // Iterable loop form
+    arr:#i32[3] = [1, 2, 3];
+    arr@print(_);
+
+    -> 0;
+}

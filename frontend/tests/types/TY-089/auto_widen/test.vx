@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Smaller types automatically widen to larger types in mixed operations | Smaller types automatically widen to larger types in mixed operations
+
+
+&^main() -> #i32 {
+    small:#i8 = 10;
+    large:#i32 = small;
+    large
+}

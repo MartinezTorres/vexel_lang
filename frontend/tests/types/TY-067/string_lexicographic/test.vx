@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: String comparison uses lexicographic ordering | String comparison uses lexicographic ordering
+
+
+&^main() -> #i32 {
+    s1:#s = "apple";
+    s2:#s = "banana";
+    (s1 < s2) ? 1 : 0
+}

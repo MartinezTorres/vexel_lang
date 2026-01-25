@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Operator methods may not declare expression parameters | Operator methods without expression parameters
+
+
+// DC-066: Operator methods may not use expression parameters
+#Type(v:#i32);
+
+&(t)#Type::+(other:#Type) -> #Type {
+    Type(t.v + other.v)
+}
+
+&^main() -> #i32 {
+    0
+}

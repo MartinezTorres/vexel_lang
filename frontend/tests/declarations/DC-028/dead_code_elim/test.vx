@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions may be eliminated if unused | Unused internal function for elimination
+
+
+// DC-028: Internal functions may be eliminated if unused
+&unused() -> #i32 {
+    999
+}
+
+&^main() -> #i32 {
+    0
+}

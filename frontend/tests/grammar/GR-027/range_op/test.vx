@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Range expressions have the form sum [ '"'"'..'"'"' sum ] | Range expression (..)
+
+
+&rangeTest() {
+  r = 0..10;
+}

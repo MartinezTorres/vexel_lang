@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Range type inference follows array literal rules (collective type for all elements) | Range type inference follows array literal rules (collective type for all elements)
+
+
+// EX-066: Range type inference
+&^main() -> #i32 {
+    r = 0..10;
+    -> (|r|);
+}

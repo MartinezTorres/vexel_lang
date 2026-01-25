@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Single assignment uses syntax x = expr and returns the assigned value | Single assignment uses syntax x = expr and returns the assigned value
+
+
+// EX-085: Assignment returns value
+&^main() -> #i32 {
+    x:#i32 = 0;
+    y:#i32 = 0;
+    y = x = 42;
+    -> y;  // Should be 42
+}

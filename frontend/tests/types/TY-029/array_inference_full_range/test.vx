@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array type inference examines full range of values: smallest to largest | Array type inference examines full range: smallest to largest
+
+
+&^main() -> #i32 {
+    arr = [10,20,30,40,50];
+    0
+}

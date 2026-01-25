@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal function parameters allow optional type annotation | Parameters allow optional type annotation
+
+
+// DC-035: Internal function parameters allow optional type
+&typed(x:#i32) -> #i32 { x }
+&inferred(y) { y }
+
+&^main() -> #i32 {
+    typed(10) + inferred(20)
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable global variables have no initialization at declaration | Mutable globals have no initialization
+
+
+// DC-010: Mutable globals declared without initialization
+counter:#i32;
+buffer:#u8[256];
+
+&^main() -> #i32 {
+    counter = 0;
+    0
+}

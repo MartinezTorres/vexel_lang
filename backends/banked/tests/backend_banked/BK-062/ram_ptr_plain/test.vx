@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: RAM pointers remain plain T* because RAM is always mapped | RAM pointers remain plain T*
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+mut X:#i32 = 0;
+
+&^get_ptr() -> #i32 {
+    X
+}

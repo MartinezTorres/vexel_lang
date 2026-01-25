@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Directory resource tuple .__0 field contains file name | Directory resource tuple __0 field contains file name
+
+
+// NR-009: Directory resource tuple .__0 field contains file name
+items = ::items;
+
+&^main() -> #i32 {
+    // __0 should contain the filename
+    result:#i32 = (items[0].__0 == "myfile.dat") ? (#i32)0 : (#i32)1;
+    -> result;
+}

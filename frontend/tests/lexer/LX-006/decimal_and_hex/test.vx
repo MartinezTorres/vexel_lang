@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Integer literals can be decimal (e.g., 123) or hexadecimal (e.g., 0xFF). | Accept decimal and hexadecimal integer literals
+
+
+&^main() -> #i32 {
+    a: #i32 = 123
+    b: #i32 = 0
+    c: #i32 = 999
+    d: #u32 = 0xFF
+    e: #u32 = 0x00
+    0
+}

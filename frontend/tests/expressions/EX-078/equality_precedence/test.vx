@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Equality operators (== !=) have precedence after relational operators | Equality operators (== !=) have precedence after relational operators
+
+
+// EX-078: Equality precedence
+&^main() -> #i32 {
+    // 5 > 3 == 1 is (5 > 3) == 1
+    result:#b = (5 > 3) == 1;
+    -> result ? 1 : 0;
+}

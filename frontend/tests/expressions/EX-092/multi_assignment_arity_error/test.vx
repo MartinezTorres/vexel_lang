@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Number of variables in multi-assignment must match tuple arity | Multi-assignment with mismatched arity is an error
+
+
+// EX-092: Multi-assignment arity mismatch - ERROR
+
+&pair() -> (#i32, #i32) {
+    (1, 2)
+}
+
+&^main() -> #i32 {
+    a:#i32;
+    a = pair();  // ERROR: arity mismatch
+    -> 0;
+}

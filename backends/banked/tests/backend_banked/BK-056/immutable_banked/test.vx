@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Immutable globals are tagged __banked so Megalinker treats them as ROM modules | Immutable globals tagged __banked
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+DATA:#i32 = 100;

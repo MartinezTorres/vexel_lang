@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The language defines syntax and semantics only; external functions provide I/O and platform services | Language defines syntax for external functions
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-007: External functions provide I/O and platform services
+// Language defines syntax for external function declarations
+
+// External function declaration using &! sigil
+&!putchar(c:#i32) -> #i32;
+
+&^main() -> #i32 {
+    // Call external function
+    putchar(72);  // 'H'
+    0;
+}

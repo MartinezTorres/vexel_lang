@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#diagnostics-specific-to-this-backend
+// @desc: Backend must emit an error when pass-by-value of zero-sized struct is attempted (already forbidden by language). | Backend emits error for pass-by-value of zero-sized struct
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

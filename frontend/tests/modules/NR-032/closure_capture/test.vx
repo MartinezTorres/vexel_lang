@@ -1,0 +1,24 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Nested functions capture enclosing scope variables by reference | Nested functions capture enclosing scope by reference
+
+
+// NR-032: Nested functions capture enclosing scope variables by reference
+
+&^main() -> #i32 {
+    mut total:#i32 = 0;
+
+    &add_one() -> #i32 {
+        total = total + 1;
+        total
+    }
+
+    &add_two() -> #i32 {
+        total = total + 2;
+        total
+    }
+
+    add_one();  // total = 1
+    add_two();  // total = 3
+    add_one();  // total = 4
+    total
+}

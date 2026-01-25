@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Postfix expressions consist of a primary expression followed by zero or more postfix operations (call, index, or member access) | Postfix call operation
+
+
+&helper(x:#i32) -> #i32 { x + 1 }
+
+&^main() -> #i32 {
+  result:#i32 = helper(3)
+  result
+}

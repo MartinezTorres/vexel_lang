@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Backend can place immutable global constants in ROM or optimize away entirely | Immutable constant for backend optimization
+
+
+// DC-005: Backend can place in ROM or optimize away
+MAGIC = 0xDEADBEEF;
+
+&^main() -> #i32 {
+    0
+}

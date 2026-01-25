@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Primitive type names may be used as identifiers elsewhere (not after #) | Primitive type names can be used as identifiers
+
+
+&^main() -> #i32 {
+    i32:#i32 = 42;
+    u8:#u8 = 10;
+    i32 + (#i32)u8
+}

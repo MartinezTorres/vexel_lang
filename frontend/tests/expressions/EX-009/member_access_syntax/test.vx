@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Member access uses syntax x.y to access fields of composite types | Member access uses syntax x.y to access fields of composite types
+
+
+// EX-009: Member access syntax
+#Rectangle(
+    width:#i32,
+    height:#i32
+);
+
+&^main() -> #i32 {
+    r:#Rectangle = Rectangle(5, 10);
+    w:#i32 = r.width;
+    h:#i32 = r.height;
+    -> w * h;
+}

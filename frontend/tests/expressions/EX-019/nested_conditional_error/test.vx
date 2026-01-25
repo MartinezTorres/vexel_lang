@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Nested conditionals without parentheses are a compile error | Nested conditionals without parentheses are a compile error
+
+
+// EX-019: Nested conditional without parentheses - ERROR
+&^main() -> #i32 {
+    a:#b = 1;
+    b:#b = 0;
+    c:#b = 1;
+    // ERROR: ambiguous nesting
+    result:#i32 = a ? 1 : b ? 2 : 3;
+    -> result;
+}

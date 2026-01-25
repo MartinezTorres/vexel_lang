@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Sorted iteration uses syntax iterable@@expr to bind _ to each element of a sorted copy | Sorted iteration uses syntax iterable@@expr to bind _ to each element of a sorted copy
+
+
+// EX-026: Sorted iteration syntax
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[4] = [30, 10, 40, 20]
+    arr @@ { print(1) }  // Should still parse sorted iteration
+    0
+}

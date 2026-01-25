@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Dead branches in compile-time conditionals are eliminated before type checking | Dead branch eliminated before type checking (false branch ignored)
+
+
+&^main() -> #i32 {
+    true ? 42 : false
+}

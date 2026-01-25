@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver method receiver type annotations are optional and inferred from use | Multi-receiver optional type annotations
+
+
+// DC-091: Multi-receiver type annotations optional
+&(m, n)multiply() -> #i32 {
+    m * n
+}
+
+&^main() -> #i32 {
+    x:#i32 = 6;
+    y:#i32 = 7;
+    (x, y).multiply()
+}

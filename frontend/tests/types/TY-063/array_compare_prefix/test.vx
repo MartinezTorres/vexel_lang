@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Arrays with mismatched lengths compare by prefix first | Arrays with mismatched lengths compare by prefix first
+
+
+&^main() -> #i32 {
+    a:#i32[2] = [1,2];
+    b:#i32[3] = [1,2,3];
+    (a < b) ? 1 : 0
+}

@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Everything is compile-time unless it cannot be | Everything is compile-time unless it cannot be
+// @expect-exit: 55
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-033: Everything is compile-time unless it cannot be
+
+&compute() -> #i32 {
+    // This entire computation can be done at compile time
+    ((#i32)10 * (#i32)11) / 2
+}
+
+// Forces compile-time execution
+RESULT:#i32 = compute();
+
+&^main() -> #i32 {
+    RESULT  // Should be 55 (sum of 1 to 10)
+}

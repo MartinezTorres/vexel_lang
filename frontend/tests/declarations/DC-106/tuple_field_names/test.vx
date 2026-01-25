@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Tuple fields use numeric naming pattern '"'"'__0'"'"', '"'"'__1'"'"', etc. | Tuple numeric field naming
+
+
+// DC-106: Tuple fields use __0, __1, etc.
+&nums() -> (#i32, #i32) {
+    (7, 14)
+}
+
+&^main() -> #i32 {
+    result = nums();
+    result.__0 + result.__1
+}

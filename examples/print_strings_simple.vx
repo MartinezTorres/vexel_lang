@@ -1,0 +1,27 @@
+// Simple string printing example without runtime ranges
+
+&!putchar(c:#u8);
+
+&print_newline() {
+  putchar(10)
+}
+
+&^main() -> #i32 {
+  // Print "Hello"
+  putchar(72);  // H
+  putchar(101); // e
+  putchar(108); // l
+  putchar(108); // l
+  putchar(111); // o
+  print_newline();
+
+  // Print "World"
+  putchar(87);  // W
+  putchar(111); // o
+  putchar(114); // r
+  putchar(108); // l
+  putchar(100); // d
+  print_newline();
+
+  0
+}

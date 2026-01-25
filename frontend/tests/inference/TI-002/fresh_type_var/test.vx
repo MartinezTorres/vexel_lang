@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Omitted parameter/field types create fresh type variables inferred from call sites | Fresh type variables for omitted types inferred from usage
+
+
+&swap(a, b) {
+    [b, a]
+}
+
+&^main() -> #i32 {
+    swap(1, 2)[0]
+}

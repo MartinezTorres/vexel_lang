@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: No function types: functions cannot be passed as values | No function types: functions cannot be passed as values
+
+
+&^compute(a:#i32) -> #i32 {
+    a * 2
+}
+
+&^main() -> #i32 {
+    compute(21)
+}

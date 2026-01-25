@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Automatic promotion: u8 -> u16 -> u32 -> u64 | Automatic promotion: u8 -> u16
+
+
+&^main() -> #i32 {
+    x:#u8 = 200;
+    y:#u16 = x;
+    0
+}

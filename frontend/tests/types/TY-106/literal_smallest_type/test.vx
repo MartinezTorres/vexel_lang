@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer literals use smallest type that fits the value | Integer literals use smallest type that fits the value
+
+
+&^main() -> #i32 {
+    x = 42;
+    0
+}

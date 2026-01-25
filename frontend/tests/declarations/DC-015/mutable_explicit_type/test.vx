@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable globals require explicit type annotation in declaration | Mutable globals require explicit type
+
+
+// DC-015: Mutable globals require explicit type annotation
+value:#i32;
+data:#f64[10];
+
+&^main() -> #i32 {
+    value = 1;
+    0
+}

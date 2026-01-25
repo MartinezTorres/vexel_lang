@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Immutable globals (initialized at declaration) are compile-time constants | Immutable globals (initialized at declaration) are compile-time constants
+// @expect-exit: 30
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-012: Immutable globals (initialized at declaration) are compile-time constants
+
+&compute() -> #i32 {
+    10 + 20;
+}
+
+// Immutable global - computed at compile time
+value:#i32 = compute();
+
+// Can use immutable global as array size (proves it's compile-time constant)
+arr:#i32[value];
+
+&^main() -> #i32 {
+    |arr|
+}

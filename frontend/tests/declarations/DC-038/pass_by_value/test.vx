@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions pass parameters by value (non-receiver parameters) | Internal functions pass parameters by value
+
+
+// DC-038: Non-receiver parameters passed by value
+&modify(x:#i32) -> #i32 {
+    temp:#i32 = x;
+    temp = temp + 1;
+    temp
+}
+
+&^main() -> #i32 {
+    a:#i32 = 10;
+    b:#i32 = modify(a);
+    a  // Still 10
+}

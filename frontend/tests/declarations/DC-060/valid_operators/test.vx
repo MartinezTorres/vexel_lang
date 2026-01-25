@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Operator method name must be one of: + - * / % == != < <= > >= | Operator method uses valid operators
+
+
+// DC-060: Valid operator method names
+#Num(v:#i32);
+
+&(l)#Num::+(r:#Num) -> #Num { Num(l.v + r.v) }
+&(l)#Num::-(r:#Num) -> #Num { Num(l.v - r.v) }
+&(l)#Num::*(r:#Num) -> #Num { Num(l.v * r.v) }
+&(l)#Num::==(r:#Num) -> #b { l.v == r.v }
+
+&^main() -> #i32 {
+    0
+}

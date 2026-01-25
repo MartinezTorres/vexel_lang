@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Re-importing requires functions/types to be textually equal for identical definitions | Re-importing requires textual equality of functions and types
+
+// NR-026: Re-importing requires functions/types to be textually equal for identical definitions
+::math;
+::math;  // Should succeed - definitions are textually identical
+
+&^main() -> #i32 {
+    math::double(21)
+}

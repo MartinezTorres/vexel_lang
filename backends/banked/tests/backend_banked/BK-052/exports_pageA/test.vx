@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Entry-point exports exposed to external code are _pageA versions | Entry-point exports are _pageA
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^main() -> #i32 { 0 }

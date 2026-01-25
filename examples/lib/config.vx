@@ -1,0 +1,5 @@
+value:#i32 = 10;
+
+&get_value() -> #i32 {
+    value
+}

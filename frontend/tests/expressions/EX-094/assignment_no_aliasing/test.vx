@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Assignment always creates independent copy with no aliasing | Assignment always creates independent copy with no aliasing
+
+
+// EX-094: No aliasing
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    p1:#Point = Point(10, 20);
+    p2:#Point = p1;
+    p2.x = 99;
+    // p1 and p2 are independent copies
+    -> p1.x;  // Should still be 10
+}

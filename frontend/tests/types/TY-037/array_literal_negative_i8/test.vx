@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array literal [-1,0,1] infers to #i8[3] (has negative, fits in i8) | Array literal [-1,0,1] infers to #i8[3]
+
+
+&^main() -> #i32 {
+    arr = [-1,0,1];
+    0
+}

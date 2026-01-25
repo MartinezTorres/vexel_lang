@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Method definitions require explicit TypeName before '"'"'::'"'"' separator | Method definitions require explicit TypeName
+
+
+// DC-058: Method definitions require explicit TypeName before ::
+#Entity(state:#i32);
+
+&(e)#Entity::update() { e.state = e.state + 1; }
+
+&^main() -> #i32 {
+    entity:#Entity = Entity(0);
+    entity.update();
+    entity.state
+}

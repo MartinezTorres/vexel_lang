@@ -1,0 +1,11 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Header must declare every external (&!) declaration. | Header must declare every external (&!) declaration
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&!external_func() -> #i32;
+
+&^main() -> #i32 {
+    external_func()
+}

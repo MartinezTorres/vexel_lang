@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Statement conditionals have no value and cannot be used in expression context | Statement conditionals have no value and cannot be used in expression context
+
+
+// EX-023: Statement conditional not usable as expression - ERROR
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    x:#i32 = 10;
+    // ERROR: statement conditional has no value
+    result = (x > 5 ? print(x));
+    -> 0;
+}

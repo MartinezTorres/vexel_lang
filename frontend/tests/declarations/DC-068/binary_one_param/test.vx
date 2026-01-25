@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Binary operator methods expect exactly one value parameter | Binary operators have one value parameter
+
+
+// DC-068: Binary operators expect exactly one value parameter
+#BinOp(x:#i32);
+
+&(a)#BinOp::+(b:#BinOp) -> #BinOp {
+    BinOp(a.x + b.x)
+}
+
+&^main() -> #i32 {
+    0
+}

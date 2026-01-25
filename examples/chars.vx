@@ -1,0 +1,6 @@
+// Test character literal initialization
+ch:#u8 = 65
+
+&^main() -> #i32 {
+    ch
+}

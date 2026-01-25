@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions cannot be eliminated by dead code optimization | Exported functions not eliminated
+
+
+// DC-111: Exported functions not eliminated by DCE
+&^preserved() -> #i32 {
+    999
+}
+
+&^main() -> #i32 {
+    0
+}

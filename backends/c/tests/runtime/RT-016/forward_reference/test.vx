@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: During initialization, can only reference previously defined constants | During initialization, can only reference previously defined constants
+// @expect-exit: 1
+// @command: {VEXEL_C} test.vx
+
+
+// RT-016: During initialization, can only reference previously defined constants
+// This should fail because 'second' tries to use 'first' before it's defined
+
+second #i32 = first + 10
+first #i32 = 20
+
+&^main() -> #i32 {
+    second
+}

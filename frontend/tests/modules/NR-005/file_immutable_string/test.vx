@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: File resource evaluates to #s (immutable string) whose bytes exactly match file contents (binary-safe) | File resource evaluates to immutable string with exact byte contents
+
+
+// NR-005: File resource evaluates to #s (immutable string) whose bytes exactly match file contents (binary-safe)
+data:#s = ::binary.dat;
+
+&^main() -> #i32 {
+    // Type must be #s (immutable string)
+    // Binary data should be preserved
+    0
+}

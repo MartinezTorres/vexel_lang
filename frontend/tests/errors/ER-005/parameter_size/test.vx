@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Array size not being a compile-time constant is a compile-time error | Array size not compile-time constant: function parameter
+
+
+&^make_array(len: #i32) -> #i32 {
+    values:#i32[len];
+    0;
+}
+
+&^main() -> #i32 {
+    make_array(5);
+}

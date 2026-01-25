@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Nested functions capture enclosing scope variables by reference | Nested function can modify captured variable by reference
+
+
+&^main() -> #i32 {
+    mut counter #i32 = 0;
+
+    &increment() -> #i32 {
+        counter = counter + 1;
+        counter;
+    }
+
+    increment();
+    increment();
+    increment();
+    counter;
+}

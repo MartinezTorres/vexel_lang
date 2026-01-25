@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable global variables have undefined contents until first assignment | Mutable global undefined until assignment
+
+
+// DC-012: Mutable globals have undefined contents until assigned
+value:#i32;
+
+&^main() -> #i32 {
+    value = 42;  // Must assign before use
+    value
+}

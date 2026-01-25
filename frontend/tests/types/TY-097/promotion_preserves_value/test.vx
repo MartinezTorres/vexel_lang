@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Promotion preserves value exactly (no precision loss for integer widening) | Promotion preserves value exactly (no precision loss for integer widening)
+
+
+&^main() -> #i32 {
+    x:#i8 = 127;
+    y:#i32 = x;
+    y
+}

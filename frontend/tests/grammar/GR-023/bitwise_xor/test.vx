@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Bitwise XOR expressions consist of one or more bit_and terms separated by '"'"'^'"'"' | Bitwise XOR expression (^)
+
+
+&^main() -> #i32 {
+  result:#u8 = (#u8)1 ^ (#u8)3;
+  (result != (#u8)0) ? 1 : 0
+}

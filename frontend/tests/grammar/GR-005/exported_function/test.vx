@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Exported functions use the form '"'"'&^'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Basic exported function
+
+
+&^main() -> #i32 {
+  0
+}

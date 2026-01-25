@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The @@ operator copies the evaluated array before sorting | The @@ operator copies the evaluated array before sorting
+
+
+// EX-030: @@ makes a copy before sorting
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [30, 10, 20];
+    arr@@print(_);  // Prints sorted: 10, 20, 30
+    arr@print(_);   // Original order: 30, 10, 20
+    -> 0;
+}

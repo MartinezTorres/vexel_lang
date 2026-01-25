@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: If condition is compile-time constant, branches can have different types (dead branch eliminated) | If condition is compile-time constant, branches can have different types (dead branch eliminated)
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-031: If condition is compile-time constant, branches can have different types
+
+DEBUG:#b = false;
+
+&^main() -> #i32 {
+    // When DEBUG is false, only false branch type matters
+    // True branch returns string, false branch returns i32
+    x = DEBUG ? "debug mode" : 42;
+    x  // x is i32 because dead branch is eliminated
+}

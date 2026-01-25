@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Automatic promotion is transitive (i8 can promote to i64 via i16, i32) | Automatic promotion is transitive (i8 -> i64 via i16, i32)
+
+
+&^main() -> #i32 {
+    x:#i8 = 10;
+    y:#i64 = x;
+    0
+}

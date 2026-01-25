@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Functions can be defined anywhere and called from anywhere | Functions defined and called from anywhere
+
+
+// DC-018: Functions can be defined and called from anywhere
+&early() -> #i32 { late() }
+&late() -> #i32 { 42 }
+
+&^main() -> #i32 {
+    early()
+}

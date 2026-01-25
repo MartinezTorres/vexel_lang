@@ -1,0 +1,14 @@
+// Module with mutable state
+value:#i32;
+
+&reset() {
+    value = 0;
+}
+
+&set(v:#i32) {
+    value = v;
+}
+
+&get() -> #i32 {
+    value
+}

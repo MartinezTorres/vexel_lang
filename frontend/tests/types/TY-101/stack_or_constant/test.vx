@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: All data is stack-allocated or compile-time constant | All data is stack-allocated or compile-time constant
+
+
+&^main() -> #i32 {
+    constant:#s = "Hello";
+    stack:#i32 = 42;
+    (#i32)|constant|
+}

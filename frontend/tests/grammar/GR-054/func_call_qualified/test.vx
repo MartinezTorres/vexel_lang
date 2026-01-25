@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Function calls use the syntax fname(...) for internal or external functions | Qualified function call with namespace
+
+
+&println(msg: #s) { }
+&func(x:#i32, y:#f32) { }
+
+&^main() -> #i32 {
+  println("Hello")
+  func(42, 3.14)
+  0
+}

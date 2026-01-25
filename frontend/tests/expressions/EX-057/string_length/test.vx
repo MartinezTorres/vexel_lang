@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: For strings, |expr| returns compile-time constant length (number of bytes) | For strings, |expr| returns compile-time constant length (number of bytes)
+
+
+// EX-057: String length
+&^main() -> #i32 {
+    s:#s = "Hello";
+    len:#i32 = |s|;
+    -> len;  // Should be 5
+}

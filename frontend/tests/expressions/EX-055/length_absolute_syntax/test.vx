@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Length/absolute operator uses syntax |expr| with type-dependent behavior | Length/absolute operator uses syntax |expr| with type-dependent behavior
+
+
+// EX-055: Length/absolute operator syntax
+&^main() -> #i32 {
+    arr:#i32[5] = [1, 2, 3, 4, 5];
+    len:#i32 = |arr|;
+    x:#i32 = -10;
+    abs:#i32 = |x|;
+    -> len + abs;
+}

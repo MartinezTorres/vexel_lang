@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Assignment evaluation is right-to-left for chained assignments | Assignment evaluation is right-to-left for chained assignments
+
+
+// EX-087: Right-to-left evaluation
+&!print(arg0:#i32);
+
+&get_value() -> #i32 {
+    print(99);
+    -> 10;
+}
+
+&^main() -> #i32 {
+    a:#i32 = 0;
+    b:#i32 = 0;
+    // Right side evaluates first
+    a = b = get_value();
+    -> a + b;  // Both should be 10
+}

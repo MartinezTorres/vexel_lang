@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Library mode: all exports are visible | Library mode: all exports are visible
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// RT-062: Library mode: all exports are visible
+
+&^func_one() -> #i32 {
+    10
+}
+
+&^func_two() -> #i32 {
+    20
+}
+
+&internal_helper() -> #i32 {
+    30;
+}

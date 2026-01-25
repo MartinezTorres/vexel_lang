@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable global constants must be initialized with compile-time constant expressions | Immutable globals use compile-time constant expressions
+
+
+// DC-002: Immutable globals initialized with compile-time constants
+ANSWER = 42;
+DOUBLE = 2 * 21;
+SUM = 10 + 32;
+
+&^main() -> #i32 {
+    ANSWER
+}

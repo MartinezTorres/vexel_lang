@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Relational operators (< <= > >=) have precedence after bitwise OR | Relational operators (< <= > >=) have precedence after bitwise OR
+
+
+// EX-077: Relational precedence
+&^main() -> #i32 {
+    // 4 | 2 < 8 is (4 | 2) < 8
+    result:#b = ((#u32)4 | (#u32)2) < (#u32)8;
+    -> result ? 1 : 0;  // 6 < 8 is 1
+}

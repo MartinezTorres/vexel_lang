@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#operations
+// @desc: Bitwise operators (&, |, ^, ~, <<, >>) require unsigned operands on both sides. | Reject bitwise AND on signed operands
+
+
+a:#i32 = 1;
+b:#i32 = 2;
+
+&^main() -> #i32 {
+    a & b
+}

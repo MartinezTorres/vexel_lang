@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Shift operators (<< >>) have precedence after range operator | Shift operators (<< >>) have precedence after range operator
+
+
+// EX-071: Shift precedence
+&^main() -> #i32 {
+    // 1 << 2 + 1 is 1 << (2 + 1) due to precedence
+    x:#u32 = (#u32)4 << (#u32)1;
+    y:#u32 = (#u32)16 >> (#u32)2;
+    -> x + y;  // 8 + 4 = 12
+}

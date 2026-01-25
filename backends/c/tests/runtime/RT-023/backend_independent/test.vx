@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time execution is backend-independent: can use any type (even unsupported by target) | Compile-time execution is backend-independent: can use any type (even unsupported by target)
+// @expect-exit: 6
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-023: Compile-time execution is backend-independent
+// Can use any type (even unsupported by target) during compile time
+
+&compute_f64() -> #f64 {
+    3.14159 * 2.0;
+}
+
+// Use f64 at compile time, convert to i32 for result
+value:#i32 = (#i32)compute_f64();
+
+&^main() -> #i32 {
+    value  // Should be 6
+}

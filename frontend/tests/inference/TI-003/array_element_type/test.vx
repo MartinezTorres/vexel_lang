@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Argument types include full array shape (element type + length) | Infer array element type from usage
+
+
+&sum_array(arr) {
+    arr[0] + arr[1] + arr[2]
+}
+
+&^main() -> #i32 {
+    sum_array([10, 20, 30])
+}

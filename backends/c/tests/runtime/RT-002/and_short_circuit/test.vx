@@ -1,0 +1,24 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Logical AND operator (&&) short-circuits evaluation | Logical AND operator (&&) short-circuits evaluation
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-002: Logical AND operator (&&) short-circuits evaluation
+// If left operand is false, right operand should NOT be evaluated
+
+mut evaluated #b = false;
+
+&trigger() -> #b {
+    evaluated = true;
+    true;
+}
+
+&^main() -> #i32 {
+    // false && trigger() should not call trigger()
+    false && trigger();
+
+    // evaluated should still be false
+    evaluated ? 1 : 0
+}

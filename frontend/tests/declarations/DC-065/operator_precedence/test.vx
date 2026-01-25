@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Compiler checks operator methods before attempting built-in operator rules | Operator methods checked before built-in
+
+
+// DC-065: Operator methods checked before built-in rules
+#Custom(data:#i32);
+
+&(c)#Custom::+(other:#Custom) -> #Custom {
+    Custom(c.data + other.data * 2)
+}
+
+&^main() -> #i32 {
+    a:#Custom = Custom(1);
+    b:#Custom = Custom(2);
+    c:#Custom = a + b;
+    c.data
+}

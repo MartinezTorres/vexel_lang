@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Array sizes are part of type identity: #i32[10] != #i32[20] | Array sizes are part of type identity (i32[3] != i32[5])
+
+
+&process(arr) {
+    arr[0]
+}
+
+&^main() -> #i32 {
+    a:#i32[3] = [1, 2, 3]
+    b:#i32[5] = [1, 2, 3, 4, 5]
+    process(a) + process(b)
+}

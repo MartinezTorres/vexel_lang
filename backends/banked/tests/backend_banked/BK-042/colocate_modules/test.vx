@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_MOVE_SYMBOLS_TO directives co-locate the modules in a single segment | ML_MOVE_SYMBOLS_TO co-locates modules
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^a() -> #i32 { b() }
+&^b() -> #i32 { a() }

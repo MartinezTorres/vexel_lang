@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The iterable expression evaluates once before the loop starts | The iterable expression evaluates once before the loop starts
+
+
+// EX-027: Iterable evaluates once before loop
+&!print(arg0:#i32);
+
+counter:#i32;
+
+&get_array() -> #i32[3] {
+    counter = counter + 1;
+    print(counter);
+    -> [1, 2, 3];
+}
+
+&^main() -> #i32 {
+    counter = 0;
+    arr:#i32[3] = get_array();
+    arr@print(_);  // get_array called once before loop
+    -> 0;
+}

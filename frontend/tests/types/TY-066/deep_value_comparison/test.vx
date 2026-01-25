@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Equality uses value-based deep comparison for all types | Equality uses value-based deep comparison for all types
+
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    p1:#Point = Point(10, 20);
+    p2:#Point = Point(10, 20);
+    (p1 == p2) ? 1 : 0
+}

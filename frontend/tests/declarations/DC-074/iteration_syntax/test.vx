@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods must use syntax '"'"'&(receiver)#TypeName::@($loop) block'"'"' or '"'"'&(receiver)#TypeName::@@($loop) block'"'"' | Iteration method correct syntax
+
+
+// DC-074: Iteration method syntax
+#Range(start:#i32, end:#i32);
+
+&(r)#Range::@($loop) {
+    _:#i32 = r.start;
+    $loop;
+}
+
+&^main() -> #i32 {
+    first:#i32 = 0;
+    rng:#Range = Range(1, 5);
+    rng@{ first = _; }
+    first
+}

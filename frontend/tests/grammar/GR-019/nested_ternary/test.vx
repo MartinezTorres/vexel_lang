@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Conditional expressions have the form logic_or [ '"'"'?'"'"' expr '"'"':'"'"' expr ] | Nested ternary conditional expressions
+
+
+&nested(x: #i32) {
+  result = x > 0 ? (x > 10 ? 2 : 1) : 0;
+}

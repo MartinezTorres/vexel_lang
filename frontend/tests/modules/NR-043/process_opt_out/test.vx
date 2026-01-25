@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Process expressions are disabled unless explicitly enabled (e.g., --allow-process); when disabled the compiler must reject them with a diagnostic | Process expressions are rejected by default (must opt in to run host commands)
+
+
+// NR-043: process expressions should be refused unless explicitly allowed
+::"echo forbidden" -> output;
+
+&^main() -> #i32 {
+    -> (#i32)0;
+}

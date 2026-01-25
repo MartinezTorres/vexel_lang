@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Ranges generate array literals at compile time based on bound values | Ranges generate array literals at compile time based on bound values
+
+
+// EX-067: Compile-time generation
+&^main() -> #i32 {
+    START:#i32 = 10;
+    END:#i32 = 15;
+    r = 10..15;
+    -> r[2];  // Should be 12
+}

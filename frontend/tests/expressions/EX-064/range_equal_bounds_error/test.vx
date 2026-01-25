@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Range a..a where a equals b produces compile error (would be empty array) | Range a..a where a equals b produces compile error (would be empty array)
+
+
+// EX-064: Equal bounds error
+&^main() -> #i32 {
+    // ERROR: 5..5 would be empty
+    r = 5..5;
+    -> 0;
+}

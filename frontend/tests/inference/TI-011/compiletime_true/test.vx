@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Compile-time conditionals allow different types in branches | Compile-time true conditional selects first branch
+
+
+&^main() -> #i32 {
+    true ? 100 : 200
+}

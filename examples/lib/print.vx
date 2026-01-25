@@ -1,0 +1,55 @@
+// Print library using external putchar
+
+&!putchar(c:#u8);
+
+&print_char(c:#u8) {
+  putchar(c)
+}
+
+&print_str(s:#s) {
+  0..|s|@{
+    putchar(s[_])
+  }
+}
+
+&print_newline() {
+  putchar(10)
+}
+
+&print_digit(d:#u8) {
+  putchar(48 + d)
+}
+
+&print_u32(n:#u32) {
+  n == 0 ? putchar(48) : {
+    buf:#u8[10];
+    idx:#u32 = 0;
+    temp:#u32 = n;
+
+    (temp > 0)@{
+      buf[idx] = (temp % 10);
+      temp = temp / 10;
+      idx = idx + 1
+    };
+
+    (idx > 0)@{
+      idx = idx - 1;
+      putchar(48 + buf[idx])
+    }
+  }
+}
+
+&print_i32(n:#i32) {
+  n < 0 ? {
+    putchar(45);
+    print_u32((#u32)(-n))
+  } : print_u32((#u32)n)
+}
+
+&print_bool(b:#b) {
+  b ? {
+    print_str("true")
+  } : {
+    print_str("false")
+  }
+}

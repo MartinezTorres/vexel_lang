@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Parameter lists consist of one or more comma-separated parameters | Invalid: trailing comma in parameter list
+
+
+&bad(x: #i32, y: #i32,) {
+  -> x;
+}

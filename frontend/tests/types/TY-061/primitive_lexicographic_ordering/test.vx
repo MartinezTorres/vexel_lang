@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Primitives (#i*, #u*, #f*, #b, #s) use numeric or lexicographic ordering | Primitives use lexicographic ordering for strings
+
+
+&^main() -> #i32 {
+    a:#s = "abc";
+    b:#s = "def";
+    (a < b) ? 1 : 0
+}

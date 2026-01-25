@@ -1,0 +1,12 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: @@ loops must sort the temporary buffer via generated comparator helpers using lexicographic ordering for all types. | @@ loops sort via generated comparator helpers
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    arr:#i32[3] = [3, 1, 2];
+    mut first:#i32 = 0;
+    arr @@ { first = _; first };
+    first  // Should be 1 (sorted)
+}

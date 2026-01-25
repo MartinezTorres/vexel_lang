@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-assignment syntax '"'"'a, b = func()'"'"' desugars to temp struct + field access | Multi-assignment desugaring
+
+
+// DC-101: Multi-assignment desugars to temp struct
+&split(val:#i32) -> (#i32, #i32) {
+    (val / 2, val - val / 2)
+}
+
+&^main() -> #i32 {
+    low:#i32;
+    high:#i32;
+    low, high = split(10);
+    low + high
+}

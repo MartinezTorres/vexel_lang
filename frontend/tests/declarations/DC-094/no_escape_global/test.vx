@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver method receiver aliases cannot escape (no storing in globals) | Multi-receiver aliases do not escape
+
+
+// DC-094: Receiver aliases cannot escape to globals
+&(item)use() -> #i32 {
+    item
+}
+
+&^main() -> #i32 {
+    val:#i32 = 99;
+    (val).use()
+}

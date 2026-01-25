@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Only exported functions (declared with &^) are callable externally | Only exported functions externally callable - internal functions work
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-017: Only &^ functions are externally callable
+&^main() -> #i32 {
+    42;
+}

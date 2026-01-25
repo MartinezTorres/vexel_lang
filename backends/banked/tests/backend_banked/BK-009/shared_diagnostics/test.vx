@@ -1,0 +1,10 @@
+// @rfc: backends/banked/README.md
+// @desc: Diagnostics emitted before code generation are shared with the portable C backend | Pre-codegen diagnostics are shared
+// @expect-exit: 1
+// @command: {VEXEL_BANKED} test.vx
+
+
+fn^ test() -> i32 {
+    let x: i32 = "string";  // Type error
+    x
+}

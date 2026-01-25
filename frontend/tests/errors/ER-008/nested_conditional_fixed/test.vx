@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Parser requires explicit parentheses to disambiguate ambiguous expressions | Parentheses disambiguate nested conditionals (positive test)
+
+
+&^main() -> #i32 {
+    choice:#i32 = true ? 1 : (false ? 2 : 3);
+    choice;
+}

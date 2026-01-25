@@ -1,0 +1,9 @@
+// @rfc: backends/banked/README.md
+// @desc: Recursion is allowed only if alternation constraints can be satisfied without violating module residency | Recursion allowed if alternation OK
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^factorial(n:#i32) -> #i32 {
+    n
+}

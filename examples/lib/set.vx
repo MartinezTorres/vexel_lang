@@ -1,0 +1,81 @@
+// Set implementation using sorted array
+
+#Set(data, len, cap);
+
+&#Set(capacity) -> {
+  Set(data, 0, capacity)
+}
+
+&(s)#Set::contains(item) -> {
+  found:#b = 0;
+  0..s.len@{
+    s.data[_] == item ? {
+      found = 1;
+      ->|
+    } : ->
+  };
+  found
+}
+
+&(s)#Set::insert(item) {
+  s.contains(item) ? -> : {
+    s.len < s.cap ? {
+      pos:#u32 = s.len;
+      0..s.len@{
+        s.data[_] > item ? {
+          pos = _;
+          ->|
+        } : ->
+      };
+
+      (s.len > pos)@(_ < s.len - pos) {
+        idx:#u32 = s.len - _ - 1;
+        s.data[idx + 1] = s.data[idx]
+      };
+
+      s.data[pos] = item;
+      s.len = s.len + 1
+    } : ->
+  }
+}
+
+&(s)#Set::remove(item) {
+  pos:#u32 = s.len;
+  0..s.len@{
+    s.data[_] == item ? {
+      pos = _;
+      ->|
+    } : ->
+  };
+
+  pos < s.len ? {
+    (s.len - pos - 1)@{
+      idx:#u32 = pos + _;
+      s.data[idx] = s.data[idx + 1]
+    };
+    s.len = s.len - 1
+  } : ->
+}
+
+&(s)#Set::clear() {
+  s.len = 0
+}
+
+&(s)#Set::size() -> {
+  s.len
+}
+
+&(s)#Set::is_empty() -> {
+  s.len == 0
+}
+
+&(s)#Set::is_full() -> {
+  s.len == s.cap
+}
+
+&(s)#Set::each($expr) {
+  0..s.len@{
+    item = s.data[_];
+    $expr
+  }
+}

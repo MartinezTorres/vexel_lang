@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Function calls can invoke both internal functions and external functions declared with &! | Function calls can invoke both internal functions and external functions declared with &!
+
+
+// EX-005: Function calls can invoke both internal functions and external functions declared with &!
+&!external_multiply(arg0:#i32, arg1:#i32) -> #i32;
+
+&internal_add(a:#i32, b:#i32) -> #i32 {
+    -> a + b;
+}
+
+&^main() -> #i32 {
+    // Call internal function
+    sum:#i32 = internal_add(10, 20);
+    // Call external function
+    product:#i32 = external_multiply(3, 4);
+    -> sum + product;
+}

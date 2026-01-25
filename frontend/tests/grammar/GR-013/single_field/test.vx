@@ -1,0 +1,5 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Field lists consist of one or more comma-separated fields, where each field has the form ident [ '"'"':'"'"' type ] | Type with single field
+
+
+#Counter(value: #i32);

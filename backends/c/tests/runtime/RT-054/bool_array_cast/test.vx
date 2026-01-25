@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Boolean arrays can be converted to/from integers via casting (creates copy) | Boolean arrays can be converted to/from integers via casting (creates copy)
+// @expect-exit: 170
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-054: Boolean arrays can be converted to/from integers via casting (creates copy)
+
+&^main() -> #i32 {
+    flags:#b[8] = [true, false, true, false, true, false, true, false];
+    // Cast to u8
+    bits:#u8 = (#u8)flags;
+    (#i32)bits  // Should be 0b10101010 = 170
+}

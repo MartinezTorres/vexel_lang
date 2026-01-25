@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression 0..|arr|@process(arr[_]) iterates entire array using length operator | Expression 0..|arr|@process(arr[_]) iterates entire array using length operator
+
+
+// EX-060: Length operator in iteration
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[4] = [10, 20, 30, 40];
+    0..4@print(arr[_]);
+    -> 0;
+}

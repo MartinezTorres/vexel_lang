@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Statement conditionals use syntax cond ? stmt with no else branch | Statement conditionals use syntax cond ? stmt with no else branch
+
+
+// EX-021: Statement conditional syntax
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    x:#i32 = 10
+    x > 5 ? print(x)
+    0
+}

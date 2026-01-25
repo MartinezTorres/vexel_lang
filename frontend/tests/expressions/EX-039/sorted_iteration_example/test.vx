@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression arr@@print(_) visits elements in lexicographic order | Expression arr@@print(_) visits elements in lexicographic order
+
+
+// EX-039: Sorted iteration
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[4] = [40, 10, 30, 20];
+    arr@@print(_);  // Prints: 10, 20, 30, 40
+    -> 0;
+}

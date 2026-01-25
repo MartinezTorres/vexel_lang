@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: When '"'"'@@'"'"' method is absent, compiler falls back to built-in array sorting for plain arrays only | Fallback to built-in array sorting
+
+
+// DC-083: Compiler falls back to built-in for arrays
+&^main() -> #i32 {
+    arr:#i32[3] = [3, 1, 2];
+    sum:#i32 = 0;
+    arr@@{ sum = sum + _; }
+    sum
+}

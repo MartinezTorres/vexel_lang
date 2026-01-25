@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Vexel is a strongly typed language | Strongly typed language - successful compilation with proper types
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-001: Strongly typed language with explicit typing
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+&^main() -> #i32 {
+    result:#i32 = add(10, 20)
+    result
+}

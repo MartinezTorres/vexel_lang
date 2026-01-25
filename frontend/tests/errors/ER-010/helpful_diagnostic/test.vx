@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Ambiguous parsing error message indicates where parentheses are needed | Ambiguous parsing error provides helpful diagnostic
+
+
+&^main() -> #i32 {
+    let x = 1 < 2 < 3;
+    0
+}

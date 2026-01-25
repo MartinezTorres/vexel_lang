@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: The # sigil is used for type annotations and type constructors (#i32, #TypeName). | Accept # sigil for type annotations and constructors
+
+
+&^main() -> #i32 {
+    x: #i32 = 42
+    y: #f64 = 3.14
+    z: #u8 = 'A'
+    0
+}

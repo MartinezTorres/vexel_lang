@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Example: font:#s = ::assets::font.bin; embeds assets/font.bin as a string | Example of embedding font file as string resource
+
+
+// NR-018: Example: font:#s = ::assets::font.bin; embeds assets/font.bin as a string
+font:#s = ::assets::font.bin;
+
+&^main() -> #i32 {
+    result:#i32 = (font == "FONT_DATA_BINARY") ? (#i32)0 : (#i32)1;
+    -> result;
+}

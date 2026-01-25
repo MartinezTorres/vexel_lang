@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions cannot use tuple returns (ABI compatibility) | Exported functions no tuple returns
+
+
+// DC-110: Exported functions cannot use tuple returns
+&^single_return(x:#i32) -> #i32 {
+    x * 2
+}
+
+&^main() -> #i32 {
+    single_return(21)
+}

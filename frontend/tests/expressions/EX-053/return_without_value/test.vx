@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Return without value uses syntax ->; to return from current function | Return without value uses syntax ->; to return from current function
+
+
+// EX-053: Return without value
+&!print(arg0:#i32);
+
+&maybe_print(flag:#b, value:#i32) {
+    !flag ? ->;
+    print(value);
+}
+
+&^main() -> #i32 {
+    maybe_print(0, 10);  // Returns early, no print
+    maybe_print(1, 20);   // Prints 20
+    -> 0;
+}

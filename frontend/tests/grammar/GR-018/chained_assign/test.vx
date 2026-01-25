@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Assignment expressions have the form lvalue '"'"'='"'"' expr or are forwarded to conditional expressions | Chained assignment expression
+
+
+&chain() {
+  x = y = z = 42;
+}

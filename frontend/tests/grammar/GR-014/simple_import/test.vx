@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Import statements use the form '"'"'::'"'"' qname '"'"';'"'"' | Simple import statement
+
+::module;
+
+&^main() -> #i32 {
+    0
+}

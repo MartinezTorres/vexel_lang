@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The _ variable is read-only within the loop body | The _ variable is read-only within the loop body
+
+
+// EX-036: _ is read-only - ERROR
+&^main() -> #i32 {
+    arr:#i32[3] = [1, 2, 3];
+    arr@{
+        _ = _ + 1;  // ERROR: cannot assign to _
+    };
+    -> 0;
+}

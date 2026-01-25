@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods must bind '"'"'_'"'"' before evaluating $loop for each element | Iteration binds _ before loop evaluation
+
+
+// DC-080: Bind _ before evaluating $loop
+#Elements(arr:#i32[3]);
+
+&(e)#Elements::@($loop) {
+    _:#i32 = e.arr[0];
+    $loop;
+}
+
+&^main() -> #i32 {
+    els:#Elements = Elements([10, 20, 30]);
+    sum:#i32 = 0;
+    els@{ sum = sum + _; }
+    sum
+}

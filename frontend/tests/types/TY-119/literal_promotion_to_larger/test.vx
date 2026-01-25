@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Automatic promotion applies when assigning literals to larger types | Automatic promotion applies when assigning literals to larger types
+
+
+&^main() -> #i32 {
+    x:#i64 = 100;
+    0
+}

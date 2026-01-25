@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: The public header declares every exported (&^) function twice: foo_pageA and foo_pageB | Header declares foo_pageA and foo_pageB
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^exported() -> #i32 { 0 }

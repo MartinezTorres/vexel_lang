@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Composite types use value semantics (assignment copies) | Composite types use value semantics (assignment copies)
+
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    p1:#Point = Point(10, 20);
+    p2:#Point = p1;
+    p2.x
+}

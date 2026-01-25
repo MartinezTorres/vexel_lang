@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Blocks use syntax { stmt; ... } to group statements | Blocks use syntax { stmt; ... } to group statements
+
+
+// EX-011: Block syntax
+&^main() -> #i32 {
+    x:#i32 = {
+        a:#i32 = 10;
+        b:#i32 = 20;
+        a + b
+    };
+    -> x;
+}

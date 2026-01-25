@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Nested functions capture enclosing scope variables by reference | Nested function captures multiple enclosing variables
+
+
+&^main() -> #i32 {
+    x:#i32 = 10;
+    y:#i32 = 20;
+
+    &compute() -> #i32 {
+        x + y;
+    }
+
+    compute();
+}

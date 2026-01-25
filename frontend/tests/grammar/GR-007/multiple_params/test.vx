@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Parameter lists consist of one or more comma-separated parameters | Function with multiple comma-separated parameters
+
+
+&calculate(a: #i32, b: #i32, c: #i32, d: #i32) {
+  -> a + b + c + d;
+}

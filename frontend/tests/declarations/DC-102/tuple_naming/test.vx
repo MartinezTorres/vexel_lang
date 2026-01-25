@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Compiler generates anonymous types for tuples with naming pattern '"'"'#__TupleN_Type1_Type2'"'"' | Tuple anonymous type naming
+
+
+// DC-102: Compiler generates anonymous tuple types
+&values() -> (#i32, #i32) {
+    (100, 200)
+}
+
+&^main() -> #i32 {
+    a:#i32;
+    b:#i32;
+    a, b = values();
+    a + b
+}

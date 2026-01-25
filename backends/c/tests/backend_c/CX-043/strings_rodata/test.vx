@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Strings must reside in a .rodata section via const definitions. | Strings must reside in .rodata section via const definitions
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    msg: #s = "Hello, World!"
+    0
+}

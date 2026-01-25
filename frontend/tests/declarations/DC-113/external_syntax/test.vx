@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: External functions must use syntax '"'"'&!name(p:Type,...)[-> Type];'"'"' (declaration only) | External function correct syntax
+
+
+// DC-113: External function declaration syntax
+&!external_add(a:#i32, b:#i32) -> #i32;
+
+&^main() -> #i32 {
+    0
+}

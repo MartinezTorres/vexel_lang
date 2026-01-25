@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_MOVE_SYMBOLS_TO is defined as a macro that creates a symbol __ML_MOVE_SYMBOLS_TO_##target##_FROM_##source at address 0x0000 | ML_MOVE_SYMBOLS_TO macro definition
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

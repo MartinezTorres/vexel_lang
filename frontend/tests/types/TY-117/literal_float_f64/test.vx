@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Floating literals infer to #f64 | Floating literals infer to #f64
+
+
+&^main() -> #i32 {
+    x = 3.14159;
+    0
+}

@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: When several symbols must reside together (e.g., mutually-recursive helpers), the backend emits matching ML_MOVE_SYMBOLS_TO directives | Co-locate symbols with ML_MOVE_SYMBOLS_TO
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^helper() -> #i32 { 0 }
+&^main() -> #i32 { helper() }

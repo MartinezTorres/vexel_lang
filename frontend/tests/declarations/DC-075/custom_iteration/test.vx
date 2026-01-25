@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods provide custom semantics for '"'"'receiver@{...}'"'"' and '"'"'receiver@@{...}'"'"' | Custom iteration semantics
+
+
+// DC-075: Custom iteration semantics
+#Container(data:#i32[3]);
+
+&(c)#Container::@($loop) {
+    _:#i32 = c.data[0];
+    $loop;
+}
+
+&^main() -> #i32 {
+    cnt:#Container = Container([1, 2, 3]);
+    sum:#i32 = 0;
+    cnt@{ sum = sum + _; }
+    sum
+}

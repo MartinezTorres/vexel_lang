@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Division by zero causes runtime trap | Division by zero causes runtime trap
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// RT-047: Division by zero causes runtime trap
+// This should trap at runtime (not compile time since divisor is runtime value)
+
+&^main(x:#i32) -> #i32 {
+    100 / x  // If x is 0, this traps
+}

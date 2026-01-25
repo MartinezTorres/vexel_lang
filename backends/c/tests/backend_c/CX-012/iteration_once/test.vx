@@ -1,0 +1,12 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: Iteration operands must evaluate exactly once. | Iteration operands must evaluate exactly once
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    arr:#i32[3] = [1, 2, 3];
+    mut sum:#i32 = 0;
+    arr @ { sum = sum + _; sum };
+    sum
+}

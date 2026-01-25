@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Scoped import instances do not share mutable state across different scopes | Scoped import instances do not share mutable state
+
+// NR-024: Scoped import instances do not share mutable state across different scopes
+&^main() -> #i32 {
+    {
+        ::stateful;
+        stateful::reset();
+        stateful::set(42);
+    }
+    {
+        ::stateful;
+        // Should be 0, not 42 (different instance)
+        stateful::reset();
+        val:#i32 = stateful::get();
+        result:#i32 = (val == 0) ? (#i32)0 : (#i32)1;
+        -> result;
+    }
+}

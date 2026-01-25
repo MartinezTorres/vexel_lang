@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Bitwise XOR (^) has precedence after bitwise AND | Bitwise XOR (^) has precedence after bitwise AND
+
+
+// EX-075: Bitwise XOR precedence
+&^main() -> #i32 {
+    // 12 & 8 ^ 4 is (12 & 8) ^ 4
+    result:#u32 = (#u32)12 & (#u32)8 ^ (#u32)4;
+    -> result;  // (12 & 8) ^ 4 = 8 ^ 4 = 12
+}

@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Range 5..0 is equivalent to [5,4,3,2,1] in descending order | Range 5..0 is equivalent to [5,4,3,2,1] in descending order
+
+
+// EX-063: Descending range
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    5..0@print(_);  // Prints: 5, 4, 3, 2, 1
+    -> 0;
+}

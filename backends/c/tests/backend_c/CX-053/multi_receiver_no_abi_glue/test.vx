@@ -1,0 +1,13 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: Multi-receiver functions require no additional ABI glue. | Multi-receiver functions require no additional ABI glue
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&equals(ax:#i32, ay:#i32, bx:#i32, by:#i32) -> #b {
+    (ax == bx) && (ay == by)
+}
+
+&^main() -> #i32 {
+    equals(1, 2, 1, 2) ? 1 : 0
+}

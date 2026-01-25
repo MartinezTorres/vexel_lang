@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The _ variable is scoped to the loop body and only available in iterable loops | The _ variable is scoped to the loop body and only available in iterable loops
+
+
+// EX-035: _ scoped to loop body
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [1, 2, 3];
+    arr@print(_);
+    // _ not available outside loop
+    -> 0;
+}

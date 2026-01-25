@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Operator methods behave like regular methods (left operand passed by reference) | Operator left operand passed by reference
+
+
+// DC-062: Left operand passed by reference
+#Accumulator(sum:#i32);
+
+&(a)#Accumulator::+(val:#i32) -> #Accumulator {
+    a.sum = a.sum + val;
+    a
+}
+
+&^main() -> #i32 {
+    acc:#Accumulator = Accumulator(0);
+    acc = acc + 10;
+    acc.sum
+}

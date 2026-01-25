@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Postfix operators (call, index, member) have highest precedence | Postfix operators (call, index, member) have highest precedence
+
+
+// EX-068: Postfix operators
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    arr:#Point[2] = [Point(1, 2), Point(3, 4)];
+    // arr[0].x: index then member access
+    result:#i32 = arr[0].x;
+    -> result;
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Assignment can be used in larger expressions like y = (x = 5) + 1 | Assignment can be used in larger expressions like y = (x = 5) + 1
+
+
+// EX-086: Assignment in expression
+&^main() -> #i32 {
+    x:#i32 = 0;
+    y:#i32 = (x = 5) + 1;
+    -> y;  // 6
+}

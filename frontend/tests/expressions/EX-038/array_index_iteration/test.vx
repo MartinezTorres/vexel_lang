@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression arr@process(arr[_]) visits each array element using index _ | Expression arr@process(arr[_]) visits each array element using index _
+
+
+// EX-038: Array indexing in iteration
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[4] = [100, 200, 300, 400];
+    0..4@print(arr[_]);
+    -> 0;
+}

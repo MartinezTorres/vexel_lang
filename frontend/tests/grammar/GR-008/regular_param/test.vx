@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Each parameter has the form [ '"'"'$'"'"' ] ident [ '"'"':'"'"' type ] where '"'"'$'"'"' prefix denotes expression parameters | Regular parameter without type annotation
+
+
+&process(x) {
+  -> x;
+}

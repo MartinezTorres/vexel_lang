@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Backend typically places mutable global variables in RAM | Mutable global for RAM placement
+
+
+// DC-013: Backend typically places mutable globals in RAM
+data:#u8[1024];
+
+&^main() -> #i32 {
+    data[0] = 1;
+    0
+}

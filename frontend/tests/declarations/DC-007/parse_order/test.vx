@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable globals are initialized in parse order (top-to-bottom) | Immutable globals initialize in parse order
+
+
+// DC-007: Immutable globals initialized in parse order
+FIRST = 1;
+SECOND = 2;
+THIRD = 3;
+
+&^main() -> #i32 {
+    FIRST + SECOND + THIRD
+}

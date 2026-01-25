@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#diagnostics-specific-to-this-backend
+// @desc: Backend must emit an error when an unsupported feature would produce invalid C. | Backend emits error when unsupported feature would produce invalid C
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

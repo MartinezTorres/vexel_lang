@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Bitwise AND expressions consist of one or more compare terms separated by '"'"'&'"'"' | Multiple bitwise AND expressions chained
+
+
+&^main() -> #i32 {
+  result:#u8 = (#u8)15 & (#u8)7 & (#u8)3 & (#u8)1;
+  (result != (#u8)0) ? 1 : 0
+}

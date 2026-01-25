@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Directory resource tuple .__1 field contains file contents | Directory resource tuple __1 field contains file contents
+
+
+// NR-010: Directory resource tuple .__1 field contains file contents
+items = ::content;
+
+&^main() -> #i32 {
+    // __1 should contain the file contents
+    result:#i32 = (items[0].__1 == "expected-content") ? (#i32)0 : (#i32)1;
+    -> result;
+}

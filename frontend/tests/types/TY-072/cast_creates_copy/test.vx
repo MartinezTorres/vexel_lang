@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: All casts always create a copy (never a reference) | All casts always create a copy (never a reference)
+
+
+&^main() -> #i32 {
+    x:#i8 = 42;
+    y:#i32 = (#i32)x;
+    y
+}

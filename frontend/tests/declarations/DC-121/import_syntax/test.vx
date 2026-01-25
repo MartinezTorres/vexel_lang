@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Import statements must use syntax '"'"'::path::to::module;'"'"' | Import statement correct syntax
+
+
+// DC-121: Import statement syntax
+// ::module::submodule;
+
+&^main() -> #i32 {
+    0
+}

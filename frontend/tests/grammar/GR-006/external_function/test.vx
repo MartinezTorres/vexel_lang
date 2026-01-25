@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: External function declarations use the form '"'"'&!'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] '"'"';'"'"' | External function declaration with parameters and return type
+
+
+&!printf(fmt: #i8, x: #i32) -> #i32;
+
+&^main() -> #i32 { 0 }

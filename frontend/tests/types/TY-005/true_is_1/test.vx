@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Use 0 for false, 1 for true when working with #b type | 1 represents true for boolean type
+
+
+&^main() -> #i32 {
+    x:#b = 1;
+    (x == 1) ? 1 : 0
+}

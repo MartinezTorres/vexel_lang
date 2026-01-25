@@ -1,0 +1,16 @@
+## Stdout
+```
+// Lowered Vexel module: tests/grammar/GR-033/var_simple/test.vx
+&^main() -> #i32 {
+    y = 1;
+    x = y;
+    x
+}
+```
+
+## Stderr
+```
+```
+
+## Exit Code
+0

@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters capture unevaluated expressions from call site | Expression parameters capture unevaluated expressions
+
+
+// DC-041: Expression parameters capture unevaluated expressions
+&twice($action) {
+    $action;
+    $action;
+}
+
+&^main() -> #i32 {
+    x:#i32 = 0;
+    twice(x = x + 1);
+    x  // Should be 2
+}

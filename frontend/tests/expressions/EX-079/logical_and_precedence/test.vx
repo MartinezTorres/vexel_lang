@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Logical AND (&&) has precedence after equality operators | Logical AND (&&) has precedence after equality operators
+
+
+// EX-079: Logical AND precedence
+&^main() -> #i32 {
+    // 5 == 5 && 3 < 4 is (5 == 5) && (3 < 4)
+    result:#b = 5 == 5 && 3 < 4;
+    -> result ? 1 : 0;
+}

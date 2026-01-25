@@ -1,0 +1,32 @@
+// Simple string array printing example
+// External putchar for printing
+
+&!putchar(c:#u8);
+
+&print_char(c:#u8) {
+  putchar(c)
+}
+
+&print_str(s:#s) {
+  len:#i32 = |s|;
+  0..len@{
+    putchar(s[_])
+  }
+}
+
+&print_newline() {
+  putchar(10)
+}
+
+&print_strings(strings:#s[4], count:#i32) {
+  0..count@{
+    print_str(strings[_]);
+    print_newline()
+  }
+}
+
+&^main() -> #i32 {
+  messages:#s[4] = ["Hello", "World", "from", "Vexel"];
+  print_strings(messages, 4);
+  0
+}

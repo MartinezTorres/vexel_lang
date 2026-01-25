@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Module resolution: ::a::b; maps to a/b.vx (case-sensitive, relative to project root) | Module resolution maps ::a::b to a/b.vx
+
+
+// NR-022: Module resolution: ::a::b; maps to a/b.vx (case-sensitive, relative to project root)
+::a::b;
+
+&^main() -> #i32 {
+    a::b::getValue()
+}

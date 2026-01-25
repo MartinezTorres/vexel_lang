@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: If condition is runtime value, branches must have same type | If condition is runtime value, branches must have same type
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// RT-032: If condition is runtime value, branches must have same type
+
+&^main(flag:#b) -> #i32 {
+    // flag is runtime parameter, so both branches must return #i32
+    flag ? 42 : 99
+}

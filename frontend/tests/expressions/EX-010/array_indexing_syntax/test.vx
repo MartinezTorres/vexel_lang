@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Array indexing uses syntax arr[expr] to access array elements | Array indexing uses syntax arr[expr] to access array elements
+
+
+// EX-010: Array indexing syntax
+&^main() -> #i32 {
+    arr:#i32[5] = [1, 2, 3, 4, 5];
+    x:#i32 = arr[0];
+    y:#i32 = arr[4];
+    -> x + y;
+}

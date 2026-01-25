@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Ambiguous parsing examples include nested conditionals and complex expressions | Ambiguous parsing example: conditional in arithmetic expression
+
+
+&^main() -> #i32 {
+    nested:#b = (1 < 2) ? 3 < 4 < 5 : false;
+    0;
+}

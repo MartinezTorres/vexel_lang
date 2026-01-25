@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: When the backend co-locates symbols, it emits ML_MOVE_SYMBOLS_TO invocations so Megalinker merges the modules before placement | Co-location emits ML_MOVE_SYMBOLS_TO
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^a() -> #i32 { b() }
+&^b() -> #i32 { a() }

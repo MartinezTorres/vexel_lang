@@ -1,0 +1,11 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: @@ loops must iterate over the sorted copy without mutating the source. | @@ loops iterate over sorted copy without mutating source
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    arr:#i32[3] = [3, 1, 2];
+    arr @@ { 0 };
+    arr[0]  // Should still be 3 (source unmutated)
+}

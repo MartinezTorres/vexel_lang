@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time execution can only read immutable globals defined earlier | Compile-time execution can only read immutable globals defined earlier
+// @expect-exit: 30
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-019: Compile-time execution can only read immutable globals defined earlier
+
+first:#i32 = 10;
+
+&compute() -> #i32 {
+    first + 20;  // OK - first is defined earlier
+}
+
+second:#i32 = compute();
+
+&^main() -> #i32 {
+    second  // Should be 30
+}

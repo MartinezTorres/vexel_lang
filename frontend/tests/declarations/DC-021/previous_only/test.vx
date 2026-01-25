@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: During constant initialization, only previously defined globals are accessible | Only previous globals accessible during constant init
+
+
+// DC-021: Only previously defined globals accessible during init
+FIRST = 10;
+SECOND = FIRST * 2;
+
+&^main() -> #i32 {
+    SECOND
+}

@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Loop control statements affect only the innermost enclosing loop | Loop control statements affect only the innermost enclosing loop
+
+
+// EX-051: Loop control affects innermost loop
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    outer:#i32 = 0;
+    (outer < 3)@{
+        inner:#i32 = 0;
+        (inner < 3)@{
+            inner == 1 ? ->|;  // Breaks inner loop only
+            print(inner);
+            inner = inner + 1;
+        };
+        outer = outer + 1;
+    };
+    -> 0;
+}

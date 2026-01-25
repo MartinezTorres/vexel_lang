@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Left operand in operator method call must be an identifier | Operator left operand is identifier
+
+
+// DC-063: Left operand must be identifier
+#Value(n:#i32);
+
+&(v)#Value::+(other:#Value) -> #Value {
+    Value(v.n + other.n)
+}
+
+&^main() -> #i32 {
+    a:#Value = Value(5);
+    b:#Value = Value(10);
+    c:#Value = a + b;
+    c.n
+}

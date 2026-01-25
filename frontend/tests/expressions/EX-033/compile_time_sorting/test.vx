@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Compile-time arrays may be fully sorted at compile time during @@ iteration | Compile-time arrays may be fully sorted at compile time during @@ iteration
+
+
+// EX-033: Compile-time array sorting
+NUMS:#i32[4] = [40, 10, 30, 20];
+
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    // NUMS is compile-time constant, can be sorted at compile time
+    NUMS@@print(_);
+    -> 0;
+}

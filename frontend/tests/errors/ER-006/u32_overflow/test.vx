@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Literal overflow: Integer or float literals that exceed type range are compile-time errors | Literal overflow: u32 value exceeds range
+
+
+&^main() -> #i32 {
+    value:#u32 = 4294967296;
+    0;
+}

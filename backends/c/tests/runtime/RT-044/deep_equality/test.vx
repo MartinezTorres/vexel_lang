@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Equality uses value-based deep comparison | Equality uses value-based deep comparison
+// @expect-exit: 1
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-044: Equality uses value-based deep comparison
+
+&^main() -> #i32 {
+    a [3]#i32 = [1, 2, 3]
+    b [3]#i32 = [1, 2, 3]
+    c [3]#i32 = [1, 2, 4]
+
+    // a and b should be equal (same values)
+    // a and c should not be equal
+    (a == b && a != c) ? 1 : 0
+}

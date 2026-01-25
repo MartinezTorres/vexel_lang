@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time execution cannot call external functions (&!) | Compile-time execution cannot call external functions (&!)
+// @expect-exit: 1
+// @expect-stderr: external
+// @command: {VEXEL_C} test.vx
+
+
+// RT-017: Compile-time execution cannot call external functions (&!)
+
+&!external_func() -> #i32
+
+compute() -> #i32 {
+    external_func()  // This should fail at compile time
+}
+
+// Trying to use at compile time
+value #i32 = compute()
+
+&^main() -> #i32 {
+    value
+}

@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: All values support <, >, <=, >=, ==, and != operators | All values support <= operator
+
+
+&^main() -> #i32 {
+    a:#i32 = 10;
+    b:#i32 = 20;
+    (a <= b) ? 1 : 0
+}

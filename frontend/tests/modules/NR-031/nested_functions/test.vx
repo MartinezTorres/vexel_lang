@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Function definitions can be scoped to blocks (nested functions) | Function definitions can be scoped to blocks (nested functions)
+
+
+// NR-031: Function definitions can be scoped to blocks (nested functions)
+&outer() -> #i32 {
+    &inner() -> #i32 {
+        99
+    }
+    inner()
+}
+
+&^main() -> #i32 {
+    outer()
+}

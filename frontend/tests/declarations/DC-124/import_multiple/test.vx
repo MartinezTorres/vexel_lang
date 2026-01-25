@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multiple import statements are allowed when they agree with duplicate-definition rules | Multiple import statements
+
+
+// DC-124: Multiple import statements allowed
+// ::first::module;
+// ::second::module;
+
+&^main() -> #i32 {
+    0
+}

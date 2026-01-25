@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Directory resource lists files in lexicographic order | Directory resource lists files in lexicographic order
+
+
+// NR-007: Directory resource lists files in lexicographic order
+files = ::data;
+
+&^main() -> #i32 {
+    // First file should be aaa.txt, last should be zzz.txt
+    result:#i32 = (files[0].__0 == "aaa.txt" && files[2].__0 == "zzz.txt") ? (#i32)0 : (#i32)1;
+    -> result;
+}

@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Arrays of booleans can be bit-packed: #b[8] fits in one byte | Boolean array #b[8] fits in one byte
+
+
+&^main() -> #i32 {
+    x:#b[8] = [1,0,1,0,1,0,1,0];
+    0
+}

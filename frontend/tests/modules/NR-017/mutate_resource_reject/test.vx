@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Attempting to mutate resource expressions is compile-time error | Attempting to mutate resource expressions is compile-time error
+
+
+// NR-017: Attempting to mutate resource expressions is compile-time error
+content:#s = ::data.txt;
+
+&^main() -> #i32 {
+    // This should fail - trying to mutate immutable resource
+    content = "new value";
+    0
+}

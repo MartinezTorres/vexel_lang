@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers | Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers
+// @expect-exit: 136
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-049: Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers
+
+&^main() -> #i32 {
+    a:#u8 = 204;  // 0b11001100
+    b:#u8 = 170;  // 0b10101010
+    (#i32)(a & b)  // Should be 0b10001000 = 136
+}

@@ -1,0 +1,2 @@
+// This module initializes first
+INIT_VALUE:#i32 = 100;

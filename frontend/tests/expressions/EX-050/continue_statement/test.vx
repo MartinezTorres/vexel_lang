@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Continue statement uses syntax ->>; to skip to next iteration of innermost loop | Continue statement uses syntax ->>; to skip to next iteration of innermost loop
+
+
+// EX-050: Continue statement
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    i:#i32 = 0;
+    (i < 5)@{
+        i = i + 1;
+        i == 3 ? ->>;
+        print(i);
+    };
+    -> 0;
+}

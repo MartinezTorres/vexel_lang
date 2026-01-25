@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Primary expressions include literals, variables, parenthesized expressions, blocks, array literals, function calls, method calls, and constructor calls | Primary expression: variable references
+
+
+&^main() -> #i32 {
+  y:#i32 = 5
+  x:#i32 = y
+  a:#i32 = x
+  a
+}

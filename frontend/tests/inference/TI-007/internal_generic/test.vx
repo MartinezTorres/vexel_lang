@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Generic functions must resolve within the compiling program | Multiple generic functions resolved internally
+
+
+&wrap(value) {
+    [value]
+}
+
+&unwrap(wrapped) {
+    wrapped[0]
+}
+
+&^main() -> #i32 {
+    unwrap(wrap(42))
+}

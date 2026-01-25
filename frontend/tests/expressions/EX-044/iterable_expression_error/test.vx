@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The iterable expression must be an identifier so it can be passed by reference to iterator methods | Non-identifier iterable expression is an error
+
+
+// EX-044: Expression as iterable - ERROR
+&print(arg0:#i32) { }
+
+&get_array() -> #i32[3] {
+    -> [1, 2, 3];
+}
+
+&^main() -> #i32 {
+    // ERROR: get_array() is not an identifier
+    get_array()@print(_);
+    -> 0;
+}

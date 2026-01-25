@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Hexadecimal digits match the pattern [0-9A-Fa-f] | Hexadecimal digits [0-9A-Fa-f]
+
+
+&test() {
+  h1 = 0x0123456789;
+  h2 = 0xABCDEF;
+  h3 = 0xabcdef;
+  s1 = "\x00\x99\xAA\xff";
+}

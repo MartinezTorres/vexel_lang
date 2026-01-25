@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Identifiers must match the pattern [A-Za-z_][A-Za-z0-9_]* (letter or underscore, followed by zero or more letters, digits, or underscores). | Accept identifiers matching [A-Za-z_][A-Za-z0-9_]*
+
+
+&^main() -> #i32 {
+    a: #i32 = 1
+    _b: #i32 = 2
+    c3: #i32 = 3
+    _D4_e: #i32 = 4
+    MyVar_123: #i32 = 5
+    0
+}

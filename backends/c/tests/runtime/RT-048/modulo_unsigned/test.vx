@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Modulo operator (%) is only defined for unsigned integers | Modulo operator (%) is only defined for unsigned integers
+// @expect-exit: 2
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-048: Modulo operator (%) is only defined for unsigned integers
+
+&^main() -> #i32 {
+    a:#u32 = 17;
+    b:#u32 = 5;
+    (#i32)(a % b)  // Should be 2
+}

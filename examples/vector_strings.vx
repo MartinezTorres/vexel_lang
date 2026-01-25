@@ -1,0 +1,22 @@
+// Vector of strings example
+// Demonstrates module imports, vectors, strings, and printing
+
+::lib::print;
+::lib::vector;
+
+&print_vector_strings(v) {
+  0..v.len@{
+    print_str(v.data[_]);
+    print_newline()
+  }
+}
+
+&^main() -> #i32 {
+  // Create a vector of strings
+  data:#s[4] = ["Hello", "World", "from", "Vexel"];
+  v:#Vec = Vec(data, 4, 4);
+
+  print_vector_strings(v);
+
+  0
+}

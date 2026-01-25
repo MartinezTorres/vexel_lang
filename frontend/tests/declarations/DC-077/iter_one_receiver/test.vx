@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods must have exactly one receiver | Iteration method one receiver
+
+
+// DC-077: Iteration methods have exactly one receiver
+#Sequence(count:#i32);
+
+&(s)#Sequence::@($loop) {
+    _:#i32 = s.count;
+    $loop;
+}
+
+&^main() -> #i32 {
+    seq:#Sequence = Sequence(3);
+    seq@{ -> 0; };
+    0
+}

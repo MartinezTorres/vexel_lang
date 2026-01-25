@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#operations
+// @desc: The length operator |expr| only accepts arrays with compile-time constant length or strings. | Length operator rejects arrays without compile-time length
+
+
+&^main(n:#i32) -> #i32 {
+    arr:#i32[n];
+    |arr|
+}

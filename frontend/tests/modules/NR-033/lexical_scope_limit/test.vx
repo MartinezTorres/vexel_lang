@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Block-scoped definitions have visibility limited to their lexical scope | Block-scoped definitions limited to lexical scope
+
+
+// NR-033: Block-scoped definitions have visibility limited to their lexical scope
+&^main() -> #i32 {
+    {
+        localVar:#i32 = 42;
+    }
+    // This should fail - localVar is not accessible outside its block
+    x:#i32 = localVar;
+    0
+}

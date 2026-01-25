@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters allow optional type annotation | Expression parameters allow optional type
+
+
+// DC-048: Expression parameters allow optional type annotation
+&typed($expr:#i32) -> #i32 {
+    $expr
+}
+
+&^main() -> #i32 {
+    typed(42)
+}

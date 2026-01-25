@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array size cannot depend on external calls, runtime values, or I/O | Array size cannot depend on runtime values (test passes with non-runtime size)
+
+
+&^main() -> #i32 {
+    n:#i32 = 5;
+    0
+}

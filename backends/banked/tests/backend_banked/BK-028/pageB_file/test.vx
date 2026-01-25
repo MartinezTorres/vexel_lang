@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: For each function foo, emit banked/foo.pageB.c | Emit banked/foo.pageB.c
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^foo() -> #i32 { 10 }

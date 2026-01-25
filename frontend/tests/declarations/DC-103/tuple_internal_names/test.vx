@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Tuple synthetic names are compiler-internal (user code references via literals or multi-assignment) | Tuple synthetic names internal
+
+
+// DC-103: Tuple names are compiler-internal
+&data() -> (#i32, #i32) {
+    (5, 10)
+}
+
+&^main() -> #i32 {
+    x:#i32;
+    y:#i32;
+    x, y = data();
+    x + y
+}

@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#toolchain-assumptions
+// @desc: No platform-specific assembly stubs must be introduced by this backend. | No platform-specific assembly stubs introduced by backend
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

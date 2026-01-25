@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Resource expressions may appear in expressions | Resource expressions may appear in expressions
+
+
+// NR-016: Resource expressions may appear in expressions
+&^main() -> #i32 {
+    // Using resource expression directly in expression context
+    val:#s = ::value.txt;
+    result:#i32 = (val == "42") ? (#i32)0 : (#i32)1;
+    -> result;
+}

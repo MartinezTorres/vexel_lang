@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: The backend can assign fixed addresses to mutable globals when requested | Backend assigns fixed addresses
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+mut MMIO:#u8 = 0xFF;

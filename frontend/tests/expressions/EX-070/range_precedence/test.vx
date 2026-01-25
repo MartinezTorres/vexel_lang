@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Range operator (..) has precedence after unary operators | Range operator (..) has precedence after unary operators
+
+
+// EX-070: Range precedence
+&^main() -> #i32 {
+    r = [ -1, 0, 1, 2 ];
+    -> r[0];  // Should be -1
+}

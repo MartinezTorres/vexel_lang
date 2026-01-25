@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Name resolution failures are reported as compile-time errors | Name resolution failure: undefined type
+
+
+&^main() -> #i32 {
+    value:#MyType = 5;
+    value;
+}

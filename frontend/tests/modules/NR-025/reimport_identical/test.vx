@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Re-importing same module in same scope is permitted when every top-level definition is identical | Re-importing same module with identical definitions is permitted
+
+
+// NR-025: Re-importing same module in same scope is permitted when every top-level definition is identical
+::utils;
+::utils;  // Re-import in same scope - should be allowed
+
+&^main() -> #i32 {
+    utils::add(1, 2)
+}

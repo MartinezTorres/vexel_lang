@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Multi-assignment uses syntax a, b, c = expr where expr returns tuple type | Multi-assignment uses syntax a, b, c = expr where expr returns tuple type
+
+
+// EX-089: Multi-assignment syntax
+
+&pair() -> (#i32, #i32) {
+    (100, 200)
+}
+
+&^main() -> #i32 {
+    a:#i32;
+    b:#i32;
+    a, b = pair();
+    -> a + b; // 300
+}

@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#testing-notes
+// @desc: Unit tests that exercise language semantics should run against this backend by default to maximise code reuse with stricter backends. | Unit tests exercising language semantics run against this backend by default
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

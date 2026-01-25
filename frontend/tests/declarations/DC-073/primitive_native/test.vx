@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Primitives retain their native arithmetic and comparison rules when no override exists | Primitives retain native arithmetic rules
+
+
+// DC-073: Primitives retain native arithmetic without override
+&^main() -> #i32 {
+    x:#i32 = 5;
+    y:#i32 = 3;
+    x * y + x - y
+}

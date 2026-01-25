@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer literals 2-255 infer to #u8 | Integer literal 2 infers to #u8
+
+
+&^main() -> #i32 {
+    x = 2;
+    0
+}

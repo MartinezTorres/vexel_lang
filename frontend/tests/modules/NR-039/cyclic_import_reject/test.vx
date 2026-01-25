@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Initialization cycles are compile-time error | Initialization cycles are compile-time error
+
+// NR-039: Initialization cycles are compile-time error
+::a;
+
+&^main() -> #i32 {
+    a::VALUE_A
+}

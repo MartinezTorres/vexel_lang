@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Arrays compare lexicographically by element | Arrays compare lexicographically by element
+
+
+&^main() -> #i32 {
+    a:#i32[3] = [1,2,3];
+    b:#i32[3] = [1,2,4];
+    (a < b) ? 1 : 0
+}

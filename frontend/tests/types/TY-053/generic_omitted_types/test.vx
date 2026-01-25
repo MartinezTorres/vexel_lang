@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Omitted param/field types become type parameters | Omitted param/field types become type parameters
+
+
+#Pair(a, b);
+
+&^main() -> #i32 {
+    p:#Pair = Pair(10, 20);
+    p.a
+}

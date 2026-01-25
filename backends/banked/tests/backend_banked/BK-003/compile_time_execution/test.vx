@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: Compile-time execution passes are identical to the portable C backend | Compile-time const evaluation works identically
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+SIZE:#i32 = 10 * 20;
+
+&^get_size() -> #i32 {
+    SIZE
+}

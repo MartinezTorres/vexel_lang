@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Pure functions can compute initial values for immutable globals at compile time | Pure functions compute immutable global values
+
+
+// DC-006: Pure functions can compute initial values at compile time
+&square(x:#i32) -> #i32 { x * x }
+
+SQUARED = square(10);
+
+&^main() -> #i32 {
+    SQUARED
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Import resolution maps '"'"'::a::b;'"'"' to '"'"'a/b.vx'"'"' (case-sensitive, relative to project root) | Import resolution to file paths
+
+
+// DC-126: Import resolution maps to file paths
+// ::utils::math; would resolve to utils/math.vx
+
+&^main() -> #i32 {
+    0
+}

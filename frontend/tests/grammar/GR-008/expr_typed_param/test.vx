@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Each parameter has the form [ '"'"'$'"'"' ] ident [ '"'"':'"'"' type ] where '"'"'$'"'"' prefix denotes expression parameters | Expression parameter with type annotation
+
+
+&transform($x: #i32) {
+  -> $x * 3;
+}

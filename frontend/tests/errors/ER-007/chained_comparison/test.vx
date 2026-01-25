@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Ambiguous parsing: Multiple valid parse trees trigger a compile-time error | Ambiguous parsing: chained comparison operators
+
+
+&^main() -> #i32 {
+    let x = 1 < 2 < 3;
+    0
+}

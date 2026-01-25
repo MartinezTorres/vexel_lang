@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer arithmetic uses two'"'"'s complement wrapping on overflow | Integer arithmetic uses two'"'"'s complement wrapping on overflow
+
+
+&^main() -> #i32 {
+    x:#u8 = 255;
+    y:#u8 = (#u8)(x + 1);
+    0
+}

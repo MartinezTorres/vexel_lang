@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Import statements disallow shadowing (compilation error on name conflicts) | Import disallows shadowing
+
+
+// DC-125: Import disallows shadowing
+&helper() -> #i32 { 42 }
+
+// If importing a module with 'helper', should error
+// ::module_with_helper;
+
+&^main() -> #i32 {
+    helper()
+}

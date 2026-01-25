@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: Backend-specific regression tests verify ROM pointer packaging and dereference helpers | Verify ROM pointer packaging
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+DATA:#i32 = 42;
+
+&^get_ptr() -> #i32 {
+    DATA
+}

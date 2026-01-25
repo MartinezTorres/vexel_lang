@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Type constructors have no pointers (no self-reference possible) | Type constructors cannot be recursive - should be rejected
+
+
+#Node(value:#i32, next:#Node);
+
+&^main() -> #i32 {
+    0
+}

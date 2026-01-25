@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Boolean array #b[N] can cast to/from integer types if bit sizes match exactly | Boolean array #b[N] can cast to/from integer types if bit sizes match
+
+
+&^main() -> #i32 {
+    b:#b[8] = [1,0,1,0,1,0,1,0];
+    u:#u8 = (#u8)b;
+    (#i32)u
+}

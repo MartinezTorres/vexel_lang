@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Primitive type names (i8, u8, i32, f32, b, s, etc.) are only special after the # sigil | Primitive type names are only special after # sigil
+
+
+&^main() -> #i32 {
+    x:#i32 = 42;
+    x
+}

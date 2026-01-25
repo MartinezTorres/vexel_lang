@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Unsigned integer comparison uses numeric ordering | Unsigned integer comparison uses numeric ordering
+
+
+&^main() -> #i32 {
+    a:#u32 = 100;
+    b:#u32 = 200;
+    (a < b) ? 1 : 0
+}

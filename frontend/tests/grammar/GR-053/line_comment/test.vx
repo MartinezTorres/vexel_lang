@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Line comments start with '"'"'//'"'"' and extend to the end of the line | Line comments starting with //
+
+
+&test() {
+  x = 10; // comment after statement
+  // comment before statement
+  y = 20;
+}

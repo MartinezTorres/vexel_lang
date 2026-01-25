@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Output must consist of exactly one .c file per compilation unit. | Output must consist of exactly one .c file
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

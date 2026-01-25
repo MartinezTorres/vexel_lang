@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Assignment expressions have the form lvalue '"'"'='"'"' expr or are forwarded to conditional expressions | Assignment expressions to various lvalues
+
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+  mut x:#i32 = 0
+  mut arr:#i32[2] = [0, 0]
+  mut obj:#Point = Point(0, 0)
+  x = 10
+  arr[0] = 20
+  obj.x = 30
+  0
+}

@@ -1,0 +1,6 @@
+// Test range operator
+rng = 0..5
+
+&^main() -> #i32 {
+    rng[2]
+}

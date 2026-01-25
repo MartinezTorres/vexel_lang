@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Type mismatches are reported as compile-time errors | Type mismatch: return type mismatch
+
+
+&^main() -> #i32 {
+    true;
+}

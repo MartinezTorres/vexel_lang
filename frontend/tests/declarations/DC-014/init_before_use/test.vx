@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable global variables must be initialized before use (compiler may not enforce) | Initialize mutable global before use
+
+
+// DC-014: Mutable globals must be initialized before use
+counter:#i32;
+
+&^main() -> #i32 {
+    counter = 0;
+    counter = counter + 1;
+    counter
+}

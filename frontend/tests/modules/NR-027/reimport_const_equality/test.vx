@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Re-importing requires constants to be equal after compile-time evaluation for identical definitions | Re-importing requires constants equal after compile-time evaluation
+
+// NR-027: Re-importing requires constants to be equal after compile-time evaluation for identical definitions
+::constants;
+::constants;  // Should succeed - constants evaluate to same values
+
+&^main() -> #i32 {
+    constants::ANSWER
+}

@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Iteration operators (@ @@) bind looser than assignment | Iteration operators (@ @@) bind looser than assignment
+
+
+// EX-083: Iteration binds loosely
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [1, 2, 3];
+    x:#i32 = 0;
+    // arr@x = _ means arr@(x = _), not (arr@x) = _
+    arr@x = _;
+    -> x;  // Last value assigned
+}

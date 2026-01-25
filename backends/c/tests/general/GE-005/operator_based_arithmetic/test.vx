@@ -1,0 +1,28 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Vexel is an operator-based language where all operations use operators rather than keywords | Operator-based language - arithmetic and logic via operators
+// @expect-exit: 15
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-005: Vexel is an operator-based language
+// All operations use operators rather than keywords
+
+&^main() -> #i32 {
+    a:#i32 = 10;
+    b:#i32 = 5;
+
+    // Arithmetic operators
+    sum:#i32 = a + b;
+    diff:#i32 = a - b;
+    prod:#i32 = a * b;
+    quot:#i32 = a / b;
+
+    // Comparison operators
+    cond:#b = a > b;
+
+    // Conditional operator
+    result:#i32 = cond ? sum : diff;
+
+    result;
+}

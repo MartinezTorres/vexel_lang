@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Global constants initialize in parse order | Constants initialize in parse order
+
+
+// DC-020: Global constants initialize in parse order
+A = 1;
+B = A + 1;
+C = B + 1;
+
+&^main() -> #i32 {
+    C
+}

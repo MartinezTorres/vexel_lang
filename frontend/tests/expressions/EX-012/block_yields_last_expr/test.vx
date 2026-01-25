@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Blocks evaluate all statements and yield the value of the last expression | Blocks evaluate all statements and yield the value of the last expression
+
+
+// EX-012: Block yields last expression value
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    result:#i32 = {
+        print(1);
+        print(2);
+        print(3);
+        42
+    };
+    -> result;
+}

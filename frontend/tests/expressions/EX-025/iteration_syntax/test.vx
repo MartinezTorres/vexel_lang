@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Iteration uses syntax iterable@expr to bind _ to each element | Iteration uses syntax iterable@expr to bind _ to each element
+
+
+// EX-025: Iteration syntax with @
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [10, 20, 30]
+    arr @ { print(1) }
+    0
+}

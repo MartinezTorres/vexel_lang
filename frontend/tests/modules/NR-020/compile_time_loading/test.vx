@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Resource expressions load resources at compile time, not runtime | Resource expressions load resources at compile time, not runtime
+
+
+// NR-020: Resource expressions load resources at compile time, not runtime
+MANIFEST:#s = ::manifest.txt;
+
+&^main() -> #i32 {
+    // MANIFEST is already loaded at compile time, not fetched at runtime
+    result:#i32 = (MANIFEST == "version=1.0") ? (#i32)0 : (#i32)1;
+    -> result;
+}

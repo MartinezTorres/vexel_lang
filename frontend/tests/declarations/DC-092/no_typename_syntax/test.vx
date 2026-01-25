@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver methods cannot use '"'"'TypeName::'"'"' syntax (ambiguous which receiver'"'"'s type) | Multi-receiver no TypeName:: syntax
+
+
+// DC-092: Multi-receiver cannot use TypeName:: syntax
+&(x, y)process() -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    a:#i32 = 1;
+    b:#i32 = 2;
+    (a, b).process()
+}

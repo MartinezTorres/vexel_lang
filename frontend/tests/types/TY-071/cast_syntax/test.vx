@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Cast syntax is (#T)expr for explicit conversion | Cast syntax is (#T)expr for explicit conversion
+
+
+&^main() -> #i32 {
+    x:#u8 = 42;
+    (#i32)x
+}

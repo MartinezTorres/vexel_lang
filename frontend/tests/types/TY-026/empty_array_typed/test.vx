@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Empty array literal [ ] produces #T[0] for target type #T when context requires an array | Empty array literal [] produces #T[0] for target type #T
+
+
+&^main() -> #i32 {
+    arr:#u8[0] = [];
+    (#i32)|arr|
+}

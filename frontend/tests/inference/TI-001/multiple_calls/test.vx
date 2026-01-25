@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Hindley-Milner type inference is applied per function body | Inference with multiple calls to same generic function
+
+
+&add(a, b) {
+    a + b
+}
+
+&^main() -> #i32 {
+    add(10, 20) + add(5, 7)
+}

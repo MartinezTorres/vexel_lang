@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Purity determination: compiler attempts compile-time execution and fails if constraints violated | Purity determination: compiler attempts compile-time execution and fails if constraints violated
+// @expect-exit: 49
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-022: Purity determination: compiler attempts compile-time execution and fails if constraints violated
+// This is a positive test - pure function executes at compile time
+
+&pure_compute(n:#i32) -> #i32 {
+    n * n;
+}
+
+// Compiler should execute pure_compute at compile time
+value:#i32 = pure_compute(7);
+
+&^main() -> #i32 {
+    value  // Should be 49
+}

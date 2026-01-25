@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Tuple return types are syntactic sugar for anonymous struct types | Tuple returns are struct sugar
+
+
+// DC-099: Tuple returns are syntactic sugar
+&pair() -> (#i32, #i32) {
+    (10, 20)
+}
+
+&^main() -> #i32 {
+    a:#i32;
+    b:#i32;
+    a, b = pair();
+    a + b
+}

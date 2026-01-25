@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: The backend shares all frontend/unit tests with the C backend to ensure semantics match | Share frontend tests with C backend
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 42 }

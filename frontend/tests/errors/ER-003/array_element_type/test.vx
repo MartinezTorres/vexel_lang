@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Type mismatches are reported as compile-time errors | Type mismatch: array element type mismatch
+
+
+&^main() -> #i32 {
+    value:#i32 = "bad";
+    0;
+}

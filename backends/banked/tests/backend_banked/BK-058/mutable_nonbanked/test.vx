@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Mutable globals are tagged __nonbanked | Mutable globals tagged __nonbanked
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+mut STATE:#i32 = 0;

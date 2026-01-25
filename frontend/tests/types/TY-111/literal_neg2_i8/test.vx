@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer literals -128 to -2 infer to #i8 | Integer literal -2 infers to #i8
+
+
+&^main() -> #i32 {
+    x = -2;
+    0
+}

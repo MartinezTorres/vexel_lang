@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#toolchain-assumptions
+// @desc: If inline assembly becomes necessary, it must be guarded so other backends remain unaffected. | Inline assembly if necessary must be guarded for other backends
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Type constructors must use syntax '"'"'#Name(field[:Type],...);'"'"' | Type constructor correct syntax
+
+
+// DC-117: Type constructor syntax
+#Person(name:#u8[32], age:#i32);
+
+&^main() -> #i32 {
+    p:#Person = Person([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 25);
+    p.age
+}

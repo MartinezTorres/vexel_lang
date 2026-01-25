@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Arithmetic operator methods typically return TypeName | Arithmetic operators return TypeName
+
+
+// DC-070: Arithmetic operators typically return TypeName
+#Arithmetic(val:#i32);
+
+&(a)#Arithmetic::+(b:#Arithmetic) -> #Arithmetic {
+    Arithmetic(a.val + b.val)
+}
+
+&(a)#Arithmetic::*(b:#Arithmetic) -> #Arithmetic {
+    Arithmetic(a.val * b.val)
+}
+
+&^main() -> #i32 {
+    0
+}

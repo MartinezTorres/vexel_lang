@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Data lifetime ends at end of scope | Data lifetime ends at end of scope
+
+
+&^main() -> #i32 {
+    {
+        x:#i32 = 42;
+    }
+    0
+}

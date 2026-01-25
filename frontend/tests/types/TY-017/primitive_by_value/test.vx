@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Primitive types are passed by value | Primitive types are passed by value
+
+
+&^copy(x:#i32) -> #i32 {
+    x
+}
+
+&^main() -> #i32 {
+    a:#i32 = 42;
+    b:#i32 = copy(a);
+    b
+}

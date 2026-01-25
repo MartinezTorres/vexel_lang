@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Nested loops shadow _ with the innermost loop'"'"'s binding winning | Nested loops shadow _ with the innermost loop'"'"'s binding winning
+
+
+// EX-043: Nested loop shadowing
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    outer:#i32[2] = [10, 20];
+    outer@{
+        inner:#i32[2] = [1, 2];
+        inner@{
+            print(_);  // _ refers to inner loop element
+        };
+    };
+    -> 0;
+}

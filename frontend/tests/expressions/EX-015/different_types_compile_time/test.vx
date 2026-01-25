@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: When condition evaluates to compile-time constant, branches can have different types | When condition evaluates to compile-time constant, branches can have different types
+
+
+// EX-015: Different types allowed for compile-time constant
+FEATURE_ENABLED:#b = 1;
+
+&^main() -> #i32 {
+    // When FEATURE_ENABLED is 1, branch returns i32
+    // When 0, would return string (but dead branch eliminated)
+    result:#i32 = FEATURE_ENABLED ? 42 : "disabled";
+    -> result;
+}

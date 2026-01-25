@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Method receiver identifier is an lvalue | Method receiver is lvalue
+
+
+// DC-051: Receiver identifier is lvalue
+#Box(val:#i32);
+
+&(b)#Box::set(new_val:#i32) {
+    b.val = new_val;
+}
+
+&^main() -> #i32 {
+    box:#Box = Box(10);
+    box.set(20);
+    box.val
+}

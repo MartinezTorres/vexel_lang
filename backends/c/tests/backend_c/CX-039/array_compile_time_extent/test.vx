@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Arrays must emit as C arrays with compile-time extents. | Arrays must emit as C arrays with compile-time extents
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    arr:#i32[5] = [1, 2, 3, 4, 5];
+    0
+}

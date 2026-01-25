@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Bitwise OR (|) has precedence after bitwise XOR | Bitwise OR (|) has precedence after bitwise XOR
+
+
+// EX-076: Bitwise OR precedence
+&^main() -> #i32 {
+    // 4 ^ 2 | 1 is (4 ^ 2) | 1
+    result:#u32 = (#u32)4 ^ (#u32)2 | (#u32)1;
+    -> result;  // 6 | 1 = 7
+}

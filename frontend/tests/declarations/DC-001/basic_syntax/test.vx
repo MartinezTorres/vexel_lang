@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable global constants use correct syntax
+
+// DC-001: Immutable global constants must use syntax 'name[:Type] = expr'
+PI:#f64 = 3.14159;
+MAX_SIZE:#u32 = (#u32)100;
+GREETING:#s = "Hello";
+
+&^main() -> #i32 {
+    0
+}

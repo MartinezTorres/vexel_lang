@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: No import aliases (simplified from v1.6) | No import aliases allowed
+
+// NR-034: No import aliases (simplified from v1.6)
+// This should fail - trying to alias an import
+::mymodule as m;
+
+&^main() -> #i32 {
+    m::helper()
+}

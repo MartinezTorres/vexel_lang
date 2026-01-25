@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Length operator |x| on signed integers/floats returns absolute value (runtime calculation) | Length operator |x| on signed integers/floats returns absolute value (runtime calculation)
+// @expect-exit: 45
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-058: Length operator |x| on signed integers/floats returns absolute value (runtime calculation)
+
+&^main() -> #i32 {
+    a:#i32 = -42;
+    b:#f64 = -3.5;
+    |a| + (#i32)(|b|)  // Should be 42 + 3 = 45
+}

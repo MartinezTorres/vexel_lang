@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Conditional expressions and statement conditionals require boolean conditions. | Conditional expressions require boolean conditions
+
+
+&^main() -> #i32 {
+    2 ? 2 : 3
+}

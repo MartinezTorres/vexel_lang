@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Method receiver type annotation is optional and defaults to TypeName | Method receiver type annotation optional
+
+
+// DC-052: Receiver type annotation optional, defaults to TypeName
+#Thing(data:#i32);
+
+&(t)#Thing::get() -> #i32 {
+    t.data
+}
+
+&^main() -> #i32 {
+    thing:#Thing = Thing(42);
+    thing.get()
+}

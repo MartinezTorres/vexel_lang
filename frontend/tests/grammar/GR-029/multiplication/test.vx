@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Multiplicative expressions consist of one or more unary terms separated by '"'"'*'"'"', '"'"'/'"'"', or '"'"'%'"'"' | Multiplication expression (*)
+
+
+&mul(a: #i32, b: #i32) {
+  result = a * b;
+}

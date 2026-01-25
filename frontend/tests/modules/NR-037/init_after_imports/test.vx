@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Each module initializes after all of its imports have initialized | Module initializes after all imports have initialized
+
+
+// NR-037: Each module initializes after all of its imports have initialized
+::dependency;
+
+// This should see dependency::INIT_VALUE already initialized
+MY_VALUE:#i32 = dependency::INIT_VALUE + 1;
+
+&^main() -> #i32 {
+    result:#i32 = (MY_VALUE == 101) ? (#i32)0 : (#i32)1;
+    -> result;
+}

@@ -1,0 +1,18 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: Receiver functions lower to C functions with receiver pointer first parameter
+// @expect-exit: 0
+// @command: bash -c "{VEXEL_C} -b c test.vx && gcc -std=c11 -c out.c -o out.o && rm -f out.o"
+
+
+#Wrapper(value:#i32);
+
+// Receiver method returns the receiver value; should lower to a pointer parameter
+&(self)#Wrapper::copy() -> #Wrapper {
+    self
+}
+
+&^main() -> #i32 {
+    w:#Wrapper = Wrapper(7);
+    c:#Wrapper = w.copy();
+    -> c.value;
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Resource expressions are immutable constants | Resource expressions are immutable constants
+
+
+// NR-014: Resource expressions are immutable constants
+content:#s = ::data.txt;
+
+&^main() -> #i32 {
+    // content should be an immutable constant (#s type)
+    x:#s = content;
+    0
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Escape sequences start with backslash and include simple escapes ([nrt\\'"'"'"]), hexadecimal escapes ('"'"'x'"'"' hex hex), and octal escapes ([0-3] [0-7] [0-7]) | Hexadecimal escape sequences \xHH
+
+
+&test() {
+  s1 = "\x00";
+  s2 = "\x41\x42\x43";
+  s3 = "\xFF";
+  s4 = "\xAB\xCD\xEF";
+}

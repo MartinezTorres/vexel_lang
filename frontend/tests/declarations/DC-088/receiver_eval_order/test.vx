@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver method receivers evaluate left-to-right | Multi-receiver left-to-right evaluation
+
+
+// DC-088: Multi-receiver receivers evaluate left-to-right
+&(x, y)combine() -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    a:#i32 = 1;
+    b:#i32 = 2;
+    (a, b).combine()
+}

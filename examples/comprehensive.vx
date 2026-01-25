@@ -1,0 +1,32 @@
+// Comprehensive Vexel Example
+// Demonstrates: arrays, compile-time execution, dead code elimination
+
+// Compile-time pure functions (will be eliminated from binary)
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+&multiply(a:#i32, b:#i32) -> #i32 {
+    a * b
+}
+
+// Compile-time array operations
+&sum_three(arr:#i32[3]) -> #i32 {
+    arr[0] + arr[1] + arr[2]
+}
+
+// Global constants evaluated at compile-time
+result = multiply(add(10, 20), 2)  // 60
+arr_val = sum_three([5, 10, 15])   // 30
+
+// Runtime function (kept in binary because it's exported)
+&^main() -> #i32 {
+    // Local arrays
+    local:#i32[4] = [1, 2, 3, 4]
+
+    // Array indexing and computation
+    local[0] + local[1] + result + arr_val  // 1 + 2 + 60 + 30 = 93
+}
+
+// Note: add(), multiply(), and sum_three() are completely eliminated
+// from the generated C code because they're only used at compile-time!

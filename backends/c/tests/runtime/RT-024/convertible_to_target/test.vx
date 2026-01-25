@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time execution results must be convertible to target types | Compile-time execution results must be convertible to target types
+// @expect-exit: 100
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-024: Compile-time execution results must be convertible to target types
+
+&compute() -> #f64 {
+    100.5;
+}
+
+// Convert f64 result to i32
+value:#i32 = (#i32)compute();
+
+&^main() -> #i32 {
+    value  // Should be 100
+}

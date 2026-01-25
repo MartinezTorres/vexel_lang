@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: The &^ sigil marks exported function declarations (&^name). | Accept &^ sigil for exported function declarations
+
+
+&^main() -> #i32 {
+    0
+}
+
+&^exported_func(x: #i32) -> #i32 {
+    x
+}

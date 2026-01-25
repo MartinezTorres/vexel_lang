@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Generic functions may not be exported (&^) | Non-generic (fully typed) functions can be exported
+
+
+&^double(x: #i32) -> #i32 {
+    x * 2
+}
+
+&^main() -> #i32 {
+    double(21)
+}

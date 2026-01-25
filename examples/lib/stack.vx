@@ -1,0 +1,41 @@
+// Stack implementation
+
+#Stack(data, top);
+
+&#Stack(capacity) -> {
+  Stack(data, 0)
+}
+
+&(s)#Stack::push(item) {
+  s.top < |s.data| ? {
+    s.data[s.top] = item;
+    s.top = s.top + 1
+  } : ->
+}
+
+&(s)#Stack::pop() -> {
+  s.top > 0 ? {
+    s.top = s.top - 1;
+    s.data[s.top]
+  } : s.data[0]
+}
+
+&(s)#Stack::peek() -> {
+  s.top > 0 ? s.data[s.top - 1] : s.data[0]
+}
+
+&(s)#Stack::clear() {
+  s.top = 0
+}
+
+&(s)#Stack::size() -> {
+  s.top
+}
+
+&(s)#Stack::is_empty() -> {
+  s.top == 0
+}
+
+&(s)#Stack::is_full() -> {
+  s.top == |s.data|
+}

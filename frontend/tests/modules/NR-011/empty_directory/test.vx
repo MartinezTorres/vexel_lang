@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Empty or missing directories yield empty tuple array for directory resources | Empty directories yield empty tuple array
+
+
+// NR-011: Empty or missing directories yield empty tuple array for directory resources
+items = ::empty;
+
+&^main() -> #i32 {
+    // Should be an empty array
+    len:#i32 = |items|;
+    result:#i32 = (len == 0) ? (#i32)0 : (#i32)1;
+    -> result;
+}

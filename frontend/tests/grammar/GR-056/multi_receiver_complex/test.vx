@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Multi-receiver method calls use the syntax (r1, r2).fname(...) | Multi-receiver method call with multiple arguments
+
+
+&(first, second, third)merge(x:#i32, y:#i32, z:#i32) -> #i32 {
+    first + second + third + x + y + z;
+}
+
+&(a, b)combine(p:#i32, q:#i32, r:#i32, s:#i32) -> #i32 {
+    a + b + p + q + r + s;
+}
+
+&^main() -> #i32 {
+    obj1:#i32 = 1;
+    obj2:#i32 = 2;
+    obj3:#i32 = 3;
+    (obj1, obj2, obj3).merge(4, 5, 6);
+}

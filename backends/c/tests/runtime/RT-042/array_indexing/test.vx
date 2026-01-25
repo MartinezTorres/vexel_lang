@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Array indexing: arr[i] accesses element at index i | Array indexing: arr[i] accesses element at index i
+// @expect-exit: 90
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-042: Array indexing: arr[i] accesses element at index i
+
+&^main() -> #i32 {
+    arr:#i32[5] = [10, 20, 30, 40, 50];
+    arr[0] + arr[2] + arr[4]  // Should be 10 + 30 + 50 = 90
+}

@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Float behavior follows IEEE 754 standard | Float behavior follows IEEE 754 standard
+// @expect-exit: 4
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-057: Float behavior follows IEEE 754 standard
+
+&^main() -> #i32 {
+    a:#f64 = 1.5;
+    b:#f64 = 2.5;
+    c:#f64 = a + b;  // Should be 4.0
+    (#i32)c
+}

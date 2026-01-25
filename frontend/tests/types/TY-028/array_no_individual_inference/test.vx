@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Individual literal type inference (e.g., 0->#b, 1->#b) does NOT apply inside arrays | Individual literal type inference does not apply inside arrays
+
+
+&^main() -> #i32 {
+    arr = [0,1];
+    0
+}

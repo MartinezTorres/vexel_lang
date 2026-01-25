@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: The & sigil marks function declarations (&name). | Accept & sigil for function declarations
+
+
+&foo() -> #i32 { 42 }
+
+&^main() -> #i32 {
+    foo()
+}

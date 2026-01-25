@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable globals allow optional type annotation in declaration | Immutable globals allow optional type
+
+
+// DC-016: Immutable globals allow optional type annotation
+WITH_TYPE:#i32 = 100;
+WITHOUT_TYPE = 200;
+
+&^main() -> #i32 {
+    WITH_TYPE + WITHOUT_TYPE
+}

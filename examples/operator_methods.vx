@@ -1,0 +1,21 @@
+// Demonstrates operator overloading via Type::operator methods
+// Note: this sample targets the C backend; the banked backend forbids returning
+// or passing structs by value, so Vec2::+ would need a different lowering there.
+
+#Vec2(x:#i32, y:#i32);
+
+&(self)#Vec2::+(other:#Vec2) -> #Vec2 {
+  Vec2(self.x + other.x, self.y + other.y)
+}
+
+&(self)#Vec2::==(other:#Vec2) -> #b {
+  (self.x == other.x) && (self.y == other.y)
+}
+
+&^main() -> #i32 {
+  a = Vec2(1, 2);
+  b = Vec2(3, 4);
+  sum = a + b;
+  expected = Vec2(4, 6);
+  sum == expected ? 1 : 0
+}

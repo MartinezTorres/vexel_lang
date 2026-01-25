@@ -1,0 +1,2 @@
+// Module at a/b.vx
+&getValue() -> #i32 { 99 }

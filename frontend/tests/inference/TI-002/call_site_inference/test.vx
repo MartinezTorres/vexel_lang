@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Omitted parameter/field types create fresh type variables inferred from call sites | Type variables inferred from call site arguments
+
+
+&max(a, b) {
+    a > b ? a : b
+}
+
+&^main() -> #i32 {
+    max(100, 200)
+}

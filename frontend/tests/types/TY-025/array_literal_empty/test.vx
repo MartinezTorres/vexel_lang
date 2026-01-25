@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array literal [e1,e2,...] infers size from element count (may be empty) | Array literal can be empty
+
+
+&^main() -> #i32 {
+    arr:#i32[0] = [];
+    0
+}

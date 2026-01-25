@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression a ? b : c ? d : e is an error and must use parentheses for disambiguation | Expression a ? b : c ? d : e is an error and must use parentheses for disambiguation
+
+
+// EX-020: Explicit nested conditional error
+&^main() -> #i32 {
+    // ERROR: must use parentheses
+    result:#i32 = 1 ? 1 : 0 ? 2 : 3;
+    -> result;
+}

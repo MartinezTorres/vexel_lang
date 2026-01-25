@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Iteration operators (@ and @@) do not return values | Iteration operators (@ and @@) do not return values
+// @expect-exit: 1
+// @command: {VEXEL_C} test.vx
+
+
+// RT-006: Iteration operators (@ and @@) do not return values
+// This should fail at compile time if we try to use the result
+
+&^main() -> #i32 {
+    arr [3]#i32 = [1, 2, 3]
+    // Try to assign the result of @ (should fail)
+    x #i32 = arr @ i { i }
+    x
+}

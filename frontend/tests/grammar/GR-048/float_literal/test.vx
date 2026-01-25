@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Floating-point literals have the form [0-9]+ '"'"'.'"'"' [0-9]+ | Floating-point literals [0-9]+.[0-9]+
+
+
+&test() {
+  pi = 3.14159;
+  small = 0.001;
+  precise = 123.456789;
+}

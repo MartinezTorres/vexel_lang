@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Composite types can cast to byte arrays | Composite types can cast to byte arrays
+
+
+#Pair(a:#u8, b:#u8);
+
+&^main() -> #i32 {
+    p:#Pair = Pair(10, 20);
+    bytes:#u8[2] = (#u8[2])p;
+    (#i32)bytes[0]
+}

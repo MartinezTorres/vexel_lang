@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Hexadecimal integer literals must start with 0x or 0X and contain valid hex digits [0-9A-Fa-f]. | Accept hex literals with 0x/0X and valid hex digits
+
+
+&^main() -> #i32 {
+    a: #u32 = 0xFF
+    b: #u32 = 0XFF
+    c: #u64 = 0x0123456789ABCDEF
+    d: #u32 = 0xabcdef
+    0
+}

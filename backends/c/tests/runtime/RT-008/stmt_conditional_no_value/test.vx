@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Statement conditionals (cond ? stmt) do not produce values | Statement conditionals (cond ? stmt) do not produce values
+// @expect-exit: 1
+// @command: {VEXEL_C} test.vx
+
+
+// RT-008: Statement conditionals (cond ? stmt) do not produce values
+// This should fail if we try to use result of statement conditional
+
+&^main() -> #i32 {
+    mut x #i32 = 0
+    // Try to assign the result of a statement conditional (should fail)
+    y #i32 = (true ? x = 5)
+    y
+}

@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Operator methods must accept exactly one receiver | Operator methods have exactly one receiver
+
+
+// DC-067: Operator methods accept exactly one receiver
+#Operand(val:#i32);
+
+&(op)#Operand::+(rhs:#Operand) -> #Operand {
+    Operand(op.val + rhs.val)
+}
+
+&^main() -> #i32 {
+    0
+}

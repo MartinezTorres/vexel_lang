@@ -1,0 +1,11 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Other read-only data must reside in a .rodata section via const definitions. | Read-only data must reside in .rodata section via const definitions
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+CONST_ARRAY:#i32[3] = [1, 2, 3];
+
+&^main() -> #i32 {
+    CONST_ARRAY[0]
+}

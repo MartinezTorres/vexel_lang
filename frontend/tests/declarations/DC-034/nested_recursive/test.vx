@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Nested functions can be recursive | Nested functions can be recursive
+
+
+// DC-034: Nested functions can be recursive
+&test() -> #i32 {
+    &fib(n:#i32) -> #i32 {
+        (n <= 1) ? -> n;
+        fib(n - 1) + fib(n - 2)
+    }
+    fib(5)
+}
+
+&^main() -> #i32 {
+    test()
+}

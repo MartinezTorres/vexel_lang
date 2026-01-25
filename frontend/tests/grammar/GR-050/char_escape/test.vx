@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Character literals are enclosed in single quotes and contain either an escape sequence or a single non-escape character | Character literals with escape sequences
+
+
+&test() {
+  newline = '\n';
+  tab = '\t';
+  backslash = '\\';
+  quote = '\'';
+  hex = '\x41';
+  octal = '\101';
+}

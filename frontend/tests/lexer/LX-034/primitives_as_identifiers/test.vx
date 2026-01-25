@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Primitive type names (i8, u8, i16, i32, f32, f64, b, s, etc.) may be used as regular identifiers in all other contexts. | Primitive type names can be used as regular identifiers
+
+
+&^main() -> #i32 {
+    i8: #i32 = 1
+    u8: #i32 = 2
+    i16: #i32 = 3
+    i32: #i32 = 4
+    f32: #i32 = 5
+    f64: #i32 = 6
+    b: #i32 = 7
+    s: #i32 = 8
+    0
+}

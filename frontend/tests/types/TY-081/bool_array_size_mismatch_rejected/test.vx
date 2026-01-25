@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Boolean array to integer cast with size mismatch is compile-time error | Boolean array to integer cast with size mismatch is compile-time error
+
+
+&^main() -> #i32 {
+    b:#b[7] = [1,0,1,0,1,0,1];
+    u:#u8 = (#u8)b;
+    (#i32)u
+}

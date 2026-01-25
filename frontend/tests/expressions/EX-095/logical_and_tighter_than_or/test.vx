@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Logical AND (&&) binds tighter than logical OR (||) | Logical AND (&&) binds tighter than logical OR (||)
+
+
+// EX-095: AND tighter than OR
+&^main() -> #i32 {
+    // false || true && false is false || (true && false)
+    result:#b = false || true && false
+    result ? 1 : 0  // 0
+}

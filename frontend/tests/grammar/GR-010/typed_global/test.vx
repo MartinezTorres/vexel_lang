@@ -1,0 +1,5 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Immutable global constants use the form ident [ '"'"':'"'"' type ] '"'"'='"'"' expr | Immutable global constant with type annotation
+
+
+MAX_SIZE: #i32 = 1000;

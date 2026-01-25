@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Statement conditionals are not expressions and have no type | Statement conditionals are not expressions and have no type
+
+
+// EX-022: Statement conditionals have no type
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    x:#i32 = 10
+    // Statement conditional is a statement, not expression
+    x > 5 ? print(x)
+    0
+}

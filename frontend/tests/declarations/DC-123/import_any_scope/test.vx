@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Import statements can appear within any scope | Import statements in any scope
+
+
+// DC-123: Import statements can appear within any scope
+&^main() -> #i32 {
+    // ::local::import;
+    0
+}

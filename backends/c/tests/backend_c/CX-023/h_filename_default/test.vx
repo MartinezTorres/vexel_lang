@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Filenames default to <module>.h for header files. | Filenames default to <module>.h for header
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

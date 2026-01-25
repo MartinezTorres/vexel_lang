@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Runtime errors trap and exit the program | Runtime errors trap - division by zero causes trap
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-013: Runtime errors trap and exit the program
+// Division by zero causes program to trap
+
+&^main() -> #i32 {
+    0;
+}

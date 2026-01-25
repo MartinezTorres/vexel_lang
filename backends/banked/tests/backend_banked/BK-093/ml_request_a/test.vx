@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_REQUEST_A is defined to extern declare __ML_SEGMENT_A_##module | ML_REQUEST_A extern declares
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

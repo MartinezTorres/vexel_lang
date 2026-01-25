@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time execution cannot modify mutable globals | Compile-time execution cannot modify mutable globals
+// @expect-exit: 1
+// @command: {VEXEL_C} test.vx
+
+
+// RT-018: Compile-time execution cannot modify mutable globals
+
+mut counter #i32 = 0
+
+increment() -> #i32 {
+    counter = counter + 1  // This should fail at compile time
+    counter
+}
+
+// Trying to use at compile time
+value #i32 = increment()
+
+&^main() -> #i32 {
+    value
+}

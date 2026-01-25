@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Conditional expression compiler attempts to evaluate condition at compile time | Conditional expression compiler attempts to evaluate condition at compile time
+// @expect-exit: 100
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-030: Conditional expression compiler attempts to evaluate condition at compile time
+
+USE_FAST:#b = true;
+
+&fast_impl() -> #i32 { 100; }
+&slow_impl() -> #i32 { 50; }
+
+&^main() -> #i32 {
+    // Condition is compile-time constant
+    USE_FAST ? fast_impl() : slow_impl()
+}

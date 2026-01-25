@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Named types without appropriate iteration method produce compile-time error | Named types without iterator
+
+
+// DC-084: Named types without iterator produce error
+#NoIterator(x:#i32);
+
+&^main() -> #i32 {
+    ni:#NoIterator = NoIterator(5);
+    // Uncommenting would error: ni@{ }
+    0
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Built-in operator semantics apply when no operator method is defined | Built-in operator semantics without override
+
+
+// DC-072: Built-in operator semantics when no override
+&^main() -> #i32 {
+    a:#i32 = 10;
+    b:#i32 = 20;
+    a + b
+}

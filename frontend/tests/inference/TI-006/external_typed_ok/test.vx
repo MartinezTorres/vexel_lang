@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Generic functions may not be external (&!) | External functions with explicit types are allowed
+
+
+&!external_add(a: #i32, b: #i32) -> #i32;
+
+&^main() -> #i32 {
+    0
+}

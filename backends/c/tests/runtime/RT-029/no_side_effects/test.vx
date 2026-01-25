@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: No side effects allowed during compile-time execution | No side effects allowed during compile-time execution
+// @expect-exit: 1
+// @command: {VEXEL_C} test.vx
+
+
+// RT-029: No side effects allowed during compile-time execution
+// Test that mutable global modification is rejected
+
+mut global_state #i32 = 0
+
+modify_state() -> #i32 {
+    global_state = 42
+    global_state
+}
+
+// Should fail at compile time
+value #i32 = modify_state()
+
+&^main() -> #i32 {
+    value
+}

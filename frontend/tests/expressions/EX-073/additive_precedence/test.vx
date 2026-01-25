@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Additive operators (+ -) have precedence after multiplicative operators | Additive operators (+ -) have precedence after multiplicative operators
+
+
+// EX-073: Additive precedence
+&^main() -> #i32 {
+    // 2 + 3 * 4 is 2 + (3 * 4)
+    result:#i32 = 2 + 3 * 4;
+    -> result;  // 14
+}

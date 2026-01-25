@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Vexel is a minimal language with no keywords | No keywords - '"'"'if'"'"' can be used as identifier
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-002: Vexel is a minimal language with no keywords
+// "if" is not a keyword - can be used as identifier
+
+&^main() -> #i32 {
+    if:#i32 = 42
+    if
+}

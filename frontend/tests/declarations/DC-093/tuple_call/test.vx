@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver methods are called via tuple notation: '"'"'(r1, r2).name(args)'"'"' | Multi-receiver tuple notation call
+
+
+// DC-093: Multi-receiver called via tuple notation
+&(r1, r2)add_assign(val:#i32) {
+    r1 = r1 + val;
+    r2 = r2 + val;
+}
+
+&^main() -> #i32 {
+    x:#i32 = 1;
+    y:#i32 = 2;
+    (x, y).add_assign(10);
+    x + y
+}

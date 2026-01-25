@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The language defines no standard library | No standard library - no built-in print function
+// @expect-exit: 1
+// @expect-stderr: print
+// @command: {VEXEL_C} test.vx
+
+
+// GE-006: The language defines no standard library
+// There are no built-in functions like print, len, etc.
+// Attempting to call undefined functions should fail
+
+&^main() -> #i32 {
+    // This should fail - no built-in 'print' function
+    print("Hello, World!")
+    0
+}

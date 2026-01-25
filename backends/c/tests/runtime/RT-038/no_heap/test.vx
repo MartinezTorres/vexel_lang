@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: No heap allocation: memory is stack or compile-time constant | No heap allocation: memory is stack or compile-time constant
+// @expect-exit: 55
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-038: No heap allocation: memory is stack or compile-time constant
+// This is a positive test showing stack allocation works
+
+&^main() -> #i32 {
+    // All of this is stack-allocated
+    arr:#i32[3] = [10, 20, 25];
+    mut sum #i32 = arr[0] + arr[1] + arr[2];
+    sum  // Should be 55
+}

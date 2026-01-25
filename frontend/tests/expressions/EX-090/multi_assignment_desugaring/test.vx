@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Multi-assignment is syntactic sugar desugaring to temp variable plus individual assignments | Multi-assignment is syntactic sugar desugaring to temp variable plus individual assignments
+
+
+// EX-090: Multi-assignment desugaring
+
+&get_pair() -> (#i32, #i32) {
+    (100, 200)
+}
+
+&^main() -> #i32 {
+    a:#i32 = 0;
+    b:#i32 = 0;
+    a, b = get_pair();
+    -> a + b;  // 300
+}

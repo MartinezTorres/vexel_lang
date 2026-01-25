@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Specialization semantics are pure language behavior - implementations may inline, share, or eliminate copies | Specialization semantics are pure language behavior
+
+
+&pure_func(x) {
+    x + x
+}
+
+&^main() -> #i32 {
+    pure_func(5) + pure_func(10)
+}

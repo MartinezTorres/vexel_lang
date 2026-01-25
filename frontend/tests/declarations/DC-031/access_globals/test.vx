@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions can access all globals (both mutable and immutable) | Internal functions access all globals
+
+
+// DC-031: Internal functions can access all globals
+IMMUTABLE = 10;
+mutable:#i32;
+
+&test() -> #i32 {
+    mutable = 20;
+    IMMUTABLE + mutable
+}
+
+&^main() -> #i32 {
+    test()
+}

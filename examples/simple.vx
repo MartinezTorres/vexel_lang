@@ -1,0 +1,33 @@
+// Vexel Example: Simple arithmetic functions
+// Demonstrates compile-time execution and dead code elimination
+
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+&multiply(a:#i32, b:#i32) -> #i32 {
+    a * b
+}
+
+&compute(x:#i32, y:#i32) -> #i32 {
+    multiply(add(x, y), 2)
+}
+
+// This will be evaluated at compile-time: compute(10, 20) = 60
+// All three functions above (add, multiply, compute) will be eliminated
+// from the generated C code since they're only used at compile-time
+res:#i32 = compute(10, 20)
+
+// Entry point - only exported function in the binary
+&^main() -> #i32 {
+    res
+}
+
+// Compile this example:
+//   ../../bin/vexel-c simple.vx -o simple.c
+//
+// Generated C will only contain:
+//   int32_t vx_res = 60;
+//   int32_t vx_main() { return vx_res; }
+//
+// All helper functions eliminated via compile-time execution!

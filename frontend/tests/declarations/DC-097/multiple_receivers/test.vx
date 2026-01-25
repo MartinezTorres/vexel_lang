@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver methods support two or more receivers in single declaration | Multi-receiver two or more receivers
+
+
+// DC-097: Multi-receiver supports two or more receivers
+&(a, b, c)sum_three() -> #i32 {
+    a + b + c
+}
+
+&^main() -> #i32 {
+    x:#i32 = 1;
+    y:#i32 = 2;
+    z:#i32 = 3;
+    (x, y, z).sum_three()
+}

@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Composite types must follow standard C layout. | Composite types must follow standard C layout
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    data:#i32[3] = [100, 200, 50];
+    0
+}

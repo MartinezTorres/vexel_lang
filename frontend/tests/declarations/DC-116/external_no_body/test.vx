@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: External functions have no body (declaration only, no implementation) | External functions declaration only
+
+
+// DC-116: External functions have no body
+&!imported_function(n:#i32) -> #i32;
+
+&^main() -> #i32 {
+    0
+}

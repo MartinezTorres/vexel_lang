@@ -1,0 +1,2 @@
+// Qualified import target
+hello:#i32 = 0;

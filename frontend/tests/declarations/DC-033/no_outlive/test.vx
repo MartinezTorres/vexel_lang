@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Nested functions cannot outlive their enclosing function (no function types) | Nested functions do not outlive scope
+
+
+// DC-033: Nested functions cannot outlive enclosing function
+&test() -> #i32 {
+    x:#i32 = 10;
+    &inner() -> #i32 { x }
+    inner()
+}
+
+&^main() -> #i32 {
+    test()
+}

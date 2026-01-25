@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Generic functions may not be exported (&^) | Generic functions may not be exported (must reject)
+
+
+&^identity(x) {
+    x;
+}
+
+&^main() -> #i32 {
+    identity(42);
+}

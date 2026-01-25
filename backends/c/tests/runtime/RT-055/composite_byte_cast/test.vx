@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Composite types can be converted to/from byte arrays via casting (creates copy) | Composite types can be converted to/from byte arrays via casting (creates copy)
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-055: Composite types can be converted to/from byte arrays via casting (creates copy)
+
+&^main() -> #i32 {
+    value:#i32 = 0x12345678;
+    // Cast to byte array
+    bytes:#u8[4] = (#u8[4])value;
+    // Sum the bytes
+    sum:#i32 = (#i32)bytes[0] + (#i32)bytes[1] + (#i32)bytes[2] + (#i32)bytes[3];
+    sum - 276  // Expect 0 if bytes were unpacked correctly
+}

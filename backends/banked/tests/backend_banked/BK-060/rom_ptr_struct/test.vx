@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ROM pointers become a struct with uint8_t page and const void *addr fields | ROM pointers are struct with page/addr
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^get_ptr() -> #i32 { 42 }

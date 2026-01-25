@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Larger negative integer literals infer to #i64 | Larger negative integer literals infer to #i64
+
+
+&^main() -> #i32 {
+    x = -2147483649;
+    0
+}

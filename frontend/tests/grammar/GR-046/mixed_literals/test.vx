@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Literals include integer literals, floating-point literals, string literals, and character literals | Mixed literals in expressions
+
+
+&test() {
+  x = 10 + 20;
+  y = 1.5 * 2.0;
+  s = "value: ";
+}

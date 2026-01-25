@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Composite to byte array cast size must match exactly in bytes | Composite to byte array cast size must match exactly in bytes
+
+
+#Data(a:#u8, b:#u8, c:#u8, d:#u8);
+
+&^main() -> #i32 {
+    d:#Data = Data(1, 2, 3, 4);
+    bytes:#u8[4] = (#u8[4])d;
+    0
+}

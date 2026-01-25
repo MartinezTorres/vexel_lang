@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Single namespace per module (functions, variables, and types share namespace) | Single namespace per module - reject duplicate names across types and functions
+
+
+// NR-001: Single namespace per module (functions, variables, and types share namespace)
+// This should fail because 'Foo' is defined both as a type and a function
+@Foo { x:#i32 }
+
+&Foo() -> #i32 {
+    42
+}

@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Signed integer comparison uses numeric ordering | Signed integer comparison uses numeric ordering
+
+
+&^main() -> #i32 {
+    a:#i32 = -100;
+    b:#i32 = 50;
+    (a < b) ? 1 : 0
+}

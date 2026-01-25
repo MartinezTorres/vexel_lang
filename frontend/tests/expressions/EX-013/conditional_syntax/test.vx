@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression conditionals use syntax cond ? expr_true : expr_false | Expression conditionals use syntax cond ? expr_true : expr_false
+
+
+// EX-013: Expression conditional syntax
+&^main() -> #i32 {
+    x:#i32 = 10;
+    result:#i32 = x > 5 ? 100 : 200;
+    -> result;
+}

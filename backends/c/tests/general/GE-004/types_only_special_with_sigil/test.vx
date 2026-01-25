@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Primitive type names (i8, u8, i32, f32, b, s, etc.) are only special after the # sigil; they may be used as identifiers elsewhere | Type names '"'"'b'"'"' and '"'"'s'"'"' can be used as parameter names
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-004: Type names are only special after # sigil
+
+&process(b:#i32, s:#i32) -> #i32 {
+    b + s;
+}
+
+&^main() -> #i32 {
+    // b and s are type names but used as identifiers
+    b:#i32 = 25;
+    s:#i32 = 17;
+
+    process(b, s);
+}

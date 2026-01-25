@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Ambiguous parsing examples include nested conditionals and complex expressions | Ambiguous parsing example: mixed && and || operators
+
+
+&^main() -> #i32 {
+    combined:#b = true || 1 < 2 < 0;
+    0;
+}

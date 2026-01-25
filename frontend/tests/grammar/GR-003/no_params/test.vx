@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Function declarations use the form '"'"'&'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Function with no parameters
+
+
+&getValue() -> #i32 {
+  -> 42;
+}

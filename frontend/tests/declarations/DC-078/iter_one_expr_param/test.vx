@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods must have exactly one expression parameter (the loop body) | Iteration method one expression parameter
+
+
+// DC-078: Iteration methods have exactly one expression parameter
+#Series(max:#i32);
+
+&(s)#Series::@($loop) {
+    _:#i32 = s.max;
+    $loop;
+}
+
+&^main() -> #i32 {
+    series:#Series = Series(4);
+    series@{ -> 0; };
+    0
+}

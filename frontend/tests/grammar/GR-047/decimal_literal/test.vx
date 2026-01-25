@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Integer literals are either decimal ([0-9]+) or hexadecimal ('"'"'0x'"'"' [0-9A-Fa-f]+) | Decimal integer literals [0-9]+
+
+
+&test() {
+  zero = 0;
+  small = 42;
+  large = 123456789;
+}

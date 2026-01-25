@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: Backend adds errors only when C emission constraints are violated (e.g., unsupported external calling convention annotations). | Backend adds errors only for C emission constraint violations
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

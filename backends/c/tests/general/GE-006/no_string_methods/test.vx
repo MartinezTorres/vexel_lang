@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The language defines no standard library | No standard library - no built-in len function
+// @expect-exit: 1
+// @expect-stderr: len
+// @command: {VEXEL_C} test.vx
+
+
+// GE-006: No standard library
+// No built-in string manipulation functions
+
+&^main() -> #i32 {
+    text:#s = "hello";
+
+    // This should fail - no built-in string length function
+    len(text);
+}

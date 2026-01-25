@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Compiler resolves '"'"'lhs <op> rhs'"'"' as call to '"'"'TypeName::<op>'"'"' when left operand has type TypeName | Compiler resolves operator method calls
+
+
+// DC-064: Compiler resolves operator as method call
+#Integer(i:#i32);
+
+&(a)#Integer::+(b:#Integer) -> #Integer {
+    Integer(a.i + b.i)
+}
+
+&^main() -> #i32 {
+    x:#Integer = Integer(100);
+    y:#Integer = Integer(200);
+    z:#Integer = x + y;
+    z.i
+}

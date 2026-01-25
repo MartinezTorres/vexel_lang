@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions are callable externally | Exported function externally callable
+
+
+// DC-108: Exported functions callable externally
+&^entry_point() -> #i32 {
+    42
+}
+
+&^main() -> #i32 {
+    entry_point()
+}

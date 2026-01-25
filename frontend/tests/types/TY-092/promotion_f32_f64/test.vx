@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Automatic promotion: f32 -> f64 | Automatic promotion: f32 -> f64
+
+
+&^main() -> #i32 {
+    x:#f32 = 3.14;
+    y:#f64 = x;
+    0
+}

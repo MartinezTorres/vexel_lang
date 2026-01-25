@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array literal [0,1,256] infers to #u16[3] (max value 256 needs u16) | Array literal [0,1,256] infers to #u16[3]
+
+
+&^main() -> #i32 {
+    arr = [0,1,256];
+    0
+}

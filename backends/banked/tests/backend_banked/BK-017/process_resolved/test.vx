@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: Process imports are resolved before code generation | Process imports resolved before codegen
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} --allow-process test.vx
+
+
+::"echo hello" -> OUTPUT;
+
+&^get_output() -> #s {
+    OUTPUT
+}

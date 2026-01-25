@@ -1,0 +1,9 @@
+// Test array literal
+&test() -> #i32 {
+    x:#i32[3] = [1, 2, 3]
+    x[0] + x[1]
+}
+
+&^main() -> #i32 {
+    test()
+}

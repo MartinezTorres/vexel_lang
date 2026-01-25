@@ -1,0 +1,10 @@
+// @rfc: backends/c/README.md#diagnostics-specific-to-this-backend
+// @desc: Integer width warnings should not occur on x86 but provide guardrails. | Integer width warnings should not occur on x86 but provide guardrails
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    x: #i32 = 42
+    0
+}

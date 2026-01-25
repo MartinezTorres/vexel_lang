@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Argument types include full array shape (element type + length) | Array shape includes length information
+
+
+&^main() -> #i32 {
+    values:#i32[4] = [1, 2, 3, 4];
+    |values|;
+}

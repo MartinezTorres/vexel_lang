@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Logical AND (&&) binds tighter than logical OR (||) | Logical AND (&&) binds tighter than logical OR (||)
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-005: Logical AND (&&) binds tighter than logical OR (||)
+// false || true && false should be false || (true && false) = false || false = false
+
+&^main() -> #i32 {
+    (false || true && false) ? 1 : 0
+}

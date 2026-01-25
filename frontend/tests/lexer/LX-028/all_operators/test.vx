@@ -1,0 +1,20 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: All operators are recognized: + - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ] | Recognize all operators
+
+
+&^main() -> #i32 {
+    a: #u32 = (#u32)1 + (#u32)2 - (#u32)3 * (#u32)4 / (#u32)5 % (#u32)6
+    b: #u32 = a & (#u32)7 | (#u32)8 ^ (#u32)9
+    c: #u32 = ~a
+    d: #u32 = b << (#u32)1 >> (#u32)1
+    e: #b = a == b
+    f: #b = a != b
+    g: #b = a < b
+    h: #b = a <= b
+    i: #b = a > b
+    j: #b = a >= b
+    k: #b = e && f || g
+    x: #i32 = 0
+    x = 42
+    0
+}

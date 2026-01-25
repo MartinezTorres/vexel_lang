@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The @@ operator iterates over the sorted copy without mutating the original array | The @@ operator iterates over the sorted copy without mutating the original array
+
+
+// EX-032: Original array not mutated
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[3] = [3, 1, 2];
+    arr@@{};  // Sort but do nothing
+    // Original array unchanged
+    -> arr[0];  // Should be 3, not 1
+}

@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Modulo operator (%) is only defined for unsigned integers | Modulo operator (%) is only defined for unsigned integers - reject signed
+// @expect-exit: 1
+// @expect-stderr: unsigned
+// @command: {VEXEL_C} test.vx
+
+
+// RT-048: Modulo operator must reject signed integers (negative test)
+
+&^main() -> #i32 {
+    a:#i32 = 17;
+    b:#i32 = 5;
+    a % b  // Should fail - modulo on signed integers
+}

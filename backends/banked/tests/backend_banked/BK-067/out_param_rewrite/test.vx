@@ -1,0 +1,9 @@
+// @rfc: backends/banked/README.md
+// @desc: The backend rewrites calls to use out-parameters for struct values | Backend rewrites to out-parameters
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^make(x:#i32, y:#i32) -> #i32 {
+    x + y
+}

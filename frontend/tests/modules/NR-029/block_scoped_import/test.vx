@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Imports can be scoped to blocks (not just module-level) | Imports can be scoped to blocks
+
+// NR-029: Imports can be scoped to blocks (not just module-level)
+&^main() -> #i32 {
+    {
+        ::helper;
+        result:#i32 = helper::compute();
+    }
+    // helper is not accessible here (out of scope)
+    0
+}

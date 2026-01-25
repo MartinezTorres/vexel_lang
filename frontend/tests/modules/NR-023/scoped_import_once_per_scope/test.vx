@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Scoped imports instantiate their module once per lexical scope | Scoped imports instantiate module once per lexical scope
+
+
+// NR-023: Scoped imports instantiate their module once per lexical scope
+&^main() -> #i32 {
+    a:#i32 = 0;
+    b:#i32 = 0;
+    {
+        ::counter;
+        counter::reset();
+        counter::increment();
+        a:#i32 = counter::getState(); // Should be 1
+    }
+    {
+        ::counter;
+        counter::reset();
+        b:#i32 = counter::getState(); // Should be 0 (new instance)
+    }
+    result:#i32 = (a == 1 && b == 0) ? (#i32)0 : (#i32)1;
+    -> result;
+}

@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Ambiguous parsing: Multiple valid parse trees trigger a compile-time error | Ambiguous parsing: complex mixed operator expression
+
+
+&^main() -> #i32 {
+    // Chained comparison without parentheses should be rejected
+    result:#b = 1 < 2 < 3;
+    0;
+}

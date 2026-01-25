@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Named types can override iteration by defining &(self)#Type::@($loop) method | Named types can override iteration by defining &(self)#Type::@($loop) method
+
+
+// EX-040: Custom iterator with @
+#Range(
+    start:#i32,
+    end:#i32
+);
+
+&(self)#Range::@($loop) {
+    _:#i32 = self.start;
+    $loop;
+}
+
+&print(arg0:#i32) { }
+
+&^main() -> #i32 {
+    r:#Range = Range(0, 5);
+    r@print(_);
+    -> 0;
+}

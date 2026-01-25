@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Tooling may allow filename overrides but must preserve the single-source requirement. | Filename overrides preserve single-source requirement
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c -o custom test.vx
+
+
+&^main() -> #i32 {
+    0
+}

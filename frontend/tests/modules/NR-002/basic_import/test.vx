@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Import syntax is ::A::B; for importing module at path A/B.vx | Import syntax ::A::B; imports module at path A/B.vx
+
+// NR-002: Import syntax is ::A::B; for importing module at path A/B.vx
+::lib;
+
+&^main() -> #i32 {
+    lib::helper()
+}

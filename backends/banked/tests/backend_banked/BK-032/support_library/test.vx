@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Runtime helpers shared across compilations (e.g., load_page) reside outside generated code and are provided by the support library | Runtime helpers in support library
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

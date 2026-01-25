@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Identifiers match the pattern [A-Za-z_][A-Za-z0-9_]* | Valid identifier patterns [A-Za-z_][A-Za-z0-9_]*
+
+
+&test() {
+  simple = 1;
+  camelCase = 2;
+  snake_case = 3;
+  UPPER_CASE = 4;
+  _leading = 5;
+  trailing_ = 6;
+  with123numbers = 7;
+}

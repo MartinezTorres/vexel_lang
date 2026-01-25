@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Expressions are evaluated according to operator precedence, starting with assignment as the lowest precedence | Expressions with multiple precedence levels
+
+
+&^main() -> #i32 {
+  x:#i32 = 1 + 2 * 3
+  y:#b = false || true && false
+  z:#b = (1 < 2) == (3 > 4)
+  x
+}

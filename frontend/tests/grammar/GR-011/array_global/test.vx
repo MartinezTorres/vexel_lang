@@ -1,0 +1,5 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Mutable global variables use the form ident '"'"':'"'"' type (no initialization) | Mutable global array with type
+
+
+buffer: #i32[100];

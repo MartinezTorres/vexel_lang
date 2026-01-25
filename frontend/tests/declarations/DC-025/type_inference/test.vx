@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions support type inference when '"'"'->'"'"' is omitted | Internal functions support type inference
+
+
+// DC-025: Support type inference when -> omitted
+&inferred(x:#i32) {
+    x * 2
+}
+
+&^main() -> #i32 {
+    inferred(21)
+}

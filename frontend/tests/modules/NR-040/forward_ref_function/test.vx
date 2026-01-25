@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Functions can be used before definition (forward references allowed) | Functions can be used before definition
+
+
+// NR-040: Functions can be used before definition (forward references allowed)
+&caller() -> #i32 {
+    callee()  // Forward reference to callee, defined below
+}
+
+&callee() -> #i32 {
+    42
+}
+
+&^main() -> #i32 {
+    caller()
+}

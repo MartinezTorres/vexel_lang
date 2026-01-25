@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions support multiple parameters with mixed type inference | Multiple parameters with mixed type inference
+
+
+// DC-036: Multiple parameters with mixed type inference
+&mixed(a:#i32, b, c:#i32, d) -> #i32 {
+    a + b + c + d
+}
+
+&^main() -> #i32 {
+    mixed(1, 2, 3, 4)
+}

@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Logical NOT operator (!) returns boolean value | Logical NOT operator (!) returns boolean value
+// @expect-exit: 3
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-007: Logical NOT operator (!) returns boolean value
+
+&^main() -> #i32 {
+    // !true should be false (0)
+    // !false should be true (1)
+    (!true ? (#i32)0 : (#i32)1) + (!false ? (#i32)2 : (#i32)0)
+}

@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Range expressions have the form sum [ '"'"'..'"'"' sum ] | Range expression used in iteration
+
+
+&^main() -> #i32 {
+  1..5 @ { 0 }
+  0
+}

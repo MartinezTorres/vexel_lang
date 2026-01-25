@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Everything is compile-time unless it cannot be determined at compile time | Everything is compile-time unless it cannot be determined at compile time
+
+
+// EX-018: Compile-time by default
+A:#i32 = 10;
+B:#i32 = 20;
+
+&^main() -> #i32 {
+    // A and B are compile-time constants
+    result:#i32 = A > B ? A : B;
+    -> result;
+}

@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Exported functions (&^) are entry points | Exported functions (&^) are entry points
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// RT-060: Exported functions (&^) are entry points
+
+&^main() -> #i32 {
+    42
+}
+
+&^other_entry() -> #i32 {
+    99
+}

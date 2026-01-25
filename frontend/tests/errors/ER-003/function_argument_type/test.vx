@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Type mismatches are reported as compile-time errors | Type mismatch: function argument type mismatch
+
+
+&^add(x: #i32, y: #i32) -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    add(5, true)
+}

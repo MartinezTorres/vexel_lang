@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Example: can use #f64 math at compile time to build #u8 lookup table | Example: can use #f64 math at compile time to build #u8 lookup table
+// @expect-exit: 100
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-025: Example: can use #f64 math at compile time to build #u8 lookup values
+
+&compute_sine_value() -> #u8 {
+    (#u8)((#f64)1.0 * 100.0)
+}
+
+// Build lookup value at compile time
+sine_value:#u8 = compute_sine_value();
+
+&^main() -> #i32 {
+    (#i32)sine_value  // Should be 100
+}

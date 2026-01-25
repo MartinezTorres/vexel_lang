@@ -1,0 +1,9 @@
+// @rfc: backends/banked/README.md
+// @desc: If the backend cannot rewrite struct calls to use out-parameters, it raises an error | Error if rewrite impossible
+// @expect-exit: 1
+// @command: {VEXEL_BANKED} test.vx
+
+
+struct S { data: [i32; 100] }
+fn^ complex(s: S) -> S { s }  // Complex case
+fn^ use_it() -> i32 { complex(complex(S{data:[0;100]})).data[0] }

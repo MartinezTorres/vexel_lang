@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Integer literals 0, 1 infer to #b | Integer literal 1 infers to #b
+
+
+&^main() -> #i32 {
+    x = 1;
+    1
+}

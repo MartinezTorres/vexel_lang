@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Generic constraint violations are reported as compile-time errors | Generic constraint violation: conflicting type inference
+
+
+&^main() -> #i32 {
+    // Mixing types forces a type mismatch during inference
+    result:#i32 = "oops";
+    result;
+}

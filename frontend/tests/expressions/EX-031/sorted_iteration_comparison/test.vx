@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: The @@ operator sorts using comparison rules defined in the Types section | The @@ operator sorts using comparison rules defined in the Types section
+
+
+// EX-031: Sorting uses type comparison rules
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[5] = [5, 2, 8, 1, 9];
+    arr@@print(_);  // Prints: 1, 2, 5, 8, 9
+    -> 0;
+}

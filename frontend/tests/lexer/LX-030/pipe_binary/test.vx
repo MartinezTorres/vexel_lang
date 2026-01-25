@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: The | operator serves as both unary (length/absolute value) and binary (bitwise OR) operator depending on context. | Accept | as binary operator (bitwise OR)
+
+
+&^main() -> #i32 {
+    a: #u32 = (#u32)5 | (#u32)3
+    0
+}

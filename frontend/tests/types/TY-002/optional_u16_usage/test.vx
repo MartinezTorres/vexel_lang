@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Optional primitive types i16, i32, i64, u16, u32, u64 may not be supported by all backends | Optional primitive type u16 usage
+
+
+&^main() -> #i32 {
+    x:#u16 = 1000;
+    0
+}

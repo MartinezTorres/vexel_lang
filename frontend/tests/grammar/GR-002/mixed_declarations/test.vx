@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Top-level declarations include function declarations, reference-taking functions, exported functions, external functions, type declarations, import statements, and global variables | Program with mixed top-level declarations
+
+
+x = 10;
+&foo() { -> 1; }
+#Type(a);
+y = 20;
+&bar() { -> 2; }

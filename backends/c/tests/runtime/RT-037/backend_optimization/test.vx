@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Backend may optimize to copy-on-write or move when safe | Backend may optimize to copy-on-write or move when safe
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-037: Backend may optimize to copy-on-write or move when safe
+// This is a positive test showing value semantics work correctly
+// (backend optimizations are transparent to the programmer)
+
+&^main() -> #i32 {
+    mut arr #i32[3] = [0, 0, 0];
+    arr[1] = 42;
+    // Even with a large array, semantics are value-based
+    arr[1]
+}

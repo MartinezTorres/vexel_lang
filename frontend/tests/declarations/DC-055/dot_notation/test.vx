@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Methods are called via dot notation: '"'"'receiver.methodname(args)'"'"' | Methods called via dot notation
+
+
+// DC-055: Methods called via dot notation
+#Item(value:#i32);
+
+&(i)#Item::get_value() -> #i32 { i.value }
+
+&^main() -> #i32 {
+    item:#Item = Item(99);
+    item.get_value()
+}

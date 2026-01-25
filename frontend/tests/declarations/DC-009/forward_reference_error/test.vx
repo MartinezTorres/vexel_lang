@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable global variables must use the syntax '"'"'name:Type'"'"' without initialization | Reject forward reference in constant initialization
+
+
+// DC-009: Cannot reference later constant
+FIRST = SECOND + 1;  // Error: SECOND not yet defined
+SECOND = 10;
+
+&^main() -> #i32 {
+    FIRST
+}

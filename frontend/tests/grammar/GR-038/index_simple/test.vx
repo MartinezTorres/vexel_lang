@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Index operations have the form '"'"'['"'"' expr '"'"']'"'"' | Simple index operation [expr]
+
+
+&^main() -> #i32 {
+  arr:#i32[2] = [5, 6]
+  x:#i32 = arr[1]
+  x
+}

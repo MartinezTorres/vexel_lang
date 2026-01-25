@@ -1,0 +1,28 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Function call evaluation: receiver expressions evaluate left-to-right before argument list, then arguments evaluate left-to-right | Function call evaluation: receiver expressions evaluate left-to-right before argument list, then arguments evaluate left-to-right
+// @expect-exit: 66
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-064: Function call evaluation: receiver expressions evaluate left-to-right before argument list,
+// then arguments evaluate left-to-right
+
+mut counter:#i32 = 0;
+
+&get_value(id:#i32) -> #i32 {
+    counter = counter + 1;
+    id * 10 + counter
+}
+
+&add(a:#i32, b:#i32, c:#i32) -> #i32 {
+    a + b + c
+}
+
+&^main() -> #i32 {
+    // get_value(1) -> counter=1, returns 11
+    // get_value(2) -> counter=2, returns 22
+    // get_value(3) -> counter=3, returns 33
+    // Result: 11 + 22 + 33 = 66
+    add(get_value(1), get_value(2), get_value(3))
+}

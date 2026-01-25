@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Composite to byte array cast creates portable byte representation | Composite to byte array cast creates portable byte representation
+
+
+#RGB(r:#u8, g:#u8, b:#u8);
+
+&^main() -> #i32 {
+    c:#RGB = RGB(255, 128, 64);
+    bytes:#u8[3] = (#u8[3])c;
+    0
+}

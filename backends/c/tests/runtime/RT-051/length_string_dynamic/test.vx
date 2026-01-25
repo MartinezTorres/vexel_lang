@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Length operator |expr| on strings is allowed dynamically | Length operator |expr| on strings is allowed dynamically
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// RT-051: Length operator |expr| on strings is allowed dynamically
+
+&get_string(flag:#b) -> #s {
+    flag ? "hello" : "world"
+}
+
+&^main(flag:#b) -> #i32 {
+    s:#s = get_string(flag);
+    |s|  // Dynamic length
+}

@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Iteration walks the resulting array value from the iterable expression | Iteration walks the resulting array value from the iterable expression
+
+
+// EX-028: Iteration walks the array
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    arr:#i32[5] = [1, 2, 3, 4, 5];
+    arr@print(_);
+    -> 0;
+}

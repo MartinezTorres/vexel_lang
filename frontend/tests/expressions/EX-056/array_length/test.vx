@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: For arrays, |expr| returns compile-time constant length (size of array) | For arrays, |expr| returns compile-time constant length (size of array)
+
+
+// EX-056: Array length
+&^main() -> #i32 {
+    arr:#i32[7] = [1, 2, 3, 4, 5, 6, 7];
+    len:#i32 = |arr|;
+    -> len;  // Should be 7
+}

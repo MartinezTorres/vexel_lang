@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Array literals have the form '"'"'['"'"' [ expr { '"'"','"'"' expr } ] '"'"']'"'"' | Empty array literal
+
+
+&test() {
+  arr = [];
+}

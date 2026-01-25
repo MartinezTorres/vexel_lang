@@ -1,0 +1,11 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: Compile-time execution must behave identically to the language specification. | Compile-time execution behaves per language spec
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+const_val:#i32 = 2 + 3;
+
+&^main() -> #i32 {
+    const_val
+}

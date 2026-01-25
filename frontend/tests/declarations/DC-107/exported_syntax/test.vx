@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Exported functions must use syntax '"'"'&^name(p:Type,...)[-> Type] block'"'"' | Exported function correct syntax
+
+
+// DC-107: Exported function syntax
+&^add(x:#i32, y:#i32) -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    add(10, 20)
+}

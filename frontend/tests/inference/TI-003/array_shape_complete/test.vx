@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Argument types include full array shape (element type + length) | Complete array shape (element type + length) inferred
+
+
+&process(arr) {
+    arr[0] * 2 + arr[1] * 3
+}
+
+&^main() -> #i32 {
+    process([5, 7])
+}

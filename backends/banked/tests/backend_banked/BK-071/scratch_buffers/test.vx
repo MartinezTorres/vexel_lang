@@ -1,0 +1,10 @@
+// @rfc: backends/banked/README.md
+// @desc: Non-reentrant functions and their callees may use dedicated global scratch buffers | Non-reentrant use global scratch
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^entry() -> #i32 {
+    buf:#i32[3] = [0, 0, 0];
+    buf[0]
+}

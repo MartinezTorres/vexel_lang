@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Variable lifetime ends at end of scope | Variable lifetime ends at end of scope
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-040: Variable lifetime ends at end of scope
+// This is a positive test showing scoped variables work correctly
+
+&^main() -> #i32 {
+    mut result #i32 = 0;
+    true ? {
+        scoped:#i32 = 42;
+        result = scoped;
+    }
+    // scoped is no longer accessible here
+    result  // Should be 42
+}

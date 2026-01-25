@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Logical OR (||) has precedence after logical AND | Logical OR (||) has precedence after logical AND
+
+
+// EX-080: Logical OR precedence
+&^main() -> #i32 {
+    // false && true || true is (false && true) || true
+    result:#b = false && true || true
+    result ? 1 : 0  // 1
+}

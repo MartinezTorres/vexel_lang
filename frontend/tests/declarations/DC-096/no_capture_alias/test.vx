@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Multi-receiver method receiver aliases cannot be captured beyond the call frame | Multi-receiver aliases not captured
+
+
+// DC-096: Receiver aliases cannot be captured beyond call
+&(data)operate() -> #i32 {
+    data + 1
+}
+
+&^main() -> #i32 {
+    value:#i32 = 50;
+    (value).operate()
+}

@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Argument lists consist of one or more comma-separated expressions | Argument list with multiple comma-separated expressions
+
+
+&foo(a:#i32, b:#i32, c:#i32, d:#i32, e:#i32) -> #i32 { a + b + c + d + e }
+&func(x:#i32) -> #i32 { x }
+
+&^main() -> #i32 {
+  arr:#i32[2] = [1,2]
+  foo(1, 2, 3 + 4, func(5), arr[1])
+}

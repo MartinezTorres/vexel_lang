@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Constructor calls use the syntax TypeName(...) to create instances of type constructors | Constructor call TypeName(...)
+
+
+#Point(x: #i32, y: #i32);
+
+&main() {
+  p = Point(10, 20);
+  q = Point(0, 0);
+}

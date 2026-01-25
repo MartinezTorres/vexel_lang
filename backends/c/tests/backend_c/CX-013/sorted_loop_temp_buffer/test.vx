@@ -1,0 +1,12 @@
+// @rfc: backends/c/README.md#shared-behavior
+// @desc: @@ loops must copy the resulting array into a temporary buffer. | @@ loops copy array into temporary buffer
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    arr:#i32[4] = [4, 2, 3, 1];
+    mut sum:#i32 = 0;
+    arr @@ { sum = sum + _; sum };
+    sum
+}

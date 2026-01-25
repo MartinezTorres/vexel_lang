@@ -1,0 +1,6 @@
+// Test character literal
+ch = 'A'
+
+&^main() -> #i32 {
+    ch
+}

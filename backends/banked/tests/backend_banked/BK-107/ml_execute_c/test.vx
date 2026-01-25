@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_EXECUTE_C is defined as a do-while(0) block that requests module, loads it, executes code, and restores previous segment | ML_EXECUTE_C do-while block
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

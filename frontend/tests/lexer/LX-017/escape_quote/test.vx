@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: String escape sequence \" represents a double quote. | Accept \" escape sequence for double quote
+
+
+&^main() -> #i32 {
+    s: #s = "He said \"hello\""
+    0
+}

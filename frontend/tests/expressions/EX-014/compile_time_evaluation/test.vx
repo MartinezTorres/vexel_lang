@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Conditional expressions attempt to evaluate the condition at compile time | Conditional expressions attempt to evaluate the condition at compile time
+
+
+// EX-014: Compile-time evaluation
+DEBUG:#b = 1;
+
+&^main() -> #i32 {
+    // DEBUG is compile-time constant, condition evaluated at compile time
+    result:#i32 = DEBUG ? 5 : 6;
+    -> result;
+}

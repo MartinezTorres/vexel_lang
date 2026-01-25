@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression q, r = divmod(10, 3) desugars to __tmp = divmod(10, 3); q = __tmp.__0; r = __tmp.__1 | Expression q, r = divmod(10, 3) desugars to __tmp = divmod(10, 3); q = __tmp.__0; r = __tmp.__1
+
+
+// EX-091: Multi-assignment divmod example
+
+&divmod(a:#u32, b:#u32) -> (#u32, #u32) {
+    (a / b, a % b)
+}
+
+&^main() -> #i32 {
+    q:#u32;
+    r:#u32;
+    q, r = divmod(10, 3);
+    -> (#i32)(q + r);  // 3 + 1 = 4
+}

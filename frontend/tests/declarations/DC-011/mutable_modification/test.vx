@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Mutable global variables can be modified at runtime | Mutable globals can be modified
+
+
+// DC-011: Mutable globals can be modified at runtime
+state:#i32;
+
+&^main() -> #i32 {
+    state = 10;
+    state = 20;
+    state
+}

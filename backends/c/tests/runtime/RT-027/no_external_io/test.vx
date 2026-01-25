@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: No external calls allowed during compile-time execution | No external calls allowed during compile-time execution
+// @expect-exit: 1
+// @expect-stderr: external
+// @command: {VEXEL_C} test.vx
+
+
+// RT-027: No external calls allowed during compile-time execution
+// Duplicate of RT-017 for completeness
+
+&!io_func() -> #i32
+
+compute() -> #i32 {
+    io_func()
+}
+
+value #i32 = compute()
+
+&^main() -> #i32 {
+    value
+}

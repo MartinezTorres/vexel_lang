@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: All ROM modules are marked __banked | ROM modules marked __banked
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^rom_func() -> #i32 { 0 }

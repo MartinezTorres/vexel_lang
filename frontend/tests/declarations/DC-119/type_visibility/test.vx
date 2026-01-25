@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Type constructor scope determines visibility | Type constructor visibility
+
+
+// DC-119: Type constructor scope determines visibility
+#Global(x:#i32);
+
+&^main() -> #i32 {
+    g:#Global = Global(10);
+    g.x
+}

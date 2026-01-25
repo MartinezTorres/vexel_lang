@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Generic types are monomorphized at use sites | Generic types are monomorphized at use sites
+
+
+#Container(value);
+
+&^main() -> #i32 {
+    c1:#Container = Container(42);
+    c2:#Container = Container(3.14);
+    c1.value
+}

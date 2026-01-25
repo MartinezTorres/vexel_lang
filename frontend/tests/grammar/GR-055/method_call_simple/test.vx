@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Method calls use the syntax receiver.fname(...) where the receiver is passed by reference | Method call with single receiver (receiver.fname(...))
+
+
+#Point(x:#i32, y:#i32);
+&(p)Point::move(dx:#i32, dy:#i32) -> #Point {
+  Point(p.x + dx, p.y + dy)
+}
+
+&^main() -> #i32 {
+  mut p:#Point = Point(0,0)
+  p = p.move(1, 2)
+  p.x + p.y
+}

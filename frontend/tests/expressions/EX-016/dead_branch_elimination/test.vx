@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Compile-time conditionals eliminate the dead branch before type checking | Compile-time conditionals eliminate the dead branch before type checking
+
+
+// EX-016: Dead branch eliminated before type checking
+ALWAYS_TRUE:#b = 1;
+
+&^main() -> #i32 {
+    // Dead branch contains type error, but should not be checked
+    result:#i32 = ALWAYS_TRUE ? 10 : "this would be a type error";
+    -> result;
+}

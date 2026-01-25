@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Function references only exist through direct calls | Function references only exist through direct calls
+
+
+&^helper() -> #i32 {
+    42
+}
+
+&^main() -> #i32 {
+    helper()
+}

@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: Prior to invoking foo_pageX, callers emit uint8_t _prev = ML_LOAD_MODULE_A(foo_pageX_module) | Caller emits ML_LOAD_MODULE_A
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^f() -> #i32 { 0 }
+&^g() -> #i32 { f() }

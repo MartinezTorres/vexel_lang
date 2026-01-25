@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions return last expression or use '"'"'-> expr;'"'"' for explicit return | Internal functions return last expression or explicit
+
+
+// DC-024: Return last expression or use '-> expr;'
+&implicit() -> #i32 {
+    42
+}
+
+&explicit() -> #i32 {
+    -> 100;
+}
+
+&^main() -> #i32 {
+    implicit() + explicit()
+}

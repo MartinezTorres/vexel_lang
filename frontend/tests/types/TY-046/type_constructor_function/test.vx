@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Type constructor auto-generates constructor function &#Name(args...) | Type constructor auto-generates constructor function
+
+
+#Color(r:#u8, g:#u8, b:#u8);
+
+&^main() -> #i32 {
+    c:#Color = Color(255, 128, 64);
+    (#i32)c.r
+}

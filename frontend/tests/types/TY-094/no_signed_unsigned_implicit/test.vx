@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: No implicit signed/unsigned conversion (must use explicit cast) | No implicit signed/unsigned conversion (must use explicit cast)
+
+
+&^main() -> #i32 {
+    s:#i32 = -10;
+    u:#u32 = (#u32)s;
+    0
+}

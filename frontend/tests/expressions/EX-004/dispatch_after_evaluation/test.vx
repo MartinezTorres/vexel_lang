@@ -1,0 +1,22 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Function call dispatch happens after all operands finish evaluating | Function call dispatch happens after all operands finish evaluating
+
+
+// EX-004: Dispatch after all evaluations complete
+&!print(arg0:#i32);
+
+&get_value(x:#i32) -> #i32 {
+    print(x);
+    x * 2
+}
+
+&compute(a:#i32, b:#i32) -> #i32 {
+    print(100);
+    a + b
+}
+
+&^main() -> #i32 {
+    // Should print 1, 2, then 100 (after both args evaluated)
+    result:#i32 = compute(get_value(1), get_value(2));
+    0
+}

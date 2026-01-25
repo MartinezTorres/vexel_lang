@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Expression a ? b : c ? d : e is an error and must use parentheses for disambiguation | Nested conditional works with explicit parentheses
+
+
+// EX-020: Nested conditional with parentheses
+&^main() -> #i32 {
+    a:#b = 1;
+    b:#b = 0;
+    c:#b = 1;
+    // OK: explicit parentheses
+    result1:#i32 = a ? (#i32)1 : (b ? (#i32)2 : (#i32)3);
+    result2:#i32 = (a ? b : c) ? (#i32)2 : (#i32)3;
+    -> result1;
+}

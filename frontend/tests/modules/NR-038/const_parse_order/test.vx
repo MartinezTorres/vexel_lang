@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Within a module, constants run in parse order (top-to-bottom) | Within module, constants run in parse order
+
+
+// NR-038: Within a module, constants run in parse order (top-to-bottom)
+FIRST:#i32 = 1;
+SECOND:#i32 = FIRST + 1;  // Can reference FIRST because it's defined above
+THIRD:#i32 = SECOND + 1;  // Can reference SECOND because it's defined above
+
+&^main() -> #i32 {
+    result:#i32 = (THIRD == 3) ? (#i32)0 : (#i32)1;
+    -> result;
+}

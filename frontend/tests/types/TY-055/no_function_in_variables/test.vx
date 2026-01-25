@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: No function types: functions cannot be stored in variables | No function types: functions cannot be stored in variables
+
+
+&^add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+&^main() -> #i32 {
+    add(10, 20)
+}

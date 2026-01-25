@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: Symbols exported from ROM modules are annotated with __banked so Megalinker can locate them | ROM symbols annotated __banked
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^rom_func() -> #i32 { 42 }

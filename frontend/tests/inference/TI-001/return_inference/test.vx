@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Hindley-Milner type inference is applied per function body | Infer return type from expression in function body
+
+
+&double(x) {
+    x * 2
+}
+
+&^main() -> #i32 {
+    double(21)
+}

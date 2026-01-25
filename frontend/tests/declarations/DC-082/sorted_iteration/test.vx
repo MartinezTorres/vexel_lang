@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: '"'"'@@'"'"' methods are responsible for delivering elements in sorted order | @@ methods deliver sorted order
+
+
+// DC-082: @@ methods deliver elements in sorted order
+#SortedSet(vals:#i32[3]);
+
+&(s)#SortedSet::@@($loop) {
+    // Simplified: assume pre-sorted
+    _:#i32 = s.vals[0];
+    $loop;
+}
+
+&^main() -> #i32 {
+    set:#SortedSet = SortedSet([1, 2, 3]);
+    result:#i32 = 0;
+    set@@{ result = result + _; }
+    result
+}

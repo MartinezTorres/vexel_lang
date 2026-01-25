@@ -1,0 +1,9 @@
+// @rfc: backends/banked/README.md
+// @desc: Alternation across pages is enforced; additional pages (C/D) may be introduced later but are currently unused | Page alternation is enforced
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^a() -> #i32 { b() }
+&^b() -> #i32 { c() }
+&^c() -> #i32 { 0 }

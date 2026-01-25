@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Assignment operator (=) has precedence after conditional operator | Assignment operator (=) has precedence after conditional operator
+
+
+// EX-082: Assignment precedence
+&^main() -> #i32 {
+    x:#i32 = 0
+    y:#i32 = 0
+    // x = true ? 10 : 20 is x = (true ? 10 : 20)
+    y = x = true ? 10 : 20
+    y  // 10
+}

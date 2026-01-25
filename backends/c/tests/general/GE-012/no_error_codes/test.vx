@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: There are no error codes provided by the language | No error codes - errno can be used as identifier
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-012: There are no error codes provided by the language
+// No errno or similar mechanisms
+
+&^main() -> #i32 {
+    42;
+}

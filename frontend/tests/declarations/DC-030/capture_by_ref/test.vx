@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Nested functions automatically capture enclosing scope variables by reference | Nested functions capture by reference
+
+
+// DC-030: Nested functions capture enclosing scope by reference
+&counter() -> #i32 {
+    count:#i32 = 0;
+    &increment() {
+        count = count + 1;
+    }
+    increment();
+    increment();
+    count
+}
+
+&^main() -> #i32 {
+    counter()
+}

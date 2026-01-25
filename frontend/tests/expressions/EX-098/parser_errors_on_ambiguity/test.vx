@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Parser errors on ambiguity rather than guessing intent | Parser errors on ambiguity rather than guessing intent
+
+
+// EX-098: Parser errors on ambiguity
+&^main() -> #i32 {
+    // ERROR: ambiguous conditional nesting
+    x:#i32 = 1 ? 1 : 1 ? 2 : 3;
+    -> x;
+}

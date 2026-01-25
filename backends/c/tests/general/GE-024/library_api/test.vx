@@ -1,0 +1,24 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The compiler can generate libraries as output | Library with API functions
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-024: Library output with clear API
+// Exported functions form the library API
+
+#Point(x:#i32, y:#i32);
+
+&^create_point(x:#i32, y:#i32) -> #Point {
+    Point(x, y);
+}
+
+&^point_sum(p:#Point) -> #i32 {
+    p.x + p.y;
+}
+
+&^main() -> #i32 {
+    p:#Point = create_point(15, 27);
+    point_sum(p);
+}

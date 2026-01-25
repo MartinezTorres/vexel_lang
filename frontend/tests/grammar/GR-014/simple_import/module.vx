@@ -1,0 +1,2 @@
+// Dummy module for import resolution
+value:#i32 = 0;

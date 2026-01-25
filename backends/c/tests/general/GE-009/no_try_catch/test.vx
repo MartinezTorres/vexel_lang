@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The language provides no explicit error handling mechanism | No error handling - try/catch can be used as identifiers
+// @expect-exit: 52
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-009: The language provides no explicit error handling mechanism
+// 'try' and 'catch' are not keywords and no error handling syntax exists
+
+&^main() -> #i32 {
+    52;
+}

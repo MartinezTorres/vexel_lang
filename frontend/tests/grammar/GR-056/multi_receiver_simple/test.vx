@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Multi-receiver method calls use the syntax (r1, r2).fname(...) | Multi-receiver method call (r1, r2).fname(...)
+
+
+&(a, b)swap() -> #i32 {
+    a + b;
+}
+
+&(x, y, z)transform(delta:#i32) -> #i32 {
+    x + y + z + delta;
+}
+
+&^main() -> #i32 {
+    left:#i32 = 1;
+    right:#i32 = 2;
+    (left, right).swap();
+}

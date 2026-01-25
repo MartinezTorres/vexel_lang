@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Signed integer types include i8, i16, i32, i64 | Signed integer type i8 is available
+
+
+&^main() -> #i32 {
+    x:#i8 = -100;
+    0
+}

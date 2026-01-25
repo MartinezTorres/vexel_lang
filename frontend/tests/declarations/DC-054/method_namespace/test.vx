@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: '"'"'TypeName::'"'"' creates a method namespace (separate from general functions) | TypeName:: creates method namespace
+
+
+// DC-054: TypeName:: creates method namespace
+#Widget(id:#i32);
+
+&(w)#Widget::show() -> #i32 { w.id }
+
+&^main() -> #i32 {
+    widget:#Widget = Widget(123);
+    widget.show()
+}

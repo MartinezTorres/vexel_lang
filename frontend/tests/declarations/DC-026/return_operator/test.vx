@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: '"'"'->'"'"' is the only return operator (implicit return via last expression, explicit '"'"'-> expr;'"'"', empty '"'"'->;'"'"') | -> is the only return operator
+
+
+// DC-026: -> is the only return operator
+&test() -> #i32 {
+    -> 42;
+}
+
+&empty() {
+    ->;
+}
+
+&^main() -> #i32 {
+    test()
+}

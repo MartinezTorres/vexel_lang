@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable global constants cannot be modified at runtime | Reject modification of immutable global
+
+
+// DC-003: Immutable globals cannot be modified
+VALUE = 100;
+
+&^main() -> #i32 {
+    VALUE = 200;  // Should error
+    0
+}

@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: After invoking foo_pageX, callers emit ML_RESTORE_A(_prev) | Caller emits ML_RESTORE_A
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^f() -> #i32 { 0 }
+&^g() -> #i32 { f() }

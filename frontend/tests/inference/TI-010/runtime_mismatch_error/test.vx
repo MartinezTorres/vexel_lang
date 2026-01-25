@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @desc: Runtime conditional '"'"'a ? b : c'"'"' requires type(b) == type(c) and a must be #b | Runtime conditional with mismatched types must reject
+
+
+&^main() -> #i32 {
+    cond:#b = true
+    cond ? 10 : false
+}

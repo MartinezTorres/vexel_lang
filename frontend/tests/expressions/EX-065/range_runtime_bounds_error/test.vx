@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Both bounds of a range must be compile-time constants | Runtime range bounds produce compile error
+
+
+// EX-065: Runtime bounds error
+&^main() -> #i32 {
+    x:#i32 = 5;
+    // ERROR: x is runtime value
+    r = 0..x;
+    -> 0;
+}

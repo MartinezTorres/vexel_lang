@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: Backend specifications define the target language for compilation | Backend defines target language - compilation succeeds
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-019: Backend specifications define the target language for compilation
+// This code should compile to the target language defined by backend
+
+&^main() -> #i32 {
+    x:#i32 = 42;
+    x;
+}

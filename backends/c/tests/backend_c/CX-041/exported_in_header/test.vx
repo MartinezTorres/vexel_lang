@@ -1,0 +1,13 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Exported function prototypes must appear in the header. | Exported function prototypes must appear in header
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^exported() -> #i32 {
+    42
+}
+
+&^main() -> #i32 {
+    0
+}

@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Float literals must contain a decimal point with digits on both sides (e.g., 1.23). | Reject floats missing digits after decimal point
+
+
+&^main() -> #i32 {
+    x: #f32 = 1.
+    0
+}

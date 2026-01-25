@@ -1,0 +1,11 @@
+// @rfc: backends/banked/README.md
+// @desc: Optimisation remains backend-neutral; divergence happens only during final code emission | Optimization passes are backend-neutral
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&compute() -> #i32 {
+    x:#i32 = 10;
+    y:#i32 = 20;
+    x + y  // Should be optimizable
+}

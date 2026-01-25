@@ -1,0 +1,9 @@
+// @rfc: backends/banked/README.md
+// @desc: Backend-specific regression tests verify compile-time rejection of struct-by-value calls | Reject struct-by-value calls
+// @expect-exit: 1
+// @command: {VEXEL_BANKED} test.vx
+
+
+struct Data { x: i32, y: i32 }
+fn^ pass(d: Data) -> i32 { d.x }
+fn^ test() -> i32 { pass(Data{x:1, y:2}) }

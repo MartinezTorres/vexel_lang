@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Functions execute at compile time when needed for constants (no explicit purity annotation) | Functions execute at compile time when needed for constants (no explicit purity annotation)
+// @expect-exit: 120
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-013: Functions execute at compile time when needed for constants
+
+&factorial(n:#i32) -> #i32 {
+    n <= 1 ? (#i32)1 : n * factorial(n - 1);
+}
+
+// This forces factorial to execute at compile time
+result:#i32 = factorial(5);
+
+&^main() -> #i32 {
+    result  // Should be 120
+}

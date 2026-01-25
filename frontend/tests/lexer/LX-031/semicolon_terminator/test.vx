@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: Statements can be terminated with a semicolon (;). | Accept semicolon as statement terminator
+
+
+&^main() -> #i32 {
+    x: #i32 = 1;
+    y: #i32 = 2;
+    z: #i32 = x + y;
+    0
+}

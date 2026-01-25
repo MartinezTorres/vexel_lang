@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Shift amount must be less than type bit width (undefined otherwise) | Shift amount must be less than type bit width (undefined otherwise)
+// @expect-exit: 128
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-053: Shift amount must be less than type bit width (undefined otherwise)
+// This is a positive test showing valid shift
+
+&^main() -> #i32 {
+    a:#u8 = 1;
+    b:#u8 = a << (#u8)7;  // Valid: shift by 7 is less than 8
+    (#i32)b  // Should be 128
+}

@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Immutable global constants are usable in compile-time expressions | Immutable globals usable in compile-time expressions
+
+
+// DC-004: Immutable globals usable in compile-time expressions
+SIZE:#i32 = 10;
+BUFFER:#u8[SIZE];
+
+&^main() -> #i32 {
+    0
+}

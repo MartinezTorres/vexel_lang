@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Exported mutable globals are not allowed by the language. | Exported mutable globals are not allowed by language
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&^main() -> #i32 {
+    0
+}

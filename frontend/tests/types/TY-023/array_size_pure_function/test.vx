@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array size can use pure functions like pow(2,3) if determinable at compile time | Array size can use compile-time computable expressions
+
+
+&^main() -> #i32 {
+    arr:#i32[3*2] = [1,2,3,4,5,6];
+    (#i32)|arr|
+}

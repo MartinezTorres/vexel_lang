@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Resource files resolve using same search order as modules (project root, then relative to importing file) | Resource files resolve using module search order
+
+
+// NR-004: Resource files resolve using same search order as modules (project root, then relative to importing file)
+config:#s = ::config.txt;
+
+&^main() -> #i32 {
+    // Should load config.txt from project root
+    result:#i32 = (config == "project-root-config") ? (#i32)0 : (#i32)1;
+    -> result;
+}

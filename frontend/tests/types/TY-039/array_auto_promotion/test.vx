@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Automatic promotion applies when assigning to typed arrays | Automatic promotion applies when assigning to typed arrays
+
+
+&^main() -> #i32 {
+    arr:#i32[3] = [1,2,3];
+    arr[0]
+}

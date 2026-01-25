@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Member access operations have the form '"'"'.'"'"' ident | Chained member access operations
+
+
+#Inner(v:#i32);
+#Outer(inner:#Inner);
+
+&^main() -> #i32 {
+  o:#Outer = Outer(Inner(7))
+  x:#i32 = o.inner.v
+  x
+}

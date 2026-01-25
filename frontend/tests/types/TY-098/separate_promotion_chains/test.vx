@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Signed and unsigned promotion chains are separate (no cross-promotion) | Signed and unsigned promotion chains are separate (no cross-promotion)
+
+
+&^main() -> #i32 {
+    s:#i8 = -10;
+    si:#i32 = s;
+    u:#u8 = 10;
+    ui:#u32 = u;
+    0
+}

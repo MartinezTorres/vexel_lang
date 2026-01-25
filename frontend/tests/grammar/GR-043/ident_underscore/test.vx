@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Identifiers match the pattern [A-Za-z_][A-Za-z0-9_]* | Identifiers with underscores
+
+
+&test() {
+  _private = 1;
+  __double = 2;
+  a_b_c_d = 3;
+}

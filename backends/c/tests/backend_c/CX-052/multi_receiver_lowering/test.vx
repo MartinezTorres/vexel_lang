@@ -1,0 +1,21 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: Multi-receiver functions must lower to plain functions that accept pointers for each receiver. | Multi-receiver functions lower to plain functions with receiver pointers
+// @expect-exit: 12
+// @run-generated: true
+// @command: {VEXEL_C} -b c test.vx
+
+
+// CX-052: multi-receiver lowering uses pointer parameters
+&(lhs, rhs)shift(delta:#i8) {
+    lhs = lhs + delta;
+    rhs = rhs + delta;
+}
+
+&^main() -> #i32 {
+    mut x:#i32;
+    mut y:#i32;
+    x = 1;
+    y = 5;
+    (x, y).shift(3);
+    x + y
+}

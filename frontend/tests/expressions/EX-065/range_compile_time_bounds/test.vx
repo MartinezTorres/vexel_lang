@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Both bounds of a range must be compile-time constants | Both bounds of a range must be compile-time constants
+
+
+// EX-065: Compile-time bounds required
+&^main() -> #i32 {
+    // OK: compile-time constants
+    r = 0..5;
+    -> r[0];
+}

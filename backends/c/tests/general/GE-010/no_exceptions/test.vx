@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: There are no exceptions in the language | No exceptions - '"'"'throw'"'"' can be used as identifier
+// @expect-exit: 99
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-010: There are no exceptions in the language
+// 'throw' is not a keyword
+
+&^main() -> #i32 {
+    99;
+}

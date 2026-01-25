@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Conditional operator (?:) has precedence after logical OR | Conditional operator (?:) has precedence after logical OR
+
+
+// EX-081: Conditional precedence
+&^main() -> #i32 {
+    // true || false ? 10 : 20 is (true || false) ? 10 : 20
+    result:#i32 = true || false ? 10 : 20
+    result  // 10
+}

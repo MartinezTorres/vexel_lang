@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: In boolean array casts, bit 0 is LSB (least significant bit) | In boolean array casts, bit 0 is LSB
+
+
+&^main() -> #i32 {
+    b:#b[8] = [1,0,0,0,0,0,0,0];
+    u:#u8 = (#u8)b;
+    (#i32)u
+}

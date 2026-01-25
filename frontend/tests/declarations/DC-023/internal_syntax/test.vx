@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Internal functions must use syntax '"'"'&name(p[:Type],...)[-> Type] block'"'"' | Internal function correct syntax
+
+
+// DC-023: Internal function syntax
+&add(x:#i32, y:#i32) -> #i32 {
+    x + y
+}
+
+&^main() -> #i32 {
+    add(10, 20)
+}

@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Import statements do not support aliases | Import statements without aliases
+
+
+// DC-122: Import statements do not support aliases
+// ::some::module;
+
+&^main() -> #i32 {
+    0
+}

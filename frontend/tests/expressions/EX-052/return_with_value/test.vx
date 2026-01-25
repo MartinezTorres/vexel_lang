@@ -1,0 +1,13 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Return with value uses syntax -> expr; to return from current function | Return with value uses syntax -> expr; to return from current function
+
+
+// EX-052: Return with value
+&add(a:#i32, b:#i32) -> #i32 {
+    -> a + b;
+}
+
+&^main() -> #i32 {
+    result:#i32 = add(10, 20);
+    -> result;
+}

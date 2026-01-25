@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration methods enable custom iteration semantics for user-defined types | Custom iteration for user types
+
+
+// DC-086: Custom iteration for user-defined types
+#UserType(values:#i32[2]);
+
+&(u)#UserType::@($loop) {
+    _:#i32 = u.values[0];
+    $loop;
+}
+
+&^main() -> #i32 {
+    ut:#UserType = UserType([100, 200]);
+    total:#i32 = 0;
+    ut@{ total = total + _; }
+    total
+}

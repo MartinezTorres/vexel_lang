@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: External functions provide all I/O and platform-specific services | External functions provide all I/O
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-008: External functions provide all I/O and platform-specific services
+// Program compiles using external functions for I/O
+
+&!putchar(c:#i32) -> #i32;
+
+&^main() -> #i32 {
+    // All I/O must go through external functions
+    putchar(65);  // Print 'A'
+    0;
+}

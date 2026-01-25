@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: In boolean array casts, bit N-1 is MSB (most significant bit) | In boolean array casts, bit N-1 is MSB
+
+
+&^main() -> #i32 {
+    b:#b[8] = [0,0,0,0,0,0,0,1];
+    u:#u8 = (#u8)b;
+    (#i32)u
+}

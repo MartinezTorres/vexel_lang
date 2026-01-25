@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Primary expressions include literals, variables, parenthesized expressions, blocks, array literals, function calls, method calls, and constructor calls | Primary expression: array literals
+
+
+&arrays() {
+  empty = [];
+  nums = [1, 2, 3, 4, 5];
+  nested = [[1, 2], [3, 4]];
+}

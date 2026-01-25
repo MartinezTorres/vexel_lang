@@ -1,0 +1,4 @@
+// Module B imports A (creates cycle)
+::a;
+
+VALUE_B:#i32 = a::VALUE_A + 1;

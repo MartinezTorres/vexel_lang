@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: At runtime, all symbols are accessible regardless of definition order | Runtime symbols accessible regardless of order
+
+
+// DC-022: At runtime, all symbols accessible regardless of order
+&^main() -> #i32 {
+    first() + second()
+}
+
+&first() -> #i32 { 1 }
+&second() -> #i32 { 2 }

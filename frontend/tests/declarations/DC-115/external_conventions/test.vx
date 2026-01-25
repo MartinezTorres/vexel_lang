@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Backend defines calling/linking conventions for external functions | External function calling conventions
+
+
+// DC-115: Backend defines calling conventions
+&!platform_specific(val:#u32) -> #u32;
+
+&^main() -> #i32 {
+    0
+}

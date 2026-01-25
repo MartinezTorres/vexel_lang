@@ -1,0 +1,8 @@
+// @rfc: backends/banked/README.md
+// @desc: Structs cannot be returned by value | Structs cannot be returned by value
+// @expect-exit: 1
+// @command: {VEXEL_BANKED} test.vx
+
+
+struct Point { x: i32, y: i32 }
+fn^ make() -> Point { Point{x:1, y:2} }

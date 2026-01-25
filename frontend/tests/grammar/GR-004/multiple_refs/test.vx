@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Reference-taking functions use the form '"'"'&'"'"' '"'"'('"'"' refparams '"'"')'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Reference-taking function with multiple reference parameters
+
+
+&(a, b, c)swap3(x: #i32, y: #i32, z: #i32) {
+  a = x;
+  b = y;
+  c = z;
+}

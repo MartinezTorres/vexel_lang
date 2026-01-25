@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @desc: Types can be used before definition (forward references allowed) | Types can be used before definition
+
+
+// NR-041: Types can be used before definition (forward references allowed)
+#Node(value:#i32, next:#NextNode);
+#NextNode(data:#i32);
+
+&^main() -> #i32 {
+    next:#NextNode = NextNode(2);
+    node:#Node = Node(1, next);
+    result:#i32 = (node.value == 1 && node.next.data == 2) ? (#i32)0 : (#i32)1;
+    -> result;
+}

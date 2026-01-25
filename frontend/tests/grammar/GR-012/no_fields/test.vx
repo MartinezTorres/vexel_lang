@@ -1,0 +1,5 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Type declarations use the form '"'"'#'"'"' ident '"'"'('"'"' [ fields ] '"'"')'"'"' '"'"';'"'"' | Type declaration with no fields
+
+
+#Empty();

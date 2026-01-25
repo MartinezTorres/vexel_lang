@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers | Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers - reject signed
+// @expect-exit: 1
+// @expect-stderr: unsigned
+// @command: {VEXEL_C} test.vx
+
+
+// RT-049: Bitwise operators must reject signed integers (negative test)
+
+&^main() -> #i32 {
+    a:#i32 = 5;
+    b:#i32 = 3;
+    a & b  // Should fail - bitwise on signed integers
+}

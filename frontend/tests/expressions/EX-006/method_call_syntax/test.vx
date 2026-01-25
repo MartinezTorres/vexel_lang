@@ -1,0 +1,19 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Method calls use syntax receiver.fname(args) | Method calls use syntax receiver.fname(args)
+
+
+// EX-006: Method call syntax
+#Point(
+    x:#i32,
+    y:#i32
+);
+
+&(self)#Point::distance_from_origin() -> #i32 {
+    -> self.x * self.x + self.y * self.y;
+}
+
+&^main() -> #i32 {
+    p:#Point = Point(3, 4);
+    d:#i32 = p.distance_from_origin();
+    -> d;
+}

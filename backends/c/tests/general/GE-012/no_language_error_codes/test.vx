@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: There are no error codes provided by the language | No error codes - functions return regular values
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// GE-012: No error codes provided by the language
+&^main() -> #i32 {
+    42;
+}

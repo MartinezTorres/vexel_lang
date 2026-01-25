@@ -1,0 +1,14 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters enable macro-like behavior without separate preprocessor | Expression parameters enable macro-like behavior
+
+
+// DC-043: Expression parameters enable macro-like behavior
+&unless($cond, $body) {
+    !($cond) ? { $body; }
+}
+
+&^main() -> #i32 {
+    x:#i32 = 5;
+    unless(x > 10, x = 100);
+    x
+}

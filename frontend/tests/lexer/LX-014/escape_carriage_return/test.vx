@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @desc: String escape sequence \r represents carriage return (0x0D). | Accept \r escape sequence for carriage return
+
+
+&^main() -> #i32 {
+    s: #s = "text\rwith\rcr"
+    0
+}

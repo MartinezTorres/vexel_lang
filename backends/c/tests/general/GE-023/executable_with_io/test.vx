@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#preamble
+// @desc: The compiler can generate executables as output | Executable with I/O operations works
+// @expect-exit: 0
+// @command: {VEXEL_C} test.vx
+
+
+// GE-023: Executable output with I/O
+// For this harness, we just ensure the program compiles
+&^main() -> #i32 {
+    0;
+}

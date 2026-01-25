@@ -1,0 +1,21 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: No I/O allowed during compile-time execution | No I/O allowed during compile-time execution
+// @expect-exit: 1
+// @expect-stderr: external
+// @command: {VEXEL_C} test.vx
+
+
+// RT-028: No I/O allowed during compile-time execution
+// Similar to RT-027, testing external function constraint
+
+&!print_func(x #i32) -> #i32
+
+compute() -> #i32 {
+    print_func(42)
+}
+
+value #i32 = compute()
+
+&^main() -> #i32 {
+    value
+}

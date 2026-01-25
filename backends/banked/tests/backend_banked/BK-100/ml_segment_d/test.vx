@@ -1,0 +1,7 @@
+// @rfc: backends/banked/README.md
+// @desc: ML_SEGMENT_D is defined to cast the address of __ML_SEGMENT_D_##module to const uint8_t | ML_SEGMENT_D casts to const uint8_t
+// @expect-exit: 0
+// @command: {VEXEL_BANKED} test.vx
+
+
+&^test() -> #i32 { 0 }

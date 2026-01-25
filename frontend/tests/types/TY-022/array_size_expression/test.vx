@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#types
+// @desc: Array size can use compile-time constant expressions like 2+3 | Array size can use compile-time constant expressions like 2+3
+
+
+&^main() -> #i32 {
+    arr:#i32[2+3] = [1,2,3,4,5];
+    (#i32)|arr|
+}

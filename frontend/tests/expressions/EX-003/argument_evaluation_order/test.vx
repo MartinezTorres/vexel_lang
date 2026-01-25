@@ -1,0 +1,31 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Function call arguments evaluate left-to-right | Function call arguments evaluate left-to-right
+
+
+// EX-003: Arguments evaluate left-to-right
+&!print(arg0:#i32);
+
+&get_first() -> #i32 {
+    print(1);
+    10
+}
+
+&get_second() -> #i32 {
+    print(2);
+    20
+}
+
+&get_third() -> #i32 {
+    print(3);
+    30
+}
+
+&sum(a:#i32, b:#i32, c:#i32) -> #i32 {
+    a + b + c
+}
+
+&^main() -> #i32 {
+    // Should print 1, 2, 3 in that order
+    result:#i32 = sum(get_first(), get_second(), get_third());
+    0
+}

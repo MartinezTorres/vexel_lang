@@ -1,0 +1,10 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Function calls use the syntax fname(...) for internal or external functions | External function call fname(...)
+
+
+&!printf(fmt: #s, val: #i32) -> #i32;
+
+&^main() -> #i32 {
+  printf("value: %d\n", 42)
+  0
+}

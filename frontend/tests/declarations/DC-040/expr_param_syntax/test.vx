@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Expression parameters must be prefixed with '"'"'$'"'"' in function signature | Expression parameters prefixed with $
+
+
+// DC-040: Expression parameters prefixed with $
+&apply_twice($expr) {
+    $expr;
+    $expr;
+}
+
+&^main() -> #i32 {
+    x:#i32 = 0;
+    apply_twice(x = x + 1);
+    x
+}

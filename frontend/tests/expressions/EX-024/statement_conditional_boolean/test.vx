@@ -1,0 +1,12 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Statement conditionals require boolean conditions | Statement conditionals require boolean conditions
+
+
+// EX-024: Statement conditional with boolean condition
+&!print(arg0:#i32);
+
+&^main() -> #i32 {
+    flag:#b = true
+    flag ? print(1)
+    0
+}

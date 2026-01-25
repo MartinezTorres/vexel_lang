@@ -1,0 +1,17 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iteration method name must be '"'"'@'"'"' or '"'"'@@'"'"' | Iteration method name @ or @@
+
+
+// DC-076: Iteration method name must be @ or @@
+#List(items:#i32[5]);
+
+&(l)#List::@($loop) {
+    _:#i32 = l.items[0];
+    $loop;
+}
+
+&^main() -> #i32 {
+    lst:#List = List([1, 2, 3, 4, 5]);
+    lst@{ -> 0; };
+    0
+}

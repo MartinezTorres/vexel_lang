@@ -1,0 +1,6 @@
+// All symbols are exported by default
+#Point(x:#i32, y:#i32);
+
+&publicFunc() -> #i32 { 42 }
+
+VALUE:#i32;

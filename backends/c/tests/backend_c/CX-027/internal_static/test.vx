@@ -1,0 +1,13 @@
+// @rfc: backends/c/README.md#code-generation-contract
+// @desc: Internal symbols must remain static inside the .c file. | Internal symbols must remain static inside .c file
+// @expect-exit: 0
+// @command: {VEXEL_C} -b c test.vx
+
+
+&internal_helper() -> #i32 {
+    99
+}
+
+&^main() -> #i32 {
+    internal_helper()
+}

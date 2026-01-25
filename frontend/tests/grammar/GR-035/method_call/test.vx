@@ -1,0 +1,15 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Method calls have the form (ident | '"'"'('"'"' ident { '"'"','"'"' ident } '"'"')'"'"') '"'"'.'"'"' ident '"'"'('"'"' [ arglist ] '"'"')'"'"' for single or multi-receiver methods | Single-receiver method call
+
+
+#Point(x:#i32, y:#i32);
+
+&(p)#Point::sum_with(other:#Point) -> #i32 {
+    p.x + other.x + p.y + other.y;
+}
+
+&^main() -> #i32 {
+    obj:#Point = Point(1, 2);
+    other:#Point = Point(3, 4);
+    obj.sum_with(other);
+}

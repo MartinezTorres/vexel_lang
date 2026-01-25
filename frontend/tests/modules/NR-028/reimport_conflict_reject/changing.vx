@@ -1,0 +1,2 @@
+// This module will be imported twice but definitions would differ
+&func() -> #i32 { 1 }

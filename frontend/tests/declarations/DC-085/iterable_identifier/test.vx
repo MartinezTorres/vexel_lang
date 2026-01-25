@@ -1,0 +1,18 @@
+// @rfc: doc/vexel-rfc.md#declarations
+// @desc: Iterable expression must be an identifier (passed by reference to iterator method) | Iterable expression is identifier
+
+
+// DC-085: Iterable expression must be identifier
+#Iterable(count:#i32);
+
+&(it)#Iterable::@($loop) {
+    _:#i32 = it.count;
+    $loop;
+}
+
+&^main() -> #i32 {
+    obj:#Iterable = Iterable(3);
+    sum:#i32 = 0;
+    obj@{ sum = sum + _; }
+    sum
+}

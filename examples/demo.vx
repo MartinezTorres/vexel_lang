@@ -1,0 +1,25 @@
+// Vexel Demo - Arrays and Compile-Time Execution
+
+// Pure functions for compile-time execution
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+&mul(a:#i32, b:#i32) -> #i32 {
+    a * b
+}
+
+// Global constant computed at compile-time
+result = mul(add(10, 20), 2)  // Evaluates to 60 at compile time
+
+// Entry point
+&^main() -> #i32 {
+    // Local array
+    nums:#i32[3] = [5, 10, 15]
+
+    // Array operations and return
+    result + nums[0] + nums[1] + nums[2]  // 60 + 5 + 10 + 15 = 90
+}
+
+// Note: add() and mul() will be completely eliminated
+// from the binary since they're only used at compile-time!

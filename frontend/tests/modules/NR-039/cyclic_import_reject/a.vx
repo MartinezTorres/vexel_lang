@@ -1,0 +1,4 @@
+// Module A imports B
+::b;
+
+VALUE_A:#i32 = b::VALUE_B + 1;

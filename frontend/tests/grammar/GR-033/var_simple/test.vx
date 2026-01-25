@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Variable references have the form ident [ '"'"':'"'"' type ] | Variable reference without type annotation
+
+
+&^main() -> #i32 {
+  y:#i32 = 1
+  x = y
+  x
+}

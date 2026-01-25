@@ -1,0 +1,9 @@
+// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @desc: Array size not being a compile-time constant is a compile-time error | Array size not compile-time constant: runtime variable
+
+
+&^main() -> #i32 {
+    mut len #i32 = 5;
+    data:#i32[len];
+    0;
+}

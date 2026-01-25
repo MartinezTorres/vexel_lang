@@ -1,0 +1,7 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Array literals have the form '"'"'['"'"' [ expr { '"'"','"'"' expr } ] '"'"']'"'"' | Nested array literals
+
+
+&test() {
+  matrix = [[1, 2], [3, 4], [5, 6]];
+}

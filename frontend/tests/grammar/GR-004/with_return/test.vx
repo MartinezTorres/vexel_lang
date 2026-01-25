@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Reference-taking functions use the form '"'"'&'"'"' '"'"'('"'"' refparams '"'"')'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Reference-taking function with return type
+
+
+&(result)compute(a: #i32, b: #i32) -> #i32 {
+  result = a + b;
+  -> result;
+}

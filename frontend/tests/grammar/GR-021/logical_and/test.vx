@@ -1,0 +1,8 @@
+// @rfc: doc/vexel-rfc.md#grammar
+// @desc: Logical AND expressions consist of one or more bit_or terms separated by '"'"'&&'"'"' | Logical AND expression (&&)
+
+
+&^main() -> #i32 {
+  result:#b = true && false
+  result ? 1 : 0
+}

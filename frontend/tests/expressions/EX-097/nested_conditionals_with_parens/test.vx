@@ -1,0 +1,11 @@
+// @rfc: doc/vexel-rfc.md#expressions--control
+// @desc: Nested conditionals must be explicitly parenthesized to avoid ambiguity | Nested conditionals work with parentheses
+
+
+// EX-097: Nested conditionals with parens
+&^main() -> #i32 {
+    // OK: explicit parentheses
+    result1:#i32 = (1 < 2) ? 3 : ((0 < -1) ? 5 : 6);
+    result2:#i32 = ((1 < 2) ? (3 < 4) : (0 > 1)) ? 5 : 6;
+    -> result1;
+}

@@ -1,0 +1,16 @@
+// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @desc: Executable mode: compiler specifies entry point from exports | Executable mode: compiler specifies entry point from exports
+// @expect-exit: 7
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+// RT-061: Executable mode: compiler specifies entry point from exports
+
+&^main() -> #i32 {
+    7
+}
+
+&helper() -> #i32 {
+    42;
+}
