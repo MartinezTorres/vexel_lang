@@ -390,7 +390,8 @@
     const statusText = document.getElementById("statusText");
     const statusDot = document.getElementById("statusDot");
 
-    let vexelModule = null;
+    let wasmBinaryCache = null;
+    let compilerReady = false;
 
     function log(message, level = "info") {
       const time = new Date().toLocaleTimeString();
@@ -480,30 +481,7 @@
       renderOutput();
     }
 
-    function resetWorkspace() {
-      const FS = vexelModule.FS;
-      if (!FS.analyzePath("/project").exists) {
-        FS.mkdir("/project");
-      }
-      const wipeDir = (path) => {
-        const entries = FS.readdir(path).filter((e) => e !== "." && e !== "..");
-        entries.forEach((entry) => {
-          const full = `${path}/${entry}`;
-          const stat = FS.stat(full);
-          if (FS.isDir(stat.mode)) {
-            wipeDir(full);
-            FS.rmdir(full);
-          } else {
-            FS.unlink(full);
-          }
-        });
-      };
-      wipeDir("/project");
-      FS.chdir("/project");
-    }
-
-    function ensureDir(path) {
-      const FS = vexelModule.FS;
+    function ensureDir(FS, path) {
       const parts = path.split("/").filter(Boolean);
       let current = "";
       for (const part of parts) {
@@ -514,8 +492,11 @@
       }
     }
 
-    function writeSources() {
-      const FS = vexelModule.FS;
+    function prepareWorkspace(FS) {
+      if (!FS.analyzePath("/project").exists) {
+        FS.mkdir("/project");
+      }
+      FS.chdir("/project");
       state.sources.forEach((src) => {
         const clean = sanitizeName(src.name);
         if (!clean) {
@@ -524,7 +505,7 @@
         }
         const fullPath = `/project/${clean}`;
         const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
-        ensureDir(dir);
+        ensureDir(FS, dir);
         FS.writeFile(fullPath, src.content);
       });
     }
@@ -534,8 +515,7 @@
       return main || state.sources[state.activeSource];
     }
 
-    function readOutputs(baseName) {
-      const FS = vexelModule.FS;
+    function readOutputs(FS, baseName) {
       const results = [];
       [".c", ".h", ".lowered.vx"].forEach((suffix) => {
         const path = `/project/${baseName}${suffix}`;
@@ -546,41 +526,67 @@
       return results;
     }
 
-    function compile() {
-      if (!vexelModule) {
+    async function compile() {
+      if (!compilerReady || !wasmBinaryCache) {
         log("Compiler not loaded. Run 'make web' to embed the compiler.", "error");
         return;
       }
+      compileBtn.disabled = true;
+      setStatus("Compiling", "loading");
       clearOutputs();
-      resetWorkspace();
-      writeSources();
 
       const entry = selectEntry();
       if (!entry) {
         log("No source files to compile", "error");
+        compileBtn.disabled = false;
+        setStatus("Ready", "ready");
         return;
       }
       const entryName = sanitizeName(entry.name);
       if (!entryName) {
         log(`Invalid entry file name: ${entry.name}`, "error");
+        compileBtn.disabled = false;
+        setStatus("Ready", "ready");
         return;
       }
       const baseName = entryName.replace(/\.vx$/, "");
 
       log(`Compiling ${entryName}...`);
       let exitCode = 0;
+      let module;
       try {
-        vexelModule.callMain(["-o", `/project/${baseName}`, entryName]);
+        module = await createVexelModule({
+          wasmBinary: wasmBinaryCache,
+          noInitialRun: true,
+          preRun: [(mod) => prepareWorkspace(mod.FS)],
+          print: (text) => {
+            if (text && text.trim().length > 0) log(text);
+          },
+          printErr: (text) => {
+            if (text && text.trim().length > 0) log(text, "error");
+          }
+        });
+      } catch (err) {
+        log(`Compiler crashed during init: ${err}`, "error");
+        compileBtn.disabled = false;
+        setStatus("Ready", "ready");
+        return;
+      }
+
+      try {
+        module.callMain(["-o", `/project/${baseName}`, entryName]);
       } catch (err) {
         if (err && err.name === "ExitStatus") {
           exitCode = err.status;
         } else {
           log(`Compiler crashed: ${err}`, "error");
+          compileBtn.disabled = false;
+          setStatus("Ready", "ready");
           return;
         }
       }
 
-      const outputs = readOutputs(baseName);
+      const outputs = readOutputs(module.FS, baseName);
       state.outputs = outputs;
       state.activeOutput = 0;
       renderOutputTabs();
@@ -588,11 +594,13 @@
 
       if (exitCode !== 0) {
         log(`Compiler exited with code ${exitCode}`, "error");
-      } else if (outputs.length === 0) {
+      } else if (state.outputs.length === 0) {
         log("Compilation finished, but no outputs were produced", "error");
       } else {
-        log(`Compilation finished (${outputs.length} file(s))`);
+        log(`Compilation finished (${state.outputs.length} file(s))`);
       }
+      compileBtn.disabled = false;
+      setStatus("Ready", "ready");
     }
 
     function loadExample(key) {
@@ -623,22 +631,13 @@
       }
       setStatus("Loading", "loading");
       try {
-        const moduleOptions = {
-          print: (text) => {
-            if (text && text.trim().length > 0) log(text);
-          },
-          printErr: (text) => {
-            if (text && text.trim().length > 0) log(text, "error");
-          }
-        };
-        const wasmBinary = decodeWasmBase64();
-        if (!wasmBinary) {
+        wasmBinaryCache = decodeWasmBase64();
+        if (!wasmBinaryCache) {
           log("Embedded wasm missing; run 'make web' to generate a self-contained playground.", "error");
           setStatus("No compiler", "error");
           return;
         }
-        moduleOptions.wasmBinary = wasmBinary;
-        vexelModule = await createVexelModule(moduleOptions);
+        compilerReady = true;
         setStatus("Ready", "ready");
         compileBtn.disabled = false;
         log("Compiler ready");

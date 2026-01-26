@@ -29,7 +29,8 @@ EMFLAGS := \
   -s EXPORTED_RUNTIME_METHODS='["FS","callMain"]' \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s ENVIRONMENT='web' \
-  -s DISABLE_EXCEPTION_CATCHING=0
+  -s DISABLE_EXCEPTION_CATCHING=0 \
+  -Wl,--export=__main_argc_argv
 
 TARGET := $(OUT_DIR)/vexel.js
 WASM := $(OUT_DIR)/vexel.wasm
