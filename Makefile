@@ -71,6 +71,11 @@ test: driver-test frontend-test $(BACKENDS_TEST_TARGETS)
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
 	rmdir $(BUILD_DIR)
 
+# Web playground (WASM build)
+.PHONY: web
+web:
+	+$(MAKE) -C web
+
 # Force target for always-run rules
 FORCE:
 .PHONY: FORCE

@@ -19,6 +19,8 @@ gcc out.c -o simple -lm
 - `backends/c/` - portable C backend (`libvexel-c.a`, `bin/vexel-c`, tests).
 - `driver/` - unified `bin/vexel` CLI that lists registered backends.
 - `doc/` - language docs (`doc/vexel-rfc.md`, `doc/frontend.md`, `doc/frontend-lowered.md`, `doc/backends.md`).
+- `tutorial/` - step-by-step Vexel tutorial (Markdown, browsable on GitHub).
+- `web/` - static playground UI mock (compile-to-C visualization; no backend wired yet).
 - `examples/` - sample programs plus `examples/lib/` helper modules; smoke tests in `examples/tests/`.
 
 ## Usage
@@ -44,6 +46,18 @@ Process expressions execute host commands. They are **disabled by default**; pas
 - Command: `make test` (builds and runs the full suite)
 
 See `doc/testing.md` for the `run.sh` format and harness details.
+
+## Web Playground
+
+The web playground runs `vexel-c` in WebAssembly and emits C for visualization. The built `playground.html` is self-contained (compiler embedded).
+
+```bash
+source /path/to/emsdk_env.sh
+make web
+python3 -m http.server
+```
+
+Open `http://localhost:8000/web/playground.html` in a browser. You can copy that single HTML file to another machine and it will still work.
 
 ## Supported Platforms & Toolchains
 
