@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: The iterable expression must be an identifier so it can be passed by reference to iterator methods | Non-identifier iterable expression is an error
 
 

@@ -74,7 +74,7 @@ clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
 # Web playground (WASM build)
 .PHONY: web
 web:
-	+$(MAKE) -C web
+	+$(MAKE) -C playground
 
 # Force target for always-run rules
 FORCE:

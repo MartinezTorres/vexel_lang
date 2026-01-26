@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Compile-time execution is backend-independent: can use any type (even unsupported by target) | Compile-time execution is backend-independent: can use any type (even unsupported by target)
 // @expect-exit: 6
 // @run-generated: true

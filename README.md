@@ -18,9 +18,9 @@ gcc out.c -o simple -lm
 - `frontend/` - lexer/parser/typechecker/evaluator/AST/codegen (`libvexelfrontend.a`, `bin/vexel-frontend`, tests).
 - `backends/c/` - portable C backend (`libvexel-c.a`, `bin/vexel-c`, tests).
 - `driver/` - unified `bin/vexel` CLI that lists registered backends.
-- `doc/` - language docs (`doc/vexel-rfc.md`, `doc/frontend.md`, `doc/frontend-lowered.md`, `doc/backends.md`).
+- `docs/` - language docs (`docs/vexel-rfc.md`, `docs/frontend.md`, `docs/frontend-lowered.md`, `docs/backends.md`).
 - `tutorial/` - step-by-step Vexel tutorial (Markdown, browsable on GitHub).
-- `web/` - static playground UI mock (compile-to-C visualization; no backend wired yet).
+- `playground/` - WebAssembly playground build (compile-to-C visualization).
 - `examples/` - sample programs plus `examples/lib/` helper modules; smoke tests in `examples/tests/`.
 
 ## Usage
@@ -45,11 +45,11 @@ Process expressions execute host commands. They are **disabled by default**; pas
 - Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
 - Command: `make test` (builds and runs the full suite)
 
-See `doc/testing.md` for the `run.sh` format and harness details.
+See `docs/testing.md` for the `run.sh` format and harness details.
 
 ## Web Playground
 
-The web playground runs `vexel-c` in WebAssembly and emits C for visualization. The built `playground.html` is self-contained (compiler embedded).
+The web playground runs `vexel-c` in WebAssembly and emits C for visualization. The built `docs/index.html` is self-contained (compiler embedded).
 
 ```bash
 source /path/to/emsdk_env.sh
@@ -57,7 +57,7 @@ make web
 python3 -m http.server
 ```
 
-Open `http://localhost:8000/web/playground.html` in a browser. You can copy that single HTML file to another machine and it will still work.
+Open `http://localhost:8000/docs/` in a browser. You can copy `docs/index.html` to another machine and it will still work.
 
 ## Supported Platforms & Toolchains
 

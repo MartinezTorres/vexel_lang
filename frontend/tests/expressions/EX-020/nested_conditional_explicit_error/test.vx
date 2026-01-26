@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Expression a ? b : c ? d : e is an error and must use parentheses for disambiguation | Expression a ? b : c ? d : e is an error and must use parentheses for disambiguation
 
 

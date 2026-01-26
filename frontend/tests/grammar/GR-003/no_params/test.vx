@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Function declarations use the form '"'"'&'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Function with no parameters
 
 

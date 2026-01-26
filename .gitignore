@@ -31,5 +31,5 @@ AUDIT.md
 Assistant.md
 
 # Web build artifacts (embedded into playground.html)
-web/vexel.js
-web/vexel.wasm
+playground/vexel.js
+playground/vexel.wasm

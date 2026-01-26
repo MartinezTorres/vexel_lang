@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Assignment always creates independent copy (no aliasing) | Assignment always creates independent copy (no aliasing)
 // @expect-exit: 30
 // @run-generated: true

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Array length |arr| yields compile-time constant integer (array size) | Array length |arr| yields compile-time constant integer
 
 

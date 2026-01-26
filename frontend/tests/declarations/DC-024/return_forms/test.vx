@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Internal functions return last expression or use '"'"'-> expr;'"'"' for explicit return | Internal functions return last expression or explicit
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Composite types can be converted to/from byte arrays via casting (creates copy) | Composite types can be converted to/from byte arrays via casting (creates copy)
 // @expect-exit: 0
 // @run-generated: true

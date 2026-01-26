@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Top-level declarations include function declarations, reference-taking functions, exported functions, external functions, type declarations, import statements, and global variables | Program with mixed top-level declarations
 
 

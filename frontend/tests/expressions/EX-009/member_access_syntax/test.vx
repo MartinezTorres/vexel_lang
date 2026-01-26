@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Member access uses syntax x.y to access fields of composite types | Member access uses syntax x.y to access fields of composite types
 
 

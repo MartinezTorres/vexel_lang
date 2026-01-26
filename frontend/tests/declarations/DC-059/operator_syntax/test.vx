@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Operator methods must use syntax '"'"'&(lhs)#TypeName::<op>(rhs[:Type])[-> Type] block'"'"' | Operator method correct syntax
 
 

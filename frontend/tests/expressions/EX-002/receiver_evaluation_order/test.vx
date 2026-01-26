@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Function call receiver expressions evaluate left-to-right before the argument list | Function call receiver expressions evaluate left-to-right before the argument list
 
 

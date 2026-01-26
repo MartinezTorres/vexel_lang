@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: In boolean array casts, bit N-1 is MSB (most significant bit) | In boolean array casts, bit N-1 is MSB
 
 

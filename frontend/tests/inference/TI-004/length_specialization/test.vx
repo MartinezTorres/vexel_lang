@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Mismatched array lengths form distinct instantiations in generic functions | Generic function specialized for different array lengths
 
 

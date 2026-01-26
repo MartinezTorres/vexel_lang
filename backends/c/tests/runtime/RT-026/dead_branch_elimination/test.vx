@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Compile-time conditionals eliminate dead branches before type checking | Compile-time conditionals eliminate dead branches before type checking
 // @expect-exit: 42
 // @run-generated: true

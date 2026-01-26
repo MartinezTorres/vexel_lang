@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Method receivers are passed by reference (mutable) for the duration of the call | Method receiver passed by reference
 
 

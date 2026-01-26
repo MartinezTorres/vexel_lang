@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: The language defines no standard library | No standard library - no built-in print function
 // @expect-exit: 1
 // @expect-stderr: print

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Data lifetime ends at end of scope | Data lifetime ends at end of scope
 
 

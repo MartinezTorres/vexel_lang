@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Everything is compile-time unless it cannot be determined at compile time | Everything is compile-time unless it cannot be determined at compile time
 
 

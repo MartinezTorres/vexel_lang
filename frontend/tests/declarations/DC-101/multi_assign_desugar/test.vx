@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-assignment syntax '"'"'a, b = func()'"'"' desugars to temp struct + field access | Multi-assignment desugaring
 
 

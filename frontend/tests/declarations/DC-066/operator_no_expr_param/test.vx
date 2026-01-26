@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Operator methods may not declare expression parameters | Operator methods without expression parameters
 
 

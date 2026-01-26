@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Generic functions may not be exported (&^) | Generic functions may not be exported (must reject)
 
 

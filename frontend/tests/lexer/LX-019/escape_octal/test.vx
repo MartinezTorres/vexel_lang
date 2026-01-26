@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: String escape sequence \NNN represents a byte in octal, limited to [0-3][0-7][0-7] (0-377 octal, 0-255 decimal). | Accept \NNN octal escape sequence (0-377)
 
 

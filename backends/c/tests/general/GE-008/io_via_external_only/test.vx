@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: External functions provide all I/O and platform-specific services | External functions provide all I/O
 // @expect-exit: 0
 // @command: {VEXEL_C} test.vx

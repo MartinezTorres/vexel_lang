@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Blocks evaluate all statements and yield the value of the last expression | Blocks evaluate all statements and yield the value of the last expression
 
 

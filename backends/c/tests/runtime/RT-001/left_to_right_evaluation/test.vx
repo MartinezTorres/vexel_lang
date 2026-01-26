@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Evaluation is strict left-to-right for all expressions | Evaluation is strict left-to-right for all expressions
 // @expect-exit: 33
 // @run-generated: true

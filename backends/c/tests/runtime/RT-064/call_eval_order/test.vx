@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Function call evaluation: receiver expressions evaluate left-to-right before argument list, then arguments evaluate left-to-right | Function call evaluation: receiver expressions evaluate left-to-right before argument list, then arguments evaluate left-to-right
 // @expect-exit: 66
 // @run-generated: true

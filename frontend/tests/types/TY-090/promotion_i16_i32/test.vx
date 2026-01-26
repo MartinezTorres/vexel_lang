@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Automatic promotion: i8 -> i16 -> i32 -> i64 | Automatic promotion: i16 -> i32
 
 

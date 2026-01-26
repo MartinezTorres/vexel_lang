@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Constructor calls use syntax TypeName(args) to create instances of user-defined types | Constructor calls use syntax TypeName(args) to create instances of user-defined types
 
 

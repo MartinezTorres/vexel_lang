@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Vexel is an operator-based language where all operations use operators rather than keywords | Operator-based language - arithmetic and logic via operators
 // @expect-exit: 15
 // @run-generated: true

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: When condition is a runtime value, both branches must have the same type | When condition is a runtime value, both branches must have the same type
 
 

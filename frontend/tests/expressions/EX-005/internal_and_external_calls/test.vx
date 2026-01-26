@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Function calls can invoke both internal functions and external functions declared with &! | Function calls can invoke both internal functions and external functions declared with &!
 
 

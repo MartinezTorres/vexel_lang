@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Module resolution: ::a::b; maps to a/b.vx (case-sensitive, relative to project root) | Module resolution maps ::a::b to a/b.vx
 
 

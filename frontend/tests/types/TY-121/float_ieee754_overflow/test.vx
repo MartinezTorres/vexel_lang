@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Float overflow behavior follows IEEE 754 standard | Float overflow behavior follows IEEE 754 standard
 
 

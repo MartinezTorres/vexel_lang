@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: The compiler can generate C source code for integration with existing C codebases | C source generation for C integration
 // @expect-exit: 42
 // @run-generated: true

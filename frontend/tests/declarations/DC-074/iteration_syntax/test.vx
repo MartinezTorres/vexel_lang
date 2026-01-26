@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Iteration methods must use syntax '"'"'&(receiver)#TypeName::@($loop) block'"'"' or '"'"'&(receiver)#TypeName::@@($loop) block'"'"' | Iteration method correct syntax
 
 

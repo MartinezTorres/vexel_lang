@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: For arrays, |expr| returns compile-time constant length (size of array) | For arrays, |expr| returns compile-time constant length (size of array)
 
 

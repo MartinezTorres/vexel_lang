@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Captured variables remain accessible throughout nested function'"'"'s lifetime | Captured variables remain accessible
 
 

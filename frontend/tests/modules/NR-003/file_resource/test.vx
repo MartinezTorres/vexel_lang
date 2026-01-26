@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Resource expressions ::A::B::file.ext in expression context load the referenced resource at compile time | Resource expressions load files at compile time
 
 

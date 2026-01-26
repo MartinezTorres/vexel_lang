@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Observable semantics must match a concrete instantiation regardless of implementation optimizations | Semantics consistent regardless of implementation optimization
 
 

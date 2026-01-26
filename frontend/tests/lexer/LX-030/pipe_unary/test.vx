@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: The | operator serves as both unary (length/absolute value) and binary (bitwise OR) operator depending on context. | Accept | as unary operator (length/absolute value)
 
 

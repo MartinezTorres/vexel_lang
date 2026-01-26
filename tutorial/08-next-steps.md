@@ -3,10 +3,10 @@
 You now have the basics. To go deeper:
 
 - Browse `examples/` for real programs (arrays, iteration, operator methods, I/O).
-- Read the language specification: `doc/vexel-rfc.md`.
-- Explore frontend internals: `doc/frontend.md` and `doc/frontend-lowered.md`.
-- Backend overview and authoring notes: `doc/backends.md` and `doc/backend-authoring.md`.
-- Testing details: `doc/testing.md`.
+- Read the language specification: `docs/vexel-rfc.md`.
+- Explore frontend internals: `docs/frontend.md` and `docs/frontend-lowered.md`.
+- Backend overview and authoring notes: `docs/backends.md` and `docs/backend-authoring.md`.
+- Testing details: `docs/testing.md`.
 
 If you want a printable or single-page version of this tutorial, open an issue or ask for a combined document.
 

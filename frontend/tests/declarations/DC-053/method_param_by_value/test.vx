@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Method non-receiver parameters are passed by value | Method non-receiver parameters by value
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Escape sequences start with backslash and include simple escapes ([nrt\\'"'"'"]), hexadecimal escapes ('"'"'x'"'"' hex hex), and octal escapes ([0-3] [0-7] [0-7]) | Hexadecimal escape sequences \xHH
 
 

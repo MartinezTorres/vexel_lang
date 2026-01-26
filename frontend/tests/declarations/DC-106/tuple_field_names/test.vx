@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Tuple fields use numeric naming pattern '"'"'__0'"'"', '"'"'__1'"'"', etc. | Tuple numeric field naming
 
 

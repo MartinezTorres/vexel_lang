@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Expression 0..10@print(_) prints 0 through 9 | Expression 0..10@print(_) prints 0 through 9
 
 

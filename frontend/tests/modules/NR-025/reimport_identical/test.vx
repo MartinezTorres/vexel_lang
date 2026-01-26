@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Re-importing same module in same scope is permitted when every top-level definition is identical | Re-importing same module with identical definitions is permitted
 
 

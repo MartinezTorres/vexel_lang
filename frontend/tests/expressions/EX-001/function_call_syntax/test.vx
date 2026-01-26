@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Function calls use syntax fname(args) for both internal and external functions | Function calls use syntax fname(args) for both internal and external functions
 
 

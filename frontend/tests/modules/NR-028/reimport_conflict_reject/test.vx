@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Re-importing same module with non-identical definitions is compile-time error | Re-importing with non-identical definitions is error
 
 

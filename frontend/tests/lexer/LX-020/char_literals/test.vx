@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Character literals are delimited by single quotes ('"'"'a'"'"') and support the same escape sequences as strings. | Accept character literals with single quotes and escape sequences
 
 

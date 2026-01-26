@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Parameter lists consist of one or more comma-separated parameters | Function with multiple comma-separated parameters
 
 

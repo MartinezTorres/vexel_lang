@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Generic functions must resolve within the compiling program | Generic functions resolve within compiling program
 
 

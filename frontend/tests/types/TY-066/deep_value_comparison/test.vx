@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Equality uses value-based deep comparison for all types | Equality uses value-based deep comparison for all types
 
 

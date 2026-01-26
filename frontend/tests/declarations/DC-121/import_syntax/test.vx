@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Import statements must use syntax '"'"'::path::to::module;'"'"' | Import statement correct syntax
 
 

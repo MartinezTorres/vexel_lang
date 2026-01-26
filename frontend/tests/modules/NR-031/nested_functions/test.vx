@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Function definitions can be scoped to blocks (nested functions) | Function definitions can be scoped to blocks (nested functions)
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Hexadecimal digits match the pattern [0-9A-Fa-f] | Hexadecimal digits [0-9A-Fa-f]
 
 

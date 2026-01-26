@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Backend specifications define the target language for compilation | Backend target language - runs correctly
 // @expect-exit: 42
 // @run-generated: true

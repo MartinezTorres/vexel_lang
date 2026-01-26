@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Everything is compile-time unless it cannot be | Everything is compile-time unless it cannot be
 // @expect-exit: 55
 // @run-generated: true

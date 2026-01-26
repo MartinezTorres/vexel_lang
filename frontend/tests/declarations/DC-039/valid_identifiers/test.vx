@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Internal function names must be valid identifiers following naming rules | Internal function names are valid identifiers
 
 

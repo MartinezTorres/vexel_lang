@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: #b[32] can cast to/from #u32 | #b[32] can cast to/from #u32
 
 

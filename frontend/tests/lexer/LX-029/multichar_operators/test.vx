@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Multi-character operators must be tokenized as single tokens (e.g., << is one token, not two < tokens). | Tokenize multi-character operators as single tokens
 
 

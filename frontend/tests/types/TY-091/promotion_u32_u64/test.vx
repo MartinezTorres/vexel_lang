@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Automatic promotion: u8 -> u16 -> u32 -> u64 | Automatic promotion: u32 -> u64
 
 

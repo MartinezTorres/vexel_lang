@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Composite to byte array cast size must match exactly in bytes | Composite to byte array cast size must match exactly in bytes
 
 

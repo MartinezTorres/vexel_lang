@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Range expression a..b is syntactic sugar for array literal | Range expression a..b is syntactic sugar for array literal
 
 

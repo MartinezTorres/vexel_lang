@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: No shadowing (compilation error if names conflict) | No shadowing - compilation error if names conflict
 
 

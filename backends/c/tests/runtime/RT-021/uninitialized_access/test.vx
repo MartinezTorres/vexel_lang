@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Accessing uninitialized values during compile-time execution triggers compile-time error | Accessing uninitialized values during compile-time execution triggers compile-time error
 // @expect-exit: 1
 // @expect-stderr: uninitialized

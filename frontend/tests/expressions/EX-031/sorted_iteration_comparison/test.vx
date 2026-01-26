@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: The @@ operator sorts using comparison rules defined in the Types section | The @@ operator sorts using comparison rules defined in the Types section
 
 

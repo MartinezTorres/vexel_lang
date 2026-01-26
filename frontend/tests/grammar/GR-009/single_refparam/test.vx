@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Reference parameters (for reference-taking functions) consist of one or more comma-separated identifiers | Single reference parameter
 
 

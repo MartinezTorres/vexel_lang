@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Argument lists consist of one or more comma-separated expressions | Argument list with multiple comma-separated expressions
 
 

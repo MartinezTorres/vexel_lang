@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Conditional operator (?:) has precedence after logical OR | Conditional operator (?:) has precedence after logical OR
 
 

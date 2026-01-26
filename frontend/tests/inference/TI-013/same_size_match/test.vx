@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Array sizes are part of type identity: #i32[10] != #i32[20] | Same size arrays are compatible types
 
 

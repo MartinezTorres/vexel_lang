@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: A block consists of '"'"'{'"'"' followed by zero or more statements and an optional final expression, then '"'"'}'"'"' | Block with final expression (no semicolon)
 
 

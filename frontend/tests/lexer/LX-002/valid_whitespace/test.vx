@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Whitespace consists of space (0x20), tab (0x09), CR (0x0D), and LF (0x0A) only. | Accept space, tab, CR, and LF as whitespace
 
 

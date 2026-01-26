@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Scoped import instances do not share mutable state across different scopes | Scoped import instances do not share mutable state
 
 // NR-024: Scoped import instances do not share mutable state across different scopes

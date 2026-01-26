@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Statements can be terminated with whitespace when unambiguous (automatic semicolon insertion). | Accept whitespace as statement terminator (automatic semicolon insertion)
 
 

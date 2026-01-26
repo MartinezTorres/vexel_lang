@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Dead branches in compile-time conditionals are eliminated before type checking | Live branch is type checked (compile-time false picks second)
 
 

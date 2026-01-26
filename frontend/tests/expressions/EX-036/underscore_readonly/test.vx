@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: The _ variable is read-only within the loop body | The _ variable is read-only within the loop body
 
 

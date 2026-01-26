@@ -9,4 +9,4 @@ How to use:
 4) Add your backend's emit logic.
 5) Register it in `driver/src/vexel_main.cpp`.
 
-See `doc/backend-authoring.md` for the full guide.
+See `docs/backend-authoring.md` for the full guide.

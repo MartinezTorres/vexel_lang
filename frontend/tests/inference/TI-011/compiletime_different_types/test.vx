@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Compile-time conditionals allow different types in branches | Compile-time conditionals allow different types in branches
 
 

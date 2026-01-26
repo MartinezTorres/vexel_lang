@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Empty array literal [ ] produces #T[0] for target type #T when context requires an array | Empty array literal [] produces #T[0] for target type #T
 
 

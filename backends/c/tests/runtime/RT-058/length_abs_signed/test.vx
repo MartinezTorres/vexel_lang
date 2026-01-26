@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Length operator |x| on signed integers/floats returns absolute value (runtime calculation) | Length operator |x| on signed integers/floats returns absolute value (runtime calculation)
 // @expect-exit: 45
 // @run-generated: true

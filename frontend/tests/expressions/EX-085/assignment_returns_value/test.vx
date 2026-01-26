@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Single assignment uses syntax x = expr and returns the assigned value | Single assignment uses syntax x = expr and returns the assigned value
 
 

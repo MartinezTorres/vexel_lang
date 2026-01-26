@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Compile-time execution results must be convertible to target types | Compile-time execution results must be convertible to target types
 // @expect-exit: 100
 // @run-generated: true

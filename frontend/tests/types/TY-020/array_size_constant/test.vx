@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Array size N must be a compile-time known non-negative integer | Array size must be compile-time known non-negative integer
 
 

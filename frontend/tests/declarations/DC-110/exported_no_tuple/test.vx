@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Exported functions cannot use tuple returns (ABI compatibility) | Exported functions no tuple returns
 
 

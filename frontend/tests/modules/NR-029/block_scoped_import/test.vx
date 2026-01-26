@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Imports can be scoped to blocks (not just module-level) | Imports can be scoped to blocks
 
 // NR-029: Imports can be scoped to blocks (not just module-level)

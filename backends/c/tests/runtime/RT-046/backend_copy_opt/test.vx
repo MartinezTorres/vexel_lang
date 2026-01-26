@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Backend optimizes unnecessary copies | Backend optimizes unnecessary copies
 // @expect-exit: 42
 // @run-generated: true

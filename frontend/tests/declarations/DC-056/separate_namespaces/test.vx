@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Methods and functions have separate namespaces (no conflict between '"'"'&TypeName::push'"'"' and '"'"'&push'"'"') | Methods and functions separate namespaces
 
 

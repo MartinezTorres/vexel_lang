@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: '"'"'->'"'"' is the only return operator (implicit return via last expression, explicit '"'"'-> expr;'"'"', empty '"'"'->;'"'"') | -> is the only return operator
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Exported functions use the form '"'"'&^'"'"' ident '"'"'('"'"' [ params ] '"'"')'"'"' [ '"'"'->'"'"' type ] block | Exported function with return type
 
 

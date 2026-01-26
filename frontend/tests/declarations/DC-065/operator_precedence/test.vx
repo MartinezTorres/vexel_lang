@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Compiler checks operator methods before attempting built-in operator rules | Operator methods checked before built-in
 
 

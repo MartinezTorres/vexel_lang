@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Mutable global variables must use the syntax '"'"'name:Type'"'"' without initialization | Reject forward reference in constant initialization
 
 

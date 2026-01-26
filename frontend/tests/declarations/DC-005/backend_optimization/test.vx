@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Backend can place immutable global constants in ROM or optimize away entirely | Immutable constant for backend optimization
 
 

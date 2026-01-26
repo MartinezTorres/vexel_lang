@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: All paths in compile-time execution must be deterministic (no runtime-dependent branches) | All paths in compile-time execution must be deterministic (no runtime-dependent branches)
 // @expect-exit: 14
 // @run-generated: true

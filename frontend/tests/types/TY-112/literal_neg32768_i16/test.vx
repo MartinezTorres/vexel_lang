@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Integer literals -32768 to -129 infer to #i16 | Integer literal -32768 infers to #i16
 
 

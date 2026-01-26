@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Comparison expressions consist of one or more shift terms separated by comparison operators ('"'"'=='"'"', '"'"'!='"'"', '"'"'<'"'"', '"'"'<='"'"', '"'"'>'"'"', '"'"'>='"'"') | All comparison operators (==, !=, <, <=, >, >=)
 
 

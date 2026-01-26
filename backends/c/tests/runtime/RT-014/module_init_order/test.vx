@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Module initialization is sequential: each module'"'"'s imports initialize first | Module initialization is sequential: each module'"'"'s imports initialize first
 // @expect-exit: 42
 // @run-generated: true

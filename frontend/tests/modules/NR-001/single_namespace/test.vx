@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Single namespace per module (functions, variables, and types share namespace) | Single namespace per module - reject duplicate names across types and functions
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Variables in expression parameters resolve in caller'"'"'s scope, not function'"'"'s scope (hygiene) | Expression parameters resolve in caller scope
 
 

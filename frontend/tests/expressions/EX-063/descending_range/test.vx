@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Range 5..0 is equivalent to [5,4,3,2,1] in descending order | Range 5..0 is equivalent to [5,4,3,2,1] in descending order
 
 

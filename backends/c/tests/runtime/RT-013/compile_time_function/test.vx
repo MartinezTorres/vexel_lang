@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Functions execute at compile time when needed for constants (no explicit purity annotation) | Functions execute at compile time when needed for constants (no explicit purity annotation)
 // @expect-exit: 120
 // @run-generated: true

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Backend specifications define code organization for the compiled output | Backend code organization - compilation produces organized output
 // @expect-exit: 42
 // @run-generated: true

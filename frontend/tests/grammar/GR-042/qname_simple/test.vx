@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Qualified names consist of one or more identifiers separated by '"'"'::'"'"' | Simple qualified name (single identifier)
 
 

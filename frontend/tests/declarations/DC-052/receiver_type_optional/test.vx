@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Method receiver type annotation is optional and defaults to TypeName | Method receiver type annotation optional
 
 

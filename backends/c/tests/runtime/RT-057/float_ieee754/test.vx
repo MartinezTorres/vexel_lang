@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Float behavior follows IEEE 754 standard | Float behavior follows IEEE 754 standard
 // @expect-exit: 4
 // @run-generated: true

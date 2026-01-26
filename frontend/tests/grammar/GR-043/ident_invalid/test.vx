@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Identifiers match the pattern [A-Za-z_][A-Za-z0-9_]* | Invalid identifier starting with digit
 
 

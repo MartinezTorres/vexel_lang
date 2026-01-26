@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Arrays with mismatched lengths compare by prefix first | Arrays with mismatched lengths compare by prefix first
 
 

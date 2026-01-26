@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Type constructors have no pointers (no self-reference possible) | Type constructors have no pointers (no self-reference possible)
 
 

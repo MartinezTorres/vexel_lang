@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Multi-receiver method calls use the syntax (r1, r2).fname(...) | Multi-receiver method call with multiple arguments
 
 

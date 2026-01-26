@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Boolean type #b is a distinct type, not an alias for u8 | Boolean type #b is distinct from u8
 
 

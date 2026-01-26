@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Postfix call operations have the form '"'"'('"'"' [ arglist ] '"'"')'"'"' | Postfix call operation with no arguments
 
 

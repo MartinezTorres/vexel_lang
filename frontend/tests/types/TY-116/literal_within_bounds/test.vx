@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Integer literal exceeding all available types is compile error | Integer literal within i64 bounds compiles successfully
 
 

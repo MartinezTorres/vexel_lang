@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Compiler generates anonymous types for tuples with naming pattern '"'"'#__TupleN_Type1_Type2'"'"' | Tuple anonymous type naming
 
 

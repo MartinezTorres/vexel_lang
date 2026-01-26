@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Block-scoped definitions have visibility limited to their lexical scope | Block-scoped definitions limited to lexical scope
 
 

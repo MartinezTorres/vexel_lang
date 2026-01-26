@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Hexadecimal integer literals must start with 0x or 0X and contain valid hex digits [0-9A-Fa-f]. | Accept hex literals with 0x/0X and valid hex digits
 
 

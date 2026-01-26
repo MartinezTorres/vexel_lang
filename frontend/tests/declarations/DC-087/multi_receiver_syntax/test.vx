@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver methods must use syntax '"'"'&(receiver1, receiver2, ...)methodname(p[:Type],...)[-> Type] block'"'"' | Multi-receiver method correct syntax
 
 

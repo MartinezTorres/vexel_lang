@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Array size is part of the type: #i32[10] != #i32[20] | Array size is part of the type: #i32[10] != #i32[20]
 
 

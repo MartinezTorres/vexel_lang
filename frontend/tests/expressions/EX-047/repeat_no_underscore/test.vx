@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Repeat loops do not bind _ variable | Repeat loops do not bind _ variable
 
 

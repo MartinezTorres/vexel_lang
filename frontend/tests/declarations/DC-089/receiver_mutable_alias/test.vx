@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver method receivers bind as mutable aliases for the call | Multi-receiver mutable aliases
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Conditional expressions and statement conditionals require boolean conditions. | Conditional expressions require boolean conditions
 
 

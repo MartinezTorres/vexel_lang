@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Hindley-Milner type inference is applied per function body | Basic Hindley-Milner type inference for identity function
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: File resource evaluates to #s (immutable string) whose bytes exactly match file contents (binary-safe) | File resource evaluates to immutable string with exact byte contents
 
 

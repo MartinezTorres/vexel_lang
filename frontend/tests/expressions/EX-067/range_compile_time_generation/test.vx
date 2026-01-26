@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Ranges generate array literals at compile time based on bound values | Ranges generate array literals at compile time based on bound values
 
 

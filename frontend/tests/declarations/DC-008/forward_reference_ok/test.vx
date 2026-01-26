@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Immutable globals can only reference globals defined earlier in the file | Immutable global references earlier global
 
 

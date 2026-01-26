@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Name resolution failures are reported as compile-time errors | Name resolution failure: undefined type
 
 

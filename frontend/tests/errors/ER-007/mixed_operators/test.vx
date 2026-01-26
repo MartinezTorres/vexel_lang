@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Ambiguous parsing: Multiple valid parse trees trigger a compile-time error | Ambiguous parsing: complex mixed operator expression
 
 

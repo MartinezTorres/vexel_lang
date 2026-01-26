@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Iteration uses syntax iterable@expr to bind _ to each element | Iteration uses syntax iterable@expr to bind _ to each element
 
 

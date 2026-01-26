@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver method receiver aliases cannot be captured beyond the call frame | Multi-receiver aliases not captured
 
 

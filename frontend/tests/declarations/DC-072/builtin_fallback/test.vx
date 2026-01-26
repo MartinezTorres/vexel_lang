@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Built-in operator semantics apply when no operator method is defined | Built-in operator semantics without override
 
 

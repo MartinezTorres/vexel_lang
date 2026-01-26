@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Method calls have the form (ident | '"'"'('"'"' ident { '"'"','"'"' ident } '"'"')'"'"') '"'"'.'"'"' ident '"'"'('"'"' [ arglist ] '"'"')'"'"' for single or multi-receiver methods | Single-receiver method call
 
 

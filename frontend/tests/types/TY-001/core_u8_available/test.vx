@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Core primitive types i8 and u8 are always available in all backends | Core primitive type u8 is always available
 
 

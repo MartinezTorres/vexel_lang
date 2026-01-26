@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Re-importing requires constants to be equal after compile-time evaluation for identical definitions | Re-importing requires constants equal after compile-time evaluation
 
 // NR-027: Re-importing requires constants to be equal after compile-time evaluation for identical definitions

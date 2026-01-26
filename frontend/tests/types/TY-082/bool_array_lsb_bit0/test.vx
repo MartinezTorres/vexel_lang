@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: In boolean array casts, bit 0 is LSB (least significant bit) | In boolean array casts, bit 0 is LSB
 
 

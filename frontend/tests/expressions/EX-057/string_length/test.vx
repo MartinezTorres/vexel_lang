@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: For strings, |expr| returns compile-time constant length (number of bytes) | For strings, |expr| returns compile-time constant length (number of bytes)
 
 

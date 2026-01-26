@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Boolean arrays can be converted to/from integers via casting (creates copy) | Boolean arrays can be converted to/from integers via casting (creates copy)
 // @expect-exit: 170
 // @run-generated: true

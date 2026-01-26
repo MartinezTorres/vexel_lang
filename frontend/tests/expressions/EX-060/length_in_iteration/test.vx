@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Expression 0..|arr|@process(arr[_]) iterates entire array using length operator | Expression 0..|arr|@process(arr[_]) iterates entire array using length operator
 
 

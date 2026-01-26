@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Assignment (b = a) creates independent copy; modifying b doesn'"'"'t affect a | Assignment (b = a) creates independent copy; modifying b doesn'"'"'t affect a
 // @expect-exit: 6
 // @run-generated: true

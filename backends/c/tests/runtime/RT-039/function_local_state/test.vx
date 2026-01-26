@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: All mutable state is function-local (except through references) | All mutable state is function-local (except through references)
 // @expect-exit: 30
 // @run-generated: true

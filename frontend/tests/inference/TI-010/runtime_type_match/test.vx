@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Runtime conditional '"'"'a ? b : c'"'"' requires type(b) == type(c) and a must be #b | Runtime conditional with matching types is valid
 
 

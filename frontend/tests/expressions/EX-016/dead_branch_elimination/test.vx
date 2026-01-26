@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Compile-time conditionals eliminate the dead branch before type checking | Compile-time conditionals eliminate the dead branch before type checking
 
 

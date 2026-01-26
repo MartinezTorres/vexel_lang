@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Scoped imports instantiate their module once per lexical scope | Scoped imports instantiate module once per lexical scope
 
 

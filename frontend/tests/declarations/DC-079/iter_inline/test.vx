@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Compiler expands iteration methods inline (never emitted as functions) | Iteration methods expanded inline
 
 

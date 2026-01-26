@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Compiler resolves '"'"'lhs <op> rhs'"'"' as call to '"'"'TypeName::<op>'"'"' when left operand has type TypeName | Compiler resolves operator method calls
 
 

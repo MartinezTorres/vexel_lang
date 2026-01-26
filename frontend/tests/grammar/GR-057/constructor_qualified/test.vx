@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Constructor calls use the syntax TypeName(...) to create instances of type constructors | Qualified constructor call with namespace
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Immutable globals are initialized in parse order (top-to-bottom) | Immutable globals initialize in parse order
 
 

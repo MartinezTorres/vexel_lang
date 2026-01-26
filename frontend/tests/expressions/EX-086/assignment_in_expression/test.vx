@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Assignment can be used in larger expressions like y = (x = 5) + 1 | Assignment can be used in larger expressions like y = (x = 5) + 1
 
 

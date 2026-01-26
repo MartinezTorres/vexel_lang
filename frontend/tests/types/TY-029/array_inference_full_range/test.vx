@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Array type inference examines full range of values: smallest to largest | Array type inference examines full range: smallest to largest
 
 

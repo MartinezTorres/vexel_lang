@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Equality uses value-based deep comparison | Equality uses value-based deep comparison
 // @expect-exit: 1
 // @run-generated: true

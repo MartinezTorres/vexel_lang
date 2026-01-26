@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Immutable global constants use correct syntax
 
 // DC-001: Immutable global constants must use syntax 'name[:Type] = expr'

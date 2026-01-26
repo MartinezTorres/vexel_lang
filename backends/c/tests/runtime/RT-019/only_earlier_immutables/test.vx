@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Compile-time execution can only read immutable globals defined earlier | Compile-time execution can only read immutable globals defined earlier
 // @expect-exit: 30
 // @run-generated: true

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Exception to no shadowing: _ in nested iterations can shadow outer _ bindings | Exception: underscore can shadow in nested iterations
 
 

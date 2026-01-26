@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Tuple construction uses syntax '"'"'(expr1, expr2, ...)'"'"' to create anonymous struct | Tuple construction syntax
 
 

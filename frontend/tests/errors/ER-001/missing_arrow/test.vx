@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Syntax errors are reported as compile-time errors | Syntax error: missing arrow in function signature
 
 

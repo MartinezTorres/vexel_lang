@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Identifiers must match the pattern [A-Za-z_][A-Za-z0-9_]* (letter or underscore, followed by zero or more letters, digits, or underscores). | Reject identifiers starting with digit
 
 

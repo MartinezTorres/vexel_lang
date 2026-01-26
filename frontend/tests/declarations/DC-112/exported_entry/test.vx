@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Exported functions serve as entry points for executables or library exports | Exported functions as entry points
 
 

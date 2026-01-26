@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Iteration methods enable custom iteration semantics for user-defined types | Custom iteration for user types
 
 

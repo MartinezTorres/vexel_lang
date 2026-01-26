@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver method receivers evaluate left-to-right | Multi-receiver left-to-right evaluation
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Loop control statements affect only the innermost enclosing loop | Loop control statements affect only the innermost enclosing loop
 
 

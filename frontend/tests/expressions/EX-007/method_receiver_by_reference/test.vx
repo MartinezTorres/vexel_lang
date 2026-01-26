@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Method calls pass the receiver by reference for the duration of the call | Method calls pass the receiver by reference for the duration of the call
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Primitives retain their native arithmetic and comparison rules when no override exists | Primitives retain native arithmetic rules
 
 

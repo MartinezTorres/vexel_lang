@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Example: sprites = ::assets::tiles; embeds contents of each file within assets/tiles/ | Example of embedding directory of sprite files
 
 

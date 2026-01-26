@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Division by zero traps at runtime | Division by zero compiles but traps at runtime
 
 

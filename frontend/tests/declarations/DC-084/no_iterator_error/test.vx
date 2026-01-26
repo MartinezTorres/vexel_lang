@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Named types without appropriate iteration method produce compile-time error | Named types without iterator
 
 

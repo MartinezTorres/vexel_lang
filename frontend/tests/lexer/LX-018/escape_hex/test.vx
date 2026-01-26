@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: String escape sequence \xHH represents a byte in hexadecimal (e.g., \x41 for '"'"'A'"'"'). | Accept \xHH escape sequence for hex bytes
 
 

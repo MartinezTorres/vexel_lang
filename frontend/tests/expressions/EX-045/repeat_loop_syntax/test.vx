@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Repeat loops use syntax (cond)@expr to repeat expr while cond is true | Repeat loops use syntax (cond)@expr to repeat expr while cond is true
 
 

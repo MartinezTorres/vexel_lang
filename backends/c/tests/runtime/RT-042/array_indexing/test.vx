@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Array indexing: arr[i] accesses element at index i | Array indexing: arr[i] accesses element at index i
 // @expect-exit: 90
 // @run-generated: true

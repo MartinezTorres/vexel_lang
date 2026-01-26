@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: The language defines syntax and semantics only; external functions provide I/O and platform services | Language defines syntax for external functions
 // @expect-exit: 0
 // @command: {VEXEL_C} test.vx

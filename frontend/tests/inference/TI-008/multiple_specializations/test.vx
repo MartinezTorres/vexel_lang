@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Specialization semantics are pure language behavior - implementations may inline, share, or eliminate copies | Multiple calls may share or create distinct specializations
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Floating point types f32 and f64 are optional and may not be supported by all backends | Floating point type f32 is optional
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Expression q, r = divmod(10, 3) desugars to __tmp = divmod(10, 3); q = __tmp.__0; r = __tmp.__1 | Expression q, r = divmod(10, 3) desugars to __tmp = divmod(10, 3); q = __tmp.__0; r = __tmp.__1
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Example: can use #f64 math at compile time to build #u8 lookup table | Example: can use #f64 math at compile time to build #u8 lookup table
 // @expect-exit: 100
 // @run-generated: true

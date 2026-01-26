@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Generic constraint violations are reported as compile-time errors | Generic constraint violation: infinite type recursion
 
 

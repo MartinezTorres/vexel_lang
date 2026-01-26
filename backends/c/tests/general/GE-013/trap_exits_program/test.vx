@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Runtime errors trap and exit the program | Runtime errors trap - out of bounds access causes trap
 // @expect-exit: 0
 // @run-generated: true

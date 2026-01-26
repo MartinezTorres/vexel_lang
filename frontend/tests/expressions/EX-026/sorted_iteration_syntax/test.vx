@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Sorted iteration uses syntax iterable@@expr to bind _ to each element of a sorted copy | Sorted iteration uses syntax iterable@@expr to bind _ to each element of a sorted copy
 
 

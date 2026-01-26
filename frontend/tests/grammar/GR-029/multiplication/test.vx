@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Multiplicative expressions consist of one or more unary terms separated by '"'"'*'"'"', '"'"'/'"'"', or '"'"'%'"'"' | Multiplication expression (*)
 
 

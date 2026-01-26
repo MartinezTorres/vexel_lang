@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Process expressions are disabled unless explicitly enabled (e.g., --allow-process); when disabled the compiler must reject them with a diagnostic | Process expressions are rejected by default (must opt in to run host commands)
 
 

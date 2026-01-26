@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: No side effects allowed during compile-time execution | No side effects allowed during compile-time execution
 // @expect-exit: 1
 // @command: {VEXEL_C} test.vx

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Tuple synthetic names are compiler-internal (user code references via literals or multi-assignment) | Tuple synthetic names internal
 
 

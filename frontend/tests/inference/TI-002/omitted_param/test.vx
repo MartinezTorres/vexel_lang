@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Omitted parameter/field types create fresh type variables inferred from call sites | Omitted parameter types create fresh type variables
 
 

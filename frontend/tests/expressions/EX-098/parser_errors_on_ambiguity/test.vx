@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Parser errors on ambiguity rather than guessing intent | Parser errors on ambiguity rather than guessing intent
 
 

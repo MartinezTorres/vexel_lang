@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Promotion preserves value exactly (no precision loss for integer widening) | Promotion preserves value exactly (no precision loss for integer widening)
 
 

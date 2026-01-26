@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Unexported functions may be eliminated if unused during whole-program compilation | Unexported functions eliminated if unused
 // @expect-exit: 42
 // @run-generated: true

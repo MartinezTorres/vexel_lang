@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Empty or missing directories yield empty tuple array for directory resources | Empty directories yield empty tuple array
 
 

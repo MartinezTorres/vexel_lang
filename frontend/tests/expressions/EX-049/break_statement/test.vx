@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Break statement uses syntax ->|; to exit the innermost enclosing loop | Break statement uses syntax ->|; to exit the innermost enclosing loop
 
 

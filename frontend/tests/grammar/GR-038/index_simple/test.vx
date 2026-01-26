@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Index operations have the form '"'"'['"'"' expr '"'"']'"'"' | Simple index operation [expr]
 
 

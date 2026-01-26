@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Length operator |expr| on arrays must have compile-time constant length | Length operator |expr| on arrays must have compile-time constant length
 // @expect-exit: 10
 // @run-generated: true

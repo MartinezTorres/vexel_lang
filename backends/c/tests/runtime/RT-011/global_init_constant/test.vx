@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Global initializers must be compile-time constants | Global initializers must be compile-time constants
 // @expect-exit: 42
 // @run-generated: true

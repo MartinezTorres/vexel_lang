@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Relational operators (< <= > >=) have precedence after bitwise OR | Relational operators (< <= > >=) have precedence after bitwise OR
 
 

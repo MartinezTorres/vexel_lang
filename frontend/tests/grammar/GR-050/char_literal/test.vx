@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Character literals are enclosed in single quotes and contain either an escape sequence or a single non-escape character | Character literals enclosed in single quotes
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Immutable global constants cannot be modified at runtime | Reject modification of immutable global
 
 

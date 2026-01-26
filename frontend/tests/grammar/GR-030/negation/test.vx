@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Unary expressions are either postfix expressions, prefix operations ('"'"'-'"'"', '"'"'!'"'"', '"'"'~'"'"' followed by unary), length/absolute ('"'"'|'"'"' unary '"'"'|'"'"'), or cast ('"'"'('"'"' type '"'"')'"'"' unary) | Negation unary expression (-)
 
 

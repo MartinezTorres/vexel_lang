@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#type-inference--generics
+// @rfc: docs/vexel-rfc.md#type-inference--generics
 // @desc: Nested functions capture enclosing scope variables by reference | Nested function can modify captured variable by reference
 
 

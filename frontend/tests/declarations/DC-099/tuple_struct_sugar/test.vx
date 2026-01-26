@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Tuple return types are syntactic sugar for anonymous struct types | Tuple returns are struct sugar
 
 

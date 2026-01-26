@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: The _ variable is scoped to the loop body and only available in iterable loops | The _ variable is scoped to the loop body and only available in iterable loops
 
 

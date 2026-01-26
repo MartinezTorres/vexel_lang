@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver method receiver aliases cannot escape (no storing in globals) | Multi-receiver aliases do not escape
 
 

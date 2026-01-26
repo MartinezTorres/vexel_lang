@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Type constructors must use syntax '"'"'#Name(field[:Type],...);'"'"' | Type constructor correct syntax
 
 

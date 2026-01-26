@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Within a module, constants initialize top-to-bottom in parse order | Within a module, constants initialize top-to-bottom in parse order
 // @expect-exit: 60
 // @run-generated: true

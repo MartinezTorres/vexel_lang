@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Range a..a where a equals b produces compile error (would be empty array) | Range a..a where a equals b produces compile error (would be empty array)
 
 

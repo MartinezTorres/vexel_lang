@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Each receiver in multi-receiver method must be an identifier | Multi-receiver parameters are identifiers
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Shift expressions consist of one or more range terms separated by shift operators ('"'"'<<'"'"', '"'"'>>'"'"') | Left shift expression (<<)
 
 

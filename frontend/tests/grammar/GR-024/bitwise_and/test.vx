@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Bitwise AND expressions consist of one or more compare terms separated by '"'"'&'"'"' | Bitwise AND expression (&)
 
 

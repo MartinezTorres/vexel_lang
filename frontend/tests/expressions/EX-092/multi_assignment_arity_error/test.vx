@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Number of variables in multi-assignment must match tuple arity | Multi-assignment with mismatched arity is an error
 
 

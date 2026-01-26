@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Symbols are exported by default (all top-level symbols visible to importers) | Symbols are exported by default
 
 // NR-021: Symbols are exported by default (all top-level symbols visible to importers)

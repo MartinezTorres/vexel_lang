@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Backend can optimize copy away when safe, but semantics remain copy-based | Backend can optimize copy away when safe, but semantics remain copy-based
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Shift operators (<< >>) have precedence after range operator | Shift operators (<< >>) have precedence after range operator
 
 

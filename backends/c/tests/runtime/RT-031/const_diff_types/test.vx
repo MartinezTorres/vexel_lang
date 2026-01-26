@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: If condition is compile-time constant, branches can have different types (dead branch eliminated) | If condition is compile-time constant, branches can have different types (dead branch eliminated)
 // @expect-exit: 42
 // @run-generated: true

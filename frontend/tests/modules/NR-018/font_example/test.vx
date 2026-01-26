@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Example: font:#s = ::assets::font.bin; embeds assets/font.bin as a string | Example of embedding font file as string resource
 
 

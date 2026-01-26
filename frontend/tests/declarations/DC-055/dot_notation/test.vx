@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Methods are called via dot notation: '"'"'receiver.methodname(args)'"'"' | Methods called via dot notation
 
 

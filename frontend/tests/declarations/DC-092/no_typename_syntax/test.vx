@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver methods cannot use '"'"'TypeName::'"'"' syntax (ambiguous which receiver'"'"'s type) | Multi-receiver no TypeName:: syntax
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers | Bitwise operators (&, |, ^, ~, <<, >>) require both operands to be unsigned integers - reject signed
 // @expect-exit: 1
 // @expect-stderr: unsigned

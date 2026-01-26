@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Immutable globals (initialized at declaration) are compile-time constants | Immutable globals (initialized at declaration) are compile-time constants
 // @expect-exit: 30
 // @run-generated: true

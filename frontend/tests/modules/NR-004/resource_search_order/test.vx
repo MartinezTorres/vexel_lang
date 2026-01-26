@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Resource files resolve using same search order as modules (project root, then relative to importing file) | Resource files resolve using module search order
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Bitwise XOR expressions consist of one or more bit_and terms separated by '"'"'^'"'"' | Multiple bitwise XOR expressions chained
 
 

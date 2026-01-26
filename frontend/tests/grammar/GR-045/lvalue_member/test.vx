@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Lvalues (assignable expressions) include variables, method calls, index operations, and member access operations | Lvalue: member access assignment
 
 

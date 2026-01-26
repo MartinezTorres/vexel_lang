@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Library mode: all exports are visible | Library mode: all exports are visible
 // @expect-exit: 0
 // @command: {VEXEL_C} test.vx

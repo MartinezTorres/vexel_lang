@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multiple import statements are allowed when they agree with duplicate-definition rules | Multiple import statements
 
 

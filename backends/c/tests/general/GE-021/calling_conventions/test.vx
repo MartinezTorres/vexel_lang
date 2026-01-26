@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Backend specifications define calling conventions for function calls | Backend calling conventions - function calls work correctly
 // @expect-exit: 72
 // @run-generated: true

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Nested loops shadow _ with the innermost loop'"'"'s binding winning | Nested loops shadow _ with the innermost loop'"'"'s binding winning
 
 

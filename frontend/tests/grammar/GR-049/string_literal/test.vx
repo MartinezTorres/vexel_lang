@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: String literals are enclosed in double quotes and may contain escape sequences or non-escape characters | String literals enclosed in double quotes
 
 

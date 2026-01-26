@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: The language uses whole-program compilation where all source is available at compile time | Whole-program compilation - all functions visible
 // @expect-exit: 42
 // @run-generated: true

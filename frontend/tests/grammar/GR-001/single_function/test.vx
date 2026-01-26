@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: A program consists of zero or more top-level declarations | Program with one top-level declaration
 
 

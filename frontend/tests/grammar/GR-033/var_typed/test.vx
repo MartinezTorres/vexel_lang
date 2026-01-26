@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Variable references have the form ident [ '"'"':'"'"' type ] | Variable reference with type annotation
 
 

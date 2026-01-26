@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Method calls use the syntax receiver.fname(...) where the receiver is passed by reference | Chained method calls
 
 

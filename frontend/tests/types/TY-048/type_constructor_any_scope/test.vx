@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Type constructors can be defined at module level or within any scope | Type constructors can be defined at module level or within any scope
 
 

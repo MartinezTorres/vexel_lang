@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Each expression parameter reference is evaluated fresh (can reference variables modified by previous evaluation) | Expression parameters evaluated fresh each use
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: Backend specifications define the target language for compilation | Backend defines target language - compilation succeeds
 // @expect-exit: 0
 // @command: {VEXEL_C} test.vx

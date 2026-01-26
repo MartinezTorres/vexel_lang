@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Operator method name must be one of: + - * / % == != < <= > >= | Operator method uses valid operators
 
 

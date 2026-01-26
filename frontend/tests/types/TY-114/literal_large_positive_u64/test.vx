@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Larger positive integer literals infer to #u64 | Larger positive integer literals infer to #u64
 
 

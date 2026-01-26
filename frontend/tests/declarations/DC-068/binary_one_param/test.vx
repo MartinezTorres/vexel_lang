@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Binary operator methods expect exactly one value parameter | Binary operators have one value parameter
 
 

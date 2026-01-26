@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Purity determination: compiler attempts compile-time execution and fails if constraints violated | Purity determination: compiler attempts compile-time execution and fails if constraints violated
 // @expect-exit: 49
 // @run-generated: true

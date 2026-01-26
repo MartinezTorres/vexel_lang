@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Variable lifetime ends at end of scope | Variable lifetime ends at end of scope
 // @expect-exit: 42
 // @run-generated: true

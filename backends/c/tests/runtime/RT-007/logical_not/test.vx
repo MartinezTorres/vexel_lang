@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Logical NOT operator (!) returns boolean value | Logical NOT operator (!) returns boolean value
 // @expect-exit: 3
 // @run-generated: true

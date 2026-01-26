@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Multi-receiver method receiver type annotations are optional and inferred from use | Multi-receiver optional type annotations
 
 

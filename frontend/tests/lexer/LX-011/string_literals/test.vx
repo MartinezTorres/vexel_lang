@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: String literals are delimited by double quotes ("..."). | Accept string literals delimited by double quotes
 
 

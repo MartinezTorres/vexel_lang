@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Methods must use syntax '"'"'&(receiver)#TypeName::methodname(p[:Type],...)[-> Type] block'"'"' | Method correct syntax
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Import resolution maps '"'"'::a::b;'"'"' to '"'"'a/b.vx'"'"' (case-sensitive, relative to project root) | Import resolution to file paths
 
 

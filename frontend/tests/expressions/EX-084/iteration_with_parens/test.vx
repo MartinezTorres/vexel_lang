@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Iteration operators require parentheses to combine with other operators | Iteration with explicit parentheses works
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Continue statement uses syntax ->>; to skip to next iteration of innermost loop | Continue statement uses syntax ->>; to skip to next iteration of innermost loop
 
 

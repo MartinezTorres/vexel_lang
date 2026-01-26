@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#name-resolution--modules
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: Directory resource is non-recursive (only lists immediate files, not subdirectories) | Directory resource is non-recursive
 
 

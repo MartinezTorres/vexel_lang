@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Named types can override iteration by defining &(self)#Type::@($loop) method | Named types can override iteration by defining &(self)#Type::@($loop) method
 
 

@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Internal functions can be nested within other functions or scopes | Internal functions can be nested
 
 

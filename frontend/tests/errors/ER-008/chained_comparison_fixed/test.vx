@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#errors--diagnostics
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
 // @desc: Parser requires explicit parentheses to disambiguate ambiguous expressions | Parentheses disambiguate comparison chains (positive test)
 
 

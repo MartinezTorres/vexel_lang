@@ -2,7 +2,7 @@
 
 This tutorial is a guided, hands-on introduction to the Vexel language as implemented in this repo. It targets the portable C backend (`vexel-c`) and stays within the current RFC.
 
-If you already know the basics, jump to `examples/` or the language spec in `doc/vexel-rfc.md`.
+If you already know the basics, jump to `examples/` or the language spec in `docs/vexel-rfc.md`.
 
 ## Chapters
 

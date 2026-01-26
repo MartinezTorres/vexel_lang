@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: The @@ operator copies the evaluated array before sorting | The @@ operator copies the evaluated array before sorting
 
 

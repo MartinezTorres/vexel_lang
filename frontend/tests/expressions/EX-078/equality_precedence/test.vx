@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#expressions--control
+// @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Equality operators (== !=) have precedence after relational operators | Equality operators (== !=) have precedence after relational operators
 
 

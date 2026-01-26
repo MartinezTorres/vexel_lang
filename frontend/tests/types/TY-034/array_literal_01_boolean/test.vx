@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#types
+// @rfc: docs/vexel-rfc.md#types
 // @desc: Array literal [0,1] infers to #b[2] (values 0-1 fit in b) | Array literal [0,1] infers to #b[2]
 
 

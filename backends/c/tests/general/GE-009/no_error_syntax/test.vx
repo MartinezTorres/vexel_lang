@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#preamble
+// @rfc: docs/vexel-rfc.md#preamble
 // @desc: The language provides no explicit error handling mechanism | No error handling - program compiles without error handling
 // @expect-exit: 5
 // @run-generated: true

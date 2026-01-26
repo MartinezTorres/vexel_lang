@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#runtime-semantics
+// @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Primitives are passed and stored by value | Primitives are passed and stored by value
 // @expect-exit: 10
 // @run-generated: true

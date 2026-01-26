@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#declarations
+// @rfc: docs/vexel-rfc.md#declarations
 // @desc: Operator methods overload core operators for instances of TypeName | Operator methods overload core operators
 
 

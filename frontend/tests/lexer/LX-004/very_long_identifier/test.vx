@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#lexical--tokens
+// @rfc: docs/vexel-rfc.md#lexical--tokens
 // @desc: Identifiers have no length limit. | Accept identifiers with no length limit (>200 chars)
 
 

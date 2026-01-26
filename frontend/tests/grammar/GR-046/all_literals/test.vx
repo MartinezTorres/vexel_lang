@@ -1,4 +1,4 @@
-// @rfc: doc/vexel-rfc.md#grammar
+// @rfc: docs/vexel-rfc.md#grammar
 // @desc: Literals include integer literals, floating-point literals, string literals, and character literals | All literal types: integer, float, string, character
 
 
