@@ -3,8 +3,10 @@
 #include "typechecker.h"
 #include "constants.h"
 #include <algorithm>
+#include <functional>
 #include <iomanip>
 #include <cctype>
+#include <tuple>
 #include <sstream>
 
 namespace {
@@ -55,6 +57,8 @@ std::string sanitize_identifier(const std::string& input) {
     }
     return result;
 }
+
+constexpr char kScopeSep = '\x1F';
 }
 
 namespace vexel {
@@ -93,6 +97,8 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
     generated_vars.clear();
     reachable_functions.clear();
     current_ref_params.clear();
+    function_writes_global.clear();
+    function_is_pure.clear();
     tuple_types.clear();
     expr_param_substitutions.clear();
     value_param_replacements.clear();
@@ -119,9 +125,46 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
     emit_header("#include <stdlib.h>");
     emit_header("#include <math.h>");
     emit_header("");
+    emit_header("#ifndef VX_MUTABLE");
+    emit_header("#define VX_MUTABLE");
+    emit_header("#endif");
+    emit_header("#ifndef VX_NON_MUTABLE");
+    emit_header("#define VX_NON_MUTABLE const");
+    emit_header("#endif");
+    emit_header("#ifndef VX_CONSTEXPR");
+    emit_header("#define VX_CONSTEXPR const");
+    emit_header("#endif");
+    emit_header("#ifndef VX_REENTRANT");
+    emit_header("#define VX_REENTRANT");
+    emit_header("#endif");
+    emit_header("#ifndef VX_NON_REENTRANT");
+    emit_header("#define VX_NON_REENTRANT");
+    emit_header("#endif");
+    emit_header("#ifndef VX_REF_MASK");
+    emit_header("#define VX_REF_MASK(x)");
+    emit_header("#endif");
+    emit_header("#ifndef VX_INLINE");
+    emit_header("#define VX_INLINE");
+    emit_header("#endif");
+    emit_header("#ifndef VX_NOINLINE");
+    emit_header("#define VX_NOINLINE");
+    emit_header("#endif");
+    emit_header("#ifndef VX_PURE");
+    emit_header("#define VX_PURE");
+    emit_header("#endif");
+    emit_header("#ifndef VX_NO_GLOBAL_WRITE");
+    emit_header("#define VX_NO_GLOBAL_WRITE");
+    emit_header("#endif");
+    emit_header("#ifndef VX_ENTRYPOINT");
+    emit_header("#define VX_ENTRYPOINT");
+    emit_header("#endif");
+    emit_header("");
 
     // Analyze reachability before generating code
     analyze_reachability(mod);
+    analyze_mutability(mod);
+    analyze_ref_variants(mod);
+    analyze_effects(mod);
 
     gen_module(mod);
 
@@ -148,7 +191,7 @@ void CodeGenerator::analyze_reachability(const Module& mod) {
             if (!stmt->type_namespace.empty()) {
                 func_name = stmt->type_namespace + "::" + stmt->func_name;
             }
-            mark_reachable(func_name, mod);
+            mark_reachable(func_name, stmt->scope_instance_id, mod);
         }
     }
 
@@ -170,22 +213,791 @@ void CodeGenerator::analyze_reachability(const Module& mod) {
             if (!evaluated_at_compile_time) {
                 std::unordered_set<std::string> calls;
                 collect_calls(stmt->var_init, calls);
-                for (const auto& func : calls) {
-                    mark_reachable(func, mod);
+                for (const auto& func_key : calls) {
+                    std::string func_name;
+                    int scope_id = -1;
+                    split_reachability_key(func_key, func_name, scope_id);
+                    mark_reachable(func_name, scope_id, mod);
                 }
             }
         }
     }
 }
 
-void CodeGenerator::mark_reachable(const std::string& func_name, const Module& mod) {
-    // Already visited
-    if (reachable_functions.count(func_name)) {
+void CodeGenerator::analyze_mutability(const Module& mod) {
+    var_mutability.clear();
+    receiver_mutates.clear();
+    std::unordered_map<std::string, StmtPtr> function_map;
+    std::unordered_map<const Stmt*, StmtPtr> var_decl_map;
+    std::unordered_map<const Stmt*, bool> var_written;
+
+    auto qualified_name = [](const StmtPtr& stmt) {
+        if (!stmt->type_namespace.empty()) {
+            return stmt->type_namespace + "::" + stmt->func_name;
+        }
+        return stmt->func_name;
+    };
+
+    // Collect function declarations and top-level variables
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind == Stmt::Kind::FuncDecl) {
+            function_map[qualified_name(stmt)] = stmt;
+            if (!stmt->ref_params.empty()) {
+                std::vector<bool> mut(stmt->ref_params.size(), false);
+                if (stmt->is_external || !stmt->body) {
+                    std::fill(mut.begin(), mut.end(), true);
+                }
+                receiver_mutates[qualified_name(stmt)] = mut;
+            }
+        } else if (stmt->kind == Stmt::Kind::VarDecl) {
+            var_decl_map[stmt.get()] = stmt;
+            var_written[stmt.get()] = false;
+        }
+    }
+
+    auto base_identifier = [](ExprPtr expr) -> std::string {
+        while (expr) {
+            if (expr->kind == Expr::Kind::Identifier) {
+                return expr->name;
+            }
+            if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
+                expr = expr->operand;
+                continue;
+            }
+            break;
+        }
+        return "";
+    };
+
+    // Determine which receivers are mutated by each function (fixpoint).
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& entry : function_map) {
+            const std::string& func_name = entry.first;
+            const StmtPtr& func = entry.second;
+            if (func->is_external || !func->body || func->ref_params.empty()) continue;
+
+            std::vector<bool> updated = receiver_mutates[func_name];
+            std::unordered_map<std::string, size_t> receiver_index;
+            receiver_index.reserve(func->ref_params.size());
+            for (size_t i = 0; i < func->ref_params.size(); i++) {
+                receiver_index[func->ref_params[i]] = i;
+            }
+
+            std::function<void(ExprPtr)> visit_expr;
+            std::function<void(StmtPtr)> visit_stmt;
+
+            visit_expr = [&](ExprPtr expr) {
+                if (!expr) return;
+                switch (expr->kind) {
+                    case Expr::Kind::Assignment: {
+                        std::string base = base_identifier(expr->left);
+                        auto it = receiver_index.find(base);
+                        if (it != receiver_index.end()) {
+                            updated[it->second] = true;
+                        }
+                        visit_expr(expr->right);
+                        break;
+                    }
+                    case Expr::Kind::Call: {
+                        // Propagate receiver mutations from callees.
+                        if (!expr->receivers.empty()) {
+                            std::string callee;
+                            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                                callee = expr->operand->name;
+                            }
+                            auto callee_it = receiver_mutates.find(callee);
+                            for (size_t i = 0; i < expr->receivers.size(); i++) {
+                                ExprPtr rec_expr = expr->receivers[i];
+                                std::string rec_name = base_identifier(rec_expr);
+                                if (rec_name.empty()) continue;
+                                auto rec_it = receiver_index.find(rec_name);
+                                if (rec_it == receiver_index.end()) continue;
+                                bool mut = true; // default to conservative if unknown
+                                if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
+                                    mut = callee_it->second[i];
+                                }
+                                if (mut) {
+                                    updated[rec_it->second] = true;
+                                }
+                            }
+                        }
+                        for (const auto& rec : expr->receivers) {
+                            visit_expr(rec);
+                        }
+                        for (const auto& arg : expr->args) {
+                            visit_expr(arg);
+                        }
+                        visit_expr(expr->operand);
+                        break;
+                    }
+                    case Expr::Kind::Binary:
+                        visit_expr(expr->left);
+                        visit_expr(expr->right);
+                        break;
+                    case Expr::Kind::Unary:
+                    case Expr::Kind::Cast:
+                    case Expr::Kind::Length:
+                        visit_expr(expr->operand);
+                        break;
+                    case Expr::Kind::Index:
+                        visit_expr(expr->operand);
+                        if (!expr->args.empty()) visit_expr(expr->args[0]);
+                        break;
+                    case Expr::Kind::Member:
+                        visit_expr(expr->operand);
+                        break;
+                    case Expr::Kind::ArrayLiteral:
+                    case Expr::Kind::TupleLiteral:
+                        for (const auto& elem : expr->elements) visit_expr(elem);
+                        break;
+                    case Expr::Kind::Block:
+                        for (const auto& stmt : expr->statements) visit_stmt(stmt);
+                        visit_expr(expr->result_expr);
+                        break;
+                    case Expr::Kind::Conditional:
+                        visit_expr(expr->condition);
+                        visit_expr(expr->true_expr);
+                        visit_expr(expr->false_expr);
+                        break;
+                    case Expr::Kind::Range:
+                    case Expr::Kind::Iteration:
+                    case Expr::Kind::Repeat:
+                        visit_expr(expr->left);
+                        visit_expr(expr->right);
+                        break;
+                    default:
+                        break;
+                }
+            };
+
+            visit_stmt = [&](StmtPtr stmt) {
+                if (!stmt) return;
+                switch (stmt->kind) {
+                    case Stmt::Kind::Expr:
+                        visit_expr(stmt->expr);
+                        break;
+                    case Stmt::Kind::Return:
+                        visit_expr(stmt->return_expr);
+                        break;
+                    case Stmt::Kind::VarDecl:
+                        visit_expr(stmt->var_init);
+                        break;
+                    case Stmt::Kind::ConditionalStmt:
+                        visit_expr(stmt->condition);
+                        visit_stmt(stmt->true_stmt);
+                        break;
+                    default:
+                        break;
+                }
+            };
+
+            visit_expr(func->body);
+
+            if (updated != receiver_mutates[func_name]) {
+                receiver_mutates[func_name] = updated;
+                changed = true;
+            }
+        }
+    }
+
+    struct ScopeFrame {
+        std::unordered_map<std::string, const Stmt*> vars;
+    };
+    std::vector<ScopeFrame> scopes;
+    scopes.emplace_back();
+
+    auto resolve_var = [&](const std::string& name) -> const Stmt* {
+        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
+            auto found = it->vars.find(name);
+            if (found != it->vars.end()) {
+                return found->second;
+            }
+        }
+        return nullptr;
+    };
+
+    auto mark_written = [&](const std::string& name) {
+        const Stmt* decl = resolve_var(name);
+        if (decl) {
+            var_written[decl] = true;
+        }
+    };
+
+    std::function<void(ExprPtr)> visit_expr;
+    std::function<void(StmtPtr)> visit_stmt;
+
+    visit_expr = [&](ExprPtr expr) {
+        if (!expr) return;
+        switch (expr->kind) {
+            case Expr::Kind::Assignment: {
+                std::string base = base_identifier(expr->left);
+                if (!base.empty()) {
+                    mark_written(base);
+                }
+                visit_expr(expr->right);
+                break;
+            }
+            case Expr::Kind::Call: {
+                if (!expr->receivers.empty()) {
+                    std::string callee;
+                    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                        callee = expr->operand->name;
+                    }
+                    auto callee_it = receiver_mutates.find(callee);
+                    for (size_t i = 0; i < expr->receivers.size(); i++) {
+                        bool mut = true;
+                        if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
+                            mut = callee_it->second[i];
+                        }
+                        if (!mut) continue;
+                        ExprPtr rec_expr = expr->receivers[i];
+                        if (!rec_expr) continue;
+                        if (!is_addressable_lvalue(rec_expr) || !is_mutable_lvalue(rec_expr)) {
+                            continue;
+                        }
+                        std::string base = base_identifier(rec_expr);
+                        if (!base.empty()) {
+                            mark_written(base);
+                        }
+                    }
+                }
+                for (const auto& rec : expr->receivers) {
+                    visit_expr(rec);
+                }
+                for (const auto& arg : expr->args) visit_expr(arg);
+                visit_expr(expr->operand);
+                break;
+            }
+            case Expr::Kind::Binary:
+                visit_expr(expr->left);
+                visit_expr(expr->right);
+                break;
+            case Expr::Kind::Unary:
+            case Expr::Kind::Cast:
+            case Expr::Kind::Length:
+                visit_expr(expr->operand);
+                break;
+            case Expr::Kind::Index:
+                visit_expr(expr->operand);
+                if (!expr->args.empty()) visit_expr(expr->args[0]);
+                break;
+            case Expr::Kind::Member:
+                visit_expr(expr->operand);
+                break;
+            case Expr::Kind::ArrayLiteral:
+            case Expr::Kind::TupleLiteral:
+                for (const auto& elem : expr->elements) visit_expr(elem);
+                break;
+            case Expr::Kind::Block:
+                scopes.emplace_back();
+                for (const auto& stmt : expr->statements) visit_stmt(stmt);
+                visit_expr(expr->result_expr);
+                scopes.pop_back();
+                break;
+            case Expr::Kind::Conditional:
+                visit_expr(expr->condition);
+                visit_expr(expr->true_expr);
+                visit_expr(expr->false_expr);
+                break;
+            case Expr::Kind::Range:
+            case Expr::Kind::Iteration:
+            case Expr::Kind::Repeat:
+                visit_expr(expr->left);
+                visit_expr(expr->right);
+                break;
+            default:
+                break;
+        }
+    };
+
+    visit_stmt = [&](StmtPtr stmt) {
+        if (!stmt) return;
+        switch (stmt->kind) {
+            case Stmt::Kind::VarDecl:
+                scopes.back().vars[stmt->var_name] = stmt.get();
+                var_decl_map[stmt.get()] = stmt;
+                var_written.emplace(stmt.get(), false);
+                visit_expr(stmt->var_init);
+                break;
+            case Stmt::Kind::Expr:
+                visit_expr(stmt->expr);
+                break;
+            case Stmt::Kind::Return:
+                visit_expr(stmt->return_expr);
+                break;
+            case Stmt::Kind::ConditionalStmt:
+                visit_expr(stmt->condition);
+                visit_stmt(stmt->true_stmt);
+                break;
+            default:
+                break;
+        }
+    };
+
+    // Analyze functions and top-level expressions for variable writes.
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind == Stmt::Kind::FuncDecl && stmt->body) {
+            scopes.emplace_back();
+            // Shadow parameters and receiver params to avoid mutating globals with the same name.
+            for (const auto& param : stmt->params) {
+                scopes.back().vars[param.name] = nullptr;
+            }
+            for (const auto& ref : stmt->ref_params) {
+                scopes.back().vars[ref] = nullptr;
+            }
+            visit_expr(stmt->body);
+            scopes.pop_back();
+        } else if (stmt->kind == Stmt::Kind::Expr) {
+            visit_expr(stmt->expr);
+        }
+    }
+
+    // Classify variables.
+    for (const auto& entry : var_decl_map) {
+        const Stmt* key = entry.first;
+        StmtPtr decl = entry.second;
+        bool written = var_written[key];
+        bool effective_mutable = decl->is_mutable && written;
+        if (effective_mutable) {
+            var_mutability[key] = VarMutability::Mutable;
+        } else if (is_compile_time_init(decl)) {
+            var_mutability[key] = VarMutability::Constexpr;
+        } else {
+            var_mutability[key] = VarMutability::NonMutableRuntime;
+        }
+    }
+}
+
+void CodeGenerator::analyze_ref_variants(const Module& mod) {
+    ref_variants.clear();
+    std::unordered_map<std::string, StmtPtr> function_map;
+
+    auto qualified_name = [](const StmtPtr& stmt) {
+        if (!stmt->type_namespace.empty()) {
+            return stmt->type_namespace + "::" + stmt->func_name;
+        }
+        return stmt->func_name;
+    };
+
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind == Stmt::Kind::FuncDecl) {
+            function_map[qualified_name(stmt)] = stmt;
+        }
+    }
+
+    auto record_call = [&](ExprPtr expr) {
+        if (!expr || expr->kind != Expr::Kind::Call) return;
+        if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) return;
+        const std::string& func_name = expr->operand->name;
+        auto fit = function_map.find(func_name);
+        if (fit == function_map.end()) return;
+        size_t ref_count = fit->second->ref_params.size();
+        if (ref_count == 0) return;
+        std::string key = ref_variant_key(expr, ref_count);
+        ref_variants[func_name].insert(key);
+    };
+
+    std::function<void(ExprPtr)> visit_expr;
+    std::function<void(StmtPtr)> visit_stmt;
+
+    visit_expr = [&](ExprPtr expr) {
+        if (!expr) return;
+        switch (expr->kind) {
+            case Expr::Kind::Call:
+                record_call(expr);
+                for (const auto& rec : expr->receivers) visit_expr(rec);
+                for (const auto& arg : expr->args) visit_expr(arg);
+                visit_expr(expr->operand);
+                break;
+            case Expr::Kind::Binary:
+                visit_expr(expr->left);
+                visit_expr(expr->right);
+                break;
+            case Expr::Kind::Unary:
+            case Expr::Kind::Cast:
+            case Expr::Kind::Length:
+                visit_expr(expr->operand);
+                break;
+            case Expr::Kind::Index:
+                visit_expr(expr->operand);
+                if (!expr->args.empty()) visit_expr(expr->args[0]);
+                break;
+            case Expr::Kind::Member:
+                visit_expr(expr->operand);
+                break;
+            case Expr::Kind::ArrayLiteral:
+            case Expr::Kind::TupleLiteral:
+                for (const auto& elem : expr->elements) visit_expr(elem);
+                break;
+            case Expr::Kind::Block:
+                for (const auto& stmt : expr->statements) visit_stmt(stmt);
+                visit_expr(expr->result_expr);
+                break;
+            case Expr::Kind::Conditional:
+                visit_expr(expr->condition);
+                visit_expr(expr->true_expr);
+                visit_expr(expr->false_expr);
+                break;
+            case Expr::Kind::Range:
+            case Expr::Kind::Iteration:
+            case Expr::Kind::Repeat:
+                visit_expr(expr->left);
+                visit_expr(expr->right);
+                break;
+            case Expr::Kind::Assignment:
+                visit_expr(expr->left);
+                visit_expr(expr->right);
+                break;
+            default:
+                break;
+        }
+    };
+
+    visit_stmt = [&](StmtPtr stmt) {
+        if (!stmt) return;
+        switch (stmt->kind) {
+            case Stmt::Kind::Expr:
+                visit_expr(stmt->expr);
+                break;
+            case Stmt::Kind::Return:
+                visit_expr(stmt->return_expr);
+                break;
+            case Stmt::Kind::VarDecl:
+                visit_expr(stmt->var_init);
+                break;
+            case Stmt::Kind::ConditionalStmt:
+                visit_expr(stmt->condition);
+                visit_stmt(stmt->true_stmt);
+                break;
+            default:
+                break;
+        }
+    };
+
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind == Stmt::Kind::FuncDecl) {
+            std::string func_name = qualified_name(stmt);
+            std::string key = reachability_key(func_name, stmt->scope_instance_id);
+            if (!reachable_functions.count(key)) {
+                continue;
+            }
+            if (stmt->body) visit_expr(stmt->body);
+        } else if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
+            bool evaluated_at_compile_time = false;
+            if (type_checker) {
+                CompileTimeEvaluator evaluator(type_checker);
+                CTValue result;
+                if (evaluator.try_evaluate(stmt->var_init, result)) {
+                    evaluated_at_compile_time = true;
+                }
+            }
+            if (!evaluated_at_compile_time) {
+                visit_expr(stmt->var_init);
+            }
+        }
+    }
+}
+
+void CodeGenerator::analyze_effects(const Module& mod) {
+    function_writes_global.clear();
+    function_is_pure.clear();
+
+    std::unordered_map<std::string, StmtPtr> function_map;
+    std::unordered_map<std::string, std::unordered_set<std::string>> function_calls;
+    std::unordered_map<std::string, bool> function_direct_writes_global;
+    std::unordered_map<std::string, bool> function_direct_impure;
+    std::unordered_map<std::string, bool> function_unknown_call;
+    std::unordered_map<std::string, bool> function_mutates_receiver;
+    std::unordered_set<std::string> external_functions;
+
+    auto qualified_name = [](const StmtPtr& stmt) {
+        if (!stmt->type_namespace.empty()) {
+            return stmt->type_namespace + "::" + stmt->func_name;
+        }
+        return stmt->func_name;
+    };
+
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
+        std::string func_name = qualified_name(stmt);
+        std::string func_key = reachability_key(func_name, stmt->scope_instance_id);
+        if (stmt->is_external) {
+            external_functions.insert(func_key);
+            continue;
+        }
+        if (!reachable_functions.count(func_key)) {
+            continue;
+        }
+        function_map[func_key] = stmt;
+        function_calls[func_key] = {};
+        function_direct_writes_global[func_key] = false;
+        function_direct_impure[func_key] = false;
+        function_unknown_call[func_key] = false;
+
+        bool mutates = false;
+        auto mut_it = receiver_mutates.find(func_name);
+        if (mut_it != receiver_mutates.end()) {
+            mutates = std::any_of(mut_it->second.begin(), mut_it->second.end(),
+                                  [](bool v) { return v; });
+        }
+        function_mutates_receiver[func_key] = mutates;
+    }
+
+    struct ScopeFrame {
+        std::unordered_set<std::string> vars;
+    };
+
+    auto base_identifier_info = [](ExprPtr expr) -> std::optional<std::tuple<std::string, int, bool>> {
+        while (expr) {
+            if (expr->kind == Expr::Kind::Identifier) {
+                return std::make_tuple(expr->name, expr->scope_instance_id, expr->is_mutable_binding);
+            }
+            if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
+                expr = expr->operand;
+                continue;
+            }
+            break;
+        }
+        return std::nullopt;
+    };
+
+    for (const auto& entry : function_map) {
+        const std::string& func_key = entry.first;
+        const StmtPtr& func = entry.second;
+        if (!func->body) {
+            function_direct_impure[func_key] = true;
+            function_unknown_call[func_key] = true;
+            continue;
+        }
+
+        std::vector<ScopeFrame> scopes;
+        scopes.emplace_back();
+        for (const auto& param : func->params) {
+            scopes.back().vars.insert(param.name);
+        }
+        for (const auto& ref : func->ref_params) {
+            scopes.back().vars.insert(ref);
+        }
+
+        auto is_local = [&](const std::string& name) {
+            for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
+                if (it->vars.count(name)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        bool direct_write = false;
+        bool direct_impure = false;
+        bool unknown_call = false;
+
+        std::function<void(ExprPtr)> visit_expr;
+        std::function<void(StmtPtr)> visit_stmt;
+
+        visit_expr = [&](ExprPtr expr) {
+            if (!expr) return;
+            switch (expr->kind) {
+                case Expr::Kind::Assignment: {
+                    if (expr->creates_new_variable &&
+                        expr->left && expr->left->kind == Expr::Kind::Identifier) {
+                        scopes.back().vars.insert(expr->left->name);
+                    } else {
+                        auto base = base_identifier_info(expr->left);
+                        if (base) {
+                            const std::string& name = std::get<0>(*base);
+                            bool is_mut = std::get<2>(*base);
+                            if (is_mut && !is_local(name)) {
+                                direct_write = true;
+                            }
+                        }
+                    }
+                    visit_expr(expr->right);
+                    break;
+                }
+                case Expr::Kind::Call: {
+                    if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
+                        unknown_call = true;
+                        direct_impure = true;
+                    } else {
+                        std::string callee_key = reachability_key(expr->operand->name, expr->operand->scope_instance_id);
+                        function_calls[func_key].insert(callee_key);
+
+                        auto callee_it = receiver_mutates.find(expr->operand->name);
+                        for (size_t i = 0; i < expr->receivers.size(); i++) {
+                            bool mut = true;
+                            if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
+                                mut = callee_it->second[i];
+                            }
+                            if (!mut) continue;
+                            ExprPtr rec = expr->receivers[i];
+                            if (!receiver_is_mutable_arg(rec)) {
+                                continue;
+                            }
+                            auto base = base_identifier_info(rec);
+                            if (base) {
+                                const std::string& name = std::get<0>(*base);
+                                if (!is_local(name)) {
+                                    direct_write = true;
+                                }
+                            }
+                        }
+                    }
+                    for (const auto& rec : expr->receivers) visit_expr(rec);
+                    for (const auto& arg : expr->args) visit_expr(arg);
+                    visit_expr(expr->operand);
+                    break;
+                }
+                case Expr::Kind::Process:
+                    direct_impure = true;
+                    break;
+                case Expr::Kind::Binary:
+                    visit_expr(expr->left);
+                    visit_expr(expr->right);
+                    break;
+                case Expr::Kind::Unary:
+                case Expr::Kind::Cast:
+                case Expr::Kind::Length:
+                    visit_expr(expr->operand);
+                    break;
+                case Expr::Kind::Index:
+                    visit_expr(expr->operand);
+                    if (!expr->args.empty()) visit_expr(expr->args[0]);
+                    break;
+                case Expr::Kind::Member:
+                    visit_expr(expr->operand);
+                    break;
+                case Expr::Kind::ArrayLiteral:
+                case Expr::Kind::TupleLiteral:
+                    for (const auto& elem : expr->elements) visit_expr(elem);
+                    break;
+                case Expr::Kind::Block:
+                    scopes.emplace_back();
+                    for (const auto& stmt : expr->statements) visit_stmt(stmt);
+                    visit_expr(expr->result_expr);
+                    scopes.pop_back();
+                    break;
+                case Expr::Kind::Conditional:
+                    visit_expr(expr->condition);
+                    visit_expr(expr->true_expr);
+                    visit_expr(expr->false_expr);
+                    break;
+                case Expr::Kind::Range:
+                case Expr::Kind::Iteration:
+                case Expr::Kind::Repeat:
+                    visit_expr(expr->left);
+                    visit_expr(expr->right);
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        visit_stmt = [&](StmtPtr stmt) {
+            if (!stmt) return;
+            switch (stmt->kind) {
+                case Stmt::Kind::VarDecl:
+                    scopes.back().vars.insert(stmt->var_name);
+                    visit_expr(stmt->var_init);
+                    break;
+                case Stmt::Kind::Expr:
+                    visit_expr(stmt->expr);
+                    break;
+                case Stmt::Kind::Return:
+                    visit_expr(stmt->return_expr);
+                    break;
+                case Stmt::Kind::ConditionalStmt:
+                    visit_expr(stmt->condition);
+                    visit_stmt(stmt->true_stmt);
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        visit_expr(func->body);
+
+        function_direct_writes_global[func_key] = direct_write;
+        function_direct_impure[func_key] = direct_impure;
+        function_unknown_call[func_key] = unknown_call;
+    }
+
+    for (const auto& entry : function_map) {
+        const std::string& func_key = entry.first;
+        function_writes_global[func_key] = function_direct_writes_global[func_key] || function_unknown_call[func_key];
+    }
+
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& entry : function_map) {
+            const std::string& func_key = entry.first;
+            bool writes = function_direct_writes_global[func_key] || function_unknown_call[func_key];
+            if (!writes) {
+                for (const auto& callee_key : function_calls[func_key]) {
+                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
+                        writes = true;
+                        break;
+                    }
+                    if (function_writes_global[callee_key]) {
+                        writes = true;
+                        break;
+                    }
+                }
+            }
+            if (writes != function_writes_global[func_key]) {
+                function_writes_global[func_key] = writes;
+                changed = true;
+            }
+        }
+    }
+
+    for (const auto& entry : function_map) {
+        const std::string& func_key = entry.first;
+        bool base = !function_writes_global[func_key] &&
+                    !function_direct_impure[func_key] &&
+                    !function_mutates_receiver[func_key];
+        function_is_pure[func_key] = base;
+    }
+
+    changed = true;
+    while (changed) {
+        changed = false;
+        for (const auto& entry : function_map) {
+            const std::string& func_key = entry.first;
+            bool base = !function_writes_global[func_key] &&
+                        !function_direct_impure[func_key] &&
+                        !function_mutates_receiver[func_key];
+            bool pure = base;
+            if (pure) {
+                for (const auto& callee_key : function_calls[func_key]) {
+                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
+                        pure = false;
+                        break;
+                    }
+                    if (!function_is_pure[callee_key]) {
+                        pure = false;
+                        break;
+                    }
+                }
+            }
+            if (pure != function_is_pure[func_key]) {
+                function_is_pure[func_key] = pure;
+                changed = true;
+            }
+        }
+    }
+}
+
+void CodeGenerator::mark_reachable(const std::string& func_name, int scope_id, const Module& mod) {
+    std::string key = reachability_key(func_name, scope_id);
+    if (reachable_functions.count(key)) {
         return;
     }
 
-    // Mark as reachable
-    reachable_functions.insert(func_name);
+    reachable_functions.insert(key);
 
     // Find the function definition
     for (const auto& stmt : mod.top_level) {
@@ -197,14 +1009,22 @@ void CodeGenerator::mark_reachable(const std::string& func_name, const Module& m
             }
 
             if (stmt_func_name == func_name) {
+                if (scope_id >= 0) {
+                    if (stmt->scope_instance_id != scope_id) continue;
+                } else if (stmt->scope_instance_id >= 0) {
+                    continue;
+                }
                 // Collect all function calls in this function's body
                 if (stmt->body) {
                     std::unordered_set<std::string> calls;
                     collect_calls(stmt->body, calls);
 
                     // Recursively mark called functions as reachable
-                    for (const auto& called_func : calls) {
-                        mark_reachable(called_func, mod);
+                    for (const auto& called_key : calls) {
+                        std::string called_name;
+                        int called_scope = -1;
+                        split_reachability_key(called_key, called_name, called_scope);
+                        mark_reachable(called_name, called_scope, mod);
                     }
                 }
                 break;
@@ -220,12 +1040,16 @@ void CodeGenerator::collect_calls(ExprPtr expr, std::unordered_set<std::string>&
         case Expr::Kind::Call:
             // Extract function name from call (already qualified by type checker for methods)
             if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                calls.insert(expr->operand->name);
+                calls.insert(reachability_key(expr->operand->name, expr->operand->scope_instance_id));
+            }
+            for (const auto& rec : expr->receivers) {
+                collect_calls(rec, calls);
             }
             // Also check arguments
             for (const auto& arg : expr->args) {
                 collect_calls(arg, calls);
             }
+            collect_calls(expr->operand, calls);
             break;
 
         case Expr::Kind::Binary:
@@ -307,8 +1131,35 @@ void CodeGenerator::gen_module(const Module& mod) {
     // External function forward declarations
     for (const auto& stmt : mod.top_level) {
         if (stmt->kind == Stmt::Kind::FuncDecl && stmt->is_external) {
+            std::string func_name = stmt->func_name;
+            if (!stmt->type_namespace.empty()) {
+                func_name = stmt->type_namespace + "::" + stmt->func_name;
+            }
+            bool is_non_reentrant = non_reentrant.count(func_name) > 0;
+            if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                            [](const Annotation& a) { return a.name == "reentrant"; })) {
+                is_non_reentrant = false;
+            }
+            std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
+            bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                          [](const Annotation& a) { return a.name == "inline"; });
+            bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                            [](const Annotation& a) { return a.name == "noinline"; });
+            std::string label_prefix;
+            if (!stmt->ref_params.empty()) {
+                std::string ref_key(stmt->ref_params.size(), 'M');
+                label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
+            }
+            if (stmt->is_exported) {
+                label_prefix += "VX_ENTRYPOINT ";
+            }
+            if (has_noinline) {
+                label_prefix += "VX_NOINLINE ";
+            } else if (has_inline) {
+                label_prefix += "VX_INLINE ";
+            }
             std::string ret_type = stmt->return_type ? gen_type(stmt->return_type) : "void";
-            emit_header(ret_type + " " + mangle_name(stmt->func_name) + "(");
+            emit_header(label_prefix + reent_prefix + ret_type + " " + mangle_name(func_name) + "(");
             for (size_t i = 0; i < stmt->params.size(); i++) {
                 if (i > 0) emit_header(", ");
                 std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
@@ -339,7 +1190,8 @@ void CodeGenerator::gen_module(const Module& mod) {
 
             // Skip unreachable functions
             // For imported functions (scope_instance_id >= 0), always generate if base name is reachable
-            if (!reachable_functions.count(func_name) && stmt->scope_instance_id < 0) {
+            std::string key = reachability_key(func_name, stmt->scope_instance_id);
+            if (!reachable_functions.count(key)) {
                 continue;
             }
 
@@ -357,6 +1209,28 @@ void CodeGenerator::gen_module(const Module& mod) {
 
             // Internal functions are static, exported functions are public
             std::string storage = stmt->is_exported ? "" : "static ";
+            bool is_non_reentrant = non_reentrant.count(func_name) > 0;
+            if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                            [](const Annotation& a) { return a.name == "reentrant"; })) {
+                is_non_reentrant = false;
+            }
+            std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
+            bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                          [](const Annotation& a) { return a.name == "inline"; });
+            bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                            [](const Annotation& a) { return a.name == "noinline"; });
+            bool is_pure = false;
+            bool no_global_write = false;
+            {
+                auto pure_it = function_is_pure.find(key);
+                if (pure_it != function_is_pure.end() && pure_it->second) {
+                    is_pure = true;
+                }
+                auto gw_it = function_writes_global.find(key);
+                if (gw_it != function_writes_global.end() && !gw_it->second) {
+                    no_global_write = true;
+                }
+            }
 
             // Handle tuple return types
             std::string ret_type;
@@ -389,40 +1263,72 @@ void CodeGenerator::gen_module(const Module& mod) {
                 }
             }
 
-            std::string codegen_name = mangle_name(func_name);
-            // Add scope instance suffix for imported functions
-            if (stmt->scope_instance_id >= 0) {
-                codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
-            }
-            emit_header(storage + ret_type + " " + codegen_name + "(");
+            auto ref_keys = ref_variant_keys_for(stmt);
+            for (const auto& ref_key : ref_keys) {
+                std::string variant_name = ref_variant_name(func_name, ref_key);
+                std::string codegen_name = mangle_name(variant_name);
+                // Add scope instance suffix for imported functions
+                if (stmt->scope_instance_id >= 0) {
+                    codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
+                }
+                std::string label_prefix;
+                if (!ref_key.empty()) {
+                    label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
+                }
+                if (stmt->is_exported) {
+                    label_prefix += "VX_ENTRYPOINT ";
+                }
+                if (is_pure) {
+                    label_prefix += "VX_PURE ";
+                }
+                if (no_global_write) {
+                    label_prefix += "VX_NO_GLOBAL_WRITE ";
+                }
+                if (has_noinline) {
+                    label_prefix += "VX_NOINLINE ";
+                } else if (has_inline) {
+                    label_prefix += "VX_INLINE ";
+                }
+                emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
 
-            // Reference parameters
-            for (size_t i = 0; i < stmt->ref_params.size(); i++) {
-                if (i > 0) emit_header(", ");
+                // Reference parameters (mutable receivers use pointers, non-mutable use values)
+                for (size_t i = 0; i < stmt->ref_params.size(); i++) {
+                    if (i > 0) emit_header(", ");
 
-                std::string ref_type;
-                TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
-                if (ref_type_ptr) {
-                    ref_type = gen_type(ref_type_ptr) + "*";
-                } else if (!stmt->type_namespace.empty() && i == 0) {
-                    ref_type = mangle_name(stmt->type_namespace) + "*";
-                } else {
-                    ref_type = "void*";
+                    std::string ref_type;
+                    TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+                    bool by_ref = true;
+                    if (!ref_key.empty() && i < ref_key.size()) {
+                        by_ref = ref_key[i] == 'M';
+                    }
+                    if (ref_type_ptr) {
+                        ref_type = gen_type(ref_type_ptr);
+                    } else if (!stmt->type_namespace.empty() && i == 0) {
+                        ref_type = mangle_name(stmt->type_namespace);
+                    } else {
+                        ref_type = "void";
+                    }
+
+                    if (by_ref) {
+                        ref_type += "*";
+                    } else if (ref_type == "void") {
+                        ref_type = "void*";
+                    }
+
+                    emit_header(ref_type + " " + mangle_name(stmt->ref_params[i]));
                 }
 
-                emit_header(ref_type + " " + mangle_name(stmt->ref_params[i]));
+                // Value parameters (skip expression parameters)
+                bool first_param = stmt->ref_params.empty();
+                for (size_t i = 0; i < stmt->params.size(); i++) {
+                    if (stmt->params[i].is_expression_param) continue;  // Skip expression parameters
+                    if (!first_param) emit_header(", ");
+                    first_param = false;
+                    std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
+                    emit_header(ptype + " " + mangle_name(stmt->params[i].name));
+                }
+                emit_header(");");
             }
-
-            // Value parameters (skip expression parameters)
-            bool first_param = stmt->ref_params.empty();
-            for (size_t i = 0; i < stmt->params.size(); i++) {
-                if (stmt->params[i].is_expression_param) continue;  // Skip expression parameters
-                if (!first_param) emit_header(", ");
-                first_param = false;
-                std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
-                emit_header(ptype + " " + mangle_name(stmt->params[i].name));
-            }
-            emit_header(");");
         }
     }
     emit_header("");
@@ -487,7 +1393,9 @@ void CodeGenerator::gen_module(const Module& mod) {
 void CodeGenerator::gen_stmt(StmtPtr stmt) {
     switch (stmt->kind) {
         case Stmt::Kind::FuncDecl:
-            gen_func_decl(stmt);
+            for (const auto& ref_key : ref_variant_keys_for(stmt)) {
+                gen_func_decl(stmt, ref_key);
+            }
             break;
         case Stmt::Kind::TypeDecl:
             // Already generated
@@ -630,7 +1538,7 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
     }
 }
 
-void CodeGenerator::gen_func_decl(StmtPtr stmt) {
+void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     if (stmt->is_external) return;
 
     // Build qualified function name for methods
@@ -638,6 +1546,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt) {
     if (!stmt->type_namespace.empty()) {
         func_name = stmt->type_namespace + "::" + stmt->func_name;
     }
+    std::string variant_name = ref_variant_name(func_name, ref_key);
 
     bool is_non_reentrant = non_reentrant.count(func_name) > 0;
     if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
@@ -645,12 +1554,31 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt) {
         is_non_reentrant = false;
     }
     current_function_non_reentrant = is_non_reentrant;
+    std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
 
     // Skip unreachable functions (dead code elimination)
     // For imported functions (scope_instance_id >= 0), always generate if base name is reachable
-    if (!reachable_functions.count(func_name) && stmt->scope_instance_id < 0) {
+    std::string reach_key = reachability_key(func_name, stmt->scope_instance_id);
+    if (!reachable_functions.count(reach_key)) {
         current_function_non_reentrant = false;
         return;
+    }
+
+    bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                  [](const Annotation& a) { return a.name == "inline"; });
+    bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                    [](const Annotation& a) { return a.name == "noinline"; });
+    bool is_pure = false;
+    bool no_global_write = false;
+    {
+        auto pure_it = function_is_pure.find(reach_key);
+        if (pure_it != function_is_pure.end() && pure_it->second) {
+            is_pure = true;
+        }
+        auto gw_it = function_writes_global.find(reach_key);
+        if (gw_it != function_writes_global.end() && !gw_it->second) {
+            no_global_write = true;
+        }
     }
 
     // Skip functions with expression parameters - they're inlined at call sites
@@ -667,10 +1595,16 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt) {
     declared_temps.clear();
     temp_counter = 0;
 
-    // Track reference parameters for this function
+    // Track reference parameters for this function (mutable paths use pointers)
     current_ref_params.clear();
-    for (const auto& ref : stmt->ref_params) {
-        current_ref_params.insert(ref);
+    for (size_t i = 0; i < stmt->ref_params.size(); i++) {
+        bool by_ref = true;
+        if (!ref_key.empty() && i < ref_key.size()) {
+            by_ref = ref_key[i] == 'M';
+        }
+        if (by_ref) {
+            current_ref_params.insert(stmt->ref_params[i]);
+        }
     }
 
     // Internal functions are static, exported functions are public
@@ -723,21 +1657,48 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt) {
     emit("");
     std::string ann_comment = render_annotation_comment(stmt->annotations);
     if (!ann_comment.empty()) emit(ann_comment);
-    std::string codegen_name = mangle_name(func_name);
+    std::string codegen_name = mangle_name(variant_name);
     if (stmt->scope_instance_id >= 0) {
         codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
     }
-    emit(storage + attr + ret_type + " " + codegen_name + "(");
+    std::string label_prefix;
+    if (!ref_key.empty()) {
+        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
+    }
+    if (stmt->is_exported) {
+        label_prefix += "VX_ENTRYPOINT ";
+    }
+    if (is_pure) {
+        label_prefix += "VX_PURE ";
+    }
+    if (no_global_write) {
+        label_prefix += "VX_NO_GLOBAL_WRITE ";
+    }
+    if (has_noinline) {
+        label_prefix += "VX_NOINLINE ";
+    } else if (has_inline) {
+        label_prefix += "VX_INLINE ";
+    }
+    emit(label_prefix + reent_prefix + storage + attr + ret_type + " " + codegen_name + "(");
 
     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
         if (i > 0) emit(", ");
         std::string ref_type;
         TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+        bool by_ref = true;
+        if (!ref_key.empty() && i < ref_key.size()) {
+            by_ref = ref_key[i] == 'M';
+        }
         if (ref_type_ptr) {
-            ref_type = gen_type(ref_type_ptr) + "*";
+            ref_type = gen_type(ref_type_ptr);
         } else if (!stmt->type_namespace.empty() && i == 0) {
-            ref_type = mangle_name(stmt->type_namespace) + "*";
+            ref_type = mangle_name(stmt->type_namespace);
         } else {
+            ref_type = "void";
+        }
+        if (by_ref) {
+            ref_type += "*";
+        } else if (ref_type == "void") {
             ref_type = "void*";
         }
         emit(ref_type + " " + mangle_name(stmt->ref_params[i]));
@@ -805,7 +1766,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt) {
     if (!func_code.empty()) {
         GeneratedFunctionInfo info;
         info.declaration = stmt;
-        info.qualified_name = func_name;
+        info.qualified_name = variant_name;
         info.c_name = codegen_name;
         info.storage = storage;
         info.code = func_code;
@@ -861,6 +1822,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     }
 
     std::string vtype = stmt->var_type ? gen_type(stmt->var_type) : "int";
+    std::string mutability = mutability_prefix(stmt);
     if (stmt->var_init) {
         // Special handling for array literals and ranges
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
@@ -887,7 +1849,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     }
                     int64_t count = (start < end) ? (end - start) : (start - end);
                     std::ostringstream init;
-                    init << storage << elem_type << " " << mangle_name(var_name) << "[" << count << "] = {";
+                    init << storage << mutability << elem_type << " " << mangle_name(var_name) << "[" << count << "] = {";
                     bool first = true;
                     if (start < end) {
                         for (int64_t i = start; i < end; ++i) {
@@ -911,7 +1873,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
 
                 // Handle array literal
                 if (stmt->var_init->kind == Expr::Kind::ArrayLiteral) {
-                    emit(storage + elem_type + " " + mangle_name(var_name) + "[" + size_str + "] = {");
+                    emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "] = {");
                     for (size_t i = 0; i < stmt->var_init->elements.size(); i++) {
                         if (i > 0) emit(", ");
                         emit(gen_expr(stmt->var_init->elements[i]));
@@ -933,7 +1895,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                         size_str = std::to_string(std::get<int64_t>(size_val));
                     }
                 }
-                emit(storage + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
+                emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
                 emit("memcpy(" + mangle_name(var_name) + ", " + gen_expr(stmt->var_init) + ", sizeof(" + mangle_name(var_name) + "));");
                 finalize();
                 return;
@@ -999,7 +1961,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                 } else if (std::holds_alternative<std::string>(result)) {
                     init_val = "\"" + escape_c_string(std::get<std::string>(result)) + "\"";
                 }
-                emit(storage + vtype + " " + mangle_name(var_name) + " = " + init_val + ";");
+                emit(storage + mutability + vtype + " " + mangle_name(var_name) + " = " + init_val + ";");
                 finalize();
                 return;
             } else if (!stmt->is_mutable) {
@@ -1009,7 +1971,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             }
         }
         // Fallback to runtime evaluation (only for mutable variables)
-        emit(storage + vtype + " " + mangle_name(var_name) + " = " + gen_expr(stmt->var_init) + ";");
+        emit(storage + mutability + vtype + " " + mangle_name(var_name) + " = " + gen_expr(stmt->var_init) + ";");
     } else {
         // No initializer - special handling for arrays
         if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
@@ -1022,13 +1984,132 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     size_str = std::to_string(std::get<int64_t>(size_val));
                 }
             }
-            emit(storage + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
+            emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
         } else {
-            emit(storage + vtype + " " + mangle_name(var_name) + ";");
+            emit(storage + mutability + vtype + " " + mangle_name(var_name) + ";");
         }
     }
 
     finalize();
+}
+
+bool CodeGenerator::is_compile_time_init(StmtPtr stmt) const {
+    if (!stmt || !stmt->var_init) return false;
+    if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
+        (stmt->var_init->kind == Expr::Kind::ArrayLiteral || stmt->var_init->kind == Expr::Kind::Range)) {
+        return true;
+    }
+    if (!type_checker) return false;
+    CompileTimeEvaluator evaluator(type_checker);
+    CTValue result;
+    return evaluator.try_evaluate(stmt->var_init, result);
+}
+
+std::string CodeGenerator::mutability_prefix(StmtPtr stmt) const {
+    auto it = var_mutability.find(stmt.get());
+    VarMutability kind = stmt->is_mutable ? VarMutability::Mutable : VarMutability::Constexpr;
+    if (it != var_mutability.end()) {
+        kind = it->second;
+    }
+    switch (kind) {
+        case VarMutability::Mutable:
+            return "VX_MUTABLE ";
+        case VarMutability::NonMutableRuntime:
+            return "VX_NON_MUTABLE ";
+        case VarMutability::Constexpr:
+            return "VX_CONSTEXPR ";
+        default:
+            return "";
+    }
+}
+
+std::string CodeGenerator::ref_variant_key(const ExprPtr& call, size_t ref_count) const {
+    std::string key;
+    key.reserve(ref_count);
+    for (size_t i = 0; i < ref_count; i++) {
+        bool is_mut = false;
+        if (call && i < call->receivers.size()) {
+            is_mut = receiver_is_mutable_arg(call->receivers[i]);
+        }
+        key.push_back(is_mut ? 'M' : 'N');
+    }
+    return key;
+}
+
+std::vector<std::string> CodeGenerator::ref_variant_keys_for(StmtPtr stmt) const {
+    std::vector<std::string> keys;
+    if (!stmt || stmt->ref_params.empty()) {
+        keys.push_back("");
+        return keys;
+    }
+    std::string func_name = stmt->func_name;
+    if (!stmt->type_namespace.empty()) {
+        func_name = stmt->type_namespace + "::" + stmt->func_name;
+    }
+    auto it = ref_variants.find(func_name);
+    if (it != ref_variants.end()) {
+        keys.assign(it->second.begin(), it->second.end());
+    }
+    if (keys.empty()) {
+        keys.push_back(std::string(stmt->ref_params.size(), 'M'));
+    }
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
+std::string CodeGenerator::ref_variant_name(const std::string& func_name, const std::string& ref_key) const {
+    if (ref_key.empty()) return func_name;
+    bool all_mut = std::all_of(ref_key.begin(), ref_key.end(), [](char c) { return c == 'M'; });
+    if (all_mut) return func_name;
+    return func_name + "__ref" + ref_key;
+}
+
+bool CodeGenerator::receiver_is_mutable_arg(ExprPtr expr) const {
+    return is_addressable_lvalue(expr) && is_mutable_lvalue(expr);
+}
+
+std::string CodeGenerator::reachability_key(const std::string& func_name, int scope_id) const {
+    if (scope_id < 0) {
+        return func_name;
+    }
+    return func_name + kScopeSep + std::to_string(scope_id);
+}
+
+void CodeGenerator::split_reachability_key(const std::string& key, std::string& func_name, int& scope_id) const {
+    size_t pos = key.rfind(kScopeSep);
+    if (pos == std::string::npos) {
+        func_name = key;
+        scope_id = -1;
+        return;
+    }
+    func_name = key.substr(0, pos);
+    scope_id = std::stoi(key.substr(pos + 1));
+}
+
+bool CodeGenerator::is_addressable_lvalue(ExprPtr expr) const {
+    if (!expr) return false;
+    switch (expr->kind) {
+        case Expr::Kind::Identifier:
+            return true;
+        case Expr::Kind::Member:
+        case Expr::Kind::Index:
+            return is_addressable_lvalue(expr->operand);
+        default:
+            return false;
+    }
+}
+
+bool CodeGenerator::is_mutable_lvalue(ExprPtr expr) const {
+    if (!expr) return false;
+    switch (expr->kind) {
+        case Expr::Kind::Identifier:
+            return expr->is_mutable_binding;
+        case Expr::Kind::Member:
+        case Expr::Kind::Index:
+            return is_mutable_lvalue(expr->operand);
+        default:
+            return false;
+    }
 }
 
 std::string CodeGenerator::gen_expr(ExprPtr expr) {
@@ -1220,6 +2301,7 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
 
     // Regular function call or method call
     std::string func_name;
+    std::string ref_key;
     std::vector<std::string> all_args;
 
     // Get function name (already qualified by type checker for methods)
@@ -1228,8 +2310,9 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
         std::string original_name = expr->operand->name;
         int scope_id = expr->operand->scope_instance_id;
 
+        Symbol* sym = nullptr;
         if (type_checker) {
-            Symbol* sym = type_checker->get_scope()->lookup(expr->operand->name);
+            sym = type_checker->get_scope()->lookup(expr->operand->name);
             if (sym && sym->declaration && sym->kind == Symbol::Kind::Function) {
                 // Use the original unmangled name from the declaration
                 original_name = sym->declaration->func_name;
@@ -1242,6 +2325,15 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             }
         }
 
+        if (sym && sym->declaration && !sym->declaration->ref_params.empty()) {
+            if (sym->declaration->is_external) {
+                ref_key = std::string(sym->declaration->ref_params.size(), 'M');
+            } else {
+                ref_key = ref_variant_key(expr, sym->declaration->ref_params.size());
+            }
+            original_name = ref_variant_name(original_name, ref_key);
+        }
+
         func_name = mangle_name(original_name);
         if (scope_id >= 0) {
             func_name += "_s" + std::to_string(scope_id);
@@ -1252,8 +2344,24 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
 
     // Handle method calls with receivers - add them as first arguments
     if (!expr->receivers.empty()) {
-        for (const auto& rec : expr->receivers) {
-            all_args.push_back("&" + mangle_name(rec));
+        for (size_t i = 0; i < expr->receivers.size(); i++) {
+            ExprPtr rec = expr->receivers[i];
+            bool by_ref = receiver_is_mutable_arg(rec);
+            if (!ref_key.empty() && i < ref_key.size()) {
+                by_ref = ref_key[i] == 'M';
+            }
+            if (by_ref) {
+                if (is_addressable_lvalue(rec) && is_mutable_lvalue(rec)) {
+                    all_args.push_back("&" + gen_expr(rec));
+                } else {
+                    std::string temp = fresh_temp();
+                    std::string rtype = rec && rec->type ? gen_type(rec->type) : "int";
+                    emit(rtype + " " + temp + " = " + gen_expr(rec) + ";");
+                    all_args.push_back("&" + temp);
+                }
+            } else {
+                all_args.push_back(gen_expr(rec));
+            }
         }
     }
 

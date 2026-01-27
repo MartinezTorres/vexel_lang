@@ -23,7 +23,7 @@ This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the
 - Mangled identifiers use the `__` prefix defined in `constants.h` (`MANGLED_PREFIX`).
 - Tuples: named `__tuple<N>_<type...>` where `<type>` components use primitive/type names (e.g., `__tuple2_i32_u8`).
 - Generated temporaries and helper functions share the mangling prefix and remain `static` unless exported.
-- Receiver functions lower to `<Type>__method` forms with an explicit receiver pointer as the first parameter.
+- Receiver functions lower to `<Type>__method` forms; mutating receivers lower to pointer parameters, non-mutating receivers lower by value.
 
 ## Types & Layout
 - Structs map directly to C `struct` with field order preserved. No padding adjustments beyond C defaults; alignment follows host compiler rules.
@@ -33,14 +33,17 @@ This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the
 
 ## Functions & Calling
 - Direct Vexel calls become direct C calls; tail-call optimisation is optional.
-- Receiver/multi-receiver methods: first parameter is a pointer to the receiver type(s); expression parameters are fully specialized before codegen.
+- Receiver/multi-receiver methods: mutating receivers are pointers, non-mutating receivers are values; rvalue receivers for mutating methods are materialized into temporaries; expression parameters are fully specialized before codegen.
+- When both mutable and non-mutable receiver paths are used, the backend emits specialized C functions per receiver mutability mask (suffix `__ref<mask>`, `M` = mutable reference, `N` = non-mutable/value).
 - Exported (`&^`) functions are non-`static` and declared in the header; internal functions are `static`.
 - External (`&!`) declarations emit as `extern` prototypes only.
+- Function declarations/definitions are annotated with `VX_REENTRANT`/`VX_NON_REENTRANT`, `VX_REF_MASK("<mask>")`, `VX_ENTRYPOINT` (exports), `VX_INLINE`/`VX_NOINLINE` (from annotations), and `VX_PURE`/`VX_NO_GLOBAL_WRITE` when proven; all macros default to empty in the generated header and are intended for backend visibility.
 
 ## Globals & Data
 - Immutable globals emit as `const` in the `.c` file; mutable globals emit as `static` unless exported (language forbids exported mutables).
 - Strings and read-only data are placed in `.rodata` via `const`.
 - No per-backend runtime state beyond standard C.
+- The C output annotates variables with `VX_MUTABLE`, `VX_NON_MUTABLE`, and `VX_CONSTEXPR` for visibility. Defaults live in the generated header (`VX_MUTABLE` empty, others `const`) and can be overridden before inclusion.
 
 ## File Structure
 - Exactly one `.c` and one `.h` file per compilation unit.

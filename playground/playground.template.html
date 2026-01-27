@@ -364,7 +364,7 @@
         {
           name: "main.vx",
           content:
-            "#Vec2(x:#i32, y:#i32);\n\n&(self)#Vec2::len2() -> #i32 {\n  self.x * self.x + self.y * self.y\n}\n\n&(lhs)#Vec2::+(rhs:#Vec2) -> #Vec2 {\n  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)\n}\n\n&^main() -> #i32 {\n  v = Vec2(3, 4);\n  (v + Vec2(1, 2)).len2()\n}\n"
+            "#Vec2(x:#i32, y:#i32);\n\n&(self)#Vec2::len2() -> #i32 {\n  self.x * self.x + self.y * self.y\n}\n\n&(lhs)#Vec2::+(rhs:#Vec2) -> #Vec2 {\n  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)\n}\n\n&^main() -> #i32 {\n  v = Vec2(3, 4);\n  sum = v + Vec2(1, 2);\n  sum.len2()\n}\n"
         }
       ],
       iteration: [

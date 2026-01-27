@@ -1,8 +1,8 @@
 // @rfc: docs/vexel-rfc.md#declarations
-// @desc: Method receiver must be single identifier (not expression) | Method receiver must be identifier
+// @desc: Receiver parameter is an identifier (declaration) | Receiver parameter is identifier
 
 
-// DC-057: Receiver must be single identifier
+// DC-057: Receiver parameter is identifier
 #Data(x:#i32);
 
 &(d)#Data::process() -> #i32 { d.x }

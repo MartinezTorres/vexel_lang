@@ -1,8 +1,8 @@
 // @rfc: docs/vexel-rfc.md#declarations
-// @desc: Operator methods behave like regular methods (left operand passed by reference) | Operator left operand passed by reference
+// @desc: Mutating operator methods pass the left operand by reference | Mutating operator left operand passed by reference
 
 
-// DC-062: Left operand passed by reference
+// DC-062: Mutating left operand passed by reference
 #Accumulator(sum:#i32);
 
 &(a)#Accumulator::+(val:#i32) -> #Accumulator {

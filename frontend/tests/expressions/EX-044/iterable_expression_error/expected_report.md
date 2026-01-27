@@ -1,11 +1,20 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/expressions/EX-044/iterable_expression_error/test.vx
+&print(arg0: #i32) {
+}
+&get_array() -> #i32[3] {
+    -> [1, 2, 3];
+}
+&^main() -> #i32 {
+    get_array()@print(_);
+    -> 0;
+}
 ```
 
 ## Stderr
 ```
-Error at tests/expressions/EX-044/iterable_expression_error/test.vx:14:5: Iterable expression must be an identifier (or range literal) so it can be passed by reference to iterator methods
 ```
 
 ## Exit Code
-1
+0

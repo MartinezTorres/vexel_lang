@@ -51,6 +51,12 @@ class CodeGenerator {
     std::unordered_map<std::string, std::string> comparator_cache;
     std::vector<std::string> comparator_definitions;
     bool in_function = false;
+    enum class VarMutability { Mutable, NonMutableRuntime, Constexpr };
+    std::unordered_map<const Stmt*, VarMutability> var_mutability;
+    std::unordered_map<std::string, std::vector<bool>> receiver_mutates;
+    std::unordered_map<std::string, std::unordered_set<std::string>> ref_variants;
+    std::unordered_map<std::string, bool> function_writes_global;
+    std::unordered_map<std::string, bool> function_is_pure;
 
 public:
     CodeGenerator();
@@ -73,12 +79,15 @@ private:
     bool current_function_non_reentrant = false;
 
     void analyze_reachability(const Module& mod);
-    void mark_reachable(const std::string& func_name, const Module& mod);
+    void analyze_mutability(const Module& mod);
+    void analyze_ref_variants(const Module& mod);
+    void analyze_effects(const Module& mod);
+    void mark_reachable(const std::string& func_name, int scope_id, const Module& mod);
     void collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls);
 
     void gen_module(const Module& mod);
     void gen_stmt(StmtPtr stmt);
-    void gen_func_decl(StmtPtr stmt);
+    void gen_func_decl(StmtPtr stmt, const std::string& ref_key);
     void gen_type_decl(StmtPtr stmt);
     void gen_var_decl(StmtPtr stmt);
 
@@ -101,6 +110,16 @@ private:
     std::string gen_iteration(ExprPtr expr);
     std::string gen_repeat(ExprPtr expr);
 
+    bool is_compile_time_init(StmtPtr stmt) const;
+    std::string mutability_prefix(StmtPtr stmt) const;
+    std::string ref_variant_key(const ExprPtr& call, size_t ref_count) const;
+    std::vector<std::string> ref_variant_keys_for(StmtPtr stmt) const;
+    std::string ref_variant_name(const std::string& func_name, const std::string& ref_key) const;
+    bool receiver_is_mutable_arg(ExprPtr expr) const;
+    std::string reachability_key(const std::string& func_name, int scope_id) const;
+    void split_reachability_key(const std::string& key, std::string& func_name, int& scope_id) const;
+    bool is_addressable_lvalue(ExprPtr expr) const;
+    bool is_mutable_lvalue(ExprPtr expr) const;
     std::string gen_type(TypePtr type);
     std::string mangle_name(const std::string& name);
     std::string fresh_temp();

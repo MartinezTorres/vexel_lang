@@ -1,8 +1,8 @@
 // @rfc: docs/vexel-rfc.md#declarations
-// @desc: Iterable expression must be an identifier (passed by reference to iterator method) | Iterable expression is identifier
+// @desc: Iterable expressions can be identifiers | Identifier iterable still works
 
 
-// DC-085: Iterable expression must be identifier
+// DC-085: Identifier iterable still works
 #Iterable(count:#i32);
 
 &(it)#Iterable::@($loop) {

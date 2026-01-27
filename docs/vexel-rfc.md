@@ -181,7 +181,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Can mix expression and value parameters: `&func(x, $y)`
 
 **Reference-taking functions (methods)**: `&(receiver)#TypeName::methodname(p[:Type],...)[-> Type] block`
-- Single receiver passed by reference (mutable) for the duration of the call
+- Single receiver binds to the call-site receiver expression (which may be any expression)
+- If the method mutates the receiver, the compiler passes it by reference; otherwise it is passed by value
+- If a mutating receiver is not a mutable lvalue, the compiler materializes a temporary and applies mutations to the copy
+- Compilers may specialize separate mutable/non-mutable receiver paths (duplicating code if needed) to preserve aliasing guarantees
 - Receiver identifier is an lvalue; type annotation is optional and defaults to `TypeName`
 - Parameters (non-receiver) passed by value
 - `TypeName::` creates a method namespace (separate from general functions)
@@ -191,7 +194,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Operator methods**: `&(lhs)#TypeName::+(rhs[:Type])[-> Type] block`
 - Overloads a core operator for instances of `TypeName`; the operator name must be one of `+ - * / % == != < <= > >=`
-- Operator methods behave like regular methods: the left operand must be an identifier so the compiler can pass it by reference
+- Operator methods behave like regular methods: the left operand is the receiver and may be any expression; mutating operators may materialize a temporary for non-lvalues
 - When the left operand has type `TypeName`, the compiler resolves `lhs <op> rhs` as a call to `TypeName::<op>` before attempting built-in operator rules
 - Operator methods may not declare expression parameters and must accept exactly one receiver; value parameters model the remaining operands (binary operators expect one value parameter)
 - Return types follow normal rules: arithmetic operators typically return `TypeName`, comparison operators return `#b`
@@ -201,10 +204,11 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Provide custom iteration semantics for `receiver@{...}` and `receiver@@{...}`. The method name must be `@` or `@@`, with exactly one receiver and exactly one expression parameter (the loop body).
 - The compiler expands the method inline (functions with expression parameters are never emitted); the method must bind `_` before evaluating `$loop` for each element. Typical pattern: declare `_` locally, assign the current element, then evaluate `$loop`.
 - `@@` methods are responsible for delivering elements in sorted order; when absent, the compiler falls back to built-in array sorting only if the iterable is a plain array. Named types without the appropriate method produce a compile-time error.
-- The iterable expression must be an identifier so it can be passed by reference to the iterator method.
+- The iterable expression may be any expression; if the iteration method mutates the receiver, the compiler may materialize a temporary.
 
 **Reference-taking functions (multi-receiver)**: `&(receiver1, receiver2, ...)#TypeName::methodname(p[:Type],...)[-> Type] block`
-- Receivers evaluate left-to-right and bind as mutable aliases for the call
+- Receivers evaluate left-to-right
+- Each receiver is treated like a receiver parameter: mutating receivers are passed by reference, non-mutating by value
 - Each receiver must be an identifier; type annotations are optional and inferred from use
 - **Cannot use TypeName:: syntax** (ambiguous which receiver's type)
 - Called via tuple notation: `(r1, r2).name(args)`
@@ -250,7 +254,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Function call**: `fname(args)` (includes external functions)
   - Receiver expressions (if any) evaluate left-to-right before the argument list
   - Arguments then evaluate left-to-right; call dispatch happens after all operands finish
-- **Method call**: `receiver.fname(args)` (receiver passed by reference)
+- **Method call**: `receiver.fname(args)` (receiver passed by reference if mutating, otherwise by value)
 - **Constructor**: `TypeName(args)`
 - **Member**: `x.y`
 - **Index**: `arr[expr]`
@@ -533,6 +537,6 @@ line_comment ::= '//' .*
 
 **Calls**:
 - `fname(...)`: function call (internal or external)
-- `receiver.fname(...)`: method (receiver by reference)
+- `receiver.fname(...)`: method (receiver by reference if mutating, otherwise by value)
 - `(r1, r2).fname(...)`: multi-receiver method
 - `TypeName(...)`: constructor

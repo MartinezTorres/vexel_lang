@@ -1,8 +1,8 @@
 // @rfc: docs/vexel-rfc.md#expressions--control
-// @desc: The iterable expression must be an identifier so it can be passed by reference to iterator methods | The iterable expression must be an identifier so it can be passed by reference to iterator methods
+// @desc: Iterable expressions can be identifiers | Identifier iterable still works
 
 
-// EX-044: Iterable must be identifier
+// EX-044: Identifier iterable still works
 &print(arg0:#i32) { }
 
 &get_array() -> #i32[3] {

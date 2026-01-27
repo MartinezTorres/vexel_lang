@@ -1,5 +1,5 @@
 // @rfc: backends/c/README.md#calling--dispatch-rules
-// @desc: Receiver functions lower to C functions with receiver pointer first parameter
+// @desc: Receiver functions lower to C functions with mutating receivers as pointers and non-mutating by value
 // @expect-exit: 0
 // @command: bash -c "{VEXEL_C} -b c test.vx && gcc -std=c11 -c out.c -o out.o && rm -f out.o"
 

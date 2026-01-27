@@ -393,6 +393,7 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
             expr->type = sym->type;
             // Track scope instance for imported symbols
             expr->scope_instance_id = sym->scope_instance_id;
+            expr->is_mutable_binding = sym->is_mutable;
             return expr->type;
         }
 
@@ -532,11 +533,6 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
         return nullptr;
     }
 
-    if (!expr->left || expr->left->kind != Expr::Kind::Identifier) {
-        throw CompileError("Operator '" + op + "' on type " + left_type->type_name +
-                           " requires the left operand to be an identifier", expr->location);
-    }
-
     if (sym->declaration->ref_params.size() != 1) {
         throw CompileError("Operator '" + op + "' on type " + left_type->type_name +
                            " must declare exactly one receiver parameter", sym->declaration->location);
@@ -557,12 +553,13 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
                            " expects " + std::to_string(expected_args) + " argument(s)", expr->location);
     }
 
+    ExprPtr receiver_expr = expr->left;
     ExprPtr right_expr = expr->right;
 
     expr->kind = Expr::Kind::Call;
     expr->operand = Expr::make_identifier(op, expr->location);
     expr->receivers.clear();
-    expr->receivers.push_back(expr->left->name);
+    expr->receivers.push_back(receiver_expr);
     expr->args.clear();
     if (right_expr) {
         expr->args.push_back(right_expr);
@@ -584,11 +581,6 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
     Symbol* sym = current_scope->lookup(method_name);
     if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
         return false;
-    }
-
-    if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
-        throw CompileError("Custom iteration on type " + iterable_type->type_name +
-                           " requires the iterable to be an identifier", expr->operand ? expr->operand->location : expr->location);
     }
 
     if (sym->declaration->ref_params.size() != 1) {
@@ -623,14 +615,14 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
     loop_depth--;
     pop_scope();
 
-    std::string receiver_name = expr->operand->name;
+    ExprPtr receiver_expr = expr->operand;
     ExprPtr body_expr = expr->right;
 
     expr->kind = Expr::Kind::Call;
     expr->operand = Expr::make_identifier(method_token, expr->location);
     expr->operand->scope_instance_id = sym->scope_instance_id;
     expr->receivers.clear();
-    expr->receivers.push_back(receiver_name);
+    expr->receivers.push_back(receiver_expr);
     expr->args.clear();
     expr->args.push_back(body_expr);
     expr->left = nullptr;
@@ -673,21 +665,15 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_call(ExprPtr expr) {
-    std::vector<Symbol*> receiver_symbols;
+    std::vector<TypePtr> receiver_types;
     if (!expr->receivers.empty()) {
-        receiver_symbols.reserve(expr->receivers.size());
+        receiver_types.reserve(expr->receivers.size());
+        bool multi_receiver = expr->receivers.size() > 1;
         for (const auto& rec : expr->receivers) {
-            Symbol* rec_sym = current_scope->lookup(rec);
-            if (!rec_sym) {
-                throw CompileError("Unknown receiver '" + rec + "' in call", expr->location);
+            if (multi_receiver && rec && rec->kind != Expr::Kind::Identifier) {
+                throw CompileError("Multi-receiver calls require identifier receivers", expr->location);
             }
-            if (rec_sym->kind != Symbol::Kind::Variable) {
-                throw CompileError("Receiver '" + rec + "' must refer to a variable", expr->location);
-            }
-            if (!rec_sym->is_mutable) {
-                throw CompileError("Receiver '" + rec + "' must be mutable", expr->location);
-            }
-            receiver_symbols.push_back(rec_sym);
+            receiver_types.push_back(check_expr(rec));
         }
     }
 
@@ -699,10 +685,10 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         func_name = expr->operand->name;
 
         if (expr->receivers.size() == 1) {
-            Symbol* receiver_sym = receiver_symbols.empty() ? nullptr : receiver_symbols[0];
-            if (receiver_sym && receiver_sym->type && receiver_sym->type->kind == Type::Kind::Named) {
+            TypePtr receiver_type = receiver_types.empty() ? nullptr : receiver_types[0];
+            if (receiver_type && receiver_type->kind == Type::Kind::Named) {
                 if (expr->operand->name.find("::") == std::string::npos) {
-                    func_name = receiver_sym->type->type_name + "::" + expr->operand->name;
+                    func_name = receiver_type->type_name + "::" + expr->operand->name;
                     expr->operand->name = func_name;
                 } else {
                     func_name = expr->operand->name;
@@ -769,8 +755,8 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             if (sym->declaration->ref_param_types.size() < sym->declaration->ref_params.size()) {
                 sym->declaration->ref_param_types.resize(sym->declaration->ref_params.size(), nullptr);
             }
-            for (size_t i = 0; i < sym->declaration->ref_params.size() && i < receiver_symbols.size(); ++i) {
-                TypePtr recv_type = receiver_symbols[i]->type;
+            for (size_t i = 0; i < sym->declaration->ref_params.size() && i < receiver_types.size(); ++i) {
+                TypePtr recv_type = receiver_types[i];
                 TypePtr& param_type = sym->declaration->ref_param_types[i];
 
                 if (!param_type || param_type->kind == Type::Kind::TypeVar) {
@@ -1284,12 +1270,8 @@ TypePtr TypeChecker::check_length(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_iteration(ExprPtr expr) {
-    if (expr->operand->kind != Expr::Kind::Identifier &&
-        expr->operand->kind != Expr::Kind::Range) {
-        if (expr->operand->kind == Expr::Kind::Assignment) {
-            throw CompileError("Iteration expressions cannot be used inside larger expressions without parentheses", expr->operand->location);
-        }
-        throw CompileError("Iterable expression must be an identifier (or range literal) so it can be passed by reference to iterator methods", expr->operand->location);
+    if (expr->operand->kind == Expr::Kind::Assignment) {
+        throw CompileError("Iteration expressions cannot be used inside larger expressions without parentheses", expr->operand->location);
     }
 
     TypePtr iterable_type = check_expr(expr->operand);
@@ -1817,14 +1799,16 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
     };
 
     for (const auto& ann : stmt->annotations) {
-        bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") || ann_is(ann, "nonbanked");
+        bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
+                          ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
         if (!recognized) continue;
         switch (stmt->kind) {
             case Stmt::Kind::FuncDecl:
                 // All recognized annotations allowed on functions
                 break;
             case Stmt::Kind::VarDecl:
-                warn_if(ann, ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant"),
+                warn_if(ann, ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
+                                 ann_is(ann, "inline") || ann_is(ann, "noinline"),
                         "[[" + ann.name + "]] is only meaningful on functions");
                 break;
             default:
@@ -1837,7 +1821,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
         case Stmt::Kind::FuncDecl: {
             for (const auto& param : stmt->params) {
                 for (const auto& ann : param.annotations) {
-                    bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") || ann_is(ann, "nonbanked");
+                    bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
+                                      ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
                     if (recognized) {
                         warn_annotation(ann, "[[" + ann.name + "]] is not used on parameters");
                     }
@@ -1854,7 +1839,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
         case Stmt::Kind::TypeDecl:
             for (const auto& field : stmt->fields) {
                 for (const auto& ann : field.annotations) {
-                    bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") || ann_is(ann, "nonbanked");
+                    bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
+                                      ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
                     if (recognized) {
                         warn_annotation(ann, "[[" + ann.name + "]] is not used on struct fields");
                     }
@@ -1883,7 +1869,8 @@ void TypeChecker::validate_expr_annotations(ExprPtr expr) {
     if (!expr) return;
 
     auto warn_all = [&](const Annotation& ann) {
-        if (ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") || ann_is(ann, "nonbanked")) {
+        if (ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
+            ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline")) {
             warn_annotation(ann, "[[" + ann.name + "]] is not used on expressions");
         }
     };
@@ -2128,6 +2115,7 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     cloned->name = expr->name;
     cloned->is_expr_param_ref = expr->is_expr_param_ref;
     cloned->creates_new_variable = expr->creates_new_variable;
+    cloned->is_mutable_binding = expr->is_mutable_binding;
 
     // Clone operator
     cloned->op = expr->op;
@@ -2153,7 +2141,9 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     }
 
     // Clone receivers
-    cloned->receivers = expr->receivers;
+    for (const auto& rec : expr->receivers) {
+        cloned->receivers.push_back(clone_expr(rec));
+    }
 
     // Clone statements (for blocks) - deep cloning
     for (const auto& stmt : expr->statements) {

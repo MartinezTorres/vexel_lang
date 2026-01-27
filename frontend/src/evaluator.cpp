@@ -635,6 +635,9 @@ bool CompileTimeEvaluator::is_expr_pure(ExprPtr expr, std::string& reason) {
                     }
                 }
             }
+            for (const auto& rec : expr->receivers) {
+                if (!is_expr_pure(rec, reason)) return false;
+            }
             // Check arguments
             for (const auto& arg : expr->args) {
                 if (!is_expr_pure(arg, reason)) return false;

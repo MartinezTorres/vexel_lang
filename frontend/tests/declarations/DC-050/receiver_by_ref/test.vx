@@ -1,8 +1,8 @@
 // @rfc: docs/vexel-rfc.md#declarations
-// @desc: Method receivers are passed by reference (mutable) for the duration of the call | Method receiver passed by reference
+// @desc: Mutating method receivers are passed by reference for the duration of the call | Mutating receiver passed by reference
 
 
-// DC-050: Receiver passed by reference (mutable)
+// DC-050: Mutating receiver passed by reference
 #Counter(value:#i32);
 
 &(c)#Counter::increment() {

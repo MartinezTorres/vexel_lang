@@ -51,6 +51,8 @@ See `docs/testing.md` for the `run.sh` format and harness details.
 
 The web playground runs `vexel-c` in WebAssembly and emits C for visualization. The built `docs/index.html` is self-contained (compiler embedded).
 
+Live playground: https://martineztorres.github.io/vexel_lang/
+
 ```bash
 source /path/to/emsdk_env.sh
 make web

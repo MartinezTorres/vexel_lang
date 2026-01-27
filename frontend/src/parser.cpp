@@ -832,14 +832,14 @@ ExprPtr Parser::parse_unary() {
         // Check for multi-receiver method call syntax (r1, r2).method(...)
         if (check(TokenType::Identifier)) {
             size_t saved = pos;
-            std::vector<std::string> receivers;
-            receivers.push_back(consume(TokenType::Identifier, "").lexeme);
+            std::vector<ExprPtr> receivers;
+            receivers.push_back(Expr::make_identifier(consume(TokenType::Identifier, "").lexeme, loc));
 
             bool is_multi_receiver = false;
             if (match(TokenType::Comma)) {
                 is_multi_receiver = true;
                 do {
-                    receivers.push_back(consume(TokenType::Identifier, "Expected identifier").lexeme);
+                    receivers.push_back(Expr::make_identifier(consume(TokenType::Identifier, "Expected identifier").lexeme, loc));
                 } while (match(TokenType::Comma));
             }
 
@@ -943,10 +943,7 @@ ExprPtr Parser::parse_postfix_suffix(ExprPtr expr) {
                 // Create method call
                 auto method = Expr::make_identifier(member, expr->location);
                 auto call = Expr::make_call(method, args, expr->location);
-                // Extract receiver identifier name from expr
-                if (expr->kind == Expr::Kind::Identifier) {
-                    call->receivers.push_back(expr->name);
-                }
+                call->receivers.push_back(expr);
                 expr = call;
             } else {
                 expr = Expr::make_member(expr, member, expr->location);
