@@ -1,6 +1,7 @@
 #include "analysis.h"
 #include "evaluator.h"
 #include "function_key.h"
+#include "optimizer.h"
 #include "typechecker.h"
 #include <algorithm>
 #include <deque>
@@ -68,7 +69,22 @@ std::optional<std::tuple<std::string, int, bool>> base_identifier_info(ExprPtr e
     }
     return std::nullopt;
 }
+
 } // namespace
+
+bool Analyzer::is_foldable(const std::string& func_key) const {
+    if (!optimization) return false;
+    return optimization->foldable_functions.count(func_key) > 0;
+}
+
+std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
+    if (!expr || !optimization) return std::nullopt;
+    auto it = optimization->constexpr_conditions.find(expr.get());
+    if (it != optimization->constexpr_conditions.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
 
 AnalysisFacts Analyzer::run(const Module& mod) {
     AnalysisFacts facts;
@@ -143,6 +159,9 @@ void Analyzer::mark_reachable(const std::string& func_name, int scope_id,
                     continue;
                 }
                 if (stmt->body) {
+                    if (is_foldable(key)) {
+                        break;
+                    }
                     std::unordered_set<std::string> calls;
                     collect_calls(stmt->body, calls);
                     for (const auto& called_key : calls) {
@@ -215,11 +234,21 @@ void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<std::string>& call
             }
             break;
 
-        case Expr::Kind::Conditional:
-            collect_calls(expr->condition, calls);
-            collect_calls(expr->true_expr, calls);
-            if (expr->false_expr) collect_calls(expr->false_expr, calls);
+        case Expr::Kind::Conditional: {
+            auto cond = constexpr_condition(expr->condition);
+            if (cond.has_value()) {
+                if (cond.value()) {
+                    collect_calls(expr->true_expr, calls);
+                } else if (expr->false_expr) {
+                    collect_calls(expr->false_expr, calls);
+                }
+            } else {
+                collect_calls(expr->condition, calls);
+                collect_calls(expr->true_expr, calls);
+                if (expr->false_expr) collect_calls(expr->false_expr, calls);
+            }
             break;
+        }
 
         case Expr::Kind::Cast:
             collect_calls(expr->operand, calls);
@@ -339,6 +368,7 @@ void Analyzer::analyze_reentrancy(const Module& mod, AnalysisFacts& facts) {
         if (it == function_map.end()) continue;
         StmtPtr func = it->second;
         if (!func || !func->body) continue;
+        if (is_foldable(func_key)) continue;
 
         std::unordered_set<std::string> calls;
         collect_calls(func->body, calls);
@@ -487,9 +517,17 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                         visit_expr(expr->result_expr);
                         break;
                     case Expr::Kind::Conditional:
-                        visit_expr(expr->condition);
-                        visit_expr(expr->true_expr);
-                        visit_expr(expr->false_expr);
+                        if (auto cond = constexpr_condition(expr->condition)) {
+                            if (cond.value()) {
+                                visit_expr(expr->true_expr);
+                            } else {
+                                visit_expr(expr->false_expr);
+                            }
+                        } else {
+                            visit_expr(expr->condition);
+                            visit_expr(expr->true_expr);
+                            visit_expr(expr->false_expr);
+                        }
                         break;
                     case Expr::Kind::Range:
                     case Expr::Kind::Iteration:
@@ -515,8 +553,14 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                         visit_expr(stmt->var_init);
                         break;
                     case Stmt::Kind::ConditionalStmt:
-                        visit_expr(stmt->condition);
-                        visit_stmt(stmt->true_stmt);
+                        if (auto cond = constexpr_condition(stmt->condition)) {
+                            if (cond.value()) {
+                                visit_stmt(stmt->true_stmt);
+                            }
+                        } else {
+                            visit_expr(stmt->condition);
+                            visit_stmt(stmt->true_stmt);
+                        }
                         break;
                     default:
                         break;
@@ -635,9 +679,17 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                 scopes.pop_back();
                 break;
             case Expr::Kind::Conditional:
-                visit_expr(expr->condition);
-                visit_expr(expr->true_expr);
-                visit_expr(expr->false_expr);
+                if (auto cond = constexpr_condition(expr->condition)) {
+                    if (cond.value()) {
+                        visit_expr(expr->true_expr);
+                    } else {
+                        visit_expr(expr->false_expr);
+                    }
+                } else {
+                    visit_expr(expr->condition);
+                    visit_expr(expr->true_expr);
+                    visit_expr(expr->false_expr);
+                }
                 break;
             case Expr::Kind::Range:
             case Expr::Kind::Iteration:
@@ -666,8 +718,14 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                 visit_expr(stmt->return_expr);
                 break;
             case Stmt::Kind::ConditionalStmt:
-                visit_expr(stmt->condition);
-                visit_stmt(stmt->true_stmt);
+                if (auto cond = constexpr_condition(stmt->condition)) {
+                    if (cond.value()) {
+                        visit_stmt(stmt->true_stmt);
+                    }
+                } else {
+                    visit_expr(stmt->condition);
+                    visit_stmt(stmt->true_stmt);
+                }
                 break;
             default:
                 break;
@@ -799,9 +857,17 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
                 visit_expr(expr->result_expr);
                 break;
             case Expr::Kind::Conditional:
-                visit_expr(expr->condition);
-                visit_expr(expr->true_expr);
-                visit_expr(expr->false_expr);
+                if (auto cond = constexpr_condition(expr->condition)) {
+                    if (cond.value()) {
+                        visit_expr(expr->true_expr);
+                    } else if (expr->false_expr) {
+                        visit_expr(expr->false_expr);
+                    }
+                } else {
+                    visit_expr(expr->condition);
+                    visit_expr(expr->true_expr);
+                    visit_expr(expr->false_expr);
+                }
                 break;
             case Expr::Kind::Range:
             case Expr::Kind::Iteration:
@@ -831,8 +897,14 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
                 visit_expr(stmt->var_init);
                 break;
             case Stmt::Kind::ConditionalStmt:
-                visit_expr(stmt->condition);
-                visit_stmt(stmt->true_stmt);
+                if (auto cond = constexpr_condition(stmt->condition)) {
+                    if (cond.value()) {
+                        visit_stmt(stmt->true_stmt);
+                    }
+                } else {
+                    visit_expr(stmt->condition);
+                    visit_stmt(stmt->true_stmt);
+                }
                 break;
             default:
                 break;
@@ -844,6 +916,9 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
             std::string func_name = qualified_name(stmt);
             std::string key = reachability_key(func_name, stmt->scope_instance_id);
             if (!facts.reachable_functions.count(key)) {
+                continue;
+            }
+            if (is_foldable(key)) {
                 continue;
             }
             if (stmt->body) visit_expr(stmt->body);
@@ -911,6 +986,12 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
     for (const auto& entry : function_map) {
         const std::string& func_key = entry.first;
         const StmtPtr& func = entry.second;
+        if (is_foldable(func_key)) {
+            function_direct_writes_global[func_key] = false;
+            function_direct_impure[func_key] = false;
+            function_unknown_call[func_key] = false;
+            continue;
+        }
         if (!func->body) {
             function_direct_impure[func_key] = true;
             function_unknown_call[func_key] = true;
@@ -1028,9 +1109,17 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                     scopes.pop_back();
                     break;
                 case Expr::Kind::Conditional:
-                    visit_expr(expr->condition);
-                    visit_expr(expr->true_expr);
-                    visit_expr(expr->false_expr);
+                    if (auto cond = constexpr_condition(expr->condition)) {
+                        if (cond.value()) {
+                            visit_expr(expr->true_expr);
+                        } else {
+                            visit_expr(expr->false_expr);
+                        }
+                    } else {
+                        visit_expr(expr->condition);
+                        visit_expr(expr->true_expr);
+                        visit_expr(expr->false_expr);
+                    }
                     break;
                 case Expr::Kind::Range:
                 case Expr::Kind::Iteration:
@@ -1057,8 +1146,14 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                     visit_expr(stmt->return_expr);
                     break;
                 case Stmt::Kind::ConditionalStmt:
-                    visit_expr(stmt->condition);
-                    visit_stmt(stmt->true_stmt);
+                    if (auto cond = constexpr_condition(stmt->condition)) {
+                        if (cond.value()) {
+                            visit_stmt(stmt->true_stmt);
+                        }
+                    } else {
+                        visit_expr(stmt->condition);
+                        visit_stmt(stmt->true_stmt);
+                    }
                     break;
                 default:
                     break;
@@ -1218,9 +1313,17 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
                 visit_expr_types(expr->result_expr);
                 break;
             case Expr::Kind::Conditional:
-                visit_expr_types(expr->condition);
-                visit_expr_types(expr->true_expr);
-                visit_expr_types(expr->false_expr);
+                if (auto cond = constexpr_condition(expr->condition)) {
+                    if (cond.value()) {
+                        visit_expr_types(expr->true_expr);
+                    } else if (expr->false_expr) {
+                        visit_expr_types(expr->false_expr);
+                    }
+                } else {
+                    visit_expr_types(expr->condition);
+                    visit_expr_types(expr->true_expr);
+                    visit_expr_types(expr->false_expr);
+                }
                 break;
             case Expr::Kind::Assignment:
                 visit_expr_types(expr->left);
@@ -1251,8 +1354,14 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
                 visit_expr_types(stmt->return_expr);
                 break;
             case Stmt::Kind::ConditionalStmt:
-                visit_expr_types(stmt->condition);
-                visit_stmt_types(stmt->true_stmt);
+                if (auto cond = constexpr_condition(stmt->condition)) {
+                    if (cond.value()) {
+                        visit_stmt_types(stmt->true_stmt);
+                    }
+                } else {
+                    visit_expr_types(stmt->condition);
+                    visit_stmt_types(stmt->true_stmt);
+                }
                 break;
             default:
                 break;
@@ -1332,9 +1441,17 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
                 scopes.pop_back();
                 break;
             case Expr::Kind::Conditional:
-                visit_expr_globals(expr->condition, scopes);
-                visit_expr_globals(expr->true_expr, scopes);
-                visit_expr_globals(expr->false_expr, scopes);
+                if (auto cond = constexpr_condition(expr->condition)) {
+                    if (cond.value()) {
+                        visit_expr_globals(expr->true_expr, scopes);
+                    } else if (expr->false_expr) {
+                        visit_expr_globals(expr->false_expr, scopes);
+                    }
+                } else {
+                    visit_expr_globals(expr->condition, scopes);
+                    visit_expr_globals(expr->true_expr, scopes);
+                    visit_expr_globals(expr->false_expr, scopes);
+                }
                 break;
             case Expr::Kind::Range:
             case Expr::Kind::Iteration:
@@ -1361,8 +1478,14 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
                 visit_expr_globals(stmt->return_expr, scopes);
                 break;
             case Stmt::Kind::ConditionalStmt:
-                visit_expr_globals(stmt->condition, scopes);
-                visit_stmt_globals(stmt->true_stmt, scopes);
+                if (auto cond = constexpr_condition(stmt->condition)) {
+                    if (cond.value()) {
+                        visit_stmt_globals(stmt->true_stmt, scopes);
+                    }
+                } else {
+                    visit_expr_globals(stmt->condition, scopes);
+                    visit_stmt_globals(stmt->true_stmt, scopes);
+                }
                 break;
             default:
                 break;
@@ -1393,6 +1516,9 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
             }
 
             if (stmt->body) {
+                if (is_foldable(key)) {
+                    continue;
+                }
                 visit_expr_types(stmt->body);
                 std::vector<ScopeFrame> scopes;
                 scopes.emplace_back();

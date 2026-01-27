@@ -54,10 +54,10 @@ Compiler::OutputPaths Compiler::compile() {
         TypeChecker checker(options.project_root, options.allow_process);
         checker.check_module(mod);
 
-        Analyzer analyzer(&checker);
-        AnalysisFacts analysis = analyzer.run(mod);
         Optimizer optimizer(&checker);
         OptimizationFacts optimization = optimizer.run(mod);
+        Analyzer analyzer(&checker, &optimization);
+        AnalysisFacts analysis = analyzer.run(mod);
 
         OutputPaths paths = resolve_output_paths(options.output_file);
         if (options.emit_lowered) {

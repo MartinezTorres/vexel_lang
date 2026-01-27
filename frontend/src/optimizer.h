@@ -10,6 +10,8 @@ class TypeChecker;
 struct OptimizationFacts {
     std::unordered_map<const Expr*, CTValue> constexpr_values;
     std::unordered_set<const Stmt*> constexpr_inits;
+    std::unordered_set<std::string> foldable_functions;
+    std::unordered_map<const Expr*, bool> constexpr_conditions;
 };
 
 class Optimizer {

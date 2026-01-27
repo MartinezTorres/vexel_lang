@@ -1,4 +1,5 @@
 #include "optimizer.h"
+#include "function_key.h"
 
 namespace vexel {
 
@@ -11,12 +12,58 @@ OptimizationFacts Optimizer::run(const Module& mod) {
     CompileTimeEvaluator eval(type_checker);
     evaluator = &eval;
 
+    // Precompute foldable functions (no params/receivers, scalar result)
+    for (const auto& stmt : mod.top_level) {
+        if (!stmt || stmt->kind != Stmt::Kind::FuncDecl) continue;
+        if (stmt->is_external || !stmt->body) continue;
+        if (!stmt->params.empty() || !stmt->ref_params.empty()) continue;
+
+        CompileTimeEvaluator func_eval(type_checker);
+        CTValue result;
+        if (!func_eval.try_evaluate(stmt->body, result)) {
+            continue;
+        }
+        bool scalar = std::holds_alternative<int64_t>(result) ||
+                      std::holds_alternative<uint64_t>(result) ||
+                      std::holds_alternative<bool>(result) ||
+                      std::holds_alternative<double>(result);
+        if (!scalar) continue;
+
+        std::string func_name = stmt->func_name;
+        if (!stmt->type_namespace.empty()) {
+            func_name = stmt->type_namespace + "::" + stmt->func_name;
+        }
+        facts.foldable_functions.insert(reachability_key(func_name, stmt->scope_instance_id));
+    }
+
     for (const auto& stmt : mod.top_level) {
         visit_stmt(stmt, facts);
     }
 
     evaluator = nullptr;
     return facts;
+}
+
+static std::optional<bool> evaluate_condition(ExprPtr expr, TypeChecker* type_checker) {
+    if (!expr || !type_checker) return std::nullopt;
+    CompileTimeEvaluator evaluator(type_checker);
+    CTValue result;
+    if (!evaluator.try_evaluate(expr, result)) {
+        return std::nullopt;
+    }
+    if (std::holds_alternative<int64_t>(result)) {
+        return std::get<int64_t>(result) != 0;
+    }
+    if (std::holds_alternative<uint64_t>(result)) {
+        return std::get<uint64_t>(result) != 0;
+    }
+    if (std::holds_alternative<bool>(result)) {
+        return std::get<bool>(result);
+    }
+    if (std::holds_alternative<double>(result)) {
+        return std::get<double>(result) != 0.0;
+    }
+    return std::nullopt;
 }
 
 void Optimizer::mark_constexpr_init(StmtPtr stmt, OptimizationFacts& facts) {
@@ -53,6 +100,9 @@ void Optimizer::visit_stmt(StmtPtr stmt, OptimizationFacts& facts) {
             visit_expr(stmt->return_expr, facts);
             break;
         case Stmt::Kind::ConditionalStmt:
+            if (auto cond = evaluate_condition(stmt->condition, type_checker)) {
+                facts.constexpr_conditions[stmt->condition.get()] = cond.value();
+            }
             visit_expr(stmt->condition, facts);
             visit_stmt(stmt->true_stmt, facts);
             break;
@@ -72,6 +122,14 @@ void Optimizer::visit_expr(ExprPtr expr, OptimizationFacts& facts) {
     }
 
     switch (expr->kind) {
+        case Expr::Kind::Conditional:
+            if (auto cond = evaluate_condition(expr->condition, type_checker)) {
+                facts.constexpr_conditions[expr->condition.get()] = cond.value();
+            }
+            visit_expr(expr->condition, facts);
+            visit_expr(expr->true_expr, facts);
+            visit_expr(expr->false_expr, facts);
+            break;
         case Expr::Kind::Call:
             visit_expr(expr->operand, facts);
             for (const auto& rec : expr->receivers) visit_expr(rec, facts);
@@ -100,11 +158,6 @@ void Optimizer::visit_expr(ExprPtr expr, OptimizationFacts& facts) {
         case Expr::Kind::Block:
             for (const auto& st : expr->statements) visit_stmt(st, facts);
             visit_expr(expr->result_expr, facts);
-            break;
-        case Expr::Kind::Conditional:
-            visit_expr(expr->condition, facts);
-            visit_expr(expr->true_expr, facts);
-            visit_expr(expr->false_expr, facts);
             break;
         case Expr::Kind::Iteration:
         case Expr::Kind::Repeat:

@@ -11,6 +11,9 @@
     helper(2)
 }
 
+mut g:#i32 = 0;
+
 &helper(x:#i32) -> #i32 {
-    x + 1
+    g = g + x;
+    g
 }

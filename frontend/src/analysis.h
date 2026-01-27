@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.h"
+#include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -7,6 +8,7 @@
 namespace vexel {
 
 class TypeChecker;
+struct OptimizationFacts;
 
 enum class VarMutability { Mutable, NonMutableRuntime, Constexpr };
 
@@ -24,12 +26,16 @@ struct AnalysisFacts {
 
 class Analyzer {
 public:
-    explicit Analyzer(TypeChecker* tc) : type_checker(tc) {}
+    explicit Analyzer(TypeChecker* tc, const OptimizationFacts* opt = nullptr)
+        : type_checker(tc), optimization(opt) {}
     AnalysisFacts run(const Module& mod);
 
 private:
     TypeChecker* type_checker;
+    const OptimizationFacts* optimization;
 
+    bool is_foldable(const std::string& func_key) const;
+    std::optional<bool> constexpr_condition(ExprPtr expr) const;
     void analyze_reachability(const Module& mod, AnalysisFacts& facts);
     void analyze_reentrancy(const Module& mod, AnalysisFacts& facts);
     void analyze_mutability(const Module& mod, AnalysisFacts& facts);

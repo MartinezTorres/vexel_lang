@@ -146,7 +146,9 @@ std::string format_analysis_report(const Module& mod, const AnalysisFacts& analy
     if (optimization) {
         out << "## Optimization Summary\n";
         out << "- Constexpr expressions: " << optimization->constexpr_values.size() << "\n";
-        out << "- Constexpr inits: " << optimization->constexpr_inits.size() << "\n\n";
+        out << "- Constexpr inits: " << optimization->constexpr_inits.size() << "\n";
+        out << "- Foldable functions: " << optimization->foldable_functions.size() << "\n";
+        out << "- Constexpr conditions: " << optimization->constexpr_conditions.size() << "\n\n";
     }
 
     std::vector<std::string> reachable(analysis.reachable_functions.begin(),

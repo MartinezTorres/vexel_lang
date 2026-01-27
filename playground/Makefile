@@ -5,12 +5,15 @@ EMXX ?= em++
 
 SOURCES := \
   $(VEXEL_ROOT_DIR)/frontend/src/ast.cpp \
+  $(VEXEL_ROOT_DIR)/frontend/src/analysis.cpp \
+  $(VEXEL_ROOT_DIR)/frontend/src/analysis_report.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/backend_registry.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/codegen.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/compiler.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/evaluator.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/lexer.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/lowered_printer.cpp \
+  $(VEXEL_ROOT_DIR)/frontend/src/optimizer.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/parser.cpp \
   $(VEXEL_ROOT_DIR)/frontend/src/typechecker.cpp \
   $(VEXEL_ROOT_DIR)/backends/c/src/c_backend.cpp \
