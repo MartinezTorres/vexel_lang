@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
+#include <vector>
 
 namespace vexel {
 
@@ -37,6 +38,7 @@ private:
     // Tracks call stack during purity analysis; raw pointers are fine while AST nodes stay alive for one evaluator run.
     std::unordered_set<const Stmt*> purity_stack;
     std::unordered_set<std::string> uninitialized_locals;
+    std::vector<std::unordered_set<std::string>> ref_param_stack;
     std::string error_msg;
     int recursion_depth = 0;
     static const int MAX_RECURSION_DEPTH = 1000;
@@ -59,6 +61,11 @@ private:
 
     int64_t to_int(const CTValue& v);
     double to_float(const CTValue& v);
+
+    void push_ref_params(StmtPtr func);
+    void pop_ref_params();
+    bool is_ref_param(const std::string& name) const;
+    std::string base_identifier(ExprPtr expr) const;
 };
 
 } // namespace vexel

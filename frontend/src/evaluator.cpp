@@ -302,12 +302,6 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    // Check for reference parameters (mutation)
-    if (!func->ref_params.empty()) {
-        error_msg = "Functions with reference parameters cannot be evaluated at compile time";
-        return false;
-    }
-
     // Check for mutable global access
     std::string impurity_reason;
     if (!is_pure_for_compile_time(func, impurity_reason)) {
@@ -317,6 +311,20 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
 
     // Evaluate arguments
     std::unordered_map<std::string, CTValue> saved_constants = constants;
+    if (!func->ref_params.empty()) {
+        if (expr->receivers.size() != func->ref_params.size()) {
+            error_msg = "Receiver count mismatch in compile-time evaluation";
+            return false;
+        }
+        for (size_t i = 0; i < func->ref_params.size(); i++) {
+            CTValue rec_val;
+            if (!try_evaluate(expr->receivers[i], rec_val)) {
+                constants = saved_constants;
+                return false;
+            }
+            constants[func->ref_params[i]] = rec_val;
+        }
+    }
     for (size_t i = 0; i < expr->args.size(); i++) {
         CTValue arg_val;
         if (!try_evaluate(expr->args[i], arg_val)) {
@@ -333,7 +341,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         return false;
     }
 
+    push_ref_params(func);
     bool success = try_evaluate(func->body, result);
+    pop_ref_params();
     constants = saved_constants;
     return success;
 }
@@ -570,6 +580,10 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
 
     // If the left side is an identifier, check if it's a local or global
     if (expr->left->kind == Expr::Kind::Identifier) {
+        if (is_ref_param(expr->left->name)) {
+            error_msg = "Cannot mutate receiver at compile time: " + expr->left->name;
+            return false;
+        }
         // Check if this is a global mutable variable (not allowed at compile-time)
         Symbol* sym = type_checker->get_scope()->lookup(expr->left->name);
         if (sym && sym->kind == Symbol::Kind::Variable && sym->is_mutable) {
@@ -600,7 +614,9 @@ bool CompileTimeEvaluator::is_pure_for_compile_time(StmtPtr func, std::string& r
     }
 
     purity_stack.insert(func.get());
+    push_ref_params(func);
     bool pure = is_expr_pure(func->body, reason);
+    pop_ref_params();
     purity_stack.erase(func.get());
     return pure;
 }
@@ -610,6 +626,13 @@ bool CompileTimeEvaluator::is_expr_pure(ExprPtr expr, std::string& reason) {
 
     switch (expr->kind) {
         case Expr::Kind::Assignment:
+            if (expr->left) {
+                std::string base = base_identifier(expr->left);
+                if (!base.empty() && is_ref_param(base)) {
+                    reason = "mutates receiver '" + base + "'";
+                    return false;
+                }
+            }
             // Check if assigning to a global mutable variable
             if (expr->left && expr->left->kind == Expr::Kind::Identifier) {
                 Symbol* sym = type_checker->get_scope()->lookup(expr->left->name);
@@ -716,6 +739,41 @@ bool CompileTimeEvaluator::is_stmt_pure(StmtPtr stmt, std::string& reason) {
         default:
             return true;
     }
+}
+
+void CompileTimeEvaluator::push_ref_params(StmtPtr func) {
+    std::unordered_set<std::string> refs;
+    if (func) {
+        for (const auto& name : func->ref_params) {
+            refs.insert(name);
+        }
+    }
+    ref_param_stack.push_back(std::move(refs));
+}
+
+void CompileTimeEvaluator::pop_ref_params() {
+    if (!ref_param_stack.empty()) {
+        ref_param_stack.pop_back();
+    }
+}
+
+bool CompileTimeEvaluator::is_ref_param(const std::string& name) const {
+    if (ref_param_stack.empty()) return false;
+    return ref_param_stack.back().count(name) > 0;
+}
+
+std::string CompileTimeEvaluator::base_identifier(ExprPtr expr) const {
+    while (expr) {
+        if (expr->kind == Expr::Kind::Identifier) {
+            return expr->name;
+        }
+        if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
+            expr = expr->operand;
+            continue;
+        }
+        break;
+    }
+    return "";
 }
 
 } // namespace vexel

@@ -57,6 +57,8 @@ class CodeGenerator {
     std::unordered_map<std::string, std::unordered_set<std::string>> ref_variants;
     std::unordered_map<std::string, bool> function_writes_global;
     std::unordered_map<std::string, bool> function_is_pure;
+    std::unordered_set<const Stmt*> used_global_vars;
+    std::unordered_set<std::string> used_type_names;
 
 public:
     CodeGenerator();
@@ -82,6 +84,7 @@ private:
     void analyze_mutability(const Module& mod);
     void analyze_ref_variants(const Module& mod);
     void analyze_effects(const Module& mod);
+    void analyze_usage(const Module& mod);
     void mark_reachable(const std::string& func_name, int scope_id, const Module& mod);
     void collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls);
 
