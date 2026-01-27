@@ -23,10 +23,12 @@ public:
         bool verbose;                 // Enable verbose output
         std::string project_root;     // Root directory for module resolution
         bool emit_lowered;            // Emit lowered Vexel subset alongside backend output
+        bool emit_analysis;           // Emit analysis report alongside backend output
         bool allow_process = false;   // Process expressions execute host commands; keep disabled by default
         std::string backend; // Backend name (registered via backend registry)
 
-        Options() : verbose(false), project_root("."), emit_lowered(false), allow_process(false), backend("c") {}
+        Options() : verbose(false), project_root("."), emit_lowered(false), emit_analysis(false),
+                    allow_process(false), backend("c") {}
     };
 
     struct OutputPaths {

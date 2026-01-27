@@ -1,7 +1,8 @@
 #pragma once
 #include "compiler.h"
+#include "analysis.h"
+#include "optimizer.h"
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 namespace vexel {
@@ -17,7 +18,8 @@ struct BackendContext {
     TypeChecker& checker;
     const Compiler::Options& options;
     const Compiler::OutputPaths& outputs;
-    const std::unordered_set<std::string>& non_reentrant_funcs;
+    const AnalysisFacts& analysis;
+    const OptimizationFacts& optimization;
 };
 
 using BackendEmitFn = void (*)(const BackendContext& ctx);

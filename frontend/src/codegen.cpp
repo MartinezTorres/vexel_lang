@@ -1,5 +1,8 @@
 #include "codegen.h"
+#include "analysis.h"
 #include "evaluator.h"
+#include "function_key.h"
+#include "optimizer.h"
 #include "typechecker.h"
 #include "constants.h"
 #include <algorithm>
@@ -59,7 +62,6 @@ std::string sanitize_identifier(const std::string& input) {
     return result;
 }
 
-constexpr char kScopeSep = '\x1F';
 }
 
 namespace vexel {
@@ -87,7 +89,9 @@ CodeGenerator::CodeGenerator() : temp_counter(0), type_checker(nullptr), in_func
     output_stack.push(&body);
 }
 
-CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
+CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
+                                       const AnalysisFacts* analysis,
+                                       const OptimizationFacts* optimization_facts) {
     type_checker = tc;
 
     header.str("");
@@ -96,13 +100,9 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
     body.clear();
     generated_functions.clear();
     generated_vars.clear();
-    reachable_functions.clear();
     current_ref_params.clear();
-    function_writes_global.clear();
-    function_is_pure.clear();
-    used_global_vars.clear();
-    used_type_names.clear();
-    reentrancy_variants.clear();
+    facts = AnalysisFacts{};
+    optimization = optimization_facts;
     current_reentrancy_key = 'N';
     tuple_types.clear();
     expr_param_substitutions.clear();
@@ -165,13 +165,12 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
     emit_header("#endif");
     emit_header("");
 
-    // Analyze reachability before generating code
-    analyze_reachability(mod);
-    analyze_reentrancy(mod);
-    analyze_mutability(mod);
-    analyze_ref_variants(mod);
-    analyze_effects(mod);
-    analyze_usage(mod);
+    if (analysis) {
+        facts = *analysis;
+    } else {
+        Analyzer analyzer(type_checker);
+        facts = analyzer.run(mod);
+    }
 
     gen_module(mod);
 
@@ -188,1372 +187,6 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
         result.source = combined.str();
     }
     return result;
-}
-
-void CodeGenerator::analyze_reachability(const Module& mod) {
-    // Start from all exported functions
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && stmt->is_exported) {
-            std::string func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                func_name = stmt->type_namespace + "::" + stmt->func_name;
-            }
-            mark_reachable(func_name, stmt->scope_instance_id, mod);
-        }
-    }
-
-    // Also mark any global variable initializers that reference functions
-    // BUT only if they weren't compile-time evaluated
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
-            // Try to evaluate at compile time
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-
-            // Only mark functions as reachable if NOT compile-time evaluated
-            if (!evaluated_at_compile_time) {
-                std::unordered_set<std::string> calls;
-                collect_calls(stmt->var_init, calls);
-                for (const auto& func_key : calls) {
-                    std::string func_name;
-                    int scope_id = -1;
-                    split_reachability_key(func_key, func_name, scope_id);
-                    mark_reachable(func_name, scope_id, mod);
-                }
-            }
-        }
-    }
-}
-
-void CodeGenerator::analyze_reentrancy(const Module& mod) {
-    reentrancy_variants.clear();
-
-    auto has_ann = [](const std::vector<Annotation>& anns, const std::string& name) {
-        return std::any_of(anns.begin(), anns.end(), [&](const Annotation& a) { return a.name == name; });
-    };
-
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
-
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_set<std::string> external_reentrant;
-    std::unordered_set<std::string> external_nonreentrant;
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string key = reachability_key(func_name, stmt->scope_instance_id);
-        if (stmt->is_external) {
-            bool is_reentrant = has_ann(stmt->annotations, "reentrant");
-            bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
-            if (is_reentrant && is_nonreentrant) {
-                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
-                                   stmt->func_name + "'", stmt->location);
-            }
-            if (is_reentrant) {
-                external_reentrant.insert(key);
-            } else {
-                external_nonreentrant.insert(key);
-            }
-            continue;
-        }
-        if (!reachable_functions.count(key)) continue;
-        function_map[key] = stmt;
-    }
-
-    std::deque<std::pair<std::string, char>> work;
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        if (!stmt->is_exported) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string key = reachability_key(func_name, stmt->scope_instance_id);
-        if (!reachable_functions.count(key)) continue;
-
-        bool is_reentrant = has_ann(stmt->annotations, "reentrant");
-        bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
-        if (is_reentrant && is_nonreentrant) {
-            throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on entry function '" +
-                               stmt->func_name + "'", stmt->location);
-        }
-
-        char ctx = (is_reentrant ? 'R' : 'N');
-        if (reentrancy_variants[key].insert(ctx).second) {
-            work.emplace_back(key, ctx);
-        }
-    }
-
-    // Seed runtime global initializers as non-reentrant paths.
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-            if (evaluated_at_compile_time) continue;
-            std::unordered_set<std::string> calls;
-            collect_calls(stmt->var_init, calls);
-            for (const auto& callee_key : calls) {
-                if (function_map.count(callee_key) == 0) continue;
-                if (reentrancy_variants[callee_key].insert('N').second) {
-                    work.emplace_back(callee_key, 'N');
-                }
-            }
-        }
-    }
-
-    while (!work.empty()) {
-        auto [func_key, ctx] = work.front();
-        work.pop_front();
-        auto it = function_map.find(func_key);
-        if (it == function_map.end()) continue;
-        StmtPtr func = it->second;
-        if (!func || !func->body) continue;
-
-        std::unordered_set<std::string> calls;
-        collect_calls(func->body, calls);
-        for (const auto& callee_key : calls) {
-            auto callee_it = function_map.find(callee_key);
-            if (callee_it == function_map.end()) {
-                if (ctx == 'R' && external_nonreentrant.count(callee_key)) {
-                    std::string callee_name;
-                    int callee_scope = -1;
-                    split_reachability_key(callee_key, callee_name, callee_scope);
-                    if (callee_scope >= 0) {
-                        callee_name += " (scope " + std::to_string(callee_scope) + ")";
-                    }
-                    throw CompileError("Reentrant path calls non-reentrant external function '" + callee_name + "'",
-                                       func->location);
-                }
-                continue;
-            }
-            if (reentrancy_variants[callee_key].insert(ctx).second) {
-                work.emplace_back(callee_key, ctx);
-            }
-        }
-    }
-
-    for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        if (reentrancy_variants[func_key].empty()) {
-            reentrancy_variants[func_key].insert('N');
-        }
-    }
-}
-
-void CodeGenerator::analyze_mutability(const Module& mod) {
-    var_mutability.clear();
-    receiver_mutates.clear();
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_map<const Stmt*, StmtPtr> var_decl_map;
-    std::unordered_map<const Stmt*, bool> var_written;
-
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
-
-    // Collect function declarations and top-level variables
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            function_map[qualified_name(stmt)] = stmt;
-            if (!stmt->ref_params.empty()) {
-                std::vector<bool> mut(stmt->ref_params.size(), false);
-                if (stmt->is_external || !stmt->body) {
-                    std::fill(mut.begin(), mut.end(), true);
-                }
-                receiver_mutates[qualified_name(stmt)] = mut;
-            }
-        } else if (stmt->kind == Stmt::Kind::VarDecl) {
-            var_decl_map[stmt.get()] = stmt;
-            var_written[stmt.get()] = false;
-        }
-    }
-
-    auto base_identifier = [](ExprPtr expr) -> std::string {
-        while (expr) {
-            if (expr->kind == Expr::Kind::Identifier) {
-                return expr->name;
-            }
-            if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
-                expr = expr->operand;
-                continue;
-            }
-            break;
-        }
-        return "";
-    };
-
-    // Determine which receivers are mutated by each function (fixpoint).
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& entry : function_map) {
-            const std::string& func_name = entry.first;
-            const StmtPtr& func = entry.second;
-            if (func->is_external || !func->body || func->ref_params.empty()) continue;
-
-            std::vector<bool> updated = receiver_mutates[func_name];
-            std::unordered_map<std::string, size_t> receiver_index;
-            receiver_index.reserve(func->ref_params.size());
-            for (size_t i = 0; i < func->ref_params.size(); i++) {
-                receiver_index[func->ref_params[i]] = i;
-            }
-
-            std::function<void(ExprPtr)> visit_expr;
-            std::function<void(StmtPtr)> visit_stmt;
-
-            visit_expr = [&](ExprPtr expr) {
-                if (!expr) return;
-                switch (expr->kind) {
-                    case Expr::Kind::Assignment: {
-                        std::string base = base_identifier(expr->left);
-                        auto it = receiver_index.find(base);
-                        if (it != receiver_index.end()) {
-                            updated[it->second] = true;
-                        }
-                        visit_expr(expr->right);
-                        break;
-                    }
-                    case Expr::Kind::Call: {
-                        // Propagate receiver mutations from callees.
-                        if (!expr->receivers.empty()) {
-                            std::string callee;
-                            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                                callee = expr->operand->name;
-                            }
-                            auto callee_it = receiver_mutates.find(callee);
-                            for (size_t i = 0; i < expr->receivers.size(); i++) {
-                                ExprPtr rec_expr = expr->receivers[i];
-                                std::string rec_name = base_identifier(rec_expr);
-                                if (rec_name.empty()) continue;
-                                auto rec_it = receiver_index.find(rec_name);
-                                if (rec_it == receiver_index.end()) continue;
-                                bool mut = true; // default to conservative if unknown
-                                if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
-                                    mut = callee_it->second[i];
-                                }
-                                if (mut) {
-                                    updated[rec_it->second] = true;
-                                }
-                            }
-                        }
-                        for (const auto& rec : expr->receivers) {
-                            visit_expr(rec);
-                        }
-                        for (const auto& arg : expr->args) {
-                            visit_expr(arg);
-                        }
-                        visit_expr(expr->operand);
-                        break;
-                    }
-                    case Expr::Kind::Binary:
-                        visit_expr(expr->left);
-                        visit_expr(expr->right);
-                        break;
-                    case Expr::Kind::Unary:
-                    case Expr::Kind::Cast:
-                    case Expr::Kind::Length:
-                        visit_expr(expr->operand);
-                        break;
-                    case Expr::Kind::Index:
-                        visit_expr(expr->operand);
-                        if (!expr->args.empty()) visit_expr(expr->args[0]);
-                        break;
-                    case Expr::Kind::Member:
-                        visit_expr(expr->operand);
-                        break;
-                    case Expr::Kind::ArrayLiteral:
-                    case Expr::Kind::TupleLiteral:
-                        for (const auto& elem : expr->elements) visit_expr(elem);
-                        break;
-                    case Expr::Kind::Block:
-                        for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                        visit_expr(expr->result_expr);
-                        break;
-                    case Expr::Kind::Conditional:
-                        visit_expr(expr->condition);
-                        visit_expr(expr->true_expr);
-                        visit_expr(expr->false_expr);
-                        break;
-                    case Expr::Kind::Range:
-                    case Expr::Kind::Iteration:
-                    case Expr::Kind::Repeat:
-                        visit_expr(expr->left);
-                        visit_expr(expr->right);
-                        break;
-                    default:
-                        break;
-                }
-            };
-
-            visit_stmt = [&](StmtPtr stmt) {
-                if (!stmt) return;
-                switch (stmt->kind) {
-                    case Stmt::Kind::Expr:
-                        visit_expr(stmt->expr);
-                        break;
-                    case Stmt::Kind::Return:
-                        visit_expr(stmt->return_expr);
-                        break;
-                    case Stmt::Kind::VarDecl:
-                        visit_expr(stmt->var_init);
-                        break;
-                    case Stmt::Kind::ConditionalStmt:
-                        visit_expr(stmt->condition);
-                        visit_stmt(stmt->true_stmt);
-                        break;
-                    default:
-                        break;
-                }
-            };
-
-            visit_expr(func->body);
-
-            if (updated != receiver_mutates[func_name]) {
-                receiver_mutates[func_name] = updated;
-                changed = true;
-            }
-        }
-    }
-
-    struct ScopeFrame {
-        std::unordered_map<std::string, const Stmt*> vars;
-    };
-    std::vector<ScopeFrame> scopes;
-    scopes.emplace_back();
-
-    auto resolve_var = [&](const std::string& name) -> const Stmt* {
-        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-            auto found = it->vars.find(name);
-            if (found != it->vars.end()) {
-                return found->second;
-            }
-        }
-        return nullptr;
-    };
-
-    auto mark_written = [&](const std::string& name) {
-        const Stmt* decl = resolve_var(name);
-        if (decl) {
-            var_written[decl] = true;
-        }
-    };
-
-    std::function<void(ExprPtr)> visit_expr;
-    std::function<void(StmtPtr)> visit_stmt;
-
-    visit_expr = [&](ExprPtr expr) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Assignment: {
-                std::string base = base_identifier(expr->left);
-                if (!base.empty()) {
-                    mark_written(base);
-                }
-                visit_expr(expr->right);
-                break;
-            }
-            case Expr::Kind::Call: {
-                if (!expr->receivers.empty()) {
-                    std::string callee;
-                    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                        callee = expr->operand->name;
-                    }
-                    auto callee_it = receiver_mutates.find(callee);
-                    for (size_t i = 0; i < expr->receivers.size(); i++) {
-                        bool mut = true;
-                        if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
-                            mut = callee_it->second[i];
-                        }
-                        if (!mut) continue;
-                        ExprPtr rec_expr = expr->receivers[i];
-                        if (!rec_expr) continue;
-                        if (!is_addressable_lvalue(rec_expr) || !is_mutable_lvalue(rec_expr)) {
-                            continue;
-                        }
-                        std::string base = base_identifier(rec_expr);
-                        if (!base.empty()) {
-                            mark_written(base);
-                        }
-                    }
-                }
-                for (const auto& rec : expr->receivers) {
-                    visit_expr(rec);
-                }
-                for (const auto& arg : expr->args) visit_expr(arg);
-                visit_expr(expr->operand);
-                break;
-            }
-            case Expr::Kind::Binary:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Index:
-                visit_expr(expr->operand);
-                if (!expr->args.empty()) visit_expr(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr(elem);
-                break;
-            case Expr::Kind::Block:
-                scopes.emplace_back();
-                for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                visit_expr(expr->result_expr);
-                scopes.pop_back();
-                break;
-            case Expr::Kind::Conditional:
-                visit_expr(expr->condition);
-                visit_expr(expr->true_expr);
-                visit_expr(expr->false_expr);
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::VarDecl:
-                scopes.back().vars[stmt->var_name] = stmt.get();
-                var_decl_map[stmt.get()] = stmt;
-                var_written.emplace(stmt.get(), false);
-                visit_expr(stmt->var_init);
-                break;
-            case Stmt::Kind::Expr:
-                visit_expr(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr(stmt->return_expr);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                visit_expr(stmt->condition);
-                visit_stmt(stmt->true_stmt);
-                break;
-            default:
-                break;
-        }
-    };
-
-    // Analyze functions and top-level expressions for variable writes.
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && stmt->body) {
-            scopes.emplace_back();
-            // Shadow parameters and receiver params to avoid mutating globals with the same name.
-            for (const auto& param : stmt->params) {
-                scopes.back().vars[param.name] = nullptr;
-            }
-            for (const auto& ref : stmt->ref_params) {
-                scopes.back().vars[ref] = nullptr;
-            }
-            visit_expr(stmt->body);
-            scopes.pop_back();
-        } else if (stmt->kind == Stmt::Kind::Expr) {
-            visit_expr(stmt->expr);
-        }
-    }
-
-    // Classify variables.
-    for (const auto& entry : var_decl_map) {
-        const Stmt* key = entry.first;
-        StmtPtr decl = entry.second;
-        bool written = var_written[key];
-        bool effective_mutable = decl->is_mutable && written;
-        if (effective_mutable) {
-            var_mutability[key] = VarMutability::Mutable;
-        } else if (is_compile_time_init(decl)) {
-            var_mutability[key] = VarMutability::Constexpr;
-        } else {
-            var_mutability[key] = VarMutability::NonMutableRuntime;
-        }
-    }
-}
-
-void CodeGenerator::analyze_ref_variants(const Module& mod) {
-    ref_variants.clear();
-    std::unordered_map<std::string, StmtPtr> function_map;
-
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            function_map[qualified_name(stmt)] = stmt;
-        }
-    }
-
-    auto record_call = [&](ExprPtr expr) {
-        if (!expr || expr->kind != Expr::Kind::Call) return;
-        if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) return;
-        const std::string& func_name = expr->operand->name;
-        auto fit = function_map.find(func_name);
-        if (fit == function_map.end()) return;
-        size_t ref_count = fit->second->ref_params.size();
-        if (ref_count == 0) return;
-        std::string key = ref_variant_key(expr, ref_count);
-        ref_variants[func_name].insert(key);
-    };
-
-    std::function<void(ExprPtr)> visit_expr;
-    std::function<void(StmtPtr)> visit_stmt;
-
-    visit_expr = [&](ExprPtr expr) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Call:
-                record_call(expr);
-                for (const auto& rec : expr->receivers) visit_expr(rec);
-                for (const auto& arg : expr->args) visit_expr(arg);
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Binary:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Index:
-                visit_expr(expr->operand);
-                if (!expr->args.empty()) visit_expr(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr(elem);
-                break;
-            case Expr::Kind::Block:
-                for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                visit_expr(expr->result_expr);
-                break;
-            case Expr::Kind::Conditional:
-                visit_expr(expr->condition);
-                visit_expr(expr->true_expr);
-                visit_expr(expr->false_expr);
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Assignment:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::Expr:
-                visit_expr(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr(stmt->return_expr);
-                break;
-            case Stmt::Kind::VarDecl:
-                visit_expr(stmt->var_init);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                visit_expr(stmt->condition);
-                visit_stmt(stmt->true_stmt);
-                break;
-            default:
-                break;
-        }
-    };
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            std::string func_name = qualified_name(stmt);
-            std::string key = reachability_key(func_name, stmt->scope_instance_id);
-            if (!reachable_functions.count(key)) {
-                continue;
-            }
-            if (stmt->body) visit_expr(stmt->body);
-        } else if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-            if (!evaluated_at_compile_time) {
-                visit_expr(stmt->var_init);
-            }
-        }
-    }
-}
-
-void CodeGenerator::analyze_effects(const Module& mod) {
-    function_writes_global.clear();
-    function_is_pure.clear();
-
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_map<std::string, std::unordered_set<std::string>> function_calls;
-    std::unordered_map<std::string, bool> function_direct_writes_global;
-    std::unordered_map<std::string, bool> function_direct_impure;
-    std::unordered_map<std::string, bool> function_unknown_call;
-    std::unordered_map<std::string, bool> function_mutates_receiver;
-    std::unordered_set<std::string> external_functions;
-
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string func_key = reachability_key(func_name, stmt->scope_instance_id);
-        if (stmt->is_external) {
-            external_functions.insert(func_key);
-            continue;
-        }
-        if (!reachable_functions.count(func_key)) {
-            continue;
-        }
-        function_map[func_key] = stmt;
-        function_calls[func_key] = {};
-        function_direct_writes_global[func_key] = false;
-        function_direct_impure[func_key] = false;
-        function_unknown_call[func_key] = false;
-
-        bool mutates = false;
-        auto mut_it = receiver_mutates.find(func_name);
-        if (mut_it != receiver_mutates.end()) {
-            mutates = std::any_of(mut_it->second.begin(), mut_it->second.end(),
-                                  [](bool v) { return v; });
-        }
-        function_mutates_receiver[func_key] = mutates;
-    }
-
-    struct ScopeFrame {
-        std::unordered_set<std::string> vars;
-    };
-
-    auto base_identifier_info = [](ExprPtr expr) -> std::optional<std::tuple<std::string, int, bool>> {
-        while (expr) {
-            if (expr->kind == Expr::Kind::Identifier) {
-                return std::make_tuple(expr->name, expr->scope_instance_id, expr->is_mutable_binding);
-            }
-            if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
-                expr = expr->operand;
-                continue;
-            }
-            break;
-        }
-        return std::nullopt;
-    };
-
-    for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        const StmtPtr& func = entry.second;
-        if (!func->body) {
-            function_direct_impure[func_key] = true;
-            function_unknown_call[func_key] = true;
-            continue;
-        }
-
-        std::vector<ScopeFrame> scopes;
-        scopes.emplace_back();
-        for (const auto& param : func->params) {
-            scopes.back().vars.insert(param.name);
-        }
-        for (const auto& ref : func->ref_params) {
-            scopes.back().vars.insert(ref);
-        }
-
-        auto is_local = [&](const std::string& name) {
-            for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-                if (it->vars.count(name)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        bool direct_write = false;
-        bool direct_impure = false;
-        bool unknown_call = false;
-
-        std::function<void(ExprPtr)> visit_expr;
-        std::function<void(StmtPtr)> visit_stmt;
-
-        visit_expr = [&](ExprPtr expr) {
-            if (!expr) return;
-            switch (expr->kind) {
-                case Expr::Kind::Assignment: {
-                    if (expr->creates_new_variable &&
-                        expr->left && expr->left->kind == Expr::Kind::Identifier) {
-                        scopes.back().vars.insert(expr->left->name);
-                    } else {
-                        auto base = base_identifier_info(expr->left);
-                        if (base) {
-                            const std::string& name = std::get<0>(*base);
-                            bool is_mut = std::get<2>(*base);
-                            if (is_mut && !is_local(name)) {
-                                direct_write = true;
-                            }
-                        }
-                    }
-                    visit_expr(expr->right);
-                    break;
-                }
-                case Expr::Kind::Call: {
-                    if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
-                        unknown_call = true;
-                        direct_impure = true;
-                    } else {
-                        std::string callee_key = reachability_key(expr->operand->name, expr->operand->scope_instance_id);
-                        function_calls[func_key].insert(callee_key);
-
-                        auto callee_it = receiver_mutates.find(expr->operand->name);
-                        for (size_t i = 0; i < expr->receivers.size(); i++) {
-                            bool mut = true;
-                            if (callee_it != receiver_mutates.end() && i < callee_it->second.size()) {
-                                mut = callee_it->second[i];
-                            }
-                            if (!mut) continue;
-                            ExprPtr rec = expr->receivers[i];
-                            if (!receiver_is_mutable_arg(rec)) {
-                                continue;
-                            }
-                            auto base = base_identifier_info(rec);
-                            if (base) {
-                                const std::string& name = std::get<0>(*base);
-                                if (!is_local(name)) {
-                                    direct_write = true;
-                                }
-                            }
-                        }
-                    }
-                    for (const auto& rec : expr->receivers) visit_expr(rec);
-                    for (const auto& arg : expr->args) visit_expr(arg);
-                    visit_expr(expr->operand);
-                    break;
-                }
-                case Expr::Kind::Process:
-                    direct_impure = true;
-                    break;
-                case Expr::Kind::Binary:
-                    visit_expr(expr->left);
-                    visit_expr(expr->right);
-                    break;
-                case Expr::Kind::Unary:
-                case Expr::Kind::Cast:
-                case Expr::Kind::Length:
-                    visit_expr(expr->operand);
-                    break;
-                case Expr::Kind::Index:
-                    visit_expr(expr->operand);
-                    if (!expr->args.empty()) visit_expr(expr->args[0]);
-                    break;
-                case Expr::Kind::Member:
-                    visit_expr(expr->operand);
-                    break;
-                case Expr::Kind::ArrayLiteral:
-                case Expr::Kind::TupleLiteral:
-                    for (const auto& elem : expr->elements) visit_expr(elem);
-                    break;
-                case Expr::Kind::Block:
-                    scopes.emplace_back();
-                    for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                    visit_expr(expr->result_expr);
-                    scopes.pop_back();
-                    break;
-                case Expr::Kind::Conditional:
-                    visit_expr(expr->condition);
-                    visit_expr(expr->true_expr);
-                    visit_expr(expr->false_expr);
-                    break;
-                case Expr::Kind::Range:
-                case Expr::Kind::Iteration:
-                case Expr::Kind::Repeat:
-                    visit_expr(expr->left);
-                    visit_expr(expr->right);
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        visit_stmt = [&](StmtPtr stmt) {
-            if (!stmt) return;
-            switch (stmt->kind) {
-                case Stmt::Kind::VarDecl:
-                    scopes.back().vars.insert(stmt->var_name);
-                    visit_expr(stmt->var_init);
-                    break;
-                case Stmt::Kind::Expr:
-                    visit_expr(stmt->expr);
-                    break;
-                case Stmt::Kind::Return:
-                    visit_expr(stmt->return_expr);
-                    break;
-                case Stmt::Kind::ConditionalStmt:
-                    visit_expr(stmt->condition);
-                    visit_stmt(stmt->true_stmt);
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        visit_expr(func->body);
-
-        function_direct_writes_global[func_key] = direct_write;
-        function_direct_impure[func_key] = direct_impure;
-        function_unknown_call[func_key] = unknown_call;
-    }
-
-    for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        function_writes_global[func_key] = function_direct_writes_global[func_key] || function_unknown_call[func_key];
-    }
-
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& entry : function_map) {
-            const std::string& func_key = entry.first;
-            bool writes = function_direct_writes_global[func_key] || function_unknown_call[func_key];
-            if (!writes) {
-                for (const auto& callee_key : function_calls[func_key]) {
-                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
-                        writes = true;
-                        break;
-                    }
-                    if (function_writes_global[callee_key]) {
-                        writes = true;
-                        break;
-                    }
-                }
-            }
-            if (writes != function_writes_global[func_key]) {
-                function_writes_global[func_key] = writes;
-                changed = true;
-            }
-        }
-    }
-
-    for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        bool base = !function_writes_global[func_key] &&
-                    !function_direct_impure[func_key] &&
-                    !function_mutates_receiver[func_key];
-        function_is_pure[func_key] = base;
-    }
-
-    changed = true;
-    while (changed) {
-        changed = false;
-        for (const auto& entry : function_map) {
-            const std::string& func_key = entry.first;
-            bool base = !function_writes_global[func_key] &&
-                        !function_direct_impure[func_key] &&
-                        !function_mutates_receiver[func_key];
-            bool pure = base;
-            if (pure) {
-                for (const auto& callee_key : function_calls[func_key]) {
-                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
-                        pure = false;
-                        break;
-                    }
-                    if (!function_is_pure[callee_key]) {
-                        pure = false;
-                        break;
-                    }
-                }
-            }
-            if (pure != function_is_pure[func_key]) {
-                function_is_pure[func_key] = pure;
-                changed = true;
-            }
-        }
-    }
-}
-
-void CodeGenerator::analyze_usage(const Module& mod) {
-    used_global_vars.clear();
-    used_type_names.clear();
-
-    std::unordered_map<std::string, StmtPtr> global_vars;
-    std::unordered_map<std::string, StmtPtr> type_decls;
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl) {
-            std::string key = reachability_key(stmt->var_name, stmt->scope_instance_id);
-            global_vars[key] = stmt;
-        } else if (stmt->kind == Stmt::Kind::TypeDecl) {
-            type_decls[stmt->type_decl_name] = stmt;
-        }
-    }
-
-    std::deque<std::string> type_worklist;
-    auto add_type_name = [&](const std::string& name) {
-        if (name.empty()) return;
-        if (used_type_names.insert(name).second) {
-            type_worklist.push_back(name);
-        }
-    };
-
-    std::function<void(TypePtr)> mark_type;
-    mark_type = [&](TypePtr type) {
-        if (!type) return;
-        switch (type->kind) {
-            case Type::Kind::Named:
-                add_type_name(type->type_name);
-                break;
-            case Type::Kind::Array:
-                mark_type(type->element_type);
-                break;
-            case Type::Kind::Primitive:
-            case Type::Kind::TypeVar:
-            default:
-                break;
-        }
-    };
-
-    std::function<void(ExprPtr)> visit_expr_types;
-    std::function<void(StmtPtr)> visit_stmt_types;
-
-    visit_expr_types = [&](ExprPtr expr) {
-        if (!expr) return;
-        mark_type(expr->type);
-        switch (expr->kind) {
-            case Expr::Kind::Binary:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr_types(expr->operand);
-                break;
-            case Expr::Kind::Call:
-                visit_expr_types(expr->operand);
-                for (const auto& rec : expr->receivers) visit_expr_types(rec);
-                for (const auto& arg : expr->args) visit_expr_types(arg);
-                break;
-            case Expr::Kind::Index:
-                visit_expr_types(expr->operand);
-                if (!expr->args.empty()) visit_expr_types(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr_types(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr_types(elem);
-                break;
-            case Expr::Kind::Block:
-                for (const auto& stmt : expr->statements) visit_stmt_types(stmt);
-                visit_expr_types(expr->result_expr);
-                break;
-            case Expr::Kind::Conditional:
-                visit_expr_types(expr->condition);
-                visit_expr_types(expr->true_expr);
-                visit_expr_types(expr->false_expr);
-                break;
-            case Expr::Kind::Assignment:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt_types = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::VarDecl:
-                mark_type(stmt->var_type);
-                visit_expr_types(stmt->var_init);
-                break;
-            case Stmt::Kind::Expr:
-                visit_expr_types(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr_types(stmt->return_expr);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                visit_expr_types(stmt->condition);
-                visit_stmt_types(stmt->true_stmt);
-                break;
-            default:
-                break;
-        }
-    };
-
-    struct ScopeFrame {
-        std::unordered_set<std::string> vars;
-    };
-
-    auto is_local = [&](const std::string& name, const std::vector<ScopeFrame>& scopes) {
-        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-            if (it->vars.count(name)) return true;
-        }
-        return false;
-    };
-
-    std::deque<StmtPtr> global_worklist;
-
-    auto mark_global = [&](const std::string& name, int scope_id) {
-        std::string key = reachability_key(name, scope_id);
-        auto it = global_vars.find(key);
-        if (it == global_vars.end()) return;
-        if (used_global_vars.insert(it->second.get()).second) {
-            global_worklist.push_back(it->second);
-        }
-    };
-
-    std::function<void(ExprPtr, std::vector<ScopeFrame>&)> visit_expr_globals;
-    std::function<void(StmtPtr, std::vector<ScopeFrame>&)> visit_stmt_globals;
-
-    visit_expr_globals = [&](ExprPtr expr, std::vector<ScopeFrame>& scopes) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Identifier:
-                if (!is_local(expr->name, scopes)) {
-                    mark_global(expr->name, expr->scope_instance_id);
-                }
-                break;
-            case Expr::Kind::Assignment:
-                if (expr->creates_new_variable &&
-                    expr->left && expr->left->kind == Expr::Kind::Identifier) {
-                    scopes.back().vars.insert(expr->left->name);
-                }
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            case Expr::Kind::Binary:
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr_globals(expr->operand, scopes);
-                break;
-            case Expr::Kind::Call:
-                visit_expr_globals(expr->operand, scopes);
-                for (const auto& rec : expr->receivers) visit_expr_globals(rec, scopes);
-                for (const auto& arg : expr->args) visit_expr_globals(arg, scopes);
-                break;
-            case Expr::Kind::Index:
-                visit_expr_globals(expr->operand, scopes);
-                if (!expr->args.empty()) visit_expr_globals(expr->args[0], scopes);
-                break;
-            case Expr::Kind::Member:
-                visit_expr_globals(expr->operand, scopes);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr_globals(elem, scopes);
-                break;
-            case Expr::Kind::Block:
-                scopes.emplace_back();
-                for (const auto& stmt : expr->statements) visit_stmt_globals(stmt, scopes);
-                visit_expr_globals(expr->result_expr, scopes);
-                scopes.pop_back();
-                break;
-            case Expr::Kind::Conditional:
-                visit_expr_globals(expr->condition, scopes);
-                visit_expr_globals(expr->true_expr, scopes);
-                visit_expr_globals(expr->false_expr, scopes);
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt_globals = [&](StmtPtr stmt, std::vector<ScopeFrame>& scopes) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::VarDecl:
-                scopes.back().vars.insert(stmt->var_name);
-                visit_expr_globals(stmt->var_init, scopes);
-                break;
-            case Stmt::Kind::Expr:
-                visit_expr_globals(stmt->expr, scopes);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr_globals(stmt->return_expr, scopes);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                visit_expr_globals(stmt->condition, scopes);
-                visit_stmt_globals(stmt->true_stmt, scopes);
-                break;
-            default:
-                break;
-        }
-    };
-
-    // Reachable functions drive usage.
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            std::string func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                func_name = stmt->type_namespace + "::" + stmt->func_name;
-                add_type_name(stmt->type_namespace);
-            }
-            std::string key = reachability_key(func_name, stmt->scope_instance_id);
-            if (!reachable_functions.count(key)) {
-                continue;
-            }
-
-            mark_type(stmt->return_type);
-            for (const auto& t : stmt->return_types) {
-                mark_type(t);
-            }
-            for (const auto& param : stmt->params) {
-                mark_type(param.type);
-            }
-            for (const auto& ref_type : stmt->ref_param_types) {
-                mark_type(ref_type);
-            }
-
-            if (stmt->body) {
-                visit_expr_types(stmt->body);
-                std::vector<ScopeFrame> scopes;
-                scopes.emplace_back();
-                for (const auto& param : stmt->params) {
-                    scopes.back().vars.insert(param.name);
-                }
-                for (const auto& ref : stmt->ref_params) {
-                    scopes.back().vars.insert(ref);
-                }
-                visit_expr_globals(stmt->body, scopes);
-            }
-        } else if (stmt->kind == Stmt::Kind::Expr) {
-            visit_expr_types(stmt->expr);
-            std::vector<ScopeFrame> scopes;
-            scopes.emplace_back();
-            visit_expr_globals(stmt->expr, scopes);
-        }
-    }
-
-    // Walk globals referenced by reachable code.
-    while (!global_worklist.empty()) {
-        StmtPtr global = global_worklist.front();
-        global_worklist.pop_front();
-        if (!global) continue;
-        mark_type(global->var_type);
-        visit_expr_types(global->var_init);
-        std::vector<ScopeFrame> scopes;
-        scopes.emplace_back();
-        visit_expr_globals(global->var_init, scopes);
-    }
-
-    // Close over field types for used type declarations.
-    while (!type_worklist.empty()) {
-        std::string type_name = type_worklist.front();
-        type_worklist.pop_front();
-        auto it = type_decls.find(type_name);
-        if (it == type_decls.end()) continue;
-        const StmtPtr& decl = it->second;
-        for (const auto& field : decl->fields) {
-            mark_type(field.type);
-        }
-    }
-}
-
-void CodeGenerator::mark_reachable(const std::string& func_name, int scope_id, const Module& mod) {
-    std::string key = reachability_key(func_name, scope_id);
-    if (reachable_functions.count(key)) {
-        return;
-    }
-
-    reachable_functions.insert(key);
-
-    // Find the function definition
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && !stmt->is_external) {
-            // Build qualified name if this is a method
-            std::string stmt_func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                stmt_func_name = stmt->type_namespace + "::" + stmt->func_name;
-            }
-
-            if (stmt_func_name == func_name) {
-                if (scope_id >= 0) {
-                    if (stmt->scope_instance_id != scope_id) continue;
-                } else if (stmt->scope_instance_id >= 0) {
-                    continue;
-                }
-                // Collect all function calls in this function's body
-                if (stmt->body) {
-                    std::unordered_set<std::string> calls;
-                    collect_calls(stmt->body, calls);
-
-                    // Recursively mark called functions as reachable
-                    for (const auto& called_key : calls) {
-                        std::string called_name;
-                        int called_scope = -1;
-                        split_reachability_key(called_key, called_name, called_scope);
-                        mark_reachable(called_name, called_scope, mod);
-                    }
-                }
-                break;
-            }
-        }
-    }
-}
-
-void CodeGenerator::collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls) {
-    if (!expr) return;
-
-    switch (expr->kind) {
-        case Expr::Kind::Call:
-            // Extract function name from call (already qualified by type checker for methods)
-            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                calls.insert(reachability_key(expr->operand->name, expr->operand->scope_instance_id));
-            }
-            for (const auto& rec : expr->receivers) {
-                collect_calls(rec, calls);
-            }
-            // Also check arguments
-            for (const auto& arg : expr->args) {
-                collect_calls(arg, calls);
-            }
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Binary:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Unary:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Index:
-            collect_calls(expr->operand, calls);
-            if (!expr->args.empty()) collect_calls(expr->args[0], calls);
-            break;
-
-        case Expr::Kind::Member:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::ArrayLiteral:
-            for (const auto& elem : expr->elements) {
-                collect_calls(elem, calls);
-            }
-            break;
-
-        case Expr::Kind::Block:
-            for (const auto& stmt : expr->statements) {
-                if (stmt->kind == Stmt::Kind::Expr && stmt->expr) {
-                    collect_calls(stmt->expr, calls);
-                } else if (stmt->kind == Stmt::Kind::Return && stmt->return_expr) {
-                    collect_calls(stmt->return_expr, calls);
-                } else if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
-                    collect_calls(stmt->var_init, calls);
-                }
-            }
-            if (expr->result_expr) {
-                collect_calls(expr->result_expr, calls);
-            }
-            break;
-
-        case Expr::Kind::Conditional:
-            collect_calls(expr->condition, calls);
-            collect_calls(expr->true_expr, calls);
-            if (expr->false_expr) collect_calls(expr->false_expr, calls);
-            break;
-
-        case Expr::Kind::Cast:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Assignment:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Range:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Length:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Iteration:
-        case Expr::Kind::Repeat:
-            collect_calls(expr->left, calls);
-            if (expr->right) collect_calls(expr->right, calls);
-            break;
-
-        default:
-            // Literals and identifiers don't contain calls
-            break;
-    }
 }
 
 void CodeGenerator::gen_module(const Module& mod) {
@@ -1605,7 +238,7 @@ void CodeGenerator::gen_module(const Module& mod) {
     // Type declarations
     for (const auto& stmt : mod.top_level) {
         if (stmt->kind == Stmt::Kind::TypeDecl) {
-            if (!used_type_names.empty() && !used_type_names.count(stmt->type_decl_name)) {
+            if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
                 continue;
             }
             gen_type_decl(stmt);
@@ -1626,7 +259,7 @@ void CodeGenerator::gen_module(const Module& mod) {
             // Skip unreachable functions
             // For imported functions (scope_instance_id >= 0), always generate if base name is reachable
             std::string key = reachability_key(func_name, stmt->scope_instance_id);
-            if (!reachable_functions.count(key)) {
+            if (!facts.reachable_functions.count(key)) {
                 continue;
             }
 
@@ -1651,12 +284,12 @@ void CodeGenerator::gen_module(const Module& mod) {
             bool is_pure = false;
             bool no_global_write = false;
             {
-                auto pure_it = function_is_pure.find(key);
-                if (pure_it != function_is_pure.end() && pure_it->second) {
+                auto pure_it = facts.function_is_pure.find(key);
+                if (pure_it != facts.function_is_pure.end() && pure_it->second) {
                     is_pure = true;
                 }
-                auto gw_it = function_writes_global.find(key);
-                if (gw_it != function_writes_global.end() && !gw_it->second) {
+                auto gw_it = facts.function_writes_global.find(key);
+                if (gw_it != facts.function_writes_global.end() && !gw_it->second) {
                     no_global_write = true;
                 }
             }
@@ -1781,7 +414,7 @@ void CodeGenerator::gen_module(const Module& mod) {
     std::vector<std::pair<std::string, std::vector<TypePtr>>> tuple_decls;
     if (!tuple_types.empty()) {
         for (const auto& pair : tuple_types) {
-            if (!used_type_names.empty() && !used_type_names.count(pair.first)) {
+            if (!facts.used_type_names.empty() && !facts.used_type_names.count(pair.first)) {
                 continue;
             }
             tuple_decls.push_back(pair);
@@ -1915,10 +548,9 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
                         // Generate array declaration with inline initialization
                         std::string elem_type = gen_type(var_type->element_type);
                         std::string size_str = "0";
-                        if (type_checker && var_type->array_size) {
-                            CompileTimeEvaluator evaluator(type_checker);
+                        if (var_type->array_size) {
                             CTValue size_val;
-                            if (evaluator.try_evaluate(var_type->array_size, size_val)) {
+                            if (try_evaluate(var_type->array_size, size_val)) {
                                 size_str = std::to_string(std::get<int64_t>(size_val));
                             }
                         }
@@ -1959,10 +591,9 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
             break;
         case Stmt::Kind::ConditionalStmt:
             // Try compile-time evaluation for dead branch elimination
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
+            {
                 CTValue cond_val;
-                if (evaluator.try_evaluate(stmt->condition, cond_val)) {
+                if (try_evaluate(stmt->condition, cond_val)) {
                     // Compile-time constant condition
                     bool is_true = false;
                     if (std::holds_alternative<int64_t>(cond_val)) {
@@ -2010,7 +641,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     // Skip unreachable functions (dead code elimination)
     // For imported functions (scope_instance_id >= 0), always generate if base name is reachable
     // reach_key already computed for variant selection
-    if (!reachable_functions.count(reach_key)) {
+    if (!facts.reachable_functions.count(reach_key)) {
         current_function_non_reentrant = false;
         current_reentrancy_key = 'N';
         return;
@@ -2023,12 +654,12 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     bool is_pure = false;
     bool no_global_write = false;
     {
-        auto pure_it = function_is_pure.find(reach_key);
-        if (pure_it != function_is_pure.end() && pure_it->second) {
+        auto pure_it = facts.function_is_pure.find(reach_key);
+        if (pure_it != facts.function_is_pure.end() && pure_it->second) {
             is_pure = true;
         }
-        auto gw_it = function_writes_global.find(reach_key);
-        if (gw_it != function_writes_global.end() && !gw_it->second) {
+        auto gw_it = facts.function_writes_global.find(reach_key);
+        if (gw_it != facts.function_writes_global.end() && !gw_it->second) {
             no_global_write = true;
         }
     }
@@ -2171,10 +802,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     bool handled_body = false;
 
     if (stmt->body) {
-        if (type_checker && stmt->params.empty() && stmt->ref_params.empty()) {
-            CompileTimeEvaluator evaluator(type_checker);
+        if (stmt->params.empty() && stmt->ref_params.empty()) {
             CTValue result;
-            if (evaluator.try_evaluate(stmt->body, result)) {
+            if (try_evaluate(stmt->body, result)) {
                 if (std::holds_alternative<int64_t>(result)) {
                     emit("return " + std::to_string(std::get<int64_t>(result)) + ";");
                     handled_body = true;
@@ -2246,7 +876,7 @@ void CodeGenerator::gen_type_decl(StmtPtr stmt) {
 
 void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     bool is_local = in_function;
-    if (!is_local && !used_global_vars.count(stmt.get())) {
+    if (!is_local && !facts.used_global_vars.count(stmt.get())) {
         return;
     }
     // Top-level mutable globals must be internal to the translation unit
@@ -2288,10 +918,9 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
 
             std::string elem_type = gen_type(stmt->var_type->element_type);
             std::string size_str = "0";
-            if (type_checker && stmt->var_type->array_size) {
-                CompileTimeEvaluator evaluator(type_checker);
+            if (stmt->var_type->array_size) {
                 CTValue size_val;
-                if (evaluator.try_evaluate(stmt->var_type->array_size, size_val)) {
+                if (try_evaluate(stmt->var_type->array_size, size_val)) {
                     size_str = std::to_string(std::get<int64_t>(size_val));
                 }
             }
@@ -2346,10 +975,9 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
                 std::string elem_type = gen_type(stmt->var_type->element_type);
                 std::string size_str = "0";
-                if (type_checker && stmt->var_type->array_size) {
-                    CompileTimeEvaluator evaluator(type_checker);
+                if (stmt->var_type->array_size) {
                     CTValue size_val;
-                    if (evaluator.try_evaluate(stmt->var_type->array_size, size_val)) {
+                    if (try_evaluate(stmt->var_type->array_size, size_val)) {
                         size_str = std::to_string(std::get<int64_t>(size_val));
                     }
                 }
@@ -2360,10 +988,9 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             }
 
             // Try compile-time evaluation for simple constants
-            if (type_checker) {
-            CompileTimeEvaluator evaluator(type_checker);
+            {
             CTValue result;
-            if (evaluator.try_evaluate(stmt->var_init, result)) {
+            if (try_evaluate(stmt->var_init, result)) {
                 // Successfully evaluated at compile time
                 std::string init_val;
                 if (std::holds_alternative<int64_t>(result)) {
@@ -2424,8 +1051,15 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                 return;
             } else if (!stmt->is_mutable) {
                 // Immutable constant must be compile-time evaluable
+                std::string error;
+                if (type_checker) {
+                    CompileTimeEvaluator evaluator(type_checker);
+                    CTValue tmp;
+                    (void)evaluator.try_evaluate(stmt->var_init, tmp);
+                    error = evaluator.get_error();
+                }
                 throw CompileError("Constant '" + stmt->var_name + "' cannot be evaluated at compile time: " +
-                                 evaluator.get_error(), stmt->location);
+                                 error, stmt->location);
             }
         }
         // Fallback to runtime evaluation (only for mutable variables)
@@ -2435,10 +1069,9 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
         if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
             std::string elem_type = gen_type(stmt->var_type->element_type);
             std::string size_str = "0";
-            if (type_checker && stmt->var_type->array_size) {
-                CompileTimeEvaluator evaluator(type_checker);
+            if (stmt->var_type->array_size) {
                 CTValue size_val;
-                if (evaluator.try_evaluate(stmt->var_type->array_size, size_val)) {
+                if (try_evaluate(stmt->var_type->array_size, size_val)) {
                     size_str = std::to_string(std::get<int64_t>(size_val));
                 }
             }
@@ -2453,20 +1086,19 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
 
 bool CodeGenerator::is_compile_time_init(StmtPtr stmt) const {
     if (!stmt || !stmt->var_init) return false;
+    if (optimization && optimization->constexpr_inits.count(stmt.get())) return true;
     if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
         (stmt->var_init->kind == Expr::Kind::ArrayLiteral || stmt->var_init->kind == Expr::Kind::Range)) {
         return true;
     }
-    if (!type_checker) return false;
-    CompileTimeEvaluator evaluator(type_checker);
     CTValue result;
-    return evaluator.try_evaluate(stmt->var_init, result);
+    return try_evaluate(stmt->var_init, result);
 }
 
 std::string CodeGenerator::mutability_prefix(StmtPtr stmt) const {
-    auto it = var_mutability.find(stmt.get());
+    auto it = facts.var_mutability.find(stmt.get());
     VarMutability kind = stmt->is_mutable ? VarMutability::Mutable : VarMutability::Constexpr;
-    if (it != var_mutability.end()) {
+    if (it != facts.var_mutability.end()) {
         kind = it->second;
     }
     switch (kind) {
@@ -2504,8 +1136,8 @@ std::vector<std::string> CodeGenerator::ref_variant_keys_for(StmtPtr stmt) const
     if (!stmt->type_namespace.empty()) {
         func_name = stmt->type_namespace + "::" + stmt->func_name;
     }
-    auto it = ref_variants.find(func_name);
-    if (it != ref_variants.end()) {
+    auto it = facts.ref_variants.find(func_name);
+    if (it != facts.ref_variants.end()) {
         keys.assign(it->second.begin(), it->second.end());
     }
     if (keys.empty()) {
@@ -2524,8 +1156,8 @@ std::string CodeGenerator::ref_variant_name(const std::string& func_name, const 
 
 std::vector<char> CodeGenerator::reentrancy_keys_for(const std::string& func_key) const {
     std::vector<char> keys;
-    auto it = reentrancy_variants.find(func_key);
-    if (it != reentrancy_variants.end()) {
+    auto it = facts.reentrancy_variants.find(func_key);
+    if (it != facts.reentrancy_variants.end()) {
         keys.assign(it->second.begin(), it->second.end());
     }
     if (keys.empty()) {
@@ -2536,8 +1168,8 @@ std::vector<char> CodeGenerator::reentrancy_keys_for(const std::string& func_key
 }
 
 std::string CodeGenerator::reentrancy_variant_name(const std::string& func_name, const std::string& func_key, char reent_key) const {
-    auto it = reentrancy_variants.find(func_key);
-    if (it == reentrancy_variants.end() || it->second.size() <= 1) {
+    auto it = facts.reentrancy_variants.find(func_key);
+    if (it == facts.reentrancy_variants.end() || it->second.size() <= 1) {
         return func_name;
     }
     if (reent_key == 'R') {
@@ -2556,22 +1188,18 @@ bool CodeGenerator::receiver_is_mutable_arg(ExprPtr expr) const {
     return is_addressable_lvalue(expr) && is_mutable_lvalue(expr);
 }
 
-std::string CodeGenerator::reachability_key(const std::string& func_name, int scope_id) const {
-    if (scope_id < 0) {
-        return func_name;
+bool CodeGenerator::try_evaluate(ExprPtr expr, CTValue& out) const {
+    if (!expr) return false;
+    if (optimization) {
+        auto it = optimization->constexpr_values.find(expr.get());
+        if (it != optimization->constexpr_values.end()) {
+            out = it->second;
+            return true;
+        }
     }
-    return func_name + kScopeSep + std::to_string(scope_id);
-}
-
-void CodeGenerator::split_reachability_key(const std::string& key, std::string& func_name, int& scope_id) const {
-    size_t pos = key.rfind(kScopeSep);
-    if (pos == std::string::npos) {
-        func_name = key;
-        scope_id = -1;
-        return;
-    }
-    func_name = key.substr(0, pos);
-    scope_id = std::stoi(key.substr(pos + 1));
+    if (!type_checker) return false;
+    CompileTimeEvaluator evaluator(type_checker);
+    return evaluator.try_evaluate(expr, out);
 }
 
 bool CodeGenerator::is_addressable_lvalue(ExprPtr expr) const {
@@ -3146,10 +1774,9 @@ std::string CodeGenerator::gen_call_optimized_with_evaluator(ExprPtr expr, Compi
 
 std::string CodeGenerator::gen_conditional(ExprPtr expr) {
     // Try to evaluate condition at compile time for dead branch elimination
-    if (type_checker) {
-        CompileTimeEvaluator evaluator(type_checker);
+    {
         CTValue cond_val;
-        if (evaluator.try_evaluate(expr->condition, cond_val)) {
+        if (try_evaluate(expr->condition, cond_val)) {
             // Condition is compile-time constant - eliminate dead branch
             bool is_true = false;
             if (std::holds_alternative<int64_t>(cond_val)) {
@@ -3261,10 +1888,9 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
 
             // Get array size
             std::string size_str = "0";
-            if (type_checker && var_type->array_size) {
-                CompileTimeEvaluator evaluator(type_checker);
+            if (var_type->array_size) {
                 CTValue size_val;
-                if (evaluator.try_evaluate(var_type->array_size, size_val)) {
+                if (try_evaluate(var_type->array_size, size_val)) {
                     size_str = std::to_string(std::get<int64_t>(size_val));
                 }
             }
@@ -3307,12 +1933,9 @@ std::optional<std::pair<int64_t, int64_t>> CodeGenerator::evaluate_range(ExprPtr
         return std::nullopt;
     }
 
-    if (!type_checker) return std::nullopt;
-
-    CompileTimeEvaluator evaluator(type_checker);
     CTValue start_val, end_val;
-    if (evaluator.try_evaluate(range_expr->left, start_val) &&
-        evaluator.try_evaluate(range_expr->right, end_val)) {
+    if (try_evaluate(range_expr->left, start_val) &&
+        try_evaluate(range_expr->right, end_val)) {
         return std::make_pair(std::get<int64_t>(start_val), std::get<int64_t>(end_val));
     }
     return std::nullopt;
@@ -3368,10 +1991,9 @@ std::string CodeGenerator::gen_length(ExprPtr expr) {
     if (expr->operand->type) {
         if (expr->operand->type->kind == Type::Kind::Array) {
             // Array length - try to evaluate at compile time
-            if (type_checker && expr->operand->type->array_size) {
-                CompileTimeEvaluator evaluator(type_checker);
+            if (expr->operand->type->array_size) {
                 CTValue size_val;
-                if (evaluator.try_evaluate(expr->operand->type->array_size, size_val)) {
+                if (try_evaluate(expr->operand->type->array_size, size_val)) {
                     return std::to_string(std::get<int64_t>(size_val));
                 }
             }
@@ -3423,13 +2045,9 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
     };
 
     if (expr->operand->kind == Expr::Kind::Range) {
-        if (!type_checker) {
-            throw CompileError("Internal error: range iteration without type checker", expr->location);
-        }
-        CompileTimeEvaluator evaluator(type_checker);
         CTValue start_val, end_val;
-        if (!evaluator.try_evaluate(expr->operand->left, start_val) ||
-            !evaluator.try_evaluate(expr->operand->right, end_val)) {
+        if (!try_evaluate(expr->operand->left, start_val) ||
+            !try_evaluate(expr->operand->right, end_val)) {
             throw CompileError("Range iteration requires compile-time constant bounds", expr->location);
         }
         int64_t start = value_to_int64(start_val, expr->operand->left->location);
@@ -3440,12 +2058,11 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
         }
         size_str = std::to_string(element_count);
     } else {
-        if (!type_checker || !array_type->array_size) {
+        if (!array_type->array_size) {
             throw CompileError("Array size must be compile-time constant for iteration", expr->location);
         }
-        CompileTimeEvaluator evaluator(type_checker);
         CTValue size_val;
-        if (!evaluator.try_evaluate(array_type->array_size, size_val)) {
+        if (!try_evaluate(array_type->array_size, size_val)) {
             throw CompileError("Array size must be compile-time constant for iteration", expr->location);
         }
         element_count = value_to_int64(size_val, array_type->array_size->location);
@@ -3625,13 +2242,8 @@ int64_t CodeGenerator::resolve_array_length(TypePtr type, const SourceLocation& 
     if (!type || type->kind != Type::Kind::Array || !type->array_size) {
         throw CompileError("Cannot determine array length for comparator generation", loc);
     }
-    if (!type_checker) {
-        throw CompileError("Internal error: array length requested without type checker", loc);
-    }
-
-    CompileTimeEvaluator evaluator(type_checker);
     CTValue size_val;
-    if (!evaluator.try_evaluate(type->array_size, size_val)) {
+    if (!try_evaluate(type->array_size, size_val)) {
         throw CompileError("Array length must be compile-time constant", loc);
     }
 

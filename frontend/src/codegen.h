@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.h"
+#include "analysis.h"
 #include "evaluator.h"
 #include <sstream>
 #include <unordered_set>
@@ -11,6 +12,7 @@
 namespace vexel {
 
 class TypeChecker;
+struct OptimizationFacts;
 
 struct CCodegenResult {
     std::string header;
@@ -51,45 +53,27 @@ class CodeGenerator {
     std::unordered_map<std::string, std::string> comparator_cache;
     std::vector<std::string> comparator_definitions;
     bool in_function = false;
-    enum class VarMutability { Mutable, NonMutableRuntime, Constexpr };
-    std::unordered_map<const Stmt*, VarMutability> var_mutability;
-    std::unordered_map<std::string, std::vector<bool>> receiver_mutates;
-    std::unordered_map<std::string, std::unordered_set<std::string>> ref_variants;
-    std::unordered_map<std::string, bool> function_writes_global;
-    std::unordered_map<std::string, bool> function_is_pure;
-    std::unordered_set<const Stmt*> used_global_vars;
-    std::unordered_set<std::string> used_type_names;
-    std::unordered_map<std::string, std::unordered_set<char>> reentrancy_variants;
+    AnalysisFacts facts;
+    const OptimizationFacts* optimization = nullptr;
     char current_reentrancy_key = 'N';
 
 public:
     CodeGenerator();
-    CCodegenResult generate(const Module& mod, TypeChecker* tc = nullptr);
-    const std::unordered_set<std::string>& reachable() const { return reachable_functions; }
+    CCodegenResult generate(const Module& mod, TypeChecker* tc = nullptr,
+                            const AnalysisFacts* analysis = nullptr,
+                            const OptimizationFacts* optimization_facts = nullptr);
+    const std::unordered_set<std::string>& reachable() const { return facts.reachable_functions; }
     const std::vector<GeneratedFunctionInfo>& functions() const { return generated_functions; }
     const std::vector<GeneratedVarInfo>& variables() const { return generated_vars; }
     std::string type_to_c(TypePtr type) { return gen_type(type); }
     std::string mangle(const std::string& name) { return mangle_name(name); }
-    void set_non_reentrant(const std::unordered_set<std::string>& names) { non_reentrant = names; }
-
 private:
-    std::unordered_set<std::string> reachable_functions;
     std::unordered_set<std::string> current_ref_params;  // Track reference parameters in current function
     std::unordered_map<std::string, std::vector<TypePtr>> tuple_types;  // Track tuple types: name -> element types
     std::unordered_map<std::string, ExprPtr> expr_param_substitutions;  // Maps $param names to their expressions
     std::unordered_map<std::string, std::string> value_param_replacements;  // Maps value params when inlining
     std::string underscore_var;  // Current loop underscore variable name (empty when not in iteration)
-    std::unordered_set<std::string> non_reentrant;
     bool current_function_non_reentrant = false;
-
-    void analyze_reachability(const Module& mod);
-    void analyze_reentrancy(const Module& mod);
-    void analyze_mutability(const Module& mod);
-    void analyze_ref_variants(const Module& mod);
-    void analyze_effects(const Module& mod);
-    void analyze_usage(const Module& mod);
-    void mark_reachable(const std::string& func_name, int scope_id, const Module& mod);
-    void collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls);
 
     void gen_module(const Module& mod);
     void gen_stmt(StmtPtr stmt);
@@ -125,8 +109,7 @@ private:
     std::string reentrancy_variant_name(const std::string& func_name, const std::string& func_key, char reent_key) const;
     std::string variant_name(const std::string& func_name, const std::string& func_key, char reent_key, const std::string& ref_key) const;
     bool receiver_is_mutable_arg(ExprPtr expr) const;
-    std::string reachability_key(const std::string& func_name, int scope_id) const;
-    void split_reachability_key(const std::string& key, std::string& func_name, int& scope_id) const;
+    bool try_evaluate(ExprPtr expr, CTValue& out) const;
     bool is_addressable_lvalue(ExprPtr expr) const;
     bool is_mutable_lvalue(ExprPtr expr) const;
     std::string gen_type(TypePtr type);

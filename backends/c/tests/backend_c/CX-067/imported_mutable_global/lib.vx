@@ -1,0 +1,6 @@
+mut counter #i32 = 0;
+
+&bump() -> #i32 {
+    counter = counter + 1;
+    counter
+}

@@ -27,7 +27,8 @@ struct BackendContext {
     TypeChecker& checker;
     const Compiler::Options& options;
     const Compiler::OutputPaths& outputs;
-    const std::unordered_set<std::string>& non_reentrant_funcs;
+    const AnalysisFacts& analysis;
+    const OptimizationFacts& optimization;
 };
 
 using BackendEmitFn = void (*)(const BackendContext& ctx);
@@ -42,6 +43,9 @@ const Backend* find_backend(const std::string& name);
 std::vector<BackendInfo> list_backends();
 }
 ```
+
+Notes:
+- `ctx.analysis` and `ctx.optimization` are precomputed by the compiler and can be used to drive backend-specific decisions.
 
 ## Backend responsibilities
 - Build any backend-specific IR or codegen from the `Module` and `TypeChecker`.

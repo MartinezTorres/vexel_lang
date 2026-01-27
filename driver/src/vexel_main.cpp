@@ -19,6 +19,7 @@ static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>&
     }
     std::cout << "\n";
     std::cout << "  -L           Emit lowered Vexel subset alongside backend output\n";
+    std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
     std::cout << "  -v           Verbose output\n";
     std::cout << "  -h           Show this help\n";
@@ -45,6 +46,8 @@ int main(int argc, char** argv) {
             opts.verbose = true;
         } else if (std::strcmp(argv[i], "-L") == 0 || std::strcmp(argv[i], "--emit-lowered") == 0) {
             opts.emit_lowered = true;
+        } else if (std::strcmp(argv[i], "--emit-analysis") == 0) {
+            opts.emit_analysis = true;
         } else if (std::strcmp(argv[i], "--allow-process") == 0) {
             opts.allow_process = true;
         } else if (std::strcmp(argv[i], "-o") == 0) {

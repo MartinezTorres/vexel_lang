@@ -17,8 +17,7 @@ static void write_file(const std::string& path, const std::string& content) {
 
 static void emit_c_backend(const BackendContext& ctx) {
     CodeGenerator codegen;
-    codegen.set_non_reentrant(ctx.non_reentrant_funcs);
-    CCodegenResult result = codegen.generate(ctx.module, &ctx.checker);
+    CCodegenResult result = codegen.generate(ctx.module, &ctx.checker, &ctx.analysis, &ctx.optimization);
 
     std::filesystem::path header_path = ctx.outputs.dir / (ctx.outputs.stem + ".h");
     std::filesystem::path source_path = ctx.outputs.dir / (ctx.outputs.stem + ".c");

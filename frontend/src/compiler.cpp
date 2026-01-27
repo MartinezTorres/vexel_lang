@@ -3,10 +3,12 @@
 #include "parser.h"
 #include "typechecker.h"
 #include "codegen.h"
+#include "analysis.h"
+#include "optimizer.h"
+#include "analysis_report.h"
 #include "backend_registry.h"
 #include "constants.h"
 #include "lowered_printer.h"
-#include <unordered_map>
 #include <functional>
 #include <queue>
 #include <fstream>
@@ -14,24 +16,10 @@
 #include <filesystem>
 #include <algorithm>
 #include <sstream>
-#include <unordered_set>
 
 namespace vexel {
 
 Compiler::Compiler(const Options& opts) : options(opts) {}
-
-static bool has_annotation(const std::vector<Annotation>& anns, const std::string& name) {
-    for (const auto& ann : anns) {
-        if (ann.name == name) return true;
-    }
-    return false;
-}
-
-static std::string fq_name(StmtPtr func) {
-    if (!func) return "";
-    if (func->type_namespace.empty()) return func->func_name;
-    return func->type_namespace + "::" + func->func_name;
-}
 
 Compiler::OutputPaths Compiler::resolve_output_paths(const std::string& output_file) {
     std::filesystem::path base_path(output_file);
@@ -66,6 +54,11 @@ Compiler::OutputPaths Compiler::compile() {
         TypeChecker checker(options.project_root, options.allow_process);
         checker.check_module(mod);
 
+        Analyzer analyzer(&checker);
+        AnalysisFacts analysis = analyzer.run(mod);
+        Optimizer optimizer(&checker);
+        OptimizationFacts optimization = optimizer.run(mod);
+
         OutputPaths paths = resolve_output_paths(options.output_file);
         if (options.emit_lowered) {
             std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
@@ -75,19 +68,12 @@ Compiler::OutputPaths Compiler::compile() {
             }
             write_file(lowered_path.string(), lowered);
         }
-        std::unordered_set<std::string> non_reentrant_funcs;
-        for (const auto& stmt : mod.top_level) {
-            if (stmt->kind == Stmt::Kind::FuncDecl && stmt->is_exported) {
-                std::string name = stmt->func_name;
-                if (!stmt->type_namespace.empty()) {
-                    name = stmt->type_namespace + "::" + stmt->func_name;
-                }
-                // Respect [[reentrant]] override: keep out of non-reentrant set if present
-                if (!has_annotation(stmt->annotations, "reentrant")) {
-                    non_reentrant_funcs.insert(name);
-                }
-                // Keep explicit [[reentrant]] out of the non-reentrant set for backend policies.
+        if (options.emit_analysis) {
+            std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
+            if (options.verbose) {
+                std::cout << "Writing analysis report: " << analysis_path << std::endl;
             }
+            write_file(analysis_path.string(), format_analysis_report(mod, analysis, &optimization));
         }
 
         const Backend* backend = find_backend(options.backend);
@@ -97,7 +83,7 @@ Compiler::OutputPaths Compiler::compile() {
         if (options.verbose) {
             std::cout << "Generating backend: " << backend->info.name << std::endl;
         }
-        BackendContext ctx{mod, checker, options, paths, non_reentrant_funcs};
+        BackendContext ctx{mod, checker, options, paths, analysis, optimization};
         backend->emit(ctx);
 
         if (options.verbose) {

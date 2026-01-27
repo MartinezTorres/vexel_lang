@@ -1,0 +1,12 @@
+// @rfc: docs/frontend-lowered.md
+// @desc: The compiler can emit an analysis report alongside backend output | Analysis report emitted with expected sections
+// @expect-exit: 0
+// @command: python3 -c "import pathlib, subprocess, sys; subprocess.run([sys.argv[1], '--emit-analysis', '-b', 'c', 'test.vx'], check=True); report = pathlib.Path('out.analysis.txt'); data = report.read_text(); ok = 'Reachable Functions' in data and 'main' in data; sys.exit(0 if ok else 1)" {VEXEL_C}
+
+&^main() -> #i32 {
+    helper()
+}
+
+&helper() -> #i32 {
+    7
+}

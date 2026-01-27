@@ -25,7 +25,8 @@ struct BackendContext {
     TypeChecker& checker;
     const Compiler::Options& options;
     const Compiler::OutputPaths& outputs;
-    const std::unordered_set<std::string>& non_reentrant_funcs;
+    const AnalysisFacts& analysis;
+    const OptimizationFacts& optimization;
 };
 
 using BackendEmitFn = void (*)(const BackendContext& ctx);
@@ -85,6 +86,7 @@ Notes:
 - Emit functions can throw `CompileError` for diagnostics; these are reported by the CLI.
 - Use `ctx.outputs.dir` and `ctx.outputs.stem` to build filenames.
 - Respect `ctx.options.verbose` for logging.
+- `ctx.analysis` and `ctx.optimization` provide precomputed whole-program facts (reachability, mutability, reentrancy, constexpr values).
 
 ## Template backend folder
 There is a copy-and-rename starter at `backends/_template`:

@@ -14,7 +14,7 @@ Use `-L/--emit-lowered` to write `<output>.lowered.vx` after Stage 1; backends s
 
 ### Current recognition (warnings only)
 - `[[hot]]`, `[[cold]]`, `[[reentrant]]`, `[[nonbanked]]` are recognized but only meaningful on functions (and `nonbanked` optionally on globals). Other placements emit warnings but are preserved. Recognized annotations are also preserved in the lowered output so backends can consume them.
-- C backend: `[[hot]]`/`[[cold]]` map to GCC attributes on exported functions; `[[reentrant]]` removes a function from the non-reentrant set used by backends.
+- C backend: `[[hot]]`/`[[cold]]` map to GCC attributes on exported functions; reentrancy is derived from entry/exit annotations and propagated by analysis.
 - Other backends: `[[nonbanked]]` may force globals into RAM; `[[reentrant]]` can be used for placement or call-graph constraints.
 
 ## Lowered subset (output contract)
