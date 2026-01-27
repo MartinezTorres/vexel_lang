@@ -59,6 +59,8 @@ class CodeGenerator {
     std::unordered_map<std::string, bool> function_is_pure;
     std::unordered_set<const Stmt*> used_global_vars;
     std::unordered_set<std::string> used_type_names;
+    std::unordered_map<std::string, std::unordered_set<char>> reentrancy_variants;
+    char current_reentrancy_key = 'N';
 
 public:
     CodeGenerator();
@@ -81,6 +83,7 @@ private:
     bool current_function_non_reentrant = false;
 
     void analyze_reachability(const Module& mod);
+    void analyze_reentrancy(const Module& mod);
     void analyze_mutability(const Module& mod);
     void analyze_ref_variants(const Module& mod);
     void analyze_effects(const Module& mod);
@@ -90,7 +93,7 @@ private:
 
     void gen_module(const Module& mod);
     void gen_stmt(StmtPtr stmt);
-    void gen_func_decl(StmtPtr stmt, const std::string& ref_key);
+    void gen_func_decl(StmtPtr stmt, const std::string& ref_key, char reent_key);
     void gen_type_decl(StmtPtr stmt);
     void gen_var_decl(StmtPtr stmt);
 
@@ -118,6 +121,9 @@ private:
     std::string ref_variant_key(const ExprPtr& call, size_t ref_count) const;
     std::vector<std::string> ref_variant_keys_for(StmtPtr stmt) const;
     std::string ref_variant_name(const std::string& func_name, const std::string& ref_key) const;
+    std::vector<char> reentrancy_keys_for(const std::string& func_key) const;
+    std::string reentrancy_variant_name(const std::string& func_name, const std::string& func_key, char reent_key) const;
+    std::string variant_name(const std::string& func_name, const std::string& func_key, char reent_key, const std::string& ref_key) const;
     bool receiver_is_mutable_arg(ExprPtr expr) const;
     std::string reachability_key(const std::string& func_name, int scope_id) const;
     void split_reachability_key(const std::string& key, std::string& func_name, int& scope_id) const;

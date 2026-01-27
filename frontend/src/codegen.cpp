@@ -102,6 +102,8 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
     function_is_pure.clear();
     used_global_vars.clear();
     used_type_names.clear();
+    reentrancy_variants.clear();
+    current_reentrancy_key = 'N';
     tuple_types.clear();
     expr_param_substitutions.clear();
     value_param_replacements.clear();
@@ -165,6 +167,7 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc) {
 
     // Analyze reachability before generating code
     analyze_reachability(mod);
+    analyze_reentrancy(mod);
     analyze_mutability(mod);
     analyze_ref_variants(mod);
     analyze_effects(mod);
@@ -224,6 +227,130 @@ void CodeGenerator::analyze_reachability(const Module& mod) {
                     mark_reachable(func_name, scope_id, mod);
                 }
             }
+        }
+    }
+}
+
+void CodeGenerator::analyze_reentrancy(const Module& mod) {
+    reentrancy_variants.clear();
+
+    auto has_ann = [](const std::vector<Annotation>& anns, const std::string& name) {
+        return std::any_of(anns.begin(), anns.end(), [&](const Annotation& a) { return a.name == name; });
+    };
+
+    auto qualified_name = [](const StmtPtr& stmt) {
+        if (!stmt->type_namespace.empty()) {
+            return stmt->type_namespace + "::" + stmt->func_name;
+        }
+        return stmt->func_name;
+    };
+
+    std::unordered_map<std::string, StmtPtr> function_map;
+    std::unordered_set<std::string> external_reentrant;
+    std::unordered_set<std::string> external_nonreentrant;
+
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
+        std::string func_name = qualified_name(stmt);
+        std::string key = reachability_key(func_name, stmt->scope_instance_id);
+        if (stmt->is_external) {
+            bool is_reentrant = has_ann(stmt->annotations, "reentrant");
+            bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
+            if (is_reentrant && is_nonreentrant) {
+                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
+                                   stmt->func_name + "'", stmt->location);
+            }
+            if (is_reentrant) {
+                external_reentrant.insert(key);
+            } else {
+                external_nonreentrant.insert(key);
+            }
+            continue;
+        }
+        if (!reachable_functions.count(key)) continue;
+        function_map[key] = stmt;
+    }
+
+    std::deque<std::pair<std::string, char>> work;
+
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
+        if (!stmt->is_exported) continue;
+        std::string func_name = qualified_name(stmt);
+        std::string key = reachability_key(func_name, stmt->scope_instance_id);
+        if (!reachable_functions.count(key)) continue;
+
+        bool is_reentrant = has_ann(stmt->annotations, "reentrant");
+        bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
+        if (is_reentrant && is_nonreentrant) {
+            throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on entry function '" +
+                               stmt->func_name + "'", stmt->location);
+        }
+
+        char ctx = (is_reentrant ? 'R' : 'N');
+        if (reentrancy_variants[key].insert(ctx).second) {
+            work.emplace_back(key, ctx);
+        }
+    }
+
+    // Seed runtime global initializers as non-reentrant paths.
+    for (const auto& stmt : mod.top_level) {
+        if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
+            bool evaluated_at_compile_time = false;
+            if (type_checker) {
+                CompileTimeEvaluator evaluator(type_checker);
+                CTValue result;
+                if (evaluator.try_evaluate(stmt->var_init, result)) {
+                    evaluated_at_compile_time = true;
+                }
+            }
+            if (evaluated_at_compile_time) continue;
+            std::unordered_set<std::string> calls;
+            collect_calls(stmt->var_init, calls);
+            for (const auto& callee_key : calls) {
+                if (function_map.count(callee_key) == 0) continue;
+                if (reentrancy_variants[callee_key].insert('N').second) {
+                    work.emplace_back(callee_key, 'N');
+                }
+            }
+        }
+    }
+
+    while (!work.empty()) {
+        auto [func_key, ctx] = work.front();
+        work.pop_front();
+        auto it = function_map.find(func_key);
+        if (it == function_map.end()) continue;
+        StmtPtr func = it->second;
+        if (!func || !func->body) continue;
+
+        std::unordered_set<std::string> calls;
+        collect_calls(func->body, calls);
+        for (const auto& callee_key : calls) {
+            auto callee_it = function_map.find(callee_key);
+            if (callee_it == function_map.end()) {
+                if (ctx == 'R' && external_nonreentrant.count(callee_key)) {
+                    std::string callee_name;
+                    int callee_scope = -1;
+                    split_reachability_key(callee_key, callee_name, callee_scope);
+                    if (callee_scope >= 0) {
+                        callee_name += " (scope " + std::to_string(callee_scope) + ")";
+                    }
+                    throw CompileError("Reentrant path calls non-reentrant external function '" + callee_name + "'",
+                                       func->location);
+                }
+                continue;
+            }
+            if (reentrancy_variants[callee_key].insert(ctx).second) {
+                work.emplace_back(callee_key, ctx);
+            }
+        }
+    }
+
+    for (const auto& entry : function_map) {
+        const std::string& func_key = entry.first;
+        if (reentrancy_variants[func_key].empty()) {
+            reentrancy_variants[func_key].insert('N');
         }
     }
 }
@@ -1437,12 +1564,15 @@ void CodeGenerator::gen_module(const Module& mod) {
             if (!stmt->type_namespace.empty()) {
                 func_name = stmt->type_namespace + "::" + stmt->func_name;
             }
-            bool is_non_reentrant = non_reentrant.count(func_name) > 0;
-            if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                            [](const Annotation& a) { return a.name == "reentrant"; })) {
-                is_non_reentrant = false;
+            bool is_reentrant = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                            [](const Annotation& a) { return a.name == "reentrant"; });
+            bool is_nonreentrant = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                               [](const Annotation& a) { return a.name == "nonreentrant"; });
+            if (is_reentrant && is_nonreentrant) {
+                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
+                                   stmt->func_name + "'", stmt->location);
             }
-            std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
+            std::string reent_prefix = is_reentrant ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
             bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
                                           [](const Annotation& a) { return a.name == "inline"; });
             bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
@@ -1514,12 +1644,6 @@ void CodeGenerator::gen_module(const Module& mod) {
 
             // Internal functions are static, exported functions are public
             std::string storage = stmt->is_exported ? "" : "static ";
-            bool is_non_reentrant = non_reentrant.count(func_name) > 0;
-            if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                            [](const Annotation& a) { return a.name == "reentrant"; })) {
-                is_non_reentrant = false;
-            }
-            std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
             bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
                                           [](const Annotation& a) { return a.name == "inline"; });
             bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
@@ -1569,70 +1693,74 @@ void CodeGenerator::gen_module(const Module& mod) {
             }
 
             auto ref_keys = ref_variant_keys_for(stmt);
-            for (const auto& ref_key : ref_keys) {
-                std::string variant_name = ref_variant_name(func_name, ref_key);
-                std::string codegen_name = mangle_name(variant_name);
-                // Add scope instance suffix for imported functions
-                if (stmt->scope_instance_id >= 0) {
-                    codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
-                }
-                std::string label_prefix;
-                if (!ref_key.empty()) {
-                    label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
-                }
-                if (stmt->is_exported) {
-                    label_prefix += "VX_ENTRYPOINT ";
-                }
-                if (is_pure) {
-                    label_prefix += "VX_PURE ";
-                }
-                if (no_global_write) {
-                    label_prefix += "VX_NO_GLOBAL_WRITE ";
-                }
-                if (has_noinline) {
-                    label_prefix += "VX_NOINLINE ";
-                } else if (has_inline) {
-                    label_prefix += "VX_INLINE ";
-                }
-                emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
-
-                // Reference parameters (mutable receivers use pointers, non-mutable use values)
-                for (size_t i = 0; i < stmt->ref_params.size(); i++) {
-                    if (i > 0) emit_header(", ");
-
-                    std::string ref_type;
-                    TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
-                    bool by_ref = true;
-                    if (!ref_key.empty() && i < ref_key.size()) {
-                        by_ref = ref_key[i] == 'M';
+            auto reent_keys = reentrancy_keys_for(key);
+            for (const auto& reent_key : reent_keys) {
+                std::string reent_prefix = (reent_key == 'R') ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
+                for (const auto& ref_key : ref_keys) {
+                    std::string variant = variant_name(func_name, key, reent_key, ref_key);
+                    std::string codegen_name = mangle_name(variant);
+                    // Add scope instance suffix for imported functions
+                    if (stmt->scope_instance_id >= 0) {
+                        codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
                     }
-                    if (ref_type_ptr) {
-                        ref_type = gen_type(ref_type_ptr);
-                    } else if (!stmt->type_namespace.empty() && i == 0) {
-                        ref_type = mangle_name(stmt->type_namespace);
-                    } else {
-                        ref_type = "void";
+                    std::string label_prefix;
+                    if (!ref_key.empty()) {
+                        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
+                    }
+                    if (stmt->is_exported) {
+                        label_prefix += "VX_ENTRYPOINT ";
+                    }
+                    if (is_pure) {
+                        label_prefix += "VX_PURE ";
+                    }
+                    if (no_global_write) {
+                        label_prefix += "VX_NO_GLOBAL_WRITE ";
+                    }
+                    if (has_noinline) {
+                        label_prefix += "VX_NOINLINE ";
+                    } else if (has_inline) {
+                        label_prefix += "VX_INLINE ";
+                    }
+                    emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
+
+                    // Reference parameters (mutable receivers use pointers, non-mutable use values)
+                    for (size_t i = 0; i < stmt->ref_params.size(); i++) {
+                        if (i > 0) emit_header(", ");
+
+                        std::string ref_type;
+                        TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+                        bool by_ref = true;
+                        if (!ref_key.empty() && i < ref_key.size()) {
+                            by_ref = ref_key[i] == 'M';
+                        }
+                        if (ref_type_ptr) {
+                            ref_type = gen_type(ref_type_ptr);
+                        } else if (!stmt->type_namespace.empty() && i == 0) {
+                            ref_type = mangle_name(stmt->type_namespace);
+                        } else {
+                            ref_type = "void";
+                        }
+
+                        if (by_ref) {
+                            ref_type += "*";
+                        } else if (ref_type == "void") {
+                            ref_type = "void*";
+                        }
+
+                        emit_header(ref_type + " " + mangle_name(stmt->ref_params[i]));
                     }
 
-                    if (by_ref) {
-                        ref_type += "*";
-                    } else if (ref_type == "void") {
-                        ref_type = "void*";
+                    // Value parameters (skip expression parameters)
+                    bool first_param = stmt->ref_params.empty();
+                    for (size_t i = 0; i < stmt->params.size(); i++) {
+                        if (stmt->params[i].is_expression_param) continue;  // Skip expression parameters
+                        if (!first_param) emit_header(", ");
+                        first_param = false;
+                        std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
+                        emit_header(ptype + " " + mangle_name(stmt->params[i].name));
                     }
-
-                    emit_header(ref_type + " " + mangle_name(stmt->ref_params[i]));
+                    emit_header(");");
                 }
-
-                // Value parameters (skip expression parameters)
-                bool first_param = stmt->ref_params.empty();
-                for (size_t i = 0; i < stmt->params.size(); i++) {
-                    if (stmt->params[i].is_expression_param) continue;  // Skip expression parameters
-                    if (!first_param) emit_header(", ");
-                    first_param = false;
-                    std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
-                    emit_header(ptype + " " + mangle_name(stmt->params[i].name));
-                }
-                emit_header(");");
             }
         }
     }
@@ -1708,8 +1836,19 @@ void CodeGenerator::gen_module(const Module& mod) {
 void CodeGenerator::gen_stmt(StmtPtr stmt) {
     switch (stmt->kind) {
         case Stmt::Kind::FuncDecl:
-            for (const auto& ref_key : ref_variant_keys_for(stmt)) {
-                gen_func_decl(stmt, ref_key);
+            {
+                std::string func_name = stmt->func_name;
+                if (!stmt->type_namespace.empty()) {
+                    func_name = stmt->type_namespace + "::" + stmt->func_name;
+                }
+                std::string key = reachability_key(func_name, stmt->scope_instance_id);
+                auto reent_keys = reentrancy_keys_for(key);
+                auto ref_keys = ref_variant_keys_for(stmt);
+                for (const auto& reent_key : reent_keys) {
+                    for (const auto& ref_key : ref_keys) {
+                        gen_func_decl(stmt, ref_key, reent_key);
+                    }
+                }
             }
             break;
         case Stmt::Kind::TypeDecl:
@@ -1853,7 +1992,7 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
     }
 }
 
-void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
+void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char reent_key) {
     if (stmt->is_external) return;
 
     // Build qualified function name for methods
@@ -1861,21 +2000,19 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     if (!stmt->type_namespace.empty()) {
         func_name = stmt->type_namespace + "::" + stmt->func_name;
     }
-    std::string variant_name = ref_variant_name(func_name, ref_key);
+    std::string reach_key = reachability_key(func_name, stmt->scope_instance_id);
+    std::string variant_id = variant_name(func_name, reach_key, reent_key, ref_key);
 
-    bool is_non_reentrant = non_reentrant.count(func_name) > 0;
-    if (std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                    [](const Annotation& a) { return a.name == "reentrant"; })) {
-        is_non_reentrant = false;
-    }
-    current_function_non_reentrant = is_non_reentrant;
-    std::string reent_prefix = is_non_reentrant ? "VX_NON_REENTRANT " : "VX_REENTRANT ";
+    current_reentrancy_key = reent_key;
+    current_function_non_reentrant = (reent_key == 'N');
+    std::string reent_prefix = (reent_key == 'R') ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
 
     // Skip unreachable functions (dead code elimination)
     // For imported functions (scope_instance_id >= 0), always generate if base name is reachable
-    std::string reach_key = reachability_key(func_name, stmt->scope_instance_id);
+    // reach_key already computed for variant selection
     if (!reachable_functions.count(reach_key)) {
         current_function_non_reentrant = false;
+        current_reentrancy_key = 'N';
         return;
     }
 
@@ -1900,6 +2037,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     for (const auto& param : stmt->params) {
         if (param.is_expression_param) {
             current_function_non_reentrant = false;
+            current_reentrancy_key = 'N';
             return;
         }
     }
@@ -1972,7 +2110,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     emit("");
     std::string ann_comment = render_annotation_comment(stmt->annotations);
     if (!ann_comment.empty()) emit(ann_comment);
-    std::string codegen_name = mangle_name(variant_name);
+    std::string codegen_name = mangle_name(variant_id);
     if (stmt->scope_instance_id >= 0) {
         codegen_name += "_s" + std::to_string(stmt->scope_instance_id);
     }
@@ -2075,6 +2213,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     emit("}");
 
     current_function_non_reentrant = false;
+    current_reentrancy_key = 'N';
     
     output_stack.pop();
     in_function = prev_in_function;
@@ -2082,7 +2221,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key) {
     if (!func_code.empty()) {
         GeneratedFunctionInfo info;
         info.declaration = stmt;
-        info.qualified_name = variant_name;
+        info.qualified_name = variant_id;
         info.c_name = codegen_name;
         info.storage = storage;
         info.code = func_code;
@@ -2383,6 +2522,36 @@ std::string CodeGenerator::ref_variant_name(const std::string& func_name, const 
     return func_name + "__ref" + ref_key;
 }
 
+std::vector<char> CodeGenerator::reentrancy_keys_for(const std::string& func_key) const {
+    std::vector<char> keys;
+    auto it = reentrancy_variants.find(func_key);
+    if (it != reentrancy_variants.end()) {
+        keys.assign(it->second.begin(), it->second.end());
+    }
+    if (keys.empty()) {
+        keys.push_back('N');
+    }
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
+std::string CodeGenerator::reentrancy_variant_name(const std::string& func_name, const std::string& func_key, char reent_key) const {
+    auto it = reentrancy_variants.find(func_key);
+    if (it == reentrancy_variants.end() || it->second.size() <= 1) {
+        return func_name;
+    }
+    if (reent_key == 'R') {
+        return func_name + "__reent";
+    }
+    return func_name + "__nonreent";
+}
+
+std::string CodeGenerator::variant_name(const std::string& func_name, const std::string& func_key,
+                                        char reent_key, const std::string& ref_key) const {
+    std::string name = reentrancy_variant_name(func_name, func_key, reent_key);
+    return ref_variant_name(name, ref_key);
+}
+
 bool CodeGenerator::receiver_is_mutable_arg(ExprPtr expr) const {
     return is_addressable_lvalue(expr) && is_mutable_lvalue(expr);
 }
@@ -2644,13 +2813,22 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             }
         }
 
-        if (sym && sym->declaration && !sym->declaration->ref_params.empty()) {
-            if (sym->declaration->is_external) {
-                ref_key = std::string(sym->declaration->ref_params.size(), 'M');
-            } else {
-                ref_key = ref_variant_key(expr, sym->declaration->ref_params.size());
+        bool is_external = false;
+        if (sym && sym->declaration && sym->kind == Symbol::Kind::Function) {
+            is_external = sym->declaration->is_external;
+            if (!sym->declaration->ref_params.empty()) {
+                if (is_external) {
+                    ref_key = std::string(sym->declaration->ref_params.size(), 'M');
+                } else {
+                    ref_key = ref_variant_key(expr, sym->declaration->ref_params.size());
+                }
             }
-            original_name = ref_variant_name(original_name, ref_key);
+            if (!is_external) {
+                std::string func_key = reachability_key(original_name, scope_id);
+                original_name = variant_name(original_name, func_key, current_reentrancy_key, ref_key);
+            } else if (!ref_key.empty()) {
+                original_name = ref_variant_name(original_name, ref_key);
+            }
         }
 
         func_name = mangle_name(original_name);

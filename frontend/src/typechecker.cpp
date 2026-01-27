@@ -1800,7 +1800,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
 
     for (const auto& ann : stmt->annotations) {
         bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
-                          ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
+                          ann_is(ann, "nonreentrant") || ann_is(ann, "nonbanked") ||
+                          ann_is(ann, "inline") || ann_is(ann, "noinline");
         if (!recognized) continue;
         switch (stmt->kind) {
             case Stmt::Kind::FuncDecl:
@@ -1808,7 +1809,7 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
                 break;
             case Stmt::Kind::VarDecl:
                 warn_if(ann, ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
-                                 ann_is(ann, "inline") || ann_is(ann, "noinline"),
+                                 ann_is(ann, "nonreentrant") || ann_is(ann, "inline") || ann_is(ann, "noinline"),
                         "[[" + ann.name + "]] is only meaningful on functions");
                 break;
             default:
@@ -1822,7 +1823,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
             for (const auto& param : stmt->params) {
                 for (const auto& ann : param.annotations) {
                     bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
-                                      ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
+                                      ann_is(ann, "nonreentrant") || ann_is(ann, "nonbanked") ||
+                                      ann_is(ann, "inline") || ann_is(ann, "noinline");
                     if (recognized) {
                         warn_annotation(ann, "[[" + ann.name + "]] is not used on parameters");
                     }
@@ -1840,7 +1842,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
             for (const auto& field : stmt->fields) {
                 for (const auto& ann : field.annotations) {
                     bool recognized = ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
-                                      ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline");
+                                      ann_is(ann, "nonreentrant") || ann_is(ann, "nonbanked") ||
+                                      ann_is(ann, "inline") || ann_is(ann, "noinline");
                     if (recognized) {
                         warn_annotation(ann, "[[" + ann.name + "]] is not used on struct fields");
                     }
@@ -1870,7 +1873,8 @@ void TypeChecker::validate_expr_annotations(ExprPtr expr) {
 
     auto warn_all = [&](const Annotation& ann) {
         if (ann_is(ann, "hot") || ann_is(ann, "cold") || ann_is(ann, "reentrant") ||
-            ann_is(ann, "nonbanked") || ann_is(ann, "inline") || ann_is(ann, "noinline")) {
+            ann_is(ann, "nonreentrant") || ann_is(ann, "nonbanked") ||
+            ann_is(ann, "inline") || ann_is(ann, "noinline")) {
             warn_annotation(ann, "[[" + ann.name + "]] is not used on expressions");
         }
     };

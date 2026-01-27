@@ -30,7 +30,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` (user types may overload `+ - * / % == != < <= > >=` via operator methods)
   - Note: `|` serves as both unary (length/absolute) and binary (bitwise OR) operator
 - **Statement termination**: `;` or any whitespace when unambiguous (see Section 8 for ambiguous parsing rules)
-- **Annotations**: Optional prefixes `[[name]]` or `[[name(arg1, arg2)]]` may precede declarations, statements, and expressions. Annotations are opaque to the language semantics; the compiler preserves them for tooling/backends. Recognized hints include `[[hot]]`, `[[cold]]`, `[[reentrant]]`, `[[nonbanked]]`.
+- **Annotations**: Optional prefixes `[[name]]` or `[[name(arg1, arg2)]]` may precede declarations, statements, and expressions. Annotations are opaque to the language semantics; the compiler preserves them for tooling/backends. Recognized hints include `[[hot]]`, `[[cold]]`, `[[reentrant]]`, `[[nonreentrant]]`, `[[nonbanked]]`.
 
 ---
 
@@ -334,7 +334,8 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Unknown annotations are preserved verbatim; they do not change language semantics.
 - Recognized hints:
   - `[[hot]]` / `[[cold]]`: performance hints for backends/tooling.
-  - `[[reentrant]]`: marks a function as reentrant; required for recursion in the banked backend and skips page save/restore there.
+  - `[[reentrant]]`: marks an entry/exit function as requiring reentrant behavior; backends may propagate this requirement through the call graph.
+  - `[[nonreentrant]]`: explicit non-reentrant entry/exit marker (default if neither is provided).
   - `[[nonbanked]]`: forces globals into RAM in the banked backend, even if immutable.
 - Lowered pipeline: the compiler can emit a fully type-checked, monomorphized “lowered Vexel” subset (`-L/--emit-lowered`) with annotations preserved. The lowered form contains no generics or expression parameters; all types are explicit.
 

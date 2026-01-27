@@ -35,6 +35,7 @@ This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the
 - Direct Vexel calls become direct C calls; tail-call optimisation is optional.
 - Receiver/multi-receiver methods: mutating receivers are pointers, non-mutating receivers are values; rvalue receivers for mutating methods are materialized into temporaries; expression parameters are fully specialized before codegen.
 - When both mutable and non-mutable receiver paths are used, the backend emits specialized C functions per receiver mutability mask (suffix `__ref<mask>`, `M` = mutable reference, `N` = non-mutable/value).
+- When both reentrant and non-reentrant call paths reach a function, the backend emits two variants (`__reent` and `__nonreent`) and call sites select the appropriate variant.
 - Exported (`&^`) functions are non-`static` and declared in the header; internal functions are `static`.
 - External (`&!`) declarations emit as `extern` prototypes only.
 - Function declarations/definitions are annotated with `VX_REENTRANT`/`VX_NON_REENTRANT`, `VX_REF_MASK("<mask>")`, `VX_ENTRYPOINT` (exports), `VX_INLINE`/`VX_NOINLINE` (from annotations), and `VX_PURE`/`VX_NO_GLOBAL_WRITE` when proven; all macros default to empty in the generated header and are intended for backend visibility.
