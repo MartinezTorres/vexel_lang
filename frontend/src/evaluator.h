@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "typechecker.h"
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
@@ -8,13 +9,21 @@
 
 namespace vexel {
 
-// Compile-time value - can be scalar or composite (struct)
+struct CTComposite;
+struct CTArray;
+
+// Compile-time value - can be scalar, composite (struct), or array
+using CTValue = std::variant<int64_t, uint64_t, double, bool, std::string,
+                             std::shared_ptr<CTComposite>, std::shared_ptr<CTArray>>;
+
 struct CTComposite {
     std::string type_name;
-    std::unordered_map<std::string, std::variant<int64_t, uint64_t, double, bool, std::string>> fields;
+    std::unordered_map<std::string, CTValue> fields;
 };
 
-using CTValue = std::variant<int64_t, uint64_t, double, bool, std::string, CTComposite>;
+struct CTArray {
+    std::vector<CTValue> elements;
+};
 
 class CompileTimeEvaluator {
 public:
@@ -41,7 +50,10 @@ private:
     std::vector<std::unordered_set<std::string>> ref_param_stack;
     std::string error_msg;
     int recursion_depth = 0;
+    int loop_depth = 0;
+    int return_depth = 0;
     static const int MAX_RECURSION_DEPTH = 1000;
+    static const int MAX_LOOP_ITERATIONS = 1000000;
 
     bool eval_literal(ExprPtr expr, CTValue& result);
     bool eval_binary(ExprPtr expr, CTValue& result);
@@ -53,6 +65,13 @@ private:
     bool eval_conditional(ExprPtr expr, CTValue& result);
     bool eval_cast(ExprPtr expr, CTValue& result);
     bool eval_assignment(ExprPtr expr, CTValue& result);
+    bool eval_array_literal(ExprPtr expr, CTValue& result);
+    bool eval_tuple_literal(ExprPtr expr, CTValue& result);
+    bool eval_range(ExprPtr expr, CTValue& result);
+    bool eval_index(ExprPtr expr, CTValue& result);
+    bool eval_iteration(ExprPtr expr, CTValue& result);
+    bool eval_repeat(ExprPtr expr, CTValue& result);
+    bool eval_length(ExprPtr expr, CTValue& result);
 
     // Purity analysis
     bool is_pure_for_compile_time(StmtPtr func, std::string& reason);
