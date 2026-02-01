@@ -555,15 +555,22 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
                             }
                         }
                         emit(elem_type + " " + var_name + "[" + size_str + "] = {");
-                        for (size_t i = 0; i < stmt->expr->right->elements.size(); i++) {
-                            if (i > 0) emit(", ");
-                            emit(gen_expr(stmt->expr->right->elements[i]));
+                        {
+                            VoidCallGuard guard(*this, false);
+                            for (size_t i = 0; i < stmt->expr->right->elements.size(); i++) {
+                                if (i > 0) emit(", ");
+                                emit(gen_expr(stmt->expr->right->elements[i]));
+                            }
                         }
                         emit("};");
                         break;
                     }
 
-                    std::string rhs = gen_expr(stmt->expr->right);
+                    std::string rhs;
+                    {
+                        VoidCallGuard guard(*this, false);
+                        rhs = gen_expr(stmt->expr->right);
+                    }
                     emit(var_type_str + " " + var_name + " = " + rhs + ";");
                     // Release RHS temp if it's a temporary
                     if (rhs.substr(0, 3) == "tmp") {
@@ -573,12 +580,23 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
                 }
 
                 // Regular expression statement (including assignments to existing variables)
-                emit(gen_expr(stmt->expr) + ";");
+                {
+                    VoidCallGuard guard(*this, true);
+                    std::string expr_code = gen_expr(stmt->expr);
+                    if (!expr_code.empty()) {
+                        emit(expr_code + ";");
+                    }
+                }
             }
             break;
         case Stmt::Kind::Return:
             if (stmt->return_expr) {
-                emit("return " + gen_expr(stmt->return_expr) + ";");
+                std::string ret_expr;
+                {
+                    VoidCallGuard guard(*this, false);
+                    ret_expr = gen_expr(stmt->return_expr);
+                }
+                emit("return " + ret_expr + ";");
             } else {
                 emit("return;");
             }
@@ -614,7 +632,14 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
             }
 
             // Runtime conditional
-            emit("if (" + gen_expr(stmt->condition) + ") {");
+            {
+                std::string cond_expr;
+                {
+                    VoidCallGuard guard(*this, false);
+                    cond_expr = gen_expr(stmt->condition);
+                }
+                emit("if (" + cond_expr + ") {");
+            }
             gen_stmt(stmt->true_stmt);
             emit("}");
             break;
@@ -831,11 +856,17 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         }
 
         if (!handled_body) {
-            std::string body_expr = gen_expr(stmt->body);
+            std::string body_expr;
             if (stmt->return_type) {
+                VoidCallGuard guard(*this, false);
+                body_expr = gen_expr(stmt->body);
                 emit("return " + body_expr + ";");
             } else {
-                emit(body_expr + ";");
+                VoidCallGuard guard(*this, true);
+                body_expr = gen_expr(stmt->body);
+                if (!body_expr.empty()) {
+                    emit(body_expr + ";");
+                }
             }
         }
     }
@@ -961,9 +992,12 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                 // Handle array literal
                 if (stmt->var_init->kind == Expr::Kind::ArrayLiteral) {
                     emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "] = {");
-                    for (size_t i = 0; i < stmt->var_init->elements.size(); i++) {
-                        if (i > 0) emit(", ");
-                        emit(gen_expr(stmt->var_init->elements[i]));
+                    {
+                        VoidCallGuard guard(*this, false);
+                        for (size_t i = 0; i < stmt->var_init->elements.size(); i++) {
+                            if (i > 0) emit(", ");
+                            emit(gen_expr(stmt->var_init->elements[i]));
+                        }
                     }
                     emit("};");
                     finalize();
@@ -982,7 +1016,12 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     }
                 }
                 emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
-                emit("memcpy(" + mangle_name(var_name) + ", " + gen_expr(stmt->var_init) + ", sizeof(" + mangle_name(var_name) + "));");
+                std::string init_expr;
+                {
+                    VoidCallGuard guard(*this, false);
+                    init_expr = gen_expr(stmt->var_init);
+                }
+                emit("memcpy(" + mangle_name(var_name) + ", " + init_expr + ", sizeof(" + mangle_name(var_name) + "));");
                 finalize();
                 return;
             }
@@ -1063,7 +1102,12 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             }
         }
         // Fallback to runtime evaluation (only for mutable variables)
-        emit(storage + mutability + vtype + " " + mangle_name(var_name) + " = " + gen_expr(stmt->var_init) + ";");
+        std::string init_expr;
+        {
+            VoidCallGuard guard(*this, false);
+            init_expr = gen_expr(stmt->var_init);
+        }
+        emit(storage + mutability + vtype + " " + mangle_name(var_name) + " = " + init_expr + ";");
     } else {
         // No initializer - special handling for arrays
         if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
@@ -1188,6 +1232,21 @@ bool CodeGenerator::receiver_is_mutable_arg(ExprPtr expr) const {
     return is_addressable_lvalue(expr) && is_mutable_lvalue(expr);
 }
 
+bool CodeGenerator::is_void_call(ExprPtr expr, std::string* name_out) const {
+    if (!expr || expr->kind != Expr::Kind::Call) return false;
+    if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) return false;
+    if (!type_checker) return false;
+
+    Symbol* sym = type_checker->get_scope()->lookup(expr->operand->name);
+    if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) return false;
+    if (sym->declaration->return_type || !sym->declaration->return_types.empty()) return false;
+
+    if (name_out) {
+        *name_out = expr->operand->name;
+    }
+    return true;
+}
+
 bool CodeGenerator::try_evaluate(ExprPtr expr, CTValue& out) const {
     if (!expr) return false;
     if (optimization) {
@@ -1230,6 +1289,14 @@ bool CodeGenerator::is_mutable_lvalue(ExprPtr expr) const {
 
 std::string CodeGenerator::gen_expr(ExprPtr expr) {
     if (!expr) return "";
+    std::string void_name;
+    if (is_void_call(expr, &void_name) && !allow_void_call) {
+        throw CompileError(
+            "Function '" + void_name +
+            "' has no return type; its result cannot be used as a value. "
+            "Declare a return type or call it as a statement.",
+            expr->location);
+    }
 
     switch (expr->kind) {
         case Expr::Kind::IntLiteral:
@@ -1315,8 +1382,13 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_binary(ExprPtr expr) {
-    std::string left = gen_expr(expr->left);
-    std::string right = gen_expr(expr->right);
+    std::string left;
+    std::string right;
+    {
+        VoidCallGuard guard(*this, false);
+        left = gen_expr(expr->left);
+        right = gen_expr(expr->right);
+    }
     if (expr->op == "==" || expr->op == "!=") {
         TypePtr cmp_type = expr->left ? expr->left->type : nullptr;
         if (!cmp_type && type_checker && expr->left && expr->left->kind == Expr::Kind::Identifier) {
@@ -1340,7 +1412,11 @@ std::string CodeGenerator::gen_binary(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_unary(ExprPtr expr) {
-    std::string operand = gen_expr(expr->operand);
+    std::string operand;
+    {
+        VoidCallGuard guard(*this, false);
+        operand = gen_expr(expr->operand);
+    }
     return "(" + expr->op + operand + ")";
 }
 
@@ -1360,10 +1436,13 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             std::string result = "((" + type_name + "){";
 
             // Match arguments to fields by position
-            for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
-                if (i > 0) result += ", ";
-                result += "." + mangle_name(sym->declaration->fields[i].name) + " = ";
-                result += gen_expr(expr->args[i]);
+            {
+                VoidCallGuard guard(*this, false);
+                for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
+                    if (i > 0) result += ", ";
+                    result += "." + mangle_name(sym->declaration->fields[i].name) + " = ";
+                    result += gen_expr(expr->args[i]);
+                }
             }
 
             result += "})";
@@ -1398,7 +1477,11 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                     if (param.is_expression_param) {
                         expr_param_substitutions[param.name] = expr->args[i];
                     } else {
-                        std::string arg_expr = gen_expr(expr->args[i]);
+                        std::string arg_expr;
+                        {
+                            VoidCallGuard guard(*this, false);
+                            arg_expr = gen_expr(expr->args[i]);
+                        }
                         value_param_replacements[param.name] = arg_expr;
                     }
                 }
@@ -1464,6 +1547,7 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             func_name += "_s" + std::to_string(scope_id);
         }
     } else if (expr->operand) {
+        VoidCallGuard guard(*this, false);
         func_name = gen_expr(expr->operand);
     }
 
@@ -1477,15 +1561,30 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             }
             if (by_ref) {
                 if (is_addressable_lvalue(rec) && is_mutable_lvalue(rec)) {
-                    all_args.push_back("&" + gen_expr(rec));
+                    std::string rec_expr;
+                    {
+                        VoidCallGuard guard(*this, false);
+                        rec_expr = gen_expr(rec);
+                    }
+                    all_args.push_back("&" + rec_expr);
                 } else {
                     std::string temp = fresh_temp();
                     std::string rtype = rec && rec->type ? gen_type(rec->type) : "int";
-                    emit(rtype + " " + temp + " = " + gen_expr(rec) + ";");
+                    std::string rec_expr;
+                    {
+                        VoidCallGuard guard(*this, false);
+                        rec_expr = gen_expr(rec);
+                    }
+                    emit(rtype + " " + temp + " = " + rec_expr + ";");
                     all_args.push_back("&" + temp);
                 }
             } else {
-                all_args.push_back(gen_expr(rec));
+                std::string rec_expr;
+                {
+                    VoidCallGuard guard(*this, false);
+                    rec_expr = gen_expr(rec);
+                }
+                all_args.push_back(rec_expr);
             }
         }
     }
@@ -1503,7 +1602,12 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                 continue;  // Skip expression parameters
             }
         }
-        all_args.push_back(gen_expr(expr->args[i]));
+        std::string arg_expr;
+        {
+            VoidCallGuard guard(*this, false);
+            arg_expr = gen_expr(expr->args[i]);
+        }
+        all_args.push_back(arg_expr);
         param_idx++;
     }
 
@@ -1517,8 +1621,13 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_index(ExprPtr expr) {
-    std::string arr = gen_expr(expr->operand);
-    std::string idx = gen_expr(expr->args[0]);
+    std::string arr;
+    std::string idx;
+    {
+        VoidCallGuard guard(*this, false);
+        arr = gen_expr(expr->operand);
+        idx = gen_expr(expr->args[0]);
+    }
     return arr + "[" + idx + "]";
 }
 
@@ -1540,6 +1649,7 @@ std::string CodeGenerator::gen_member(ExprPtr expr) {
             obj += "_s" + std::to_string(scope_id);
         }
     } else {
+        VoidCallGuard guard(*this, false);
         obj = gen_expr(expr->operand);
     }
 
@@ -1569,9 +1679,12 @@ std::string CodeGenerator::gen_array_literal(ExprPtr expr) {
     // Generate array declaration and initialization
     // Use static to ensure it persists beyond the current scope (important for struct fields)
     emit("static " + elem_type + " " + temp + "[" + std::to_string(storage_count) + "] = {");
-    for (size_t i = 0; i < count; i++) {
-        if (i > 0) emit(", ");
-        emit(gen_expr(expr->elements[i]));
+    {
+        VoidCallGuard guard(*this, false);
+        for (size_t i = 0; i < count; i++) {
+            if (i > 0) emit(", ");
+            emit(gen_expr(expr->elements[i]));
+        }
     }
     emit("};");
 
@@ -1596,10 +1709,13 @@ std::string CodeGenerator::gen_tuple_literal(ExprPtr expr) {
     }
 
     std::string result = "((" + type_name + "){";
-    for (size_t i = 0; i < expr->elements.size(); i++) {
-        if (i > 0) result += ", ";
-        result += ".__" + std::to_string(i) + " = ";
-        result += gen_expr(expr->elements[i]);
+    {
+        VoidCallGuard guard(*this, false);
+        for (size_t i = 0; i < expr->elements.size(); i++) {
+            if (i > 0) result += ", ";
+            result += ".__" + std::to_string(i) + " = ";
+            result += gen_expr(expr->elements[i]);
+        }
     }
     result += "})";
 
@@ -1607,14 +1723,24 @@ std::string CodeGenerator::gen_tuple_literal(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_block(ExprPtr expr) {
-    // If block has no result expression, don't create a temp
-    if (!expr->result_expr) {
+    if (allow_void_call) {
         emit("{");
         for (const auto& stmt : expr->statements) {
             gen_stmt(stmt);
         }
+        if (expr->result_expr) {
+            std::string result = gen_expr(expr->result_expr);
+            if (!result.empty()) {
+                emit(result + ";");
+            }
+        }
         emit("}");
-        return "";  // No result value
+        return "";
+    }
+
+    if (!expr->result_expr) {
+        throw CompileError("Block expression has no result; use it as a statement or add a final expression",
+                           expr->location);
     }
 
     std::string temp = fresh_temp();
@@ -1640,7 +1766,11 @@ std::string CodeGenerator::gen_block(ExprPtr expr) {
         gen_stmt(stmt);
     }
 
-    std::string result = gen_expr(expr->result_expr);
+    std::string result;
+    {
+        VoidCallGuard guard(*this, false);
+        result = gen_expr(expr->result_expr);
+    }
     emit(temp + " = " + result + ";");
     // Release the result temp if it's a temporary
     if (result.substr(0, 3) == "tmp") {
@@ -1788,17 +1918,37 @@ std::string CodeGenerator::gen_conditional(ExprPtr expr) {
             }
 
             if (is_true) {
+                if (allow_void_call) {
+                    return gen_expr(expr->true_expr);
+                }
+                VoidCallGuard guard(*this, false);
                 return gen_expr(expr->true_expr);
             } else {
+                if (allow_void_call) {
+                    return gen_expr(expr->false_expr);
+                }
+                VoidCallGuard guard(*this, false);
                 return gen_expr(expr->false_expr);
             }
         }
     }
 
     // Runtime conditional
-    std::string cond = gen_expr(expr->condition);
-    std::string true_expr = gen_expr(expr->true_expr);
-    std::string false_expr = gen_expr(expr->false_expr);
+    std::string cond;
+    {
+        VoidCallGuard guard(*this, false);
+        cond = gen_expr(expr->condition);
+    }
+    std::string true_expr;
+    std::string false_expr;
+    if (allow_void_call) {
+        true_expr = gen_expr(expr->true_expr);
+        false_expr = gen_expr(expr->false_expr);
+    } else {
+        VoidCallGuard guard(*this, false);
+        true_expr = gen_expr(expr->true_expr);
+        false_expr = gen_expr(expr->false_expr);
+    }
     return "(" + cond + " ? " + true_expr + " : " + false_expr + ")";
 }
 
@@ -1818,7 +1968,11 @@ std::string CodeGenerator::gen_cast(ExprPtr expr) {
             throw CompileError("Array length/type size mismatch in cast", expr->location);
         }
 
-        std::string source_val = gen_expr(expr->operand);
+        std::string source_val;
+        {
+            VoidCallGuard guard(*this, false);
+            source_val = gen_expr(expr->operand);
+        }
         std::string source_tmp = fresh_temp();
         std::string source_type = gen_type(expr->operand->type);
         if (!declared_temps.count(source_tmp)) {
@@ -1855,7 +2009,11 @@ std::string CodeGenerator::gen_cast(ExprPtr expr) {
 
         int64_t length = resolve_array_length(expr->operand->type, expr->location);
         std::string target = gen_type(expr->target_type);
-        std::string source = gen_expr(expr->operand);
+        std::string source;
+        {
+            VoidCallGuard guard(*this, false);
+            source = gen_expr(expr->operand);
+        }
         std::string temp = fresh_temp();
         if (!declared_temps.count(temp)) {
             emit(storage_prefix() + target + " " + temp + ";");
@@ -1870,7 +2028,11 @@ std::string CodeGenerator::gen_cast(ExprPtr expr) {
     }
 
     std::string target = gen_type(expr->target_type);
-    std::string operand = gen_expr(expr->operand);
+    std::string operand;
+    {
+        VoidCallGuard guard(*this, false);
+        operand = gen_expr(expr->operand);
+    }
     return "((" + target + ")" + operand + ")";
 }
 
@@ -1896,9 +2058,12 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
             }
 
             emit(elem_type + " " + var_name + "[" + size_str + "] = {");
-            for (size_t i = 0; i < expr->right->elements.size(); i++) {
-                if (i > 0) emit(", ");
-                emit(gen_expr(expr->right->elements[i]));
+            {
+                VoidCallGuard guard(*this, false);
+                for (size_t i = 0; i < expr->right->elements.size(); i++) {
+                    if (i > 0) emit(", ");
+                    emit(gen_expr(expr->right->elements[i]));
+                }
             }
             emit("};");
 
@@ -1907,7 +2072,11 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
             return temp;
         }
 
-        std::string rhs = gen_expr(expr->right);
+        std::string rhs;
+        {
+            VoidCallGuard guard(*this, false);
+            rhs = gen_expr(expr->right);
+        }
         // Release RHS temp if it's a temporary
         if (rhs.substr(0, 3) == "tmp") {
             release_temp(rhs);
@@ -1919,8 +2088,13 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
     }
 
     // Regular assignment
-    std::string lhs = gen_expr(expr->left);
-    std::string rhs = gen_expr(expr->right);
+    std::string lhs;
+    std::string rhs;
+    {
+        VoidCallGuard guard(*this, false);
+        lhs = gen_expr(expr->left);
+        rhs = gen_expr(expr->right);
+    }
     // Release RHS temp if it's a temporary
     if (rhs.substr(0, 3) == "tmp") {
         release_temp(rhs);
@@ -2004,12 +2178,21 @@ std::string CodeGenerator::gen_length(ExprPtr expr) {
             if (expr->operand->kind == Expr::Kind::StringLiteral) {
                 return std::to_string(expr->operand->string_val.size());
             }
-            return "strlen(" + gen_expr(expr->operand) + ")";
+            std::string operand;
+            {
+                VoidCallGuard guard(*this, false);
+                operand = gen_expr(expr->operand);
+            }
+            return "strlen(" + operand + ")";
         }
     }
 
     // Absolute value for numeric types
-    std::string operand = gen_expr(expr->operand);
+    std::string operand;
+    {
+        VoidCallGuard guard(*this, false);
+        operand = gen_expr(expr->operand);
+    }
     if (expr->operand->type && expr->operand->type->kind == Type::Kind::Primitive) {
         if (is_float(expr->operand->type->primitive)) {
             return "fabs(" + operand + ")";
@@ -2072,7 +2255,11 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
         size_str = std::to_string(element_count);
     }
 
-    std::string array_expr = gen_expr(expr->operand);
+    std::string array_expr;
+    {
+        VoidCallGuard guard(*this, false);
+        array_expr = gen_expr(expr->operand);
+    }
     std::string array_ptr = fresh_temp();
     std::string loop_var = fresh_temp();
     std::string underscore = fresh_temp();
@@ -2113,8 +2300,14 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
     std::string saved_underscore = underscore_var;
     underscore_var = underscore;
 
-    std::string body_code = gen_expr(expr->right);
-    emit("    " + body_code + ";");
+    std::string body_code;
+    {
+        VoidCallGuard guard(*this, true);
+        body_code = gen_expr(expr->right);
+    }
+    if (!body_code.empty()) {
+        emit("    " + body_code + ";");
+    }
 
     underscore_var = saved_underscore;
 
@@ -2125,9 +2318,20 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_repeat(ExprPtr expr) {
-    std::string cond = gen_expr(expr->condition);
+    std::string cond;
+    {
+        VoidCallGuard guard(*this, false);
+        cond = gen_expr(expr->condition);
+    }
     emit("while (" + cond + ") {");
-    emit("  " + gen_expr(expr->right) + ";");
+    std::string body_code;
+    {
+        VoidCallGuard guard(*this, true);
+        body_code = gen_expr(expr->right);
+    }
+    if (!body_code.empty()) {
+        emit("  " + body_code + ";");
+    }
     emit("}");
     return "";
 }
@@ -2166,9 +2370,7 @@ std::string CodeGenerator::gen_type(TypePtr type) {
             return mangle_name(type->type_name);
 
         case Type::Kind::TypeVar:
-            // TypeVars appear when types aren't explicitly annotated
-            // Default to int32_t as a reasonable default for untyped fields
-            return "int32_t";
+            throw CompileError("Type could not be inferred; add an explicit type annotation", type->location);
     }
 
     return "void";

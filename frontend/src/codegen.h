@@ -112,6 +112,7 @@ private:
     bool try_evaluate(ExprPtr expr, CTValue& out) const;
     bool is_addressable_lvalue(ExprPtr expr) const;
     bool is_mutable_lvalue(ExprPtr expr) const;
+    bool is_void_call(ExprPtr expr, std::string* name_out = nullptr) const;
     std::string gen_type(TypePtr type);
     std::string mangle_name(const std::string& name);
     std::string fresh_temp();
@@ -124,6 +125,17 @@ private:
 
     void emit(const std::string& code);
     void emit_header(const std::string& code);
+
+    struct VoidCallGuard {
+        CodeGenerator& gen;
+        bool prev;
+        explicit VoidCallGuard(CodeGenerator& g, bool allow) : gen(g), prev(g.allow_void_call) {
+            gen.allow_void_call = allow;
+        }
+        ~VoidCallGuard() { gen.allow_void_call = prev; }
+    };
+
+    bool allow_void_call = false;
 };
 
 }

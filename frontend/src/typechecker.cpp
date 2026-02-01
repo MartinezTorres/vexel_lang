@@ -863,6 +863,10 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             expr->type = sym->declaration->return_type;
             return expr->type;
         }
+
+        // No declared return type: treat as void (no value)
+        expr->type = nullptr;
+        return expr->type;
     }
 
     expr->type = make_fresh_typevar();

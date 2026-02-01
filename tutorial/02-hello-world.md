@@ -6,7 +6,7 @@ Vexel has no standard library, so I/O is done via **external functions**. The po
 &!putchar(c:#u8);
 
 &print_newline() {
-  putchar(10)
+  putchar(10);
 }
 
 &^main() -> #i32 {
