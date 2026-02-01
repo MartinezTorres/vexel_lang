@@ -19,6 +19,9 @@
       --tab-active: #273047;
       --outline: #2e364a;
       --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      --code-line-height: 1.5;
+      --code-font-size: 0.95rem;
+      --mobile-code-lines: 20;
     }
 
     * { box-sizing: border-box; }
@@ -200,8 +203,8 @@
       background: #0f141c;
       color: #e9efff;
       font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-      font-size: 0.95rem;
-      line-height: 1.5;
+      font-size: var(--code-font-size);
+      line-height: var(--code-line-height);
       padding: 16px;
       min-height: 0;
     }
@@ -281,6 +284,12 @@
 
       .panes {
         grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .editor, .output {
+        min-height: calc(var(--mobile-code-lines) * var(--code-line-height) * 1em);
       }
     }
   </style>
