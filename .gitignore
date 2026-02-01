@@ -2,6 +2,10 @@
 build/
 bin/
 
+# External
+ext/*
+!ext/vexel_megalinker_backend/
+
 # Generated C files
 *.c
 !examples/*.c

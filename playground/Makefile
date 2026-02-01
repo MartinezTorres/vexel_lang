@@ -18,12 +18,18 @@ SOURCES := \
   $(VEXEL_ROOT_DIR)/frontend/src/typechecker.cpp \
   $(VEXEL_ROOT_DIR)/backends/c/src/c_backend.cpp \
   $(VEXEL_ROOT_DIR)/backends/c/src/c_driver.cpp \
-  $(VEXEL_ROOT_DIR)/backends/c/src/c_main.cpp
+  $(VEXEL_ROOT_DIR)/playground/web_main.cpp
 
 INCLUDES := \
   -I$(VEXEL_ROOT_DIR) \
   -I$(VEXEL_ROOT_DIR)/frontend/src \
   -I$(VEXEL_ROOT_DIR)/backends/c/src
+
+MEGALINKER_DIR := $(VEXEL_ROOT_DIR)/ext/vexel_megalinker_backend
+ifneq ("$(wildcard $(MEGALINKER_DIR)/src/megalinker_backend.cpp)","")
+  SOURCES += $(MEGALINKER_DIR)/src/megalinker_backend.cpp
+  INCLUDES += -I$(MEGALINKER_DIR)/src
+endif
 
 EMXXFLAGS ?= -std=c++17 -O2 -fexceptions
 EMFLAGS := \

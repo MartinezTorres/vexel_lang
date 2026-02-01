@@ -1,0 +1,112 @@
+#include "backend_registry.h"
+#include "c_backend.h"
+#include "compiler.h"
+#include <iostream>
+#include <cstring>
+#include <vector>
+
+#if __has_include("megalinker_backend.h")
+#include "megalinker_backend.h"
+#define VEXEL_HAS_MEGALINKER 1
+#else
+#define VEXEL_HAS_MEGALINKER 0
+#endif
+
+// Web playground CLI: mirrors the unified driver but registers available backends.
+static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>& backends) {
+    std::cout << "Vexel Compiler (web)\n";
+    std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
+    std::cout << "Options:\n";
+    std::cout << "  -o <path>    Output path (base name for generated files, default: out)\n";
+    std::cout << "  -b <name>    Backend: ";
+    for (size_t i = 0; i < backends.size(); ++i) {
+        std::cout << backends[i].name;
+        if (i + 1 < backends.size()) std::cout << ", ";
+    }
+    std::cout << "\n";
+    std::cout << "  -L           Emit lowered Vexel subset alongside backend output\n";
+    std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
+    std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
+    std::cout << "  -v           Verbose output\n";
+    std::cout << "  -h           Show this help\n";
+}
+
+int main(int argc, char** argv) {
+    vexel::register_backend_c();
+#if VEXEL_HAS_MEGALINKER
+    vexel::register_backend_megalinker();
+#endif
+
+    std::vector<vexel::BackendInfo> available_backends = vexel::list_backends();
+    if (available_backends.empty()) {
+        std::cerr << "No backends available\n";
+        return 1;
+    }
+
+    vexel::Compiler::Options opts;
+    opts.output_file = "out";
+    opts.backend = available_backends[0].name;
+
+    for (int i = 1; i < argc; i++) {
+        if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0], available_backends);
+            return 0;
+        } else if (std::strcmp(argv[i], "-v") == 0) {
+            opts.verbose = true;
+        } else if (std::strcmp(argv[i], "-L") == 0 || std::strcmp(argv[i], "--emit-lowered") == 0) {
+            opts.emit_lowered = true;
+        } else if (std::strcmp(argv[i], "--emit-analysis") == 0) {
+            opts.emit_analysis = true;
+        } else if (std::strcmp(argv[i], "--allow-process") == 0) {
+            opts.allow_process = true;
+        } else if (std::strcmp(argv[i], "-o") == 0) {
+            if (i + 1 < argc) {
+                opts.output_file = argv[++i];
+            } else {
+                std::cerr << "Error: -o requires an argument\n";
+                return 1;
+            }
+        } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--backend") == 0) {
+            if (i + 1 < argc) {
+                const char* backend = argv[++i];
+                if (!vexel::find_backend(backend)) {
+                    std::cerr << "Error: Unknown backend '" << backend << "'\n";
+                    return 1;
+                }
+                opts.backend = backend;
+            } else {
+                std::cerr << "Error: -b/--backend requires an argument\n";
+                return 1;
+            }
+        } else if (argv[i][0] == '-') {
+            std::cerr << "Error: Unknown option: " << argv[i] << "\n";
+            return 1;
+        } else {
+            opts.input_file = argv[i];
+        }
+    }
+
+    if (opts.input_file.empty()) {
+        std::cerr << "Error: No input file specified\n";
+        print_usage(argv[0], available_backends);
+        return 1;
+    }
+
+    try {
+        vexel::Compiler compiler(opts);
+        (void)compiler.compile();
+        return 0;
+    } catch (const vexel::CompileError& e) {
+        std::cerr << "Error";
+        if (!e.location.filename.empty()) {
+            std::cerr << " at " << e.location.filename
+                      << ":" << e.location.line
+                      << ":" << e.location.column;
+        }
+        std::cerr << ": " << e.what() << "\n";
+        return 1;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+}
