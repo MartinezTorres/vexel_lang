@@ -87,6 +87,7 @@ class TypeChecker {
     int type_var_counter;
     int scope_counter;
     int loop_depth;
+    std::unordered_map<std::string, TypePtr> type_var_bindings;
 
     // Generic instantiation tracking
     std::unordered_map<std::string,
@@ -108,6 +109,7 @@ public:
     TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false);
     void check_module(Module& mod);
     Scope* get_scope() { return current_scope; }
+    TypePtr resolve_type(TypePtr type);
 
     // Generic monomorphization
     std::string get_or_create_instantiation(const std::string& func_name,
@@ -164,6 +166,7 @@ private:
     bool types_equal(TypePtr a, TypePtr b);
     bool types_compatible(TypePtr a, TypePtr b);
     TypePtr unify_types(TypePtr a, TypePtr b);
+    TypePtr bind_typevar(TypePtr var, TypePtr target);
     TypePtr infer_literal_type(ExprPtr expr);
     bool literal_assignable_to(TypePtr target, ExprPtr expr);
     TypePtr make_fresh_typevar();

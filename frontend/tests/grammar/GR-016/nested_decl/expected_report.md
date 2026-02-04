@@ -1,7 +1,7 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/grammar/GR-016/nested_decl/test.vx
-&outer() -> #T0 {
+&outer() {
     #Inner(val: #i32);
     &helper() {
         -> 10;

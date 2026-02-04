@@ -46,6 +46,7 @@ std::vector<BackendInfo> list_backends();
 
 Notes:
 - `ctx.analysis` and `ctx.optimization` are precomputed by the compiler and can be used to drive backend-specific decisions.
+- Backend-specific options are passed via `ctx.options.backend_options`, populated from `--backend-opt key=value` flags.
 
 ## Backend responsibilities
 - Build any backend-specific IR or codegen from the `Module` and `TypeChecker`.

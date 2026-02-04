@@ -88,6 +88,27 @@ Notes:
 - Respect `ctx.options.verbose` for logging.
 - `ctx.analysis` and `ctx.optimization` provide precomputed whole-program facts (reachability, mutability, reentrancy, constexpr values).
 
+## Backend-specific options
+The CLI supports a generic option pass-through:
+```
+--backend-opt key=value
+```
+Values are stored in `ctx.options.backend_options`. This allows third-party backends to add flags without touching the core CLI. Recommended patterns:
+
+```cpp
+// In your backend emit():
+auto it = ctx.options.backend_options.find("caller_limit");
+if (it != ctx.options.backend_options.end()) {
+    int limit = std::stoi(it->second);
+    // validate and apply
+}
+```
+
+```cpp
+// In your backend CLI (vexel-<name>):
+if (std::strcmp(argv[i], "--backend-opt") == 0) { /* parse key=value and store */ }
+```
+
 ## Template backend folder
 There is a copy-and-rename starter at `backends/_template`:
 - Copy it to `backends/<name>`.

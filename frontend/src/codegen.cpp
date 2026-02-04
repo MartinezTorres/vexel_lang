@@ -148,6 +148,9 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
     emit_header("#ifndef VX_REF_MASK");
     emit_header("#define VX_REF_MASK(x)");
     emit_header("#endif");
+    emit_header("#ifndef VX_ENTRYPOINT");
+    emit_header("#define VX_ENTRYPOINT");
+    emit_header("#endif");
     emit_header("#ifndef VX_INLINE");
     emit_header("#define VX_INLINE");
     emit_header("#endif");
@@ -159,9 +162,6 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
     emit_header("#endif");
     emit_header("#ifndef VX_NO_GLOBAL_WRITE");
     emit_header("#define VX_NO_GLOBAL_WRITE");
-    emit_header("#endif");
-    emit_header("#ifndef VX_ENTRYPOINT");
-    emit_header("#define VX_ENTRYPOINT");
     emit_header("#endif");
     emit_header("");
 

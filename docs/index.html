@@ -313,6 +313,9 @@
           <option value="hello">Hello</option>
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
+          <option value="arrays">Arrays</option>
+          <option value="globals">Globals</option>
+          <option value="consteval">Compile-Time</option>
         </select>
         <span class="status"><span class="status-dot loading" id="statusDot"></span><span id="statusText">Loading</span></span>
       </div>
@@ -407,6 +410,27 @@ else if (typeof exports === 'object')
           name: "main.vx",
           content:
             "arr:#i32[4] = [1, 2, 3, 4];\n\n&^main() -> #i32 {\n  sum:#i32 = 0;\n  arr@{\n    sum = sum + _\n  };\n  sum\n}\n"
+        }
+      ],
+      arrays: [
+        {
+          name: "main.vx",
+          content:
+            "arr:#i32[3] = [1, 2, 3];\n\n&sum(a:#i32[3]) -> #i32 {\n  a[0] + a[1] + a[2]\n}\n\n&^main() -> #i32 {\n  sum(arr)\n}\n"
+        }
+      ],
+      globals: [
+        {
+          name: "main.vx",
+          content:
+            "value:#i32 = 10;\ncount:#i32;\n\n&increment() -> #i32 {\n  count = count + 1;\n  count\n}\n\n&^main() -> #i32 {\n  count = 0;\n  increment();\n  increment();\n  value + count\n}\n"
+        }
+      ],
+      consteval: [
+        {
+          name: "main.vx",
+          content:
+            "#Point(x:#i32, y:#i32);\n#Vec3(x:#i32, y:#i32, z:#i32);\n\n&^main() -> #i32 {\n  p:#Point = Point(10, 20);\n  v:#Vec3 = Vec3(p.x, p.y, 30);\n  v.x + v.y + v.z\n}\n"
         }
       ]
     };

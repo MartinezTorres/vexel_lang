@@ -4,6 +4,7 @@
 #include "typechecker.h"
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <filesystem>
 
 namespace vexel {
@@ -26,6 +27,7 @@ public:
         bool emit_analysis;           // Emit analysis report alongside backend output
         bool allow_process = false;   // Process expressions execute host commands; keep disabled by default
         std::string backend; // Backend name (registered via backend registry)
+        std::unordered_map<std::string, std::string> backend_options; // Backend-specific key=value options
 
         Options() : verbose(false), project_root("."), emit_lowered(false), emit_analysis(false),
                     allow_process(false), backend("c") {}

@@ -12,6 +12,13 @@ Template backend starter: `backends/_template`.
 
 Run backend suites with `make test`.
 
+## Backend-specific options
+The unified `vexel` CLI accepts backend-specific options without changing core flags:
+```
+--backend-opt key=value
+```
+These are stored in `ctx.options.backend_options` (a string map) and are intended for out-of-tree backends. A backend-specific CLI should parse the same `--backend-opt` flag and populate the map before invoking `Compiler`.
+
 ## Preferred workflow for new backends
 Vexel favors out-of-tree backend development to keep core changes separate:
 
