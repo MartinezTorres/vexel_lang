@@ -1537,6 +1537,32 @@ TypePtr TypeChecker::unify_types(TypePtr a, TypePtr b) {
     return a;
 }
 
+TypePtr TypeChecker::resolve_type(TypePtr type) {
+    if (!type) return nullptr;
+    if (type->kind == Type::Kind::TypeVar) {
+        auto it = type_var_bindings.find(type->var_name);
+        if (it != type_var_bindings.end()) {
+            return resolve_type(it->second);
+        }
+    }
+    if (type->kind == Type::Kind::Array && type->element_type) {
+        TypePtr elem = resolve_type(type->element_type);
+        if (elem != type->element_type) {
+            TypePtr cloned = std::make_shared<Type>(*type);
+            cloned->element_type = elem;
+            return cloned;
+        }
+    }
+    return type;
+}
+
+TypePtr TypeChecker::bind_typevar(TypePtr var, TypePtr target) {
+    if (!var || var->kind != Type::Kind::TypeVar) return target;
+    if (!target) return target;
+    type_var_bindings[var->var_name] = target;
+    return target;
+}
+
 TypePtr TypeChecker::infer_literal_type(ExprPtr expr) {
     switch (expr->kind) {
         case Expr::Kind::IntLiteral: {

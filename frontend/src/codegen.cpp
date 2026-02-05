@@ -104,6 +104,15 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
     facts = AnalysisFacts{};
     optimization = optimization_facts;
     current_reentrancy_key = 'N';
+    current_module_id_expr = "0";
+    current_bank_page = 'A';
+    current_func_key.clear();
+    current_variant_id.clear();
+    current_variant_name_override.clear();
+    current_returns_aggregate = false;
+    aggregate_out_param.clear();
+    aggregate_out_type.clear();
+    current_aggregate_params.clear();
     tuple_types.clear();
     expr_param_substitutions.clear();
     value_param_replacements.clear();
@@ -187,6 +196,73 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
         result.source = combined.str();
     }
     return result;
+}
+
+GeneratedFunctionInfo CodeGenerator::generate_single_function(const Module& mod,
+                                                              StmtPtr func,
+                                                              TypeChecker* tc,
+                                                              const AnalysisFacts* analysis,
+                                                              const OptimizationFacts* optimization_facts,
+                                                              const CodegenABI& options,
+                                                              const std::string& ref_key,
+                                                              char reent_key,
+                                                              const std::string& variant_name_override,
+                                                              const std::string& variant_id_override) {
+    type_checker = tc;
+    abi = options;
+
+    header.str("");
+    header.clear();
+    body.str("");
+    body.clear();
+    generated_functions.clear();
+    generated_vars.clear();
+    current_ref_params.clear();
+    current_aggregate_params.clear();
+    facts = AnalysisFacts{};
+    optimization = optimization_facts;
+    current_reentrancy_key = reent_key;
+    current_module_id_expr = "0";
+    current_bank_page = 'A';
+    current_func_key.clear();
+    current_variant_id = variant_id_override;
+    current_variant_name_override = variant_name_override;
+    current_returns_aggregate = false;
+    aggregate_out_param.clear();
+    aggregate_out_type.clear();
+    tuple_types.clear();
+    expr_param_substitutions.clear();
+    value_param_replacements.clear();
+    underscore_var.clear();
+    if (tc) {
+        for (const auto& pair : tc->get_forced_tuple_types()) {
+            tuple_types[pair.first] = pair.second;
+        }
+    }
+    comparator_cache.clear();
+    comparator_definitions.clear();
+    while (!output_stack.empty()) output_stack.pop();
+    output_stack.push(&body);
+    temp_counter = 0;
+    while (!available_temps.empty()) available_temps.pop();
+    live_temps.clear();
+    declared_temps.clear();
+
+    if (analysis) {
+        facts = *analysis;
+    } else {
+        Analyzer analyzer(type_checker);
+        facts = analyzer.run(mod);
+    }
+
+    if (func) {
+        gen_func_decl(func, ref_key, reent_key);
+    }
+
+    if (!generated_functions.empty()) {
+        return generated_functions.back();
+    }
+    return GeneratedFunctionInfo{};
 }
 
 void CodeGenerator::gen_module(const Module& mod) {
@@ -296,7 +372,8 @@ void CodeGenerator::gen_module(const Module& mod) {
 
             // Handle tuple return types
             std::string ret_type;
-            if (!stmt->return_types.empty()) {
+            bool returns_tuple = !stmt->return_types.empty();
+            if (returns_tuple) {
                 // Tuple return: generate tuple type name (same format as typechecker)
                 std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + std::to_string(stmt->return_types.size());
                 for (const auto& t : stmt->return_types) {
@@ -314,14 +391,38 @@ void CodeGenerator::gen_module(const Module& mod) {
                 ret_type = mangle_name(tuple_name);
             } else {
                 if (stmt->return_type) {
-                    ret_type = gen_type(stmt->return_type);
+                    if (stmt->return_type->kind == Type::Kind::TypeVar) {
+                        ret_type = "void";
+                    } else {
+                        ret_type = gen_type(stmt->return_type);
+                    }
                 } else {
                     // For functions without explicit return type, infer from body
-                    if (stmt->body && stmt->body->type) {
+                    if (stmt->body && stmt->body->type && stmt->body->type->kind != Type::Kind::TypeVar) {
                         ret_type = gen_type(stmt->body->type);
                     } else {
                         ret_type = "void";
                     }
+                }
+            }
+
+            TypePtr return_type_ptr = nullptr;
+            if (!returns_tuple) {
+                if (stmt->return_type && stmt->return_type->kind != Type::Kind::TypeVar) {
+                    return_type_ptr = stmt->return_type;
+                } else if (stmt->body && stmt->body->type && stmt->body->type->kind != Type::Kind::TypeVar) {
+                    return_type_ptr = stmt->body->type;
+                }
+            }
+
+            bool returns_aggregate = abi.lower_aggregates && (returns_tuple || is_aggregate_type(return_type_ptr));
+            std::string agg_out_type;
+            if (returns_aggregate) {
+                agg_out_type = ret_type;
+                ret_type = "void";
+            } else if (return_type_ptr && is_pointer_like(return_type_ptr)) {
+                if (abi.func_return_ptr_kind && abi.func_return_ptr_kind(key) == PtrKind::Far) {
+                    ret_type = "uint32_t";
                 }
             }
 
@@ -356,15 +457,33 @@ void CodeGenerator::gen_module(const Module& mod) {
                     }
                     emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
 
+                    bool first_param = true;
+                    if (returns_aggregate) {
+                        emit_header(agg_out_type + "* __vx_out");
+                        first_param = false;
+                    }
+
                     // Reference parameters (mutable receivers use pointers, non-mutable use values)
                     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
-                        if (i > 0) emit_header(", ");
+                        if (!first_param) emit_header(", ");
+                        first_param = false;
 
                         std::string ref_type;
                         TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+                        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::TypeVar) {
+                            TypePtr resolved = resolve_type(ref_type_ptr);
+                            if (resolved && resolved->kind != Type::Kind::TypeVar) {
+                                ref_type_ptr = resolved;
+                            } else {
+                                ref_type_ptr = Type::make_primitive(PrimitiveType::I32, stmt->location);
+                            }
+                        }
                         bool by_ref = true;
                         if (!ref_key.empty() && i < ref_key.size()) {
                             by_ref = ref_key[i] == 'M';
+                        }
+                        if (abi.lower_aggregates && ref_type_ptr && is_aggregate_type(ref_type_ptr)) {
+                            by_ref = true;
                         }
                         if (ref_type_ptr) {
                             ref_type = gen_type(ref_type_ptr);
@@ -384,12 +503,19 @@ void CodeGenerator::gen_module(const Module& mod) {
                     }
 
                     // Value parameters (skip expression parameters)
-                    bool first_param = stmt->ref_params.empty();
                     for (size_t i = 0; i < stmt->params.size(); i++) {
                         if (stmt->params[i].is_expression_param) continue;  // Skip expression parameters
                         if (!first_param) emit_header(", ");
                         first_param = false;
                         std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
+                        if (stmt->params[i].type && is_pointer_like(stmt->params[i].type)) {
+                            if (ptr_kind_for_symbol(stmt->params[i].name, stmt->scope_instance_id) == PtrKind::Far) {
+                                ptype = "uint32_t";
+                            }
+                        }
+                        if (abi.lower_aggregates && stmt->params[i].type && is_aggregate_type(stmt->params[i].type)) {
+                            ptype = gen_type(stmt->params[i].type) + "*";
+                        }
                         emit_header(ptype + " " + mangle_name(stmt->params[i].name));
                     }
                     emit_header(");");
@@ -596,9 +722,9 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
                     VoidCallGuard guard(*this, false);
                     ret_expr = gen_expr(stmt->return_expr);
                 }
-                emit("return " + ret_expr + ";");
+                emit_return_stmt(ret_expr);
             } else {
-                emit("return;");
+                emit_return_stmt("");
             }
             break;
         case Stmt::Kind::Break:
@@ -659,6 +785,15 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     std::string reach_key = reachability_key(func_name, stmt->scope_instance_id);
     std::string variant_id = variant_name(func_name, reach_key, reent_key, ref_key);
 
+    if (!current_variant_name_override.empty()) {
+        variant_id = current_variant_name_override;
+        if (current_variant_id.empty()) {
+            current_variant_id = variant_id;
+        }
+    } else {
+        current_variant_id = variant_id;
+    }
+
     current_reentrancy_key = reent_key;
     current_function_non_reentrant = (reent_key == 'N');
     std::string reent_prefix = (reent_key == 'R') ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
@@ -670,6 +805,18 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         current_function_non_reentrant = false;
         current_reentrancy_key = 'N';
         return;
+    }
+
+    current_func_key = reach_key;
+    if (abi.func_page) {
+        current_bank_page = abi.func_page(reach_key);
+    } else {
+        current_bank_page = 'A';
+    }
+    if (abi.func_module_id_expr) {
+        current_module_id_expr = abi.func_module_id_expr(reach_key, current_bank_page);
+    } else {
+        current_module_id_expr = "0";
     }
 
     bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
@@ -706,13 +853,33 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
 
     // Track reference parameters for this function (mutable paths use pointers)
     current_ref_params.clear();
+    current_aggregate_params.clear();
     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
         bool by_ref = true;
         if (!ref_key.empty() && i < ref_key.size()) {
             by_ref = ref_key[i] == 'M';
         }
+        TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::TypeVar) {
+            TypePtr resolved = resolve_type(ref_type_ptr);
+            if (resolved && resolved->kind != Type::Kind::TypeVar) {
+                ref_type_ptr = resolved;
+            } else {
+                ref_type_ptr = Type::make_primitive(PrimitiveType::I32, stmt->location);
+            }
+        }
+        if (abi.lower_aggregates && ref_type_ptr && is_aggregate_type(ref_type_ptr)) {
+            by_ref = true;
+            current_aggregate_params.insert(stmt->ref_params[i]);
+        }
         if (by_ref) {
             current_ref_params.insert(stmt->ref_params[i]);
+        }
+    }
+    for (const auto& param : stmt->params) {
+        if (param.is_expression_param) continue;
+        if (abi.lower_aggregates && param.type && is_aggregate_type(param.type)) {
+            current_aggregate_params.insert(param.name);
         }
     }
 
@@ -732,7 +899,8 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
 
     // Handle tuple return types
     std::string ret_type;
-    if (!stmt->return_types.empty()) {
+    bool returns_tuple = !stmt->return_types.empty();
+    if (returns_tuple) {
         std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + std::to_string(stmt->return_types.size());
         for (const auto& t : stmt->return_types) {
             tuple_name += "_";
@@ -748,13 +916,41 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         ret_type = mangle_name(tuple_name);
     } else {
         if (stmt->return_type) {
-            ret_type = gen_type(stmt->return_type);
+            if (stmt->return_type->kind == Type::Kind::TypeVar) {
+                ret_type = "void";
+            } else {
+                ret_type = gen_type(stmt->return_type);
+            }
         } else {
-            if (stmt->body && stmt->body->type) {
+            if (stmt->body && stmt->body->type && stmt->body->type->kind != Type::Kind::TypeVar) {
                 ret_type = gen_type(stmt->body->type);
             } else {
                 ret_type = "void";
             }
+        }
+    }
+
+    TypePtr return_type_ptr = nullptr;
+    if (!returns_tuple) {
+        if (stmt->return_type && stmt->return_type->kind != Type::Kind::TypeVar) {
+            return_type_ptr = stmt->return_type;
+        } else if (stmt->body && stmt->body->type && stmt->body->type->kind != Type::Kind::TypeVar) {
+            return_type_ptr = stmt->body->type;
+        }
+    }
+
+    current_returns_aggregate = false;
+    aggregate_out_param.clear();
+    aggregate_out_type.clear();
+
+    if (abi.lower_aggregates && (returns_tuple || is_aggregate_type(return_type_ptr))) {
+        current_returns_aggregate = true;
+        aggregate_out_param = "__vx_out";
+        aggregate_out_type = ret_type;
+        ret_type = "void";
+    } else if (return_type_ptr && is_pointer_like(return_type_ptr)) {
+        if (abi.func_return_ptr_kind && abi.func_return_ptr_kind(reach_key) == PtrKind::Far) {
+            ret_type = "uint32_t";
         }
     }
 
@@ -790,13 +986,23 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     }
     emit(label_prefix + reent_prefix + storage + attr + ret_type + " " + codegen_name + "(");
 
+    bool first_param = true;
+    if (current_returns_aggregate) {
+        emit(aggregate_out_type + "* " + aggregate_out_param);
+        first_param = false;
+    }
+
     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
-        if (i > 0) emit(", ");
+        if (!first_param) emit(", ");
+        first_param = false;
         std::string ref_type;
         TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
         bool by_ref = true;
         if (!ref_key.empty() && i < ref_key.size()) {
             by_ref = ref_key[i] == 'M';
+        }
+        if (abi.lower_aggregates && ref_type_ptr && is_aggregate_type(ref_type_ptr)) {
+            by_ref = true;
         }
         if (ref_type_ptr) {
             ref_type = gen_type(ref_type_ptr);
@@ -813,12 +1019,19 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         emit(ref_type + " " + mangle_name(stmt->ref_params[i]));
     }
 
-    bool first_param = stmt->ref_params.empty();
     for (size_t i = 0; i < stmt->params.size(); i++) {
         if (stmt->params[i].is_expression_param) continue;
         if (!first_param) emit(", ");
         first_param = false;
         std::string ptype = stmt->params[i].type ? gen_type(stmt->params[i].type) : "int";
+        if (stmt->params[i].type && is_pointer_like(stmt->params[i].type)) {
+            if (ptr_kind_for_symbol(stmt->params[i].name, stmt->scope_instance_id) == PtrKind::Far) {
+                ptype = "uint32_t";
+            }
+        }
+        if (abi.lower_aggregates && stmt->params[i].type && is_aggregate_type(stmt->params[i].type)) {
+            ptype = gen_type(stmt->params[i].type) + "*";
+        }
         emit(ptype + " " + mangle_name(stmt->params[i].name));
     }
 
@@ -831,16 +1044,16 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
             CTValue result;
             if (try_evaluate(stmt->body, result)) {
                 if (std::holds_alternative<int64_t>(result)) {
-                    emit("return " + std::to_string(std::get<int64_t>(result)) + ";");
+                    emit_return_stmt(std::to_string(std::get<int64_t>(result)));
                     handled_body = true;
                 } else if (std::holds_alternative<uint64_t>(result)) {
-                    emit("return " + std::to_string(std::get<uint64_t>(result)) + ";");
+                    emit_return_stmt(std::to_string(std::get<uint64_t>(result)));
                     handled_body = true;
                 } else if (std::holds_alternative<bool>(result)) {
-                    emit("return " + std::string(std::get<bool>(result) ? "1" : "0") + ";");
+                    emit_return_stmt(std::string(std::get<bool>(result) ? "1" : "0"));
                     handled_body = true;
                 } else if (std::holds_alternative<double>(result)) {
-                    emit("return " + std::to_string(std::get<double>(result)) + ";");
+                    emit_return_stmt(std::to_string(std::get<double>(result)));
                     handled_body = true;
                 }
             }
@@ -858,9 +1071,20 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         if (!handled_body) {
             std::string body_expr;
             if (stmt->return_type) {
-                VoidCallGuard guard(*this, false);
-                body_expr = gen_expr(stmt->body);
-                emit("return " + body_expr + ";");
+                if (stmt->body && stmt->body->kind == Expr::Kind::Block) {
+                    for (const auto& bstmt : stmt->body->statements) {
+                        gen_stmt(bstmt);
+                    }
+                    if (stmt->body->result_expr) {
+                        VoidCallGuard guard(*this, false);
+                        body_expr = gen_expr(stmt->body->result_expr);
+                        emit_return_stmt(body_expr);
+                    }
+                } else {
+                    VoidCallGuard guard(*this, false);
+                    body_expr = gen_expr(stmt->body);
+                    emit_return_stmt(body_expr);
+                }
             } else {
                 VoidCallGuard guard(*this, true);
                 body_expr = gen_expr(stmt->body);
@@ -871,10 +1095,24 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         }
     }
 
+    if (!current_returns_aggregate && !stmt->return_type && stmt->return_types.empty() &&
+        !abi.return_prefix.empty()) {
+        emit_return_stmt("");
+    }
+
     emit("}");
 
     current_function_non_reentrant = false;
     current_reentrancy_key = 'N';
+    current_returns_aggregate = false;
+    aggregate_out_param.clear();
+    aggregate_out_type.clear();
+    current_aggregate_params.clear();
+    current_variant_name_override.clear();
+    current_variant_id.clear();
+    current_func_key.clear();
+    current_module_id_expr = "0";
+    current_bank_page = 'A';
     
     output_stack.pop();
     in_function = prev_in_function;
@@ -907,11 +1145,16 @@ void CodeGenerator::gen_type_decl(StmtPtr stmt) {
 
 void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     bool is_local = in_function;
-    if (!is_local && !facts.used_global_vars.count(stmt.get())) {
+    bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                   [](const Annotation& a) { return a.name == "export"; });
+    if (!is_local && !facts.used_global_vars.count(stmt.get()) && !is_exported) {
         return;
     }
     // Top-level mutable globals must be internal to the translation unit
     std::string storage = (!is_local && stmt->is_mutable) ? "static " : "";
+    if (!is_local && is_exported && !stmt->is_mutable) {
+        storage = "extern ";
+    }
     std::ostringstream var_stream;
     output_stack.push(&var_stream);
     std::string ann_comment = render_annotation_comment(stmt->annotations);
@@ -930,7 +1173,9 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             info.declaration = stmt;
             info.code = code;
             generated_vars.push_back(std::move(info));
-            body << code;
+            if (!abi.multi_file_globals) {
+                body << code;
+            }
         }
     };
 
@@ -941,7 +1186,31 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     }
 
     std::string vtype = stmt->var_type ? gen_type(stmt->var_type) : "int";
+    if (stmt->var_type) {
+        TypePtr resolved = resolve_type(stmt->var_type);
+        if (resolved && is_pointer_like(resolved) && resolved->kind != Type::Kind::Array) {
+            if (ptr_kind_for_symbol(stmt->var_name, stmt->scope_instance_id) == PtrKind::Far) {
+                vtype = "uint32_t";
+            }
+        }
+    }
     std::string mutability = mutability_prefix(stmt);
+    if (!is_local && is_exported) {
+        if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
+            std::string elem_type = gen_type(stmt->var_type->element_type);
+            std::string size_str;
+            if (stmt->var_type->array_size) {
+                CTValue size_val;
+                if (try_evaluate(stmt->var_type->array_size, size_val)) {
+                    size_str = std::to_string(std::get<int64_t>(size_val));
+                }
+            }
+            std::string suffix = size_str.empty() ? "[]" : ("[" + size_str + "]");
+            emit_header("extern " + mutability + elem_type + " " + mangle_name(var_name) + suffix + ";");
+        } else {
+            emit_header("extern " + mutability + vtype + " " + mangle_name(var_name) + ";");
+        }
+    }
     if (stmt->var_init) {
         // Special handling for array literals and ranges
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
@@ -1287,6 +1556,93 @@ bool CodeGenerator::is_mutable_lvalue(ExprPtr expr) const {
     }
 }
 
+bool CodeGenerator::is_aggregate_type(TypePtr type) const {
+    TypePtr resolved = resolve_type(type);
+    if (!resolved) return false;
+    if (resolved->kind == Type::Kind::Named) return true;
+    return false;
+}
+
+bool CodeGenerator::is_pointer_like(TypePtr type) const {
+    if (!type) return false;
+    if (type->kind == Type::Kind::Array) return true;
+    if (type->kind == Type::Kind::Primitive && type->primitive == PrimitiveType::String) return true;
+    return false;
+}
+
+TypePtr CodeGenerator::resolve_type(TypePtr type) const {
+    if (!type) return nullptr;
+    if (type_checker) {
+        return type_checker->resolve_type(type);
+    }
+    return type;
+}
+
+PtrKind CodeGenerator::ptr_kind_for_expr(const ExprPtr& expr) const {
+    if (!expr || !expr->type) return PtrKind::Ram;
+    if (!is_pointer_like(expr->type)) return PtrKind::Ram;
+    if (abi.expr_ptr_kind) {
+        return abi.expr_ptr_kind(expr);
+    }
+    return PtrKind::Ram;
+}
+
+PtrKind CodeGenerator::ptr_kind_for_symbol(const std::string& name, int scope_id) const {
+    if (!abi.symbol_ptr_kind) return PtrKind::Ram;
+    return abi.symbol_ptr_kind(name, scope_id);
+}
+
+std::string CodeGenerator::c_type_for_expr(ExprPtr expr) {
+    if (!expr || !expr->type) return "void";
+    if (is_pointer_like(expr->type)) {
+        if (ptr_kind_for_expr(expr) == PtrKind::Far) {
+            return "uint32_t";
+        }
+    }
+    return gen_type(expr->type);
+}
+
+bool CodeGenerator::expr_has_side_effects(ExprPtr expr) const {
+    if (!expr) return false;
+    switch (expr->kind) {
+        case Expr::Kind::Call:
+        case Expr::Kind::Assignment:
+        case Expr::Kind::Process:
+        case Expr::Kind::Resource:
+            return true;
+        case Expr::Kind::Binary:
+            return expr_has_side_effects(expr->left) || expr_has_side_effects(expr->right);
+        case Expr::Kind::Unary:
+        case Expr::Kind::Cast:
+        case Expr::Kind::Length:
+            return expr_has_side_effects(expr->operand);
+        case Expr::Kind::Conditional:
+            return expr_has_side_effects(expr->condition) ||
+                   expr_has_side_effects(expr->true_expr) ||
+                   expr_has_side_effects(expr->false_expr);
+        case Expr::Kind::Index:
+        case Expr::Kind::Member:
+            return expr_has_side_effects(expr->operand);
+        case Expr::Kind::ArrayLiteral:
+            for (const auto& el : expr->elements) {
+                if (expr_has_side_effects(el)) return true;
+            }
+            return false;
+        case Expr::Kind::TupleLiteral:
+            for (const auto& el : expr->elements) {
+                if (expr_has_side_effects(el)) return true;
+            }
+            return false;
+        case Expr::Kind::Block:
+            return true;
+        case Expr::Kind::Iteration:
+        case Expr::Kind::Repeat:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::string CodeGenerator::gen_expr(ExprPtr expr) {
     if (!expr) return "";
     std::string void_name;
@@ -1304,7 +1660,14 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
         case Expr::Kind::FloatLiteral:
             return std::to_string(expr->float_val);
         case Expr::Kind::StringLiteral:
-            return "\"" + escape_c_string(expr->string_val) + "\"";
+            {
+                std::string lit = "\"" + escape_c_string(expr->string_val) + "\"";
+                if (ptr_kind_for_expr(expr) == PtrKind::Far) {
+                    std::string mod = current_module_id_expr.empty() ? "0" : current_module_id_expr;
+                    return "VX_FARPTR(" + mod + ", " + lit + ")";
+                }
+                return lit;
+            }
         case Expr::Kind::CharLiteral:
             return std::to_string(expr->uint_val);
         case Expr::Kind::Identifier:
@@ -1326,6 +1689,7 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
             {
                 std::string name = mangle_name(expr->name);
                 bool is_ref_param = current_ref_params.count(expr->name) > 0;
+                bool is_agg_param = current_aggregate_params.count(expr->name) > 0;
                 // Add scope instance suffix for imported symbols
                 int scope_id = expr->scope_instance_id;
                 if (scope_id < 0 && type_checker) {
@@ -1338,7 +1702,29 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
                 if (scope_id >= 0) {
                     name += "_s" + std::to_string(scope_id);
                 }
+
+                if (abi.symbol_load_expr) {
+                    std::string load_expr = abi.symbol_load_expr(expr->name, scope_id, current_bank_page);
+                    if (!load_expr.empty()) {
+                        std::string load_fn = (current_bank_page == 'A') ? "vx_load_module_id_b" : "vx_load_module_id_a";
+                        emit(load_fn + "(" + load_expr + ");");
+                    }
+                }
+
+                if (expr->type && is_pointer_like(expr->type) &&
+                    ptr_kind_for_symbol(expr->name, scope_id) == PtrKind::Far) {
+                    std::string mod_expr;
+                    if (abi.symbol_module_id_expr) {
+                        mod_expr = abi.symbol_module_id_expr(expr->name, scope_id, current_bank_page);
+                    }
+                    if (!mod_expr.empty()) {
+                        return "VX_FARPTR(" + mod_expr + ", " + name + ")";
+                    }
+                }
                 if (is_ref_param) {
+                    return "(*" + name + ")";
+                }
+                if (is_agg_param) {
                     return "(*" + name + ")";
                 }
                 return name;
@@ -1503,20 +1889,27 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
     std::string ref_key;
     std::vector<std::string> all_args;
 
+    Symbol* sym = nullptr;
+    StmtPtr callee_decl;
+    bool is_external = false;
+    std::string base_name;
+    std::string func_key;
+    int scope_id = -1;
+
     // Get function name (already qualified by type checker for methods)
     if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
         // Look up symbol to get original function name and scope instance
-        std::string original_name = expr->operand->name;
-        int scope_id = expr->operand->scope_instance_id;
+        base_name = expr->operand->name;
+        scope_id = expr->operand->scope_instance_id;
 
-        Symbol* sym = nullptr;
         if (type_checker) {
             sym = type_checker->get_scope()->lookup(expr->operand->name);
             if (sym && sym->declaration && sym->kind == Symbol::Kind::Function) {
+                callee_decl = sym->declaration;
                 // Use the original unmangled name from the declaration
-                original_name = sym->declaration->func_name;
+                base_name = sym->declaration->func_name;
                 if (!sym->declaration->type_namespace.empty()) {
-                    original_name = sym->declaration->type_namespace + "::" + original_name;
+                    base_name = sym->declaration->type_namespace + "::" + base_name;
                 }
                 if (sym->scope_instance_id >= 0) {
                     scope_id = sym->scope_instance_id;
@@ -1524,31 +1917,85 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             }
         }
 
-        bool is_external = false;
-        if (sym && sym->declaration && sym->kind == Symbol::Kind::Function) {
-            is_external = sym->declaration->is_external;
-            if (!sym->declaration->ref_params.empty()) {
+        if (callee_decl) {
+            is_external = callee_decl->is_external;
+            if (!callee_decl->ref_params.empty()) {
                 if (is_external) {
-                    ref_key = std::string(sym->declaration->ref_params.size(), 'M');
+                    ref_key = std::string(callee_decl->ref_params.size(), 'M');
                 } else {
-                    ref_key = ref_variant_key(expr, sym->declaration->ref_params.size());
+                    ref_key = ref_variant_key(expr, callee_decl->ref_params.size());
                 }
             }
             if (!is_external) {
-                std::string func_key = reachability_key(original_name, scope_id);
-                original_name = variant_name(original_name, func_key, current_reentrancy_key, ref_key);
+                func_key = reachability_key(base_name, scope_id);
+                std::string variant = variant_name(base_name, func_key, current_reentrancy_key, ref_key);
+                func_name = mangle_name(variant);
             } else if (!ref_key.empty()) {
-                original_name = ref_variant_name(original_name, ref_key);
+                std::string variant = ref_variant_name(base_name, ref_key);
+                func_name = mangle_name(variant);
+            } else {
+                func_name = mangle_name(base_name);
             }
+        } else {
+            func_name = mangle_name(base_name);
         }
 
-        func_name = mangle_name(original_name);
         if (scope_id >= 0) {
             func_name += "_s" + std::to_string(scope_id);
         }
     } else if (expr->operand) {
         VoidCallGuard guard(*this, false);
         func_name = gen_expr(expr->operand);
+    }
+
+    CallTargetInfo target;
+    if (abi.resolve_call && callee_decl && !is_external && !func_key.empty()) {
+        target = abi.resolve_call(expr, base_name, func_key, current_variant_id, current_bank_page, ref_key);
+        if (!target.name.empty()) {
+            func_name = mangle_name(target.name);
+            if (scope_id >= 0) {
+                func_name += "_s" + std::to_string(scope_id);
+            }
+        }
+    }
+
+    bool returns_aggregate = false;
+    std::string agg_out_type;
+    if (abi.lower_aggregates && callee_decl && !is_external) {
+        bool returns_tuple = !callee_decl->return_types.empty();
+        TypePtr return_type_ptr = nullptr;
+        if (!returns_tuple) {
+            if (callee_decl->return_type) {
+                return_type_ptr = callee_decl->return_type;
+            } else if (callee_decl->body && callee_decl->body->type) {
+                return_type_ptr = callee_decl->body->type;
+            }
+        }
+        if (returns_tuple || is_aggregate_type(return_type_ptr)) {
+            returns_aggregate = true;
+            if (returns_tuple) {
+                std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + std::to_string(callee_decl->return_types.size());
+                for (const auto& t : callee_decl->return_types) {
+                    tuple_name += "_";
+                    if (t) {
+                        tuple_name += t->to_string();
+                    } else {
+                        tuple_name += "unknown";
+                    }
+                }
+                agg_out_type = mangle_name(tuple_name);
+            } else if (return_type_ptr) {
+                agg_out_type = gen_type(return_type_ptr);
+            }
+        }
+    }
+
+    std::vector<bool> param_is_aggregate;
+    if (abi.lower_aggregates && callee_decl) {
+        for (const auto& param : callee_decl->params) {
+            if (param.is_expression_param) continue;
+            param_is_aggregate.push_back(param.type && is_aggregate_type(param.type));
+        }
     }
 
     // Handle method calls with receivers - add them as first arguments
@@ -1558,6 +2005,9 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             bool by_ref = receiver_is_mutable_arg(rec);
             if (!ref_key.empty() && i < ref_key.size()) {
                 by_ref = ref_key[i] == 'M';
+            }
+            if (abi.lower_aggregates && rec && rec->type && is_aggregate_type(rec->type)) {
+                by_ref = true;
             }
             if (by_ref) {
                 if (is_addressable_lvalue(rec) && is_mutable_lvalue(rec)) {
@@ -1591,24 +2041,53 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
 
     // Add regular arguments (skip expression parameters)
     size_t param_idx = 0;
+    size_t agg_idx = 0;
     for (size_t i = 0; i < expr->args.size(); i++) {
         // Check if this argument corresponds to an expression parameter
         if (type_checker && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-            Symbol* sym = type_checker->get_scope()->lookup(expr->operand->name);
-            if (sym && sym->kind == Symbol::Kind::Function && sym->declaration &&
-                param_idx < sym->declaration->params.size() &&
-                sym->declaration->params[param_idx].is_expression_param) {
+            Symbol* psym = type_checker->get_scope()->lookup(expr->operand->name);
+            if (psym && psym->kind == Symbol::Kind::Function && psym->declaration &&
+                param_idx < psym->declaration->params.size() &&
+                psym->declaration->params[param_idx].is_expression_param) {
                 param_idx++;
                 continue;  // Skip expression parameters
             }
         }
+        bool by_ref = (agg_idx < param_is_aggregate.size() && param_is_aggregate[agg_idx]);
         std::string arg_expr;
         {
             VoidCallGuard guard(*this, false);
             arg_expr = gen_expr(expr->args[i]);
         }
-        all_args.push_back(arg_expr);
+        if (by_ref) {
+            if (is_addressable_lvalue(expr->args[i])) {
+                all_args.push_back("&" + arg_expr);
+            } else {
+                std::string temp = fresh_temp();
+                std::string atype = expr->args[i] && expr->args[i]->type ? gen_type(expr->args[i]->type) : "int";
+                emit(atype + " " + temp + " = " + arg_expr + ";");
+                all_args.push_back("&" + temp);
+            }
+        } else {
+            all_args.push_back(arg_expr);
+        }
         param_idx++;
+        agg_idx++;
+    }
+
+    std::string out_temp;
+    if (returns_aggregate) {
+        out_temp = fresh_temp();
+        if (!declared_temps.count(out_temp)) {
+            emit(storage_prefix() + agg_out_type + " " + out_temp + ";");
+            declared_temps.insert(out_temp);
+        }
+        all_args.insert(all_args.begin(), "&" + out_temp);
+    }
+
+    if (!target.module_id_expr.empty()) {
+        std::string load_fn = (target.page == 'A') ? "vx_load_module_id_a" : "vx_load_module_id_b";
+        emit(load_fn + "(" + target.module_id_expr + ");");
     }
 
     std::string result = func_name + "(";
@@ -1617,6 +2096,15 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
         result += all_args[i];
     }
     result += ")";
+
+    if (returns_aggregate) {
+        emit(result + ";");
+        if (allow_void_call) {
+            return "";
+        }
+        return out_temp;
+    }
+
     return result;
 }
 
@@ -1628,6 +2116,22 @@ std::string CodeGenerator::gen_index(ExprPtr expr) {
         arr = gen_expr(expr->operand);
         idx = gen_expr(expr->args[0]);
     }
+    if (ptr_kind_for_expr(expr->operand) == PtrKind::Far) {
+        std::string ptr_expr = arr;
+        if (expr_has_side_effects(expr->operand)) {
+            std::string temp = fresh_temp();
+            if (!declared_temps.count(temp)) {
+                emit(storage_prefix() + std::string("uint32_t ") + temp + ";");
+                declared_temps.insert(temp);
+            }
+            emit(temp + " = " + arr + ";");
+            ptr_expr = temp;
+        }
+        std::string load_fn = (current_bank_page == 'A') ? "vx_load_module_id_b" : "vx_load_module_id_a";
+        emit(load_fn + "(VX_FARPTR_MOD(" + ptr_expr + "));");
+        std::string elem_type = expr->type ? gen_type(expr->type) : "int";
+        return "(((" + elem_type + "*)VX_FARPTR_ADDR(" + ptr_expr + "))[" + idx + "])";
+    }
     return arr + "[" + idx + "]";
 }
 
@@ -1635,7 +2139,8 @@ std::string CodeGenerator::gen_member(ExprPtr expr) {
     bool operand_is_ref = false;
     std::string obj;
     if (expr->operand && expr->operand->kind == Expr::Kind::Identifier &&
-        current_ref_params.count(expr->operand->name)) {
+        (current_ref_params.count(expr->operand->name) ||
+         current_aggregate_params.count(expr->operand->name))) {
         operand_is_ref = true;
         obj = mangle_name(expr->operand->name);
         int scope_id = expr->operand->scope_instance_id;
@@ -1688,6 +2193,10 @@ std::string CodeGenerator::gen_array_literal(ExprPtr expr) {
     }
     emit("};");
 
+    if (ptr_kind_for_expr(expr) == PtrKind::Far) {
+        std::string mod = current_module_id_expr.empty() ? "0" : current_module_id_expr;
+        return "VX_FARPTR(" + mod + ", " + temp + ")";
+    }
     return temp;
 }
 
@@ -1749,8 +2258,15 @@ std::string CodeGenerator::gen_block(ExprPtr expr) {
     // Infer result type from expression type or result_expr type
     if (expr->type) {
         result_type = gen_type(expr->type);
+        if (is_pointer_like(expr->type) && ptr_kind_for_expr(expr) == PtrKind::Far) {
+            result_type = "uint32_t";
+        }
     } else if (expr->result_expr && expr->result_expr->type) {
         result_type = gen_type(expr->result_expr->type);
+        if (is_pointer_like(expr->result_expr->type) &&
+            ptr_kind_for_expr(expr->result_expr) == PtrKind::Far) {
+            result_type = "uint32_t";
+        }
     } else {
         result_type = "int";  // Safe default for unknown types
     }
@@ -1850,11 +2366,21 @@ std::string CodeGenerator::gen_block_optimized(ExprPtr expr) {
     if (expr->result_expr) {
         CTValue result_val;
         if (evaluator.try_evaluate(expr->result_expr, result_val)) {
+            std::string value;
             if (std::holds_alternative<int64_t>(result_val)) {
-                optimized << "return " << std::get<int64_t>(result_val) << ";\n";
-                return optimized.str();
+                value = std::to_string(std::get<int64_t>(result_val));
             } else if (std::holds_alternative<uint64_t>(result_val)) {
-                optimized << "return " << std::get<uint64_t>(result_val) << ";\n";
+                value = std::to_string(std::get<uint64_t>(result_val));
+            }
+            if (!value.empty()) {
+                if (current_returns_aggregate) {
+                    optimized << "*" << aggregate_out_param << " = " << value << ";\n";
+                    append_return_prefix(optimized);
+                    optimized << "return;\n";
+                } else {
+                    append_return_prefix(optimized);
+                    optimized << "return " << value << ";\n";
+                }
                 return optimized.str();
             }
         }
@@ -2041,6 +2567,12 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
     if (expr->creates_new_variable) {
         TypePtr var_type = expr->left->type ? expr->left->type : expr->type;
         std::string var_type_str = gen_type(var_type);
+        if (var_type && is_pointer_like(var_type) && var_type->kind != Type::Kind::Array) {
+            int scope_id = expr->left->scope_instance_id;
+            if (ptr_kind_for_symbol(expr->left->name, scope_id) == PtrKind::Far) {
+                var_type_str = "uint32_t";
+            }
+        }
         std::string var_name = mangle_name(expr->left->name);
 
         // For array declarations, we need to handle the literal specially
@@ -2182,6 +2714,10 @@ std::string CodeGenerator::gen_length(ExprPtr expr) {
             {
                 VoidCallGuard guard(*this, false);
                 operand = gen_expr(expr->operand);
+            }
+            if (ptr_kind_for_expr(expr->operand) == PtrKind::Far) {
+                std::string fn = (current_bank_page == 'A') ? "vx_strlen_far_b" : "vx_strlen_far_a";
+                return fn + "(" + operand + ")";
             }
             return "strlen(" + operand + ")";
         }
@@ -2438,6 +2974,34 @@ void CodeGenerator::emit_header(const std::string& code) {
 
 std::string CodeGenerator::storage_prefix() const {
     return current_function_non_reentrant ? "static " : "";
+}
+
+void CodeGenerator::emit_return_stmt(const std::string& expr) {
+    if (current_returns_aggregate) {
+        if (!expr.empty()) {
+            emit("*" + aggregate_out_param + " = " + expr + ";");
+        }
+        if (!abi.return_prefix.empty()) {
+            emit(abi.return_prefix);
+        }
+        emit("return;");
+        return;
+    }
+
+    if (!abi.return_prefix.empty()) {
+        emit(abi.return_prefix);
+    }
+    if (expr.empty()) {
+        emit("return;");
+    } else {
+        emit("return " + expr + ";");
+    }
+}
+
+void CodeGenerator::append_return_prefix(std::ostringstream& out) const {
+    if (!abi.return_prefix.empty()) {
+        out << abi.return_prefix << "\n";
+    }
 }
 
 int64_t CodeGenerator::resolve_array_length(TypePtr type, const SourceLocation& loc) {
