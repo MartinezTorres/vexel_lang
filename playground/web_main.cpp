@@ -1,16 +1,8 @@
 #include "backend_registry.h"
-#include "c_backend.h"
 #include "compiler.h"
 #include <iostream>
 #include <cstring>
 #include <vector>
-
-#if __has_include("megalinker_backend.h")
-#include "megalinker_backend.h"
-#define VEXEL_HAS_MEGALINKER 1
-#else
-#define VEXEL_HAS_MEGALINKER 0
-#endif
 
 // Web playground CLI: mirrors the unified driver but registers available backends.
 static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>& backends) {
@@ -32,11 +24,6 @@ static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>&
 }
 
 int main(int argc, char** argv) {
-    vexel::register_backend_c();
-#if VEXEL_HAS_MEGALINKER
-    vexel::register_backend_megalinker();
-#endif
-
     std::vector<vexel::BackendInfo> available_backends = vexel::list_backends();
     if (available_backends.empty()) {
         std::cerr << "No backends available\n";

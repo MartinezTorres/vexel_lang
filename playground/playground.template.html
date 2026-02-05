@@ -304,10 +304,7 @@
       <div class="controls">
         <button class="btn primary" id="compileBtn" disabled>Compile</button>
         <button class="btn" id="addFileBtn">Add File</button>
-        <select id="backendSelect">
-          <option value="c">Backend: C</option>
-          <option value="megalinker">Backend: Megalinker</option>
-        </select>
+        <select id="backendSelect"></select>
         <select id="exampleSelect">
           <option value="">Load example</option>
           <option value="hello">Hello</option>
@@ -352,6 +349,7 @@
   </script>
   <script>
     const VEXEL_WASM_BASE64 = "__VEXEL_WASM_BASE64__";
+    const BACKENDS = __VEXEL_BACKENDS_JSON__;
     const state = {
       sources: [
         {
@@ -363,7 +361,7 @@
       activeSource: 0,
       activeOutput: 0,
       messages: [],
-      backend: "c"
+      backend: (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS[0] : "c"
     };
 
     const examples = {
@@ -692,8 +690,21 @@
     compileBtn.addEventListener("click", compile);
     addFileBtn.addEventListener("click", addFile);
     addFileBtnInline.addEventListener("click", addFile);
+    function populateBackends() {
+      const list = (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS : ["c"];
+      backendSelect.textContent = "";
+      list.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = `Backend: ${name}`;
+        backendSelect.appendChild(option);
+      });
+      state.backend = list[0] || "c";
+      backendSelect.value = state.backend;
+    }
+
     backendSelect.addEventListener("change", (event) => {
-      state.backend = event.target.value || "c";
+      state.backend = event.target.value || state.backend || "c";
     });
     clearLogBtn.addEventListener("click", () => {
       state.messages = [];
@@ -720,7 +731,10 @@
     renderSourceTabs();
     renderEditors();
     clearOutputs();
-    window.addEventListener("DOMContentLoaded", initCompiler);
+    window.addEventListener("DOMContentLoaded", () => {
+      populateBackends();
+      initCompiler();
+    });
   </script>
 </body>
 </html>

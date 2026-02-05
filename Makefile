@@ -38,30 +38,31 @@ frontend-clean:
 	+$(MAKE) -C frontend clean
 
 # Backends
-BACKENDS := $(filter-out backends/common/. backends/_template/.,$(wildcard backends/*/.))
-BACKENDS_TARGETS := $(patsubst backends/%/.,backend-%,$(BACKENDS))
-BACKENDS_TEST_TARGETS := $(patsubst backends/%/.,backend-%-test,$(BACKENDS))
-BACKENDS_CLEAN_TARGETS := $(patsubst backends/%/.,backend-%-clean,$(BACKENDS))
+BACKEND_DIRS := $(filter-out backends/common/ backends/_template/ backends/ext/,$(wildcard backends/*/ backends/ext/*/))
+BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
+BACKENDS_TARGETS := $(addprefix backend-,$(BACKEND_NAMES))
+BACKENDS_TEST_TARGETS := $(addprefix backend-,$(addsuffix -test,$(BACKEND_NAMES)))
+BACKENDS_CLEAN_TARGETS := $(addprefix backend-,$(addsuffix -clean,$(BACKEND_NAMES)))
+
+backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 .PHONY: backends
 
 backends: $(BACKENDS_TARGETS)
 
-backend-%: $(BUILD_DIR)/vexel-%
-	@:
+backend-%: frontend FORCE
+	@dir="$(call backend_dir,$*)"; \
+	if [ -z "$$dir" ]; then echo "Unknown backend '$*'"; exit 1; fi; \
+	$(MAKE) -C "$$dir"
 
-$(BUILD_DIR)/backends/c/libvexel-c.a: FORCE
-	+$(MAKE) -C backends/$(patsubst libvexel-%.a,%,$(notdir $@))
+backend-%-test: FORCE
+	@dir="$(call backend_dir,$*)"; \
+	if [ -z "$$dir" ]; then echo "Unknown backend '$*'"; exit 1; fi; \
+	$(MAKE) -C "$$dir" test
 
-$(BUILD_DIR)/vexel-%: backends/% frontend FORCE
-	+$(MAKE) -C $<
-
-.PRECIOUS: $(BUILD_DIR)/vexel-%
-
-backend-%-test: backends/%
-	+$(MAKE) -C $< test
-
-backend-%-clean: backends/%
-	+$(MAKE) -C $< clean
+backend-%-clean: FORCE
+	@dir="$(call backend_dir,$*)"; \
+	if [ -z "$$dir" ]; then echo "Unknown backend '$*'"; exit 1; fi; \
+	$(MAKE) -C "$$dir" clean
 
 	
 #tests

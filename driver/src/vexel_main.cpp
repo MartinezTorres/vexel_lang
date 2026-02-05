@@ -1,5 +1,4 @@
 #include "backend_registry.h"
-#include "c_backend.h"
 #include "compiler.h"
 #include <iostream>
 #include <cstring>
@@ -27,8 +26,6 @@ static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>&
 }
 
 int main(int argc, char** argv) {
-    vexel::register_backend_c();
-
     std::vector<vexel::BackendInfo> available_backends = vexel::list_backends();
     if (available_backends.empty()) {
         std::cerr << "No backends available\n";

@@ -4,7 +4,7 @@ bin/
 
 # External
 ext/*
-!ext/vexel_megalinker_backend/
+backends/ext/
 
 # Generated C files
 *.c
