@@ -191,6 +191,8 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
         facts = analyzer.run(mod);
     }
 
+    validate_codegen_invariants(mod);
+
     gen_module(mod);
 
     CCodegenResult result;
@@ -282,6 +284,8 @@ GeneratedFunctionInfo CodeGenerator::generate_single_function(const Module& mod,
         facts = analyzer.run(mod);
     }
 
+    validate_codegen_invariants(func);
+
     if (func) {
         gen_func_decl(func, ref_key, reent_key);
     }
@@ -296,6 +300,216 @@ GeneratedFunctionInfo CodeGenerator::generate_single_function(const Module& mod,
         tc->set_current_instance(saved_instance);
     }
     return GeneratedFunctionInfo{};
+}
+
+void CodeGenerator::validate_codegen_invariants(const Module& mod) {
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    int saved_instance = type_checker ? type_checker->current_instance() : -1;
+
+    auto set_instance = [&](int instance_id) {
+        current_instance_id = instance_id;
+        if (type_checker) {
+            type_checker->set_current_instance(instance_id);
+        }
+    };
+
+    auto validate_module = [&](const Module& module) {
+        validate_codegen_invariants_impl(module.top_level, true, true);
+    };
+
+    if (program) {
+        for (const auto& instance : program->instances) {
+            set_instance(instance.id);
+            const Module& module = program->modules[static_cast<size_t>(instance.module_id)].module;
+            validate_module(module);
+        }
+    } else {
+        set_instance(-1);
+        validate_module(mod);
+    }
+
+    if (type_checker) {
+        type_checker->set_current_instance(saved_instance);
+    }
+}
+
+void CodeGenerator::validate_codegen_invariants(StmtPtr func) {
+    if (!func) return;
+    std::vector<StmtPtr> stmts = {func};
+    validate_codegen_invariants_impl(stmts, false, true);
+}
+
+void CodeGenerator::validate_codegen_invariants_impl(const std::vector<StmtPtr>& stmts,
+                                                     bool use_facts,
+                                                     bool top_level) {
+    std::function<void(ExprPtr, bool)> validate_expr;
+    std::function<void(StmtPtr, bool)> validate_stmt;
+
+    validate_expr = [&](ExprPtr expr, bool value_required) {
+        if (!expr) return;
+        bool allow_untyped = expr->kind == Expr::Kind::ArrayLiteral && expr->elements.empty();
+        if (value_required && !expr->is_expr_param_ref && !allow_untyped && !expr->type) {
+            throw CompileError("Internal error: missing type before code generation", expr->location);
+        }
+
+        switch (expr->kind) {
+            case Expr::Kind::Binary:
+                validate_expr(expr->left, true);
+                validate_expr(expr->right, true);
+                break;
+            case Expr::Kind::Unary:
+            case Expr::Kind::Cast:
+            case Expr::Kind::Length:
+                validate_expr(expr->operand, true);
+                break;
+            case Expr::Kind::Call: {
+                if (expr->operand && expr->operand->kind != Expr::Kind::Identifier) {
+                    validate_expr(expr->operand, true);
+                }
+                for (const auto& rec : expr->receivers) {
+                    validate_expr(rec, true);
+                }
+                const Symbol* callee = nullptr;
+                if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                    callee = binding_for(expr->operand.get());
+                }
+                size_t param_index = 0;
+                for (const auto& arg : expr->args) {
+                    if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
+                        param_index < callee->declaration->params.size() &&
+                        callee->declaration->params[param_index].is_expression_param) {
+                        ++param_index;
+                        continue;
+                    }
+                    validate_expr(arg, true);
+                    ++param_index;
+                }
+                break;
+            }
+            case Expr::Kind::Index:
+                validate_expr(expr->operand, true);
+                if (!expr->args.empty()) {
+                    validate_expr(expr->args[0], true);
+                }
+                break;
+            case Expr::Kind::Member:
+                validate_expr(expr->operand, true);
+                break;
+            case Expr::Kind::ArrayLiteral:
+            case Expr::Kind::TupleLiteral:
+                for (const auto& elem : expr->elements) {
+                    validate_expr(elem, true);
+                }
+                break;
+            case Expr::Kind::Block:
+                for (const auto& st : expr->statements) {
+                    validate_stmt(st, false);
+                }
+                validate_expr(expr->result_expr, value_required);
+                break;
+            case Expr::Kind::Conditional:
+                if (type_checker) {
+                    auto cond = type_checker->constexpr_condition(expr->condition);
+                    if (cond.has_value()) {
+                        validate_expr(cond.value() ? expr->true_expr : expr->false_expr, value_required);
+                        break;
+                    }
+                }
+                validate_expr(expr->condition, true);
+                validate_expr(expr->true_expr, value_required);
+                validate_expr(expr->false_expr, value_required);
+                break;
+            case Expr::Kind::Assignment:
+                if (!expr->creates_new_variable) {
+                    validate_expr(expr->left, true);
+                } else if (expr->left && expr->left->kind != Expr::Kind::Identifier) {
+                    validate_expr(expr->left, true);
+                }
+                validate_expr(expr->right, true);
+                break;
+            case Expr::Kind::Range:
+                validate_expr(expr->left, true);
+                validate_expr(expr->right, true);
+                break;
+            case Expr::Kind::Iteration:
+                validate_expr(expr->operand, true);
+                validate_expr(expr->right, false);
+                break;
+            case Expr::Kind::Repeat:
+                validate_expr(expr->condition, true);
+                validate_expr(expr->right, false);
+                break;
+            default:
+                break;
+        }
+    };
+
+    validate_stmt = [&](StmtPtr stmt, bool is_top_level) {
+        if (!stmt) return;
+        switch (stmt->kind) {
+            case Stmt::Kind::FuncDecl: {
+                if (stmt->is_external) {
+                    return;
+                }
+                Symbol* sym = binding_for(stmt);
+                if (use_facts && sym && !facts.reachable_functions.count(sym)) {
+                    return;
+                }
+                if (stmt->body) {
+                    bool require_value = stmt->return_type || !stmt->return_types.empty();
+                    if (stmt->body->kind == Expr::Kind::Block) {
+                        for (const auto& bstmt : stmt->body->statements) {
+                            validate_stmt(bstmt, false);
+                        }
+                        if (stmt->body->result_expr) {
+                            validate_expr(stmt->body->result_expr, require_value);
+                        }
+                    } else {
+                        validate_expr(stmt->body, require_value);
+                    }
+                }
+                break;
+            }
+            case Stmt::Kind::VarDecl: {
+                if (!stmt->var_type) {
+                    throw CompileError("Internal error: variable '" + stmt->var_name +
+                                       "' missing type before code generation", stmt->location);
+                }
+                bool skip = false;
+                if (is_top_level && use_facts) {
+                    bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
+                                                   [](const Annotation& a) { return a.name == "export"; });
+                    Symbol* sym = binding_for(stmt);
+                    if (sym && !facts.used_global_vars.count(sym) && !is_exported) {
+                        skip = true;
+                    }
+                }
+                if (!skip && stmt->var_init) {
+                    validate_expr(stmt->var_init, true);
+                }
+                break;
+            }
+            case Stmt::Kind::Expr:
+                validate_expr(stmt->expr, false);
+                break;
+            case Stmt::Kind::Return:
+                validate_expr(stmt->return_expr, true);
+                break;
+            case Stmt::Kind::ConditionalStmt:
+                validate_expr(stmt->condition, true);
+                validate_stmt(stmt->true_stmt, false);
+                break;
+            case Stmt::Kind::TypeDecl:
+            case Stmt::Kind::Import:
+            case Stmt::Kind::Break:
+            case Stmt::Kind::Continue:
+                break;
+        }
+    };
+
+    for (const auto& stmt : stmts) {
+        validate_stmt(stmt, top_level);
+    }
 }
 
 void CodeGenerator::gen_module(const Module& mod) {

@@ -3,6 +3,15 @@
 
 namespace vexel {
 
+namespace {
+ExprPtr wrap_stmt_block(ExprPtr expr) {
+    if (!expr || expr->kind == Expr::Kind::Block) return expr;
+    std::vector<StmtPtr> stmts;
+    stmts.push_back(Stmt::make_expr(expr, expr->location));
+    return Expr::make_block(stmts, nullptr, expr->location);
+}
+} // namespace
+
 Lowerer::Lowerer(TypeChecker* checker)
     : checker(checker) {}
 
@@ -108,12 +117,14 @@ ExprPtr Lowerer::lower_expr(ExprPtr expr) {
             expr->right = lower_expr(expr->right);
             break;
         case Expr::Kind::Iteration:
-            expr->left = lower_expr(expr->left);
+            expr->operand = lower_expr(expr->operand);
             expr->right = lower_expr(expr->right);
+            expr->right = wrap_stmt_block(expr->right);
             break;
         case Expr::Kind::Repeat:
             expr->condition = lower_expr(expr->condition);
             expr->right = lower_expr(expr->right);
+            expr->right = wrap_stmt_block(expr->right);
             break;
         default:
             break;

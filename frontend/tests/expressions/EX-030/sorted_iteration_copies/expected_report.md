@@ -4,8 +4,12 @@
 &!print(arg0: #i32);
 &^main() -> #i32 {
     arr = [30, 10, 20];
-    arr@@print(_);
-    arr@print(_);
+    arr@@{
+        print(_);
+    };
+    arr@{
+        print(_);
+    };
     -> 0;
 }
 ```

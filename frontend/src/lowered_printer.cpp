@@ -152,7 +152,13 @@ std::string render_expr(const ExprPtr& expr, int level, bool inline_ctx) {
             break;
         }
         case Expr::Kind::Repeat:
-            os << wrap_ann(render_expr(expr->condition, level, true) + "@{" + render_expr(expr->right, level + 1, true) + "}");
+            if (expr->right && expr->right->kind == Expr::Kind::Block) {
+                os << wrap_ann(render_expr(expr->condition, level, true) + "@" +
+                               render_expr(expr->right, level + 1, true));
+            } else {
+                os << wrap_ann(render_expr(expr->condition, level, true) + "@{" +
+                               render_expr(expr->right, level + 1, true) + "}");
+            }
             break;
         case Expr::Kind::Resource: {
             os << ann << "::";

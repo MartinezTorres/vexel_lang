@@ -120,11 +120,11 @@ struct CallCollector {
                 collect_expr(expr->right, true);
                 break;
             case Expr::Kind::Iteration:
-                collect_expr(expr->left, true);
+                collect_expr(expr->operand, true);
                 collect_expr(expr->right, false);
                 break;
             case Expr::Kind::Repeat:
-                collect_expr(expr->left, true);
+                collect_expr(expr->condition, true);
                 collect_expr(expr->right, false);
                 break;
             default:
@@ -183,7 +183,11 @@ struct TypeUseValidator {
     void validate_expr(ExprPtr expr, bool value_required) {
         if (!expr) return;
         bool allow_untyped = expr->kind == Expr::Kind::ArrayLiteral && expr->elements.empty();
-        if (value_required && !expr->is_expr_param_ref && !allow_untyped && !type_is_concrete(ctx, expr->type)) {
+        if (value_required && !expr->is_expr_param_ref && !allow_untyped) {
+            if (!expr->type) {
+                throw CompileError("Expression produces no value", expr->location);
+            }
+            if (!type_is_concrete(ctx, expr->type)) {
             if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
                 std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
                           << " type=" << (expr->type ? expr->type->to_string() : "<null>");
@@ -194,6 +198,7 @@ struct TypeUseValidator {
                           << ":" << expr->location.column << "\n";
             }
             throw CompileError("Expression requires a concrete type", expr->location);
+            }
         }
 
         switch (expr->kind) {
@@ -271,11 +276,11 @@ struct TypeUseValidator {
                 validate_expr(expr->right, true);
                 break;
             case Expr::Kind::Iteration:
-                validate_expr(expr->left, true);
+                validate_expr(expr->operand, true);
                 validate_expr(expr->right, false);
                 break;
             case Expr::Kind::Repeat:
-                validate_expr(expr->left, true);
+                validate_expr(expr->condition, true);
                 validate_expr(expr->right, false);
                 break;
             default:

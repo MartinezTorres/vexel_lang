@@ -4,16 +4,16 @@
 &!print(arg0: #i32);
 &^main() -> #i32 {
     outer = 0;
-    outer < 3@{{
+    outer < 3@{
             inner = 0;
-            inner < 3@{{
+            inner < 3@{
                     inner == 1 ? 
                         ->|;
                     print(inner);
                     inner = inner + 1
-                }};
+                };
             outer = outer + 1
-        }};
+        };
     -> 0;
 }
 ```

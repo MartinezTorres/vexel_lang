@@ -191,6 +191,9 @@ private:
     int64_t resolve_array_length(TypePtr type, const SourceLocation& loc);
     void emit_return_stmt(const std::string& expr);
     void append_return_prefix(std::ostringstream& out) const;
+    void validate_codegen_invariants(const Module& mod);
+    void validate_codegen_invariants(StmtPtr func);
+    void validate_codegen_invariants_impl(const std::vector<StmtPtr>& stmts, bool use_facts, bool top_level);
 
     void emit(const std::string& code);
     void emit_header(const std::string& code);

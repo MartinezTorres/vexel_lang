@@ -7,7 +7,9 @@
     -> [1, 2, 3];
 }
 &^main() -> #i32 {
-    get_array()@print(_);
+    get_array()@{
+        print(_);
+    };
     -> 0;
 }
 ```

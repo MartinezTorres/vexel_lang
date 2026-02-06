@@ -4,10 +4,10 @@
 &!print(arg0: #i32);
 &^main() -> #i32 {
     count = 0;
-    count < 3@{{
+    count < 3@{
             print(count);
             count = count + 1
-        }};
+        };
     -> count;
 }
 ```

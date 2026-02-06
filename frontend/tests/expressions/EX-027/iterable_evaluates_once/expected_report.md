@@ -11,7 +11,9 @@ mut counter: #i32;
 &^main() -> #i32 {
     counter = 0;
     arr = get_array();
-    arr@print(_);
+    arr@{
+        print(_);
+    };
     -> 0;
 }
 ```
