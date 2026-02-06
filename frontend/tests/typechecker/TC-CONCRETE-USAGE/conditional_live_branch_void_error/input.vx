@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Index expressions require value-producing operands. | Unresolved return cannot be used as array index
+
+
+&!idx();
+
+&^main() -> #i32 {
+    arr:#i32[1] = [7];
+    arr[idx()]
+}

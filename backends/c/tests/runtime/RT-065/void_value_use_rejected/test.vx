@@ -1,0 +1,13 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Using a value from an unresolved return is rejected before code generation | Using unresolved return values is rejected
+// @expect-exit: 1
+// @expect-stderr: Expression produces no value
+// @command: {VEXEL_C} test.vx
+
+
+&!foo();
+
+&^main() -> #i32 {
+    x:#i32 = foo();
+    x
+}

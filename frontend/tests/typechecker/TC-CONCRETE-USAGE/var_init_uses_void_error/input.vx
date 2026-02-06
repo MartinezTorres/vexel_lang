@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Initializing a variable from an unresolved return value is an error. | Variable init from unresolved return is rejected
+
+
+&!foo();
+
+&^main() -> #i32 {
+    x:#i32 = foo();
+    x
+}

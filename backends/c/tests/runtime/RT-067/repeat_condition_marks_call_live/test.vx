@@ -1,0 +1,20 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Calls used only as repeat conditions in (cond)@ loops are reachable and must be emitted | Repeat condition calls remain reachable
+// @expect-exit: 6
+// @run-generated: true
+// @command: {VEXEL_C} test.vx
+
+
+&cond(i:#i32) -> #b {
+    i < 4
+}
+
+&^main() -> #i32 {
+    i:#i32 = 0;
+    sum:#i32 = 0;
+    (cond(i))@{
+        sum = sum + i;
+        i = i + 1;
+    };
+    sum
+}
