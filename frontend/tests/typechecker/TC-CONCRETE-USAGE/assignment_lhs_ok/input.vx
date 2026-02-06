@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Assigning a new variable should not require a concrete type on the LHS. | LHS assignment ok
+
+
+&^main() -> #i32 {
+    x = 1;
+    x
+}

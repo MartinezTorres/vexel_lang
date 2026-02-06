@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time-dead branches do not require concrete types. | Constexpr dead branch ignored
+
+
+&!foo();
+
+&^main() -> #i32 {
+    true ? 1 : foo()
+}

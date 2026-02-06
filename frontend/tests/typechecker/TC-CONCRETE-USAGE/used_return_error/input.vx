@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Using an unresolved return value is an error. | Used external return is rejected
+
+
+&!foo();
+
+&^main() -> #i32 {
+    foo() + 1
+}

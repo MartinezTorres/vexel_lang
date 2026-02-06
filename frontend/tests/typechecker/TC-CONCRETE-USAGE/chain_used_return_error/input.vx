@@ -1,0 +1,13 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Using an unresolved return value through a chain is an error. | Chained used returns rejected
+
+
+&!foo();
+
+&bar() {
+    -> foo();
+}
+
+&^main() -> #i32 {
+    bar() + 1
+}

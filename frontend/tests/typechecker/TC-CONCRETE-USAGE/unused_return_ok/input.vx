@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Unused return values may be unresolved. | Unused external return is allowed
+
+
+&!foo();
+
+&^main() -> #i32 {
+    foo();
+    0
+}

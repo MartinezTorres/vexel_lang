@@ -1,0 +1,14 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Unresolved return values may propagate if never used. | Chained unused returns ok
+
+
+&!foo();
+
+&bar() {
+    -> foo();
+}
+
+&^main() -> #i32 {
+    bar();
+    0
+}
