@@ -36,76 +36,61 @@ Compiler::OutputPaths Compiler::resolve_output_paths(const std::string& output_f
 }
 
 Compiler::OutputPaths Compiler::compile() {
-    try {
-        if (options.verbose) {
-            std::cout << "Compiling: " << options.input_file << std::endl;
-        }
-
-        // Load main module
-        Module mod = load_module(options.input_file);
-
-        // Import processing now handled per-scope by type checker
-
-        if (options.verbose) {
-            std::cout << "Type checking..." << std::endl;
-        }
-
-        // Type check
-        TypeChecker checker(options.project_root, options.allow_process);
-        checker.check_module(mod);
-
-        Optimizer optimizer(&checker);
-        OptimizationFacts optimization = optimizer.run(mod);
-        Analyzer analyzer(&checker, &optimization);
-        AnalysisFacts analysis = analyzer.run(mod);
-        checker.validate_type_usage(mod, analysis);
-
-        OutputPaths paths = resolve_output_paths(options.output_file);
-        if (options.emit_lowered) {
-            std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
-            std::string lowered = print_lowered_module(mod);
-            if (options.verbose) {
-                std::cout << "Writing lowered module: " << lowered_path << std::endl;
-            }
-            write_file(lowered_path.string(), lowered);
-        }
-        if (options.emit_analysis) {
-            std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
-            if (options.verbose) {
-                std::cout << "Writing analysis report: " << analysis_path << std::endl;
-            }
-            write_file(analysis_path.string(), format_analysis_report(mod, analysis, &optimization));
-        }
-
-        const Backend* backend = find_backend(options.backend);
-        if (!backend) {
-            throw CompileError("Unknown backend: " + options.backend, SourceLocation());
-        }
-        if (options.verbose) {
-            std::cout << "Generating backend: " << backend->info.name << std::endl;
-        }
-        BackendContext ctx{mod, checker, options, paths, analysis, optimization};
-        backend->emit(ctx);
-
-        if (options.verbose) {
-            std::cout << "Compilation successful!" << std::endl;
-        }
-
-        return paths;
-
-    } catch (const CompileError& e) {
-        std::cerr << "Error";
-        if (!e.location.filename.empty()) {
-            std::cerr << " at " << e.location.filename
-                     << ":" << e.location.line
-                     << ":" << e.location.column;
-        }
-        std::cerr << ": " << e.what() << std::endl;
-        throw;
-    } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
-        throw;
+    if (options.verbose) {
+        std::cout << "Compiling: " << options.input_file << std::endl;
     }
+
+    // Load main module
+    Module mod = load_module(options.input_file);
+
+    // Import processing now handled per-scope by type checker
+
+    if (options.verbose) {
+        std::cout << "Type checking..." << std::endl;
+    }
+
+    // Type check
+    TypeChecker checker(options.project_root, options.allow_process);
+    checker.check_module(mod);
+
+    Optimizer optimizer(&checker);
+    OptimizationFacts optimization = optimizer.run(mod);
+    Analyzer analyzer(&checker, &optimization);
+    AnalysisFacts analysis = analyzer.run(mod);
+    checker.validate_type_usage(mod, analysis);
+
+    OutputPaths paths = resolve_output_paths(options.output_file);
+    if (options.emit_lowered) {
+        std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
+        std::string lowered = print_lowered_module(mod);
+        if (options.verbose) {
+            std::cout << "Writing lowered module: " << lowered_path << std::endl;
+        }
+        write_file(lowered_path.string(), lowered);
+    }
+    if (options.emit_analysis) {
+        std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
+        if (options.verbose) {
+            std::cout << "Writing analysis report: " << analysis_path << std::endl;
+        }
+        write_file(analysis_path.string(), format_analysis_report(mod, analysis, &optimization));
+    }
+
+    const Backend* backend = find_backend(options.backend);
+    if (!backend) {
+        throw CompileError("Unknown backend: " + options.backend, SourceLocation());
+    }
+    if (options.verbose) {
+        std::cout << "Generating backend: " << backend->info.name << std::endl;
+    }
+    BackendContext ctx{mod, checker, options, paths, analysis, optimization};
+    backend->emit(ctx);
+
+    if (options.verbose) {
+        std::cout << "Compilation successful!" << std::endl;
+    }
+
+    return paths;
 }
 
 std::string Compiler::read_file(const std::string& path) {
