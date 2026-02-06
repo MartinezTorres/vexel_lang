@@ -7,6 +7,8 @@
 
 namespace vexel {
 
+struct AnalysisFacts;
+
 // Type signature for generic instantiations
 struct TypeSignature {
     std::vector<TypePtr> param_types;
@@ -108,8 +110,10 @@ class TypeChecker {
 public:
     TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false);
     void check_module(Module& mod);
+    void validate_type_usage(const Module& mod, const AnalysisFacts& facts);
     Scope* get_scope() { return current_scope; }
     TypePtr resolve_type(TypePtr type);
+    std::optional<bool> constexpr_condition(ExprPtr expr);
 
     // Generic monomorphization
     std::string get_or_create_instantiation(const std::string& func_name,

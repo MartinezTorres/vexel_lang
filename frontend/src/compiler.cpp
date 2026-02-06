@@ -58,6 +58,7 @@ Compiler::OutputPaths Compiler::compile() {
         OptimizationFacts optimization = optimizer.run(mod);
         Analyzer analyzer(&checker, &optimization);
         AnalysisFacts analysis = analyzer.run(mod);
+        checker.validate_type_usage(mod, analysis);
 
         OutputPaths paths = resolve_output_paths(options.output_file);
         if (options.emit_lowered) {
