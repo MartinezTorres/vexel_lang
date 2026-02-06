@@ -1,5 +1,6 @@
 #include "lowered_printer.h"
 #include "constants.h"
+#include "expr_access.h"
 #include <sstream>
 
 namespace vexel {
@@ -148,16 +149,17 @@ std::string render_expr(const ExprPtr& expr, int level, bool inline_ctx) {
             break;
         case Expr::Kind::Iteration: {
             std::string op = expr->is_sorted_iteration ? "@@" : "@";
-            os << ann << render_expr(expr->operand, level, true) << op << render_expr(expr->right, level, true);
+            os << ann << render_expr(loop_subject(expr), level, true) << op
+               << render_expr(loop_body(expr), level, true);
             break;
         }
         case Expr::Kind::Repeat:
-            if (expr->right && expr->right->kind == Expr::Kind::Block) {
-                os << wrap_ann(render_expr(expr->condition, level, true) + "@" +
-                               render_expr(expr->right, level + 1, true));
+            if (loop_body(expr) && loop_body(expr)->kind == Expr::Kind::Block) {
+                os << wrap_ann(render_expr(loop_subject(expr), level, true) + "@" +
+                               render_expr(loop_body(expr), level + 1, true));
             } else {
-                os << wrap_ann(render_expr(expr->condition, level, true) + "@{" +
-                               render_expr(expr->right, level + 1, true) + "}");
+                os << wrap_ann(render_expr(loop_subject(expr), level, true) + "@{" +
+                               render_expr(loop_body(expr), level + 1, true) + "}");
             }
             break;
         case Expr::Kind::Resource: {

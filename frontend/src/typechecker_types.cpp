@@ -20,8 +20,7 @@ TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const S
     if (type_str == "b") return Type::make_primitive(PrimitiveType::Bool, loc);
     if (type_str == "s") return Type::make_primitive(PrimitiveType::String, loc);
 
-    // For now, return type variable for complex types
-    // TODO: Handle array types, named types, etc.
+    // Named/complex types are resolved later through bindings and resolver scopes.
     TypePtr named = Type::make_named(type_str, loc);
     if (bindings) {
         Symbol* sym = lookup_global(type_str);

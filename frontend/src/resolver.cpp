@@ -1,5 +1,6 @@
 #include "resolver.h"
 #include "annotation_validator.h"
+#include "expr_access.h"
 #include "path_utils.h"
 #include <algorithm>
 #include <filesystem>
@@ -522,7 +523,7 @@ void Resolver::resolve_expr(ExprPtr expr) {
             resolve_expr(expr->right);
             break;
         case Expr::Kind::Iteration:
-            resolve_expr(expr->operand);
+            resolve_expr(loop_subject(expr));
             push_scope();
             {
                 Symbol* sym = create_symbol(Symbol::Kind::Variable, "_", nullptr, false, true);
@@ -530,12 +531,12 @@ void Resolver::resolve_expr(ExprPtr expr) {
                 sym->instance_id = current_instance_id;
                 current_scope->define("_", sym);
             }
-            resolve_expr(expr->right);
+            resolve_expr(loop_body(expr));
             pop_scope();
             break;
         case Expr::Kind::Repeat:
-            resolve_expr(expr->condition);
-            resolve_expr(expr->right);
+            resolve_expr(loop_subject(expr));
+            resolve_expr(loop_body(expr));
             break;
         case Expr::Kind::Resource:
         case Expr::Kind::Process:
@@ -759,12 +760,12 @@ void Resolver::collect_imports_expr(ExprPtr expr, std::vector<std::vector<std::s
             collect_imports_expr(expr->right, out);
             break;
         case Expr::Kind::Iteration:
-            collect_imports_expr(expr->left, out);
-            collect_imports_expr(expr->right, out);
+            collect_imports_expr(loop_subject(expr), out);
+            collect_imports_expr(loop_body(expr), out);
             break;
         case Expr::Kind::Repeat:
-            collect_imports_expr(expr->left, out);
-            collect_imports_expr(expr->right, out);
+            collect_imports_expr(loop_subject(expr), out);
+            collect_imports_expr(loop_body(expr), out);
             break;
         case Expr::Kind::Resource:
         case Expr::Kind::Process:

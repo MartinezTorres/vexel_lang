@@ -1,5 +1,6 @@
 #include "analysis.h"
 #include "evaluator.h"
+#include "expr_access.h"
 #include "optimizer.h"
 #include "typechecker.h"
 #include <algorithm>
@@ -253,8 +254,8 @@ void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& ca
 
         case Expr::Kind::Iteration:
         case Expr::Kind::Repeat:
-            collect_calls(expr->left, calls);
-            if (expr->right) collect_calls(expr->right, calls);
+            collect_calls(loop_subject(expr), calls);
+            if (loop_body(expr)) collect_calls(loop_body(expr), calls);
             break;
 
         default:
@@ -521,10 +522,13 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                         }
                         break;
                     case Expr::Kind::Range:
-                    case Expr::Kind::Iteration:
-                    case Expr::Kind::Repeat:
                         visit_expr(expr->left);
                         visit_expr(expr->right);
+                        break;
+                    case Expr::Kind::Iteration:
+                    case Expr::Kind::Repeat:
+                        visit_expr(loop_subject(expr));
+                        visit_expr(loop_body(expr));
                         break;
                     default:
                         break;
@@ -656,10 +660,13 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                     }
                     break;
                 case Expr::Kind::Range:
-                case Expr::Kind::Iteration:
-                case Expr::Kind::Repeat:
                     visit_expr(expr->left);
                     visit_expr(expr->right);
+                    break;
+                case Expr::Kind::Iteration:
+                case Expr::Kind::Repeat:
+                    visit_expr(loop_subject(expr));
+                    visit_expr(loop_body(expr));
                     break;
                 default:
                     break;
@@ -817,10 +824,13 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
                 }
                 break;
             case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
                 visit_expr(expr->left);
                 visit_expr(expr->right);
+                break;
+            case Expr::Kind::Iteration:
+            case Expr::Kind::Repeat:
+                visit_expr(loop_subject(expr));
+                visit_expr(loop_body(expr));
                 break;
             case Expr::Kind::Assignment:
                 visit_expr(expr->left);
@@ -1047,10 +1057,13 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                     }
                     break;
                 case Expr::Kind::Range:
-                case Expr::Kind::Iteration:
-                case Expr::Kind::Repeat:
                     visit_expr(expr->left);
                     visit_expr(expr->right);
+                    break;
+                case Expr::Kind::Iteration:
+                case Expr::Kind::Repeat:
+                    visit_expr(loop_subject(expr));
+                    visit_expr(loop_body(expr));
                     break;
                 default:
                     break;
@@ -1255,10 +1268,13 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
                 visit_expr_globals(expr->false_expr);
                 break;
             case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
                 visit_expr_globals(expr->left);
                 visit_expr_globals(expr->right);
+                break;
+            case Expr::Kind::Iteration:
+            case Expr::Kind::Repeat:
+                visit_expr_globals(loop_subject(expr));
+                visit_expr_globals(loop_body(expr));
                 break;
             default:
                 break;

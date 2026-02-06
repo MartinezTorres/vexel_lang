@@ -1,4 +1,5 @@
 #include "optimizer.h"
+#include "expr_access.h"
 
 namespace vexel {
 
@@ -170,8 +171,8 @@ void Optimizer::visit_expr(ExprPtr expr, OptimizationFacts& facts) {
             break;
         case Expr::Kind::Iteration:
         case Expr::Kind::Repeat:
-            visit_expr(expr->left, facts);
-            visit_expr(expr->right, facts);
+            visit_expr(loop_subject(expr), facts);
+            visit_expr(loop_body(expr), facts);
             break;
         default:
             break;

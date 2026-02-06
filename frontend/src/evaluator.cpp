@@ -1,5 +1,6 @@
 #include "evaluator.h"
 #include "constants.h"
+#include "expr_access.h"
 #include <algorithm>
 #include <functional>
 
@@ -1663,10 +1664,10 @@ bool CompileTimeEvaluator::is_expr_pure(ExprPtr expr, std::string& reason) {
             return is_expr_pure(expr->operand, reason);
 
         case Expr::Kind::Iteration:
-            return is_expr_pure(expr->operand, reason) && is_expr_pure(expr->right, reason);
+            return is_expr_pure(loop_subject(expr), reason) && is_expr_pure(loop_body(expr), reason);
 
         case Expr::Kind::Repeat:
-            return is_expr_pure(expr->condition, reason) && is_expr_pure(expr->right, reason);
+            return is_expr_pure(loop_subject(expr), reason) && is_expr_pure(loop_body(expr), reason);
 
         default:
             // Literals and identifiers are pure

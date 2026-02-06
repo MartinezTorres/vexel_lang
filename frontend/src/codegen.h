@@ -174,6 +174,7 @@ private:
     bool is_aggregate_type(TypePtr type) const;
     bool is_pointer_like(TypePtr type) const;
     TypePtr resolve_type(TypePtr type) const;
+    TypePtr resolve_ref_param_type_or_fail(StmtPtr stmt, size_t index) const;
     PtrKind ptr_kind_for_expr(const ExprPtr& expr) const;
     PtrKind ptr_kind_for_symbol(const std::string& name, int scope_id) const;
     PtrKind ptr_kind_for_symbol(const Symbol* sym) const;

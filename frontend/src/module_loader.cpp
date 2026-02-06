@@ -1,4 +1,5 @@
 #include "module_loader.h"
+#include "expr_access.h"
 #include "lexer.h"
 #include "parser.h"
 #include "path_utils.h"
@@ -128,12 +129,12 @@ void ModuleLoader::collect_imports_expr(ExprPtr expr, std::vector<std::vector<st
             collect_imports_expr(expr->right, out);
             break;
         case Expr::Kind::Iteration:
-            collect_imports_expr(expr->operand, out);
-            collect_imports_expr(expr->right, out);
+            collect_imports_expr(loop_subject(expr), out);
+            collect_imports_expr(loop_body(expr), out);
             break;
         case Expr::Kind::Repeat:
-            collect_imports_expr(expr->condition, out);
-            collect_imports_expr(expr->right, out);
+            collect_imports_expr(loop_subject(expr), out);
+            collect_imports_expr(loop_body(expr), out);
             break;
         case Expr::Kind::Resource:
         case Expr::Kind::Process:

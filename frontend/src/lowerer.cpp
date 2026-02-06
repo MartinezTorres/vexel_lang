@@ -1,4 +1,5 @@
 #include "lowerer.h"
+#include "expr_access.h"
 #include "typechecker.h"
 
 namespace vexel {
@@ -117,14 +118,14 @@ ExprPtr Lowerer::lower_expr(ExprPtr expr) {
             expr->right = lower_expr(expr->right);
             break;
         case Expr::Kind::Iteration:
-            expr->operand = lower_expr(expr->operand);
-            expr->right = lower_expr(expr->right);
-            expr->right = wrap_stmt_block(expr->right);
+            loop_subject_ref(expr) = lower_expr(loop_subject(expr));
+            loop_body_ref(expr) = lower_expr(loop_body(expr));
+            loop_body_ref(expr) = wrap_stmt_block(loop_body(expr));
             break;
         case Expr::Kind::Repeat:
-            expr->condition = lower_expr(expr->condition);
-            expr->right = lower_expr(expr->right);
-            expr->right = wrap_stmt_block(expr->right);
+            loop_subject_ref(expr) = lower_expr(loop_subject(expr));
+            loop_body_ref(expr) = lower_expr(loop_body(expr));
+            loop_body_ref(expr) = wrap_stmt_block(loop_body(expr));
             break;
         default:
             break;

@@ -1,5 +1,6 @@
 #include "typechecker.h"
 #include "evaluator.h"
+#include "expr_access.h"
 #include "resolver.h"
 #include "type_use_validator.h"
 #include <algorithm>
@@ -15,7 +16,7 @@ TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs,
     : resolver(resolver),
       bindings(bindings_in),
       program(program_in),
-      global_scope(resolver ? resolver->instance_scope(current_instance_id) : nullptr),
+      global_scope(nullptr),
       type_var_counter(0),
       loop_depth(0),
       project_root(proj_root),
@@ -395,12 +396,12 @@ void TypeChecker::validate_invariants(const Module& mod) {
                 validate_expr(expr->right);
                 break;
             case Expr::Kind::Iteration:
-                validate_expr(expr->operand);
-                validate_expr(expr->right);
+                validate_expr(loop_subject(expr));
+                validate_expr(loop_body(expr));
                 break;
             case Expr::Kind::Repeat:
-                validate_expr(expr->condition);
-                validate_expr(expr->right);
+                validate_expr(loop_subject(expr));
+                validate_expr(loop_body(expr));
                 break;
             case Expr::Kind::Resource:
             case Expr::Kind::Process:

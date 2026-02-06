@@ -1,5 +1,6 @@
 #include "type_use_validator.h"
 #include "common.h"
+#include "expr_access.h"
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -120,12 +121,12 @@ struct CallCollector {
                 collect_expr(expr->right, true);
                 break;
             case Expr::Kind::Iteration:
-                collect_expr(expr->operand, true);
-                collect_expr(expr->right, false);
+                collect_expr(loop_subject(expr), true);
+                collect_expr(loop_body(expr), false);
                 break;
             case Expr::Kind::Repeat:
-                collect_expr(expr->condition, true);
-                collect_expr(expr->right, false);
+                collect_expr(loop_subject(expr), true);
+                collect_expr(loop_body(expr), false);
                 break;
             default:
                 break;
@@ -276,12 +277,12 @@ struct TypeUseValidator {
                 validate_expr(expr->right, true);
                 break;
             case Expr::Kind::Iteration:
-                validate_expr(expr->operand, true);
-                validate_expr(expr->right, false);
+                validate_expr(loop_subject(expr), true);
+                validate_expr(loop_body(expr), false);
                 break;
             case Expr::Kind::Repeat:
-                validate_expr(expr->condition, true);
-                validate_expr(expr->right, false);
+                validate_expr(loop_subject(expr), true);
+                validate_expr(loop_body(expr), false);
                 break;
             default:
                 break;

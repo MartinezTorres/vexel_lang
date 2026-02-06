@@ -1,5 +1,6 @@
 #include "typechecker.h"
 #include "evaluator.h"
+#include "expr_access.h"
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -73,8 +74,8 @@ void assign_loop_symbol_expr(ExprPtr expr, TypePtr type, Bindings* bindings, int
             assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
             break;
         case Expr::Kind::Repeat:
-            assign_loop_symbol_expr(expr->condition, type, bindings, instance_id);
-            assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
+            assign_loop_symbol_expr(loop_subject(expr), type, bindings, instance_id);
+            assign_loop_symbol_expr(loop_body(expr), type, bindings, instance_id);
             break;
         case Expr::Kind::Iteration:
         case Expr::Kind::Resource:

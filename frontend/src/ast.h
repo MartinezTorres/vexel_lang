@@ -92,6 +92,11 @@ struct Expr {
     // Conditional
     ExprPtr condition, true_expr, false_expr;
 
+    // Loop invariant:
+    // - Iteration stores iterable in operand and body in right.
+    // - Repeat stores condition in condition and body in right.
+    // - left is intentionally unused for loop nodes.
+
     // Cast
     TypePtr target_type;
 

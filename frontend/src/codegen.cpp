@@ -1,6 +1,7 @@
 #include "codegen.h"
 #include "analysis.h"
 #include "evaluator.h"
+#include "expr_access.h"
 #include "function_key.h"
 #include "optimizer.h"
 #include "typechecker.h"
@@ -432,12 +433,12 @@ void CodeGenerator::validate_codegen_invariants_impl(const std::vector<StmtPtr>&
                 validate_expr(expr->right, true);
                 break;
             case Expr::Kind::Iteration:
-                validate_expr(expr->operand, true);
-                validate_expr(expr->right, false);
+                validate_expr(loop_subject(expr), true);
+                validate_expr(loop_body(expr), false);
                 break;
             case Expr::Kind::Repeat:
-                validate_expr(expr->condition, true);
-                validate_expr(expr->right, false);
+                validate_expr(loop_subject(expr), true);
+                validate_expr(loop_body(expr), false);
                 break;
             default:
                 break;
@@ -750,15 +751,7 @@ void CodeGenerator::gen_module(const Module& mod) {
                         first_param = false;
 
                         std::string ref_type;
-                        TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
-                        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::TypeVar) {
-                            TypePtr resolved = resolve_type(ref_type_ptr);
-                            if (resolved && resolved->kind != Type::Kind::TypeVar) {
-                                ref_type_ptr = resolved;
-                            } else {
-                                ref_type_ptr = Type::make_primitive(PrimitiveType::I32, stmt->location);
-                            }
-                        }
+                        TypePtr ref_type_ptr = resolve_ref_param_type_or_fail(stmt, i);
                         bool by_ref = true;
                         if (!ref_key.empty() && i < ref_key.size()) {
                             by_ref = ref_key[i] == 'M';
@@ -810,13 +803,8 @@ void CodeGenerator::gen_module(const Module& mod) {
     emit_header("");
 
     // Global variables and functions
-    emit("// DEBUG: Starting gen_stmt loop");
     for_instances([&](const Module& module) {
         for (const auto& stmt : module.top_level) {
-            if (stmt->kind == Stmt::Kind::FuncDecl) {
-                emit("// DEBUG: gen_stmt calling gen_func_decl for " + stmt->func_name +
-                     " instance_id=" + std::to_string(current_instance_id));
-            }
             gen_stmt(stmt);
         }
     });
@@ -1155,15 +1143,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         if (!ref_key.empty() && i < ref_key.size()) {
             by_ref = ref_key[i] == 'M';
         }
-        TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
-        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::TypeVar) {
-            TypePtr resolved = resolve_type(ref_type_ptr);
-            if (resolved && resolved->kind != Type::Kind::TypeVar) {
-                ref_type_ptr = resolved;
-            } else {
-                ref_type_ptr = Type::make_primitive(PrimitiveType::I32, stmt->location);
-            }
-        }
+        TypePtr ref_type_ptr = resolve_ref_param_type_or_fail(stmt, i);
         if (abi.lower_aggregates && ref_type_ptr && is_aggregate_type(ref_type_ptr)) {
             by_ref = true;
             current_aggregate_params.insert(stmt->ref_params[i]);
@@ -1879,6 +1859,22 @@ TypePtr CodeGenerator::resolve_type(TypePtr type) const {
         return type_checker->resolve_type(type);
     }
     return type;
+}
+
+TypePtr CodeGenerator::resolve_ref_param_type_or_fail(StmtPtr stmt, size_t index) const {
+    if (!stmt) return nullptr;
+    TypePtr type = (index < stmt->ref_param_types.size()) ? stmt->ref_param_types[index] : nullptr;
+    if (!type) return nullptr;
+    if (type->kind != Type::Kind::TypeVar) return type;
+
+    TypePtr resolved = resolve_type(type);
+    if (resolved && resolved->kind != Type::Kind::TypeVar) {
+        return resolved;
+    }
+
+    std::string ref_name = (index < stmt->ref_params.size()) ? stmt->ref_params[index] : ("ref#" + std::to_string(index));
+    throw CompileError("Internal error: unresolved receiver type '" + ref_name +
+                       "' in function '" + stmt->func_name + "'", stmt->location);
 }
 
 Symbol* CodeGenerator::binding_for(const void* node) const {
