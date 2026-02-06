@@ -9,6 +9,7 @@ namespace vexel {
 
 struct AnalysisFacts;
 class Resolver;
+class Importer;
 
 // Type signature for generic instantiations
 struct TypeSignature {
@@ -86,6 +87,7 @@ public:
 
 class TypeChecker {
     friend class Resolver;
+    friend class Importer;
     Scope* current_scope;
     std::vector<std::unique_ptr<Scope>> scopes;
     int type_var_counter;
@@ -101,7 +103,6 @@ class TypeChecker {
     // If the checker ever caches across runs or reuses freed nodes, switch to stable IDs or shared_ptr keys.
     std::unordered_set<Stmt*> checked_statements;
 
-    // Module loading for per-scope imports
     std::string project_root;
     bool allow_process;
     // Scope* keys rely on scopes surviving for the lifetime of a single check; use stable handles if that changes.
@@ -126,13 +127,6 @@ public:
     void register_tuple_type(const std::string& name, const std::vector<TypePtr>& elem_types);
 
 private:
-    Module load_module_file(const std::string& path);
-    std::vector<StmtPtr> clone_module_declarations(const std::vector<StmtPtr>& decls);
-    StmtPtr clone_stmt_deep(StmtPtr stmt);
-    void rename_identifiers(StmtPtr stmt, const std::unordered_map<std::string, std::string>& name_map);
-    void rename_identifiers_in_expr(ExprPtr expr, const std::unordered_map<std::string, std::string>& name_map);
-    void tag_scope_instances(StmtPtr stmt, int instance_id);
-    void tag_scope_instances_in_expr(ExprPtr expr, int instance_id, const std::unordered_set<std::string>& module_symbols);
 
     void push_scope();
     void pop_scope();
@@ -141,7 +135,6 @@ private:
     void check_func_decl(StmtPtr stmt);
     void check_type_decl(StmtPtr stmt);
     void check_var_decl(StmtPtr stmt);
-    void check_import(StmtPtr stmt);
 
     TypePtr check_expr(ExprPtr expr);
     TypePtr check_binary(ExprPtr expr);
@@ -190,7 +183,6 @@ private:
     bool is_generic_function(StmtPtr func);
 
     bool try_resolve_relative_path(const std::string& relative, const std::string& current_file, std::string& out_path);
-    bool try_resolve_module_path(const std::vector<std::string>& import_path, const std::string& current_file, std::string& out_path);
     bool try_resolve_resource_path(const std::vector<std::string>& import_path, const std::string& current_file, std::string& out_path);
     std::string join_import_path(const std::vector<std::string>& import_path);
 

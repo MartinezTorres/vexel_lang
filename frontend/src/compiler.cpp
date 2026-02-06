@@ -9,6 +9,8 @@
 #include "backend_registry.h"
 #include "constants.h"
 #include "lowered_printer.h"
+#include "lowerer.h"
+#include "monomorphizer.h"
 #include <functional>
 #include <queue>
 #include <fstream>
@@ -52,6 +54,12 @@ Compiler::OutputPaths Compiler::compile() {
     // Type check
     TypeChecker checker(options.project_root, options.allow_process);
     checker.check_module(mod);
+
+    Monomorphizer monomorphizer(&checker);
+    monomorphizer.run(mod);
+
+    Lowerer lowerer(&checker);
+    lowerer.run(mod);
 
     Optimizer optimizer(&checker);
     OptimizationFacts optimization = optimizer.run(mod);

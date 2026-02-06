@@ -2,6 +2,8 @@
 #include "parser.h"
 #include "typechecker.h"
 #include "lowered_printer.h"
+#include "lowerer.h"
+#include "monomorphizer.h"
 #include <iostream>
 #include <cstring>
 #include <fstream>
@@ -63,6 +65,12 @@ int main(int argc, char** argv) {
         if (verbose) std::cout << "Type checking...\n";
         vexel::TypeChecker checker(".", allow_process);
         checker.check_module(mod);
+
+        vexel::Monomorphizer monomorphizer(&checker);
+        monomorphizer.run(mod);
+
+        vexel::Lowerer lowerer(&checker);
+        lowerer.run(mod);
 
         std::cout << vexel::print_lowered_module(mod);
         return 0;

@@ -21,6 +21,7 @@ all: $(BUILD_DIR)/vexel-frontend $(BUILD_DIR)/lib/libvexelfrontend.a
 
 $(BUILD_DIR)/lib/libvexelfrontend.a: $(LIB_OBJECTS)
 	@mkdir -p $(@D)
+	@rm -f $@
 	ar rcs $@ $^
 
 $(BUILD_DIR)/vexel-frontend: $(CLI_OBJECT) $(BUILD_DIR)/lib/libvexelfrontend.a

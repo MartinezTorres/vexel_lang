@@ -1,5 +1,6 @@
 #include "typechecker.h"
 #include "evaluator.h"
+#include "importer.h"
 #include "resolver.h"
 #include "type_use_validator.h"
 #include <algorithm>
@@ -50,19 +51,6 @@ void TypeChecker::check_module(Module& mod) {
         check_stmt(stmt);
     }
 
-    // Process pending generic instantiations
-    while (!pending_instantiations.empty()) {
-        std::vector<StmtPtr> batch;
-        batch.swap(pending_instantiations);
-
-        for (auto& inst : batch) {
-            // Type check the instantiation
-            check_func_decl(inst);
-
-            // Add to module
-            mod.top_level.push_back(inst);
-        }
-    }
 }
 
 void TypeChecker::check_stmt(StmtPtr stmt) {
@@ -82,9 +70,11 @@ void TypeChecker::check_stmt(StmtPtr stmt) {
         case Stmt::Kind::VarDecl:
             check_var_decl(stmt);
             break;
-        case Stmt::Kind::Import:
-            check_import(stmt);
+        case Stmt::Kind::Import: {
+            Importer importer(this);
+            importer.handle_import(stmt);
             break;
+        }
         case Stmt::Kind::Expr:
             if (stmt->expr) check_expr(stmt->expr);
             break;

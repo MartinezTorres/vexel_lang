@@ -1,0 +1,11 @@
+// @desc: Unreachable functions may reference unresolved return types without error.
+
+&!foo();
+
+&dead() -> #i32 {
+    foo() + 1
+}
+
+&^main() -> #i32 {
+    0
+}
