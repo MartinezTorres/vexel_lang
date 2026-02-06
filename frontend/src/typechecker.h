@@ -1,5 +1,8 @@
 #pragma once
 #include "ast.h"
+#include "bindings.h"
+#include "program.h"
+#include "symbols.h"
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -9,7 +12,6 @@ namespace vexel {
 
 struct AnalysisFacts;
 class Resolver;
-class Importer;
 
 // Type signature for generic instantiations
 struct TypeSignature {
@@ -47,51 +49,14 @@ struct GenericInstantiation {
     StmtPtr declaration;
 };
 
-struct Symbol {
-    enum class Kind { Variable, Function, Type, Constant };
-    Kind kind;
-    TypePtr type;
-    bool is_mutable;
-    bool is_external;
-    bool is_exported;
-    StmtPtr declaration;
-    int scope_instance_id = -1;  // For imported symbols: which scope instance they belong to (-1 = not imported)
-};
-
-class Scope {
-public:
-    Scope* parent;
-    std::unordered_map<std::string, Symbol> symbols;
-    int id;
-
-    Scope(Scope* p = nullptr, int scope_id = 0) : parent(p), id(scope_id) {}
-
-    Symbol* lookup(const std::string& name) {
-        auto it = symbols.find(name);
-        if (it != symbols.end()) return &it->second;
-        if (parent) return parent->lookup(name);
-        return nullptr;
-    }
-
-    void define(const std::string& name, const Symbol& sym) {
-        if (symbols.count(name)) {
-            throw CompileError("Name already defined: " + name, SourceLocation());
-        }
-        symbols[name] = sym;
-    }
-
-    bool exists_in_current(const std::string& name) {
-        return symbols.count(name) > 0;
-    }
-};
+class Resolver;
 
 class TypeChecker {
-    friend class Resolver;
-    friend class Importer;
-    Scope* current_scope;
-    std::vector<std::unique_ptr<Scope>> scopes;
+    Resolver* resolver;
+    Bindings* bindings;
+    Program* program;
+    Scope* global_scope;
     int type_var_counter;
-    int scope_counter;
     int loop_depth;
     std::unordered_map<std::string, TypePtr> type_var_bindings;
 
@@ -101,20 +66,28 @@ class TypeChecker {
     std::vector<StmtPtr> pending_instantiations;
     // Raw pointer keys are safe here because the owning Module/AST lives for the duration of type checking.
     // If the checker ever caches across runs or reuses freed nodes, switch to stable IDs or shared_ptr keys.
-    std::unordered_set<Stmt*> checked_statements;
+    std::unordered_set<unsigned long long> checked_statements;
 
     std::string project_root;
     bool allow_process;
-    // Scope* keys rely on scopes surviving for the lifetime of a single check; use stable handles if that changes.
-    std::unordered_map<Scope*, std::unordered_set<std::string>> scope_loaded_modules;
-    Module* current_module;
     std::unordered_map<std::string, std::vector<TypePtr>> forced_tuple_types;
+    int current_instance_id = -1;
 
 public:
-    TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false);
+    TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false,
+                Resolver* resolver = nullptr, Bindings* bindings = nullptr, Program* program = nullptr);
+    void check_program(Program& program);
     void check_module(Module& mod);
     void validate_type_usage(const Module& mod, const AnalysisFacts& facts);
-    Scope* get_scope() { return current_scope; }
+    Scope* get_scope() { return global_scope; }
+    void set_resolver(Resolver* resolver);
+    void set_bindings(Bindings* bindings_in);
+    void set_program(Program* program_in);
+    Symbol* binding_for(const void* node) const { return lookup_binding(node); }
+    Symbol* binding_for(int instance_id, const void* node) const;
+    int current_instance() const { return current_instance_id; }
+    void set_current_instance(int instance_id);
+    Program* get_program() const { return program; }
     TypePtr resolve_type(TypePtr type);
     std::optional<bool> constexpr_condition(ExprPtr expr);
 
@@ -127,9 +100,9 @@ public:
     void register_tuple_type(const std::string& name, const std::vector<TypePtr>& elem_types);
 
 private:
-
-    void push_scope();
-    void pop_scope();
+    Symbol* lookup_global(const std::string& name) const;
+    Symbol* lookup_binding(const void* node) const;
+    unsigned long long stmt_key(const Stmt* stmt) const;
 
     void check_stmt(StmtPtr stmt);
     void check_func_decl(StmtPtr stmt);
@@ -157,9 +130,6 @@ private:
     TypePtr try_operator_overload(ExprPtr expr, const std::string& op, TypePtr left_type);
     bool try_custom_iteration(ExprPtr expr, TypePtr iterable_type);
 
-    void validate_annotations(const Module& mod);
-    void validate_stmt_annotations(StmtPtr stmt);
-    void validate_expr_annotations(ExprPtr expr);
     void warn_annotation(const Annotation& ann, const std::string& msg);
 
     bool types_equal(TypePtr a, TypePtr b);
@@ -170,7 +140,6 @@ private:
     bool literal_assignable_to(TypePtr target, ExprPtr expr);
     TypePtr make_fresh_typevar();
 
-    void verify_no_shadowing(const std::string& name, const SourceLocation& loc);
     TypePtr parse_type_from_string(const std::string& type_str, const SourceLocation& loc);
     void validate_type(TypePtr type, const SourceLocation& loc);
     void check_recursive_type(const std::string& type_name, StmtPtr type_decl, const SourceLocation& loc);
@@ -182,9 +151,7 @@ private:
     bool types_in_same_family(TypePtr a, TypePtr b);
     bool is_generic_function(StmtPtr func);
 
-    bool try_resolve_relative_path(const std::string& relative, const std::string& current_file, std::string& out_path);
-    bool try_resolve_resource_path(const std::vector<std::string>& import_path, const std::string& current_file, std::string& out_path);
-    std::string join_import_path(const std::vector<std::string>& import_path);
+    // Path helpers moved to path_utils.
 
     // Generic monomorphization helpers
     StmtPtr clone_function(StmtPtr func);

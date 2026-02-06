@@ -319,6 +319,7 @@ StmtPtr Stmt::make_func(const std::string& name, std::vector<Parameter> params, 
     s->is_external = external;
     s->is_exported = exported;
     s->is_generic = false;  // Will be set during type checking
+    s->is_instantiation = false;
     s->location = loc;
     return s;
 }

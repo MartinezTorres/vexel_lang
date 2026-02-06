@@ -563,7 +563,13 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     }
 
     std::string func_name = expr->operand->name;
-    Symbol* sym = type_checker->get_scope()->lookup(func_name);
+    Symbol* sym = nullptr;
+    if (type_checker) {
+        sym = type_checker->binding_for(expr->operand.get());
+    }
+    if (!sym && type_checker && type_checker->get_scope()) {
+        sym = type_checker->get_scope()->lookup(func_name);
+    }
 
     if (!sym) {
         error_msg = "Symbol not found: " + func_name;
@@ -659,7 +665,10 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     }
 
     // Try to look up global constant
-    Symbol* sym = type_checker->get_scope()->lookup(expr->name);
+    Symbol* sym = type_checker ? type_checker->binding_for(expr.get()) : nullptr;
+    if (!sym && type_checker && type_checker->get_scope()) {
+        sym = type_checker->get_scope()->lookup(expr->name);
+    }
     if (sym && sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
         return try_evaluate(sym->declaration->var_init, result);
     }
@@ -692,7 +701,13 @@ bool CompileTimeEvaluator::eval_type_constructor(ExprPtr expr, CTValue& result) 
     }
 
     std::string type_name = expr->operand->name;
-    Symbol* sym = type_checker->get_scope()->lookup(type_name);
+    Symbol* sym = nullptr;
+    if (type_checker) {
+        sym = type_checker->binding_for(expr->operand.get());
+    }
+    if (!sym && type_checker && type_checker->get_scope()) {
+        sym = type_checker->get_scope()->lookup(type_name);
+    }
 
     if (!sym || sym->kind != Symbol::Kind::Type || !sym->declaration) {
         error_msg = "Type not found: " + type_name;

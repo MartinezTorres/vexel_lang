@@ -1,6 +1,5 @@
 #include "analysis.h"
 #include "evaluator.h"
-#include "function_key.h"
 #include "optimizer.h"
 #include "typechecker.h"
 #include <algorithm>
@@ -11,8 +10,26 @@
 
 namespace vexel {
 
-namespace {
-bool is_addressable_lvalue(ExprPtr expr) {
+bool Analyzer::is_foldable(const Symbol* func_sym) const {
+    if (!optimization) return false;
+    return optimization->foldable_functions.count(func_sym) > 0;
+}
+
+std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
+    if (!expr || !optimization) return std::nullopt;
+    auto it = optimization->constexpr_conditions.find(expr.get());
+    if (it != optimization->constexpr_conditions.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+Symbol* Analyzer::binding_for(ExprPtr expr) const {
+    if (!type_checker) return nullptr;
+    return type_checker->binding_for(current_instance_id, expr.get());
+}
+
+bool Analyzer::is_addressable_lvalue(ExprPtr expr) const {
     if (!expr) return false;
     switch (expr->kind) {
         case Expr::Kind::Identifier:
@@ -25,11 +42,13 @@ bool is_addressable_lvalue(ExprPtr expr) {
     }
 }
 
-bool is_mutable_lvalue(ExprPtr expr) {
+bool Analyzer::is_mutable_lvalue(ExprPtr expr) const {
     if (!expr) return false;
     switch (expr->kind) {
-        case Expr::Kind::Identifier:
-            return expr->is_mutable_binding;
+        case Expr::Kind::Identifier: {
+            Symbol* sym = binding_for(expr);
+            return sym && sym->is_mutable;
+        }
         case Expr::Kind::Member:
         case Expr::Kind::Index:
             return is_mutable_lvalue(expr->operand);
@@ -38,50 +57,23 @@ bool is_mutable_lvalue(ExprPtr expr) {
     }
 }
 
-bool receiver_is_mutable_arg(ExprPtr expr) {
+bool Analyzer::receiver_is_mutable_arg(ExprPtr expr) const {
     return is_addressable_lvalue(expr) && is_mutable_lvalue(expr);
 }
 
-std::string base_identifier(ExprPtr expr) {
+std::optional<const Symbol*> Analyzer::base_identifier_symbol(ExprPtr expr) const {
     while (expr) {
         if (expr->kind == Expr::Kind::Identifier) {
-            return expr->name;
+            if (Symbol* sym = binding_for(expr)) {
+                return sym;
+            }
+            return std::nullopt;
         }
         if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
             expr = expr->operand;
             continue;
         }
         break;
-    }
-    return "";
-}
-
-std::optional<std::tuple<std::string, int, bool>> base_identifier_info(ExprPtr expr) {
-    while (expr) {
-        if (expr->kind == Expr::Kind::Identifier) {
-            return std::make_tuple(expr->name, expr->scope_instance_id, expr->is_mutable_binding);
-        }
-        if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
-            expr = expr->operand;
-            continue;
-        }
-        break;
-    }
-    return std::nullopt;
-}
-
-} // namespace
-
-bool Analyzer::is_foldable(const std::string& func_key) const {
-    if (!optimization) return false;
-    return optimization->foldable_functions.count(func_key) > 0;
-}
-
-std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
-    if (!expr || !optimization) return std::nullopt;
-    auto it = optimization->constexpr_conditions.find(expr.get());
-    if (it != optimization->constexpr_conditions.end()) {
-        return it->second;
     }
     return std::nullopt;
 }
@@ -98,92 +90,83 @@ AnalysisFacts Analyzer::run(const Module& mod) {
 }
 
 void Analyzer::analyze_reachability(const Module& mod, AnalysisFacts& facts) {
-    // Start from all exported functions
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && stmt->is_exported) {
-            std::string func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                func_name = stmt->type_namespace + "::" + stmt->func_name;
-            }
-            mark_reachable(func_name, stmt->scope_instance_id, mod, facts);
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
+
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->kind != Symbol::Kind::Function) continue;
+            if (!sym->is_exported) continue;
+            mark_reachable(sym, mod, facts);
         }
     }
 
-    // Also mark any global variable initializers that reference functions
-    // BUT only if they weren't compile-time evaluated
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
+            if (!sym->declaration || !sym->declaration->var_init) continue;
             bool evaluated_at_compile_time = false;
             if (type_checker) {
                 CompileTimeEvaluator evaluator(type_checker);
                 CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
+                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
                     evaluated_at_compile_time = true;
                 }
             }
-
             if (!evaluated_at_compile_time) {
-                std::unordered_set<std::string> calls;
-                collect_calls(stmt->var_init, calls);
-                for (const auto& func_key : calls) {
-                    std::string func_name;
-                    int scope_id = -1;
-                    split_reachability_key(func_key, func_name, scope_id);
-                    mark_reachable(func_name, scope_id, mod, facts);
+                std::unordered_set<const Symbol*> calls;
+                collect_calls(sym->declaration->var_init, calls);
+                for (const Symbol* callee : calls) {
+                    mark_reachable(callee, mod, facts);
                 }
             }
         }
     }
 }
 
-void Analyzer::mark_reachable(const std::string& func_name, int scope_id,
+void Analyzer::mark_reachable(const Symbol* func_sym,
                               const Module& mod, AnalysisFacts& facts) {
-    std::string key = reachability_key(func_name, scope_id);
-    if (facts.reachable_functions.count(key)) {
+    if (!func_sym) return;
+    if (facts.reachable_functions.count(func_sym)) {
         return;
     }
 
-    facts.reachable_functions.insert(key);
+    facts.reachable_functions.insert(func_sym);
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && !stmt->is_external) {
-            std::string stmt_func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                stmt_func_name = stmt->type_namespace + "::" + stmt->func_name;
-            }
-
-            if (stmt_func_name == func_name) {
-                if (scope_id >= 0) {
-                    if (stmt->scope_instance_id != scope_id) continue;
-                } else if (stmt->scope_instance_id >= 0) {
-                    continue;
-                }
-                if (stmt->body) {
-                    if (is_foldable(key)) {
-                        break;
-                    }
-                    std::unordered_set<std::string> calls;
-                    collect_calls(stmt->body, calls);
-                    for (const auto& called_key : calls) {
-                        std::string called_name;
-                        int called_scope = -1;
-                        split_reachability_key(called_key, called_name, called_scope);
-                        mark_reachable(called_name, called_scope, mod, facts);
-                    }
-                }
-                break;
-            }
-        }
+    if (func_sym->kind != Symbol::Kind::Function || !func_sym->declaration || func_sym->declaration->is_external) {
+        return;
     }
+
+    if (is_foldable(func_sym)) {
+        return;
+    }
+
+    int saved_instance = current_instance_id;
+    current_instance_id = func_sym->instance_id;
+
+    std::unordered_set<const Symbol*> calls;
+    collect_calls(func_sym->declaration->body, calls);
+    for (const auto& called_sym : calls) {
+        mark_reachable(called_sym, mod, facts);
+    }
+
+    current_instance_id = saved_instance;
 }
 
-void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<std::string>& calls) {
+void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls) {
     if (!expr) return;
 
     switch (expr->kind) {
         case Expr::Kind::Call:
             if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                calls.insert(reachability_key(expr->operand->name, expr->operand->scope_instance_id));
+                Symbol* sym = binding_for(expr->operand);
+                if (sym && sym->kind == Symbol::Kind::Function) {
+                    calls.insert(sym);
+                }
             }
             for (const auto& rec : expr->receivers) {
                 collect_calls(rec, calls);
@@ -280,123 +263,130 @@ void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<std::string>& call
 }
 
 void Analyzer::analyze_reentrancy(const Module& mod, AnalysisFacts& facts) {
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
+
     auto has_ann = [](const std::vector<Annotation>& anns, const std::string& name) {
         return std::any_of(anns.begin(), anns.end(), [&](const Annotation& a) { return a.name == name; });
     };
 
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
+    std::unordered_map<const Symbol*, StmtPtr> function_map;
+    std::unordered_set<const Symbol*> external_reentrant;
+    std::unordered_set<const Symbol*> external_nonreentrant;
+
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->kind != Symbol::Kind::Function) continue;
+            if (sym->is_external) {
+                bool is_reentrant = has_ann(sym->declaration->annotations, "reentrant");
+                bool is_nonreentrant = has_ann(sym->declaration->annotations, "nonreentrant");
+                if (is_reentrant && is_nonreentrant) {
+                    throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
+                                       sym->name + "'", sym->declaration->location);
+                }
+                if (is_reentrant) {
+                    external_reentrant.insert(sym);
+                } else {
+                    external_nonreentrant.insert(sym);
+                }
+                continue;
+            }
+            if (!facts.reachable_functions.count(sym)) continue;
+            function_map[sym] = sym->declaration;
         }
-        return stmt->func_name;
-    };
+    }
 
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_set<std::string> external_reentrant;
-    std::unordered_set<std::string> external_nonreentrant;
+    std::deque<std::pair<const Symbol*, char>> work;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string key = reachability_key(func_name, stmt->scope_instance_id);
-        if (stmt->is_external) {
-            bool is_reentrant = has_ann(stmt->annotations, "reentrant");
-            bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->kind != Symbol::Kind::Function) continue;
+            if (!sym->is_exported) continue;
+            if (!facts.reachable_functions.count(sym)) continue;
+
+            bool is_reentrant = has_ann(sym->declaration->annotations, "reentrant");
+            bool is_nonreentrant = has_ann(sym->declaration->annotations, "nonreentrant");
             if (is_reentrant && is_nonreentrant) {
-                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
-                                   stmt->func_name + "'", stmt->location);
+                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on entry function '" +
+                                   sym->name + "'", sym->declaration->location);
             }
-            if (is_reentrant) {
-                external_reentrant.insert(key);
-            } else {
-                external_nonreentrant.insert(key);
+
+            char ctx = (is_reentrant ? 'R' : 'N');
+            if (facts.reentrancy_variants[sym].insert(ctx).second) {
+                work.emplace_back(sym, ctx);
             }
-            continue;
-        }
-        if (!facts.reachable_functions.count(key)) continue;
-        function_map[key] = stmt;
-    }
-
-    std::deque<std::pair<std::string, char>> work;
-
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        if (!stmt->is_exported) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string key = reachability_key(func_name, stmt->scope_instance_id);
-        if (!facts.reachable_functions.count(key)) continue;
-
-        bool is_reentrant = has_ann(stmt->annotations, "reentrant");
-        bool is_nonreentrant = has_ann(stmt->annotations, "nonreentrant");
-        if (is_reentrant && is_nonreentrant) {
-            throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on entry function '" +
-                               stmt->func_name + "'", stmt->location);
-        }
-
-        char ctx = (is_reentrant ? 'R' : 'N');
-        if (facts.reentrancy_variants[key].insert(ctx).second) {
-            work.emplace_back(key, ctx);
         }
     }
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
+            if (!sym->declaration || !sym->declaration->var_init) continue;
+
             bool evaluated_at_compile_time = false;
             if (type_checker) {
                 CompileTimeEvaluator evaluator(type_checker);
                 CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
+                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
                     evaluated_at_compile_time = true;
                 }
             }
             if (evaluated_at_compile_time) continue;
-            std::unordered_set<std::string> calls;
-            collect_calls(stmt->var_init, calls);
-            for (const auto& callee_key : calls) {
-                if (function_map.count(callee_key) == 0) continue;
-                if (facts.reentrancy_variants[callee_key].insert('N').second) {
-                    work.emplace_back(callee_key, 'N');
+            std::unordered_set<const Symbol*> calls;
+            collect_calls(sym->declaration->var_init, calls);
+            for (const auto& callee_sym : calls) {
+                if (!callee_sym) continue;
+                if (facts.reentrancy_variants[callee_sym].insert('N').second) {
+                    work.emplace_back(callee_sym, 'N');
                 }
             }
         }
     }
 
     while (!work.empty()) {
-        auto [func_key, ctx] = work.front();
+        auto [func_sym, ctx] = work.front();
         work.pop_front();
-        auto it = function_map.find(func_key);
-        if (it == function_map.end()) continue;
+        auto it = function_map.find(func_sym);
+        if (it == function_map.end()) {
+            if (ctx == 'R' && external_nonreentrant.count(func_sym)) {
+                throw CompileError("Reentrant path calls non-reentrant external function '" + func_sym->name + "'",
+                                   func_sym->declaration ? func_sym->declaration->location : SourceLocation());
+            }
+            continue;
+        }
         StmtPtr func = it->second;
         if (!func || !func->body) continue;
-        if (is_foldable(func_key)) continue;
+        if (is_foldable(func_sym)) continue;
 
-        std::unordered_set<std::string> calls;
+        int saved_instance = current_instance_id;
+        current_instance_id = func_sym->instance_id;
+
+        std::unordered_set<const Symbol*> calls;
         collect_calls(func->body, calls);
-        for (const auto& callee_key : calls) {
-            auto callee_it = function_map.find(callee_key);
-            if (callee_it == function_map.end()) {
-                if (ctx == 'R' && external_nonreentrant.count(callee_key)) {
-                    std::string callee_name;
-                    int callee_scope = -1;
-                    split_reachability_key(callee_key, callee_name, callee_scope);
-                    if (callee_scope >= 0) {
-                        callee_name += " (scope " + std::to_string(callee_scope) + ")";
-                    }
-                    throw CompileError("Reentrant path calls non-reentrant external function '" + callee_name + "'",
-                                       func->location);
-                }
-                continue;
+        for (const auto& callee_sym : calls) {
+            if (!callee_sym) continue;
+            if (ctx == 'R' && external_nonreentrant.count(callee_sym)) {
+                throw CompileError("Reentrant path calls non-reentrant external function '" + callee_sym->name + "'",
+                                   func->location);
             }
-            if (facts.reentrancy_variants[callee_key].insert(ctx).second) {
-                work.emplace_back(callee_key, ctx);
+            if (facts.reentrancy_variants[callee_sym].insert(ctx).second) {
+                work.emplace_back(callee_sym, ctx);
             }
         }
+
+        current_instance_id = saved_instance;
     }
 
     for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        if (facts.reentrancy_variants[func_key].empty()) {
-            facts.reentrancy_variants[func_key].insert('N');
+        const Symbol* func_sym = entry.first;
+        if (facts.reentrancy_variants[func_sym].empty()) {
+            facts.reentrancy_variants[func_sym].insert('N');
         }
     }
 }
@@ -404,30 +394,29 @@ void Analyzer::analyze_reentrancy(const Module& mod, AnalysisFacts& facts) {
 void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
     facts.var_mutability.clear();
     facts.receiver_mutates.clear();
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_map<const Stmt*, StmtPtr> var_decl_map;
-    std::unordered_map<const Stmt*, bool> var_written;
 
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            function_map[qualified_name(stmt)] = stmt;
-            if (!stmt->ref_params.empty()) {
-                std::vector<bool> mut(stmt->ref_params.size(), false);
-                if (stmt->is_external || !stmt->body) {
-                    std::fill(mut.begin(), mut.end(), true);
+    std::unordered_map<const Symbol*, StmtPtr> function_map;
+    std::unordered_map<const Symbol*, bool> global_written;
+
+    for (const auto& instance : program->instances) {
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym) continue;
+            if (sym->kind == Symbol::Kind::Function && sym->declaration) {
+                function_map[sym] = sym->declaration;
+                if (!sym->declaration->ref_params.empty()) {
+                    std::vector<bool> mut(sym->declaration->ref_params.size(), false);
+                    if (sym->is_external || !sym->declaration->body) {
+                        std::fill(mut.begin(), mut.end(), true);
+                    }
+                    facts.receiver_mutates[sym] = mut;
                 }
-                facts.receiver_mutates[qualified_name(stmt)] = mut;
+            } else if ((sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant) && !sym->is_local) {
+                global_written[sym] = false;
             }
-        } else if (stmt->kind == Stmt::Kind::VarDecl) {
-            var_decl_map[stmt.get()] = stmt;
-            var_written[stmt.get()] = false;
         }
     }
 
@@ -435,11 +424,13 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
     while (changed) {
         changed = false;
         for (const auto& entry : function_map) {
-            const std::string& func_name = entry.first;
+            const Symbol* func_sym = entry.first;
             const StmtPtr& func = entry.second;
-            if (func->is_external || !func->body || func->ref_params.empty()) continue;
+            if (!func || func->is_external || !func->body || func->ref_params.empty()) continue;
 
-            std::vector<bool> updated = facts.receiver_mutates[func_name];
+            current_instance_id = func_sym->instance_id;
+
+            std::vector<bool> updated = facts.receiver_mutates[func_sym];
             std::unordered_map<std::string, size_t> receiver_index;
             receiver_index.reserve(func->ref_params.size());
             for (size_t i = 0; i < func->ref_params.size(); i++) {
@@ -453,34 +444,34 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                 if (!expr) return;
                 switch (expr->kind) {
                     case Expr::Kind::Assignment: {
-                        std::string base = base_identifier(expr->left);
-                        auto it = receiver_index.find(base);
-                        if (it != receiver_index.end()) {
-                            updated[it->second] = true;
+                        auto base = base_identifier_symbol(expr->left);
+                        if (base) {
+                            auto it = receiver_index.find((*base)->name);
+                            if (it != receiver_index.end()) {
+                                updated[it->second] = true;
+                            }
                         }
                         visit_expr(expr->right);
                         break;
                     }
                     case Expr::Kind::Call: {
-                        if (!expr->receivers.empty()) {
-                            std::string callee;
-                            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                                callee = expr->operand->name;
+                        Symbol* callee_sym = nullptr;
+                        if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                            callee_sym = binding_for(expr->operand);
+                        }
+                        auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym) : facts.receiver_mutates.end();
+                        for (size_t i = 0; i < expr->receivers.size(); i++) {
+                            ExprPtr rec_expr = expr->receivers[i];
+                            auto base = base_identifier_symbol(rec_expr);
+                            if (!base) continue;
+                            auto rec_it = receiver_index.find((*base)->name);
+                            if (rec_it == receiver_index.end()) continue;
+                            bool mut = true;
+                            if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
+                                mut = callee_it->second[i];
                             }
-                            auto callee_it = facts.receiver_mutates.find(callee);
-                            for (size_t i = 0; i < expr->receivers.size(); i++) {
-                                ExprPtr rec_expr = expr->receivers[i];
-                                std::string rec_name = base_identifier(rec_expr);
-                                if (rec_name.empty()) continue;
-                                auto rec_it = receiver_index.find(rec_name);
-                                if (rec_it == receiver_index.end()) continue;
-                                bool mut = true;
-                                if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
-                                    mut = callee_it->second[i];
-                                }
-                                if (mut) {
-                                    updated[rec_it->second] = true;
-                                }
+                            if (mut) {
+                                updated[rec_it->second] = true;
                             }
                         }
                         for (const auto& rec : expr->receivers) {
@@ -569,65 +560,42 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
 
             visit_expr(func->body);
 
-            if (updated != facts.receiver_mutates[func_name]) {
-                facts.receiver_mutates[func_name] = updated;
+            if (updated != facts.receiver_mutates[func_sym]) {
+                facts.receiver_mutates[func_sym] = updated;
                 changed = true;
             }
         }
     }
 
-    struct ScopeFrame {
-        std::unordered_map<std::string, const Stmt*> vars;
-    };
-    std::vector<ScopeFrame> scopes;
-    scopes.emplace_back();
+    for (const auto& entry : function_map) {
+        const Symbol* func_sym = entry.first;
+        const StmtPtr& func = entry.second;
+        if (!func || !func->body) continue;
+        if (!facts.reachable_functions.count(func_sym)) continue;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl) {
-            std::string key = reachability_key(stmt->var_name, stmt->scope_instance_id);
-            scopes.back().vars[key] = stmt.get();
-        }
-    }
+        current_instance_id = func_sym->instance_id;
 
-    auto resolve_var = [&](const std::string& name, int scope_id) -> const Stmt* {
-        std::string key = reachability_key(name, scope_id);
-        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-            auto found = it->vars.find(key);
-            if (found != it->vars.end()) {
-                return found->second;
-            }
-        }
-        return nullptr;
-    };
+        std::function<void(ExprPtr)> visit_expr;
+        std::function<void(StmtPtr)> visit_stmt;
 
-    auto mark_written = [&](const std::string& name, int scope_id) {
-        const Stmt* decl = resolve_var(name, scope_id);
-        if (decl) {
-            var_written[decl] = true;
-        }
-    };
-
-    std::function<void(ExprPtr)> visit_expr;
-    std::function<void(StmtPtr)> visit_stmt;
-
-    visit_expr = [&](ExprPtr expr) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Assignment: {
-                auto info = base_identifier_info(expr->left);
-                if (info) {
-                    mark_written(std::get<0>(*info), std::get<1>(*info));
-                }
-                visit_expr(expr->right);
-                break;
-            }
-            case Expr::Kind::Call: {
-                if (!expr->receivers.empty()) {
-                    std::string callee;
-                    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                        callee = expr->operand->name;
+        visit_expr = [&](ExprPtr expr) {
+            if (!expr) return;
+            switch (expr->kind) {
+                case Expr::Kind::Assignment: {
+                    auto base = base_identifier_symbol(expr->left);
+                    if (base && !(*base)->is_local &&
+                        ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
+                        global_written[*base] = true;
                     }
-                    auto callee_it = facts.receiver_mutates.find(callee);
+                    visit_expr(expr->right);
+                    break;
+                }
+                case Expr::Kind::Call: {
+                    Symbol* callee_sym = nullptr;
+                    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                        callee_sym = binding_for(expr->operand);
+                    }
+                    auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym) : facts.receiver_mutates.end();
                     for (size_t i = 0; i < expr->receivers.size(); i++) {
                         bool mut = true;
                         if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
@@ -639,159 +607,137 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
                         if (!is_addressable_lvalue(rec_expr) || !is_mutable_lvalue(rec_expr)) {
                             continue;
                         }
-                        auto info = base_identifier_info(rec_expr);
-                        if (info) {
-                            mark_written(std::get<0>(*info), std::get<1>(*info));
+                        auto base = base_identifier_symbol(rec_expr);
+                        if (base && !(*base)->is_local &&
+                            ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
+                            global_written[*base] = true;
                         }
                     }
+                    for (const auto& rec : expr->receivers) visit_expr(rec);
+                    for (const auto& arg : expr->args) visit_expr(arg);
+                    visit_expr(expr->operand);
+                    break;
                 }
-                for (const auto& rec : expr->receivers) {
-                    visit_expr(rec);
-                }
-                for (const auto& arg : expr->args) visit_expr(arg);
-                visit_expr(expr->operand);
-                break;
-            }
-            case Expr::Kind::Binary:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Index:
-                visit_expr(expr->operand);
-                if (!expr->args.empty()) visit_expr(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr(elem);
-                break;
-            case Expr::Kind::Block:
-                scopes.emplace_back();
-                for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                visit_expr(expr->result_expr);
-                scopes.pop_back();
-                break;
-            case Expr::Kind::Conditional:
-                if (auto cond = constexpr_condition(expr->condition)) {
-                    if (cond.value()) {
-                        visit_expr(expr->true_expr);
+                case Expr::Kind::Binary:
+                    visit_expr(expr->left);
+                    visit_expr(expr->right);
+                    break;
+                case Expr::Kind::Unary:
+                case Expr::Kind::Cast:
+                case Expr::Kind::Length:
+                    visit_expr(expr->operand);
+                    break;
+                case Expr::Kind::Index:
+                    visit_expr(expr->operand);
+                    if (!expr->args.empty()) visit_expr(expr->args[0]);
+                    break;
+                case Expr::Kind::Member:
+                    visit_expr(expr->operand);
+                    break;
+                case Expr::Kind::ArrayLiteral:
+                case Expr::Kind::TupleLiteral:
+                    for (const auto& elem : expr->elements) visit_expr(elem);
+                    break;
+                case Expr::Kind::Block:
+                    for (const auto& stmt : expr->statements) visit_stmt(stmt);
+                    visit_expr(expr->result_expr);
+                    break;
+                case Expr::Kind::Conditional:
+                    if (auto cond = constexpr_condition(expr->condition)) {
+                        if (cond.value()) {
+                            visit_expr(expr->true_expr);
+                        } else {
+                            visit_expr(expr->false_expr);
+                        }
                     } else {
+                        visit_expr(expr->condition);
+                        visit_expr(expr->true_expr);
                         visit_expr(expr->false_expr);
                     }
-                } else {
-                    visit_expr(expr->condition);
-                    visit_expr(expr->true_expr);
-                    visit_expr(expr->false_expr);
-                }
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            default:
-                break;
-        }
-    };
+                    break;
+                case Expr::Kind::Range:
+                case Expr::Kind::Iteration:
+                case Expr::Kind::Repeat:
+                    visit_expr(expr->left);
+                    visit_expr(expr->right);
+                    break;
+                default:
+                    break;
+            }
+        };
 
-    visit_stmt = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::VarDecl:
-                scopes.back().vars[reachability_key(stmt->var_name, stmt->scope_instance_id)] = stmt.get();
-                var_decl_map[stmt.get()] = stmt;
-                var_written.emplace(stmt.get(), false);
-                visit_expr(stmt->var_init);
-                break;
-            case Stmt::Kind::Expr:
-                visit_expr(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr(stmt->return_expr);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                if (auto cond = constexpr_condition(stmt->condition)) {
-                    if (cond.value()) {
+        visit_stmt = [&](StmtPtr stmt) {
+            if (!stmt) return;
+            switch (stmt->kind) {
+                case Stmt::Kind::Expr:
+                    visit_expr(stmt->expr);
+                    break;
+                case Stmt::Kind::Return:
+                    visit_expr(stmt->return_expr);
+                    break;
+                case Stmt::Kind::VarDecl:
+                    visit_expr(stmt->var_init);
+                    break;
+                case Stmt::Kind::ConditionalStmt:
+                    if (auto cond = constexpr_condition(stmt->condition)) {
+                        if (cond.value()) {
+                            visit_stmt(stmt->true_stmt);
+                        }
+                    } else {
+                        visit_expr(stmt->condition);
                         visit_stmt(stmt->true_stmt);
                     }
-                } else {
-                    visit_expr(stmt->condition);
-                    visit_stmt(stmt->true_stmt);
-                }
-                break;
-            default:
-                break;
-        }
-    };
+                    break;
+                default:
+                    break;
+            }
+        };
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl && stmt->body) {
-            scopes.emplace_back();
-            for (const auto& param : stmt->params) {
-                scopes.back().vars[param.name] = nullptr;
-            }
-            for (const auto& ref : stmt->ref_params) {
-                scopes.back().vars[ref] = nullptr;
-            }
-            visit_expr(stmt->body);
-            scopes.pop_back();
-        } else if (stmt->kind == Stmt::Kind::Expr) {
-            visit_expr(stmt->expr);
-        }
+        visit_expr(func->body);
     }
 
-    for (const auto& entry : var_decl_map) {
-        const Stmt* key = entry.first;
-        StmtPtr decl = entry.second;
-        bool written = var_written[key];
-        bool effective_mutable = decl->is_mutable && written;
+    for (const auto& entry : global_written) {
+        const Symbol* sym = entry.first;
+        bool written = entry.second;
+        if (!sym || !sym->declaration) continue;
+        bool effective_mutable = sym->is_mutable && written;
         if (effective_mutable) {
-            facts.var_mutability[key] = VarMutability::Mutable;
+            facts.var_mutability[sym] = VarMutability::Mutable;
         } else {
             bool constexpr_init = false;
-            if (decl->var_init) {
-                if (decl->var_type && decl->var_type->kind == Type::Kind::Array &&
-                    (decl->var_init->kind == Expr::Kind::ArrayLiteral || decl->var_init->kind == Expr::Kind::Range)) {
+            if (sym->declaration->var_init) {
+                if (sym->declaration->var_type && sym->declaration->var_type->kind == Type::Kind::Array &&
+                    (sym->declaration->var_init->kind == Expr::Kind::ArrayLiteral ||
+                     sym->declaration->var_init->kind == Expr::Kind::Range)) {
                     constexpr_init = true;
                 } else if (type_checker) {
                     CompileTimeEvaluator evaluator(type_checker);
                     CTValue result;
-                    if (evaluator.try_evaluate(decl->var_init, result)) {
+                    if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
                         constexpr_init = true;
                     }
                 }
             }
             if (constexpr_init) {
-                facts.var_mutability[key] = VarMutability::Constexpr;
+                facts.var_mutability[sym] = VarMutability::Constexpr;
             } else {
-                facts.var_mutability[key] = VarMutability::NonMutableRuntime;
+                facts.var_mutability[sym] = VarMutability::NonMutableRuntime;
             }
         }
     }
 }
-
 void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
     facts.ref_variants.clear();
-    std::unordered_map<std::string, StmtPtr> function_map;
 
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            function_map[qualified_name(stmt)] = stmt;
+    std::unordered_map<const Symbol*, StmtPtr> function_map;
+    for (const auto& instance : program->instances) {
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) continue;
+            function_map[sym] = sym->declaration;
         }
     }
 
@@ -811,13 +757,14 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
     auto record_call = [&](ExprPtr expr) {
         if (!expr || expr->kind != Expr::Kind::Call) return;
         if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) return;
-        const std::string& func_name = expr->operand->name;
-        auto fit = function_map.find(func_name);
+        Symbol* callee = binding_for(expr->operand);
+        if (!callee) return;
+        auto fit = function_map.find(callee);
         if (fit == function_map.end()) return;
         size_t ref_count = fit->second->ref_params.size();
         if (ref_count == 0) return;
         std::string key = ref_variant_key(expr, ref_count);
-        facts.ref_variants[func_name].insert(key);
+        facts.ref_variants[callee].insert(key);
     };
 
     std::function<void(ExprPtr)> visit_expr;
@@ -911,117 +858,97 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
         }
     };
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            std::string func_name = qualified_name(stmt);
-            std::string key = reachability_key(func_name, stmt->scope_instance_id);
-            if (!facts.reachable_functions.count(key)) {
-                continue;
-            }
-            if (is_foldable(key)) {
-                continue;
-            }
-            if (stmt->body) visit_expr(stmt->body);
-        } else if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
+    for (const auto& func_sym : facts.reachable_functions) {
+        if (!func_sym || !func_sym->declaration) continue;
+        if (is_foldable(func_sym)) continue;
+        current_instance_id = func_sym->instance_id;
+        if (func_sym->declaration->body) {
+            visit_expr(func_sym->declaration->body);
+        }
+    }
+
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
+            if (!sym->declaration || !sym->declaration->var_init) continue;
             bool evaluated_at_compile_time = false;
             if (type_checker) {
                 CompileTimeEvaluator evaluator(type_checker);
                 CTValue result;
-                if (evaluator.try_evaluate(stmt->var_init, result)) {
+                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
                     evaluated_at_compile_time = true;
                 }
             }
             if (!evaluated_at_compile_time) {
-                visit_expr(stmt->var_init);
+                visit_expr(sym->declaration->var_init);
             }
         }
     }
 }
-
 void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
     facts.function_writes_global.clear();
     facts.function_is_pure.clear();
 
-    std::unordered_map<std::string, StmtPtr> function_map;
-    std::unordered_map<std::string, std::unordered_set<std::string>> function_calls;
-    std::unordered_map<std::string, bool> function_direct_writes_global;
-    std::unordered_map<std::string, bool> function_direct_impure;
-    std::unordered_map<std::string, bool> function_unknown_call;
-    std::unordered_map<std::string, bool> function_mutates_receiver;
-    std::unordered_set<std::string> external_functions;
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
 
-    auto qualified_name = [](const StmtPtr& stmt) {
-        if (!stmt->type_namespace.empty()) {
-            return stmt->type_namespace + "::" + stmt->func_name;
-        }
-        return stmt->func_name;
-    };
+    std::unordered_map<const Symbol*, StmtPtr> function_map;
+    std::unordered_map<const Symbol*, std::unordered_set<const Symbol*>> function_calls;
+    std::unordered_map<const Symbol*, bool> function_direct_writes_global;
+    std::unordered_map<const Symbol*, bool> function_direct_impure;
+    std::unordered_map<const Symbol*, bool> function_unknown_call;
+    std::unordered_map<const Symbol*, bool> function_mutates_receiver;
+    std::unordered_set<const Symbol*> external_functions;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        std::string func_name = qualified_name(stmt);
-        std::string func_key = reachability_key(func_name, stmt->scope_instance_id);
-        if (stmt->is_external) {
-            external_functions.insert(func_key);
-            continue;
-        }
-        if (!facts.reachable_functions.count(func_key)) {
-            continue;
-        }
-        function_map[func_key] = stmt;
-        function_calls[func_key] = {};
-        function_direct_writes_global[func_key] = false;
-        function_direct_impure[func_key] = false;
-        function_unknown_call[func_key] = false;
+    for (const auto& instance : program->instances) {
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->kind != Symbol::Kind::Function) continue;
+            if (sym->is_external) {
+                external_functions.insert(sym);
+                continue;
+            }
+            if (!facts.reachable_functions.count(sym)) {
+                continue;
+            }
+            function_map[sym] = sym->declaration;
+            function_calls[sym] = {};
+            function_direct_writes_global[sym] = false;
+            function_direct_impure[sym] = false;
+            function_unknown_call[sym] = false;
 
-        bool mutates = false;
-        auto mut_it = facts.receiver_mutates.find(func_name);
-        if (mut_it != facts.receiver_mutates.end()) {
-            mutates = std::any_of(mut_it->second.begin(), mut_it->second.end(),
-                                  [](bool v) { return v; });
+            bool mutates = false;
+            auto mut_it = facts.receiver_mutates.find(sym);
+            if (mut_it != facts.receiver_mutates.end()) {
+                mutates = std::any_of(mut_it->second.begin(), mut_it->second.end(),
+                                      [](bool v) { return v; });
+            }
+            function_mutates_receiver[sym] = mutates;
         }
-        function_mutates_receiver[func_key] = mutates;
     }
 
     for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
+        const Symbol* func_sym = entry.first;
         const StmtPtr& func = entry.second;
-        if (is_foldable(func_key)) {
-            function_direct_writes_global[func_key] = false;
-            function_direct_impure[func_key] = false;
-            function_unknown_call[func_key] = false;
+        if (is_foldable(func_sym)) {
+            function_direct_writes_global[func_sym] = false;
+            function_direct_impure[func_sym] = false;
+            function_unknown_call[func_sym] = false;
             continue;
         }
-        if (!func->body) {
-            function_direct_impure[func_key] = true;
-            function_unknown_call[func_key] = true;
+        if (!func || !func->body) {
+            function_direct_impure[func_sym] = true;
+            function_unknown_call[func_sym] = true;
             continue;
         }
-
-        struct ScopeFrame {
-            std::unordered_set<std::string> vars;
-        };
-        std::vector<ScopeFrame> scopes;
-        scopes.emplace_back();
-        for (const auto& param : func->params) {
-            scopes.back().vars.insert(param.name);
-        }
-        for (const auto& ref : func->ref_params) {
-            scopes.back().vars.insert(ref);
-        }
-
-        auto is_local = [&](const std::string& name) {
-            for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-                if (it->vars.count(name)) {
-                    return true;
-                }
-            }
-            return false;
-        };
 
         bool direct_write = false;
         bool direct_impure = false;
         bool unknown_call = false;
+
+        current_instance_id = func_sym->instance_id;
 
         std::function<void(ExprPtr)> visit_expr;
         std::function<void(StmtPtr)> visit_stmt;
@@ -1032,15 +959,13 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                 case Expr::Kind::Assignment: {
                     if (expr->creates_new_variable &&
                         expr->left && expr->left->kind == Expr::Kind::Identifier) {
-                        scopes.back().vars.insert(expr->left->name);
+                        // local declaration
                     } else {
-                        auto base = base_identifier_info(expr->left);
-                        if (base) {
-                            const std::string& name = std::get<0>(*base);
-                            bool is_mut = std::get<2>(*base);
-                            if (is_mut && !is_local(name)) {
-                                direct_write = true;
-                            }
+                        auto base = base_identifier_symbol(expr->left);
+                        if (base && !(*base)->is_local &&
+                            ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant) &&
+                            (*base)->is_mutable) {
+                            direct_write = true;
                         }
                     }
                     visit_expr(expr->right);
@@ -1051,24 +976,26 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                         unknown_call = true;
                         direct_impure = true;
                     } else {
-                        std::string callee_key = reachability_key(expr->operand->name, expr->operand->scope_instance_id);
-                        function_calls[func_key].insert(callee_key);
-
-                        auto callee_it = facts.receiver_mutates.find(expr->operand->name);
-                        for (size_t i = 0; i < expr->receivers.size(); i++) {
-                            bool mut = true;
-                            if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
-                                mut = callee_it->second[i];
-                            }
-                            if (!mut) continue;
-                            ExprPtr rec = expr->receivers[i];
-                            if (!receiver_is_mutable_arg(rec)) {
-                                continue;
-                            }
-                            auto base = base_identifier_info(rec);
-                            if (base) {
-                                const std::string& name = std::get<0>(*base);
-                                if (!is_local(name)) {
+                        Symbol* callee_sym = binding_for(expr->operand);
+                        if (!callee_sym) {
+                            unknown_call = true;
+                            direct_impure = true;
+                        } else {
+                            function_calls[func_sym].insert(callee_sym);
+                            auto callee_it = facts.receiver_mutates.find(callee_sym);
+                            for (size_t i = 0; i < expr->receivers.size(); i++) {
+                                bool mut = true;
+                                if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
+                                    mut = callee_it->second[i];
+                                }
+                                if (!mut) continue;
+                                ExprPtr rec = expr->receivers[i];
+                                if (!receiver_is_mutable_arg(rec)) {
+                                    continue;
+                                }
+                                auto base = base_identifier_symbol(rec);
+                                if (base && !(*base)->is_local &&
+                                    ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
                                     direct_write = true;
                                 }
                             }
@@ -1103,10 +1030,8 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
                     for (const auto& elem : expr->elements) visit_expr(elem);
                     break;
                 case Expr::Kind::Block:
-                    scopes.emplace_back();
                     for (const auto& stmt : expr->statements) visit_stmt(stmt);
                     visit_expr(expr->result_expr);
-                    scopes.pop_back();
                     break;
                 case Expr::Kind::Conditional:
                     if (auto cond = constexpr_condition(expr->condition)) {
@@ -1136,7 +1061,6 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
             if (!stmt) return;
             switch (stmt->kind) {
                 case Stmt::Kind::VarDecl:
-                    scopes.back().vars.insert(stmt->var_name);
                     visit_expr(stmt->var_init);
                     break;
                 case Stmt::Kind::Expr:
@@ -1162,92 +1086,91 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
 
         visit_expr(func->body);
 
-        function_direct_writes_global[func_key] = direct_write;
-        function_direct_impure[func_key] = direct_impure;
-        function_unknown_call[func_key] = unknown_call;
+        function_direct_writes_global[func_sym] = direct_write;
+        function_direct_impure[func_sym] = direct_impure;
+        function_unknown_call[func_sym] = unknown_call;
     }
 
     for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        facts.function_writes_global[func_key] = function_direct_writes_global[func_key] ||
-                                                 function_unknown_call[func_key];
+        const Symbol* func_sym = entry.first;
+        facts.function_writes_global[func_sym] = function_direct_writes_global[func_sym] ||
+                                                 function_unknown_call[func_sym];
     }
 
     bool changed = true;
     while (changed) {
         changed = false;
         for (const auto& entry : function_map) {
-            const std::string& func_key = entry.first;
-            bool writes = function_direct_writes_global[func_key] || function_unknown_call[func_key];
+            const Symbol* func_sym = entry.first;
+            bool writes = function_direct_writes_global[func_sym] || function_unknown_call[func_sym];
             if (!writes) {
-                for (const auto& callee_key : function_calls[func_key]) {
-                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
+                for (const auto& callee_sym : function_calls[func_sym]) {
+                    if (external_functions.count(callee_sym) || !function_map.count(callee_sym)) {
                         writes = true;
                         break;
                     }
-                    if (facts.function_writes_global[callee_key]) {
+                    if (facts.function_writes_global[callee_sym]) {
                         writes = true;
                         break;
                     }
                 }
             }
-            if (writes != facts.function_writes_global[func_key]) {
-                facts.function_writes_global[func_key] = writes;
+            if (writes != facts.function_writes_global[func_sym]) {
+                facts.function_writes_global[func_sym] = writes;
                 changed = true;
             }
         }
     }
 
     for (const auto& entry : function_map) {
-        const std::string& func_key = entry.first;
-        bool base = !facts.function_writes_global[func_key] &&
-                    !function_direct_impure[func_key] &&
-                    !function_mutates_receiver[func_key];
-        facts.function_is_pure[func_key] = base;
+        const Symbol* func_sym = entry.first;
+        bool base = !facts.function_writes_global[func_sym] &&
+                    !function_direct_impure[func_sym] &&
+                    !function_mutates_receiver[func_sym];
+        facts.function_is_pure[func_sym] = base;
     }
 
     changed = true;
     while (changed) {
         changed = false;
         for (const auto& entry : function_map) {
-            const std::string& func_key = entry.first;
-            bool base = !facts.function_writes_global[func_key] &&
-                        !function_direct_impure[func_key] &&
-                        !function_mutates_receiver[func_key];
+            const Symbol* func_sym = entry.first;
+            bool base = !facts.function_writes_global[func_sym] &&
+                        !function_direct_impure[func_sym] &&
+                        !function_mutates_receiver[func_sym];
             bool pure = base;
             if (pure) {
-                for (const auto& callee_key : function_calls[func_key]) {
-                    if (external_functions.count(callee_key) || !function_map.count(callee_key)) {
+                for (const auto& callee_sym : function_calls[func_sym]) {
+                    if (external_functions.count(callee_sym) || !function_map.count(callee_sym)) {
                         pure = false;
                         break;
                     }
-                    if (!facts.function_is_pure[callee_key]) {
+                    if (!facts.function_is_pure[callee_sym]) {
                         pure = false;
                         break;
                     }
                 }
             }
-            if (pure != facts.function_is_pure[func_key]) {
-                facts.function_is_pure[func_key] = pure;
+            if (pure != facts.function_is_pure[func_sym]) {
+                facts.function_is_pure[func_sym] = pure;
                 changed = true;
             }
         }
     }
 }
-
 void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
     facts.used_global_vars.clear();
     facts.used_type_names.clear();
 
-    std::unordered_map<std::string, StmtPtr> global_vars;
-    std::unordered_map<std::string, StmtPtr> type_decls;
+    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    if (!program) return;
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::VarDecl) {
-            std::string key = reachability_key(stmt->var_name, stmt->scope_instance_id);
-            global_vars[key] = stmt;
-        } else if (stmt->kind == Stmt::Kind::TypeDecl) {
-            type_decls[stmt->type_decl_name] = stmt;
+    std::unordered_map<std::string, StmtPtr> type_decls;
+    for (const auto& mod_info : program->modules) {
+        for (const auto& stmt : mod_info.module.top_level) {
+            if (stmt->kind == Stmt::Kind::TypeDecl) {
+                type_decls[stmt->type_decl_name] = stmt;
+            }
         }
     }
 
@@ -1276,277 +1199,139 @@ void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
         }
     };
 
-    std::function<void(ExprPtr)> visit_expr_types;
-    std::function<void(StmtPtr)> visit_stmt_types;
+    std::deque<const Symbol*> global_worklist;
+    auto note_global = [&](const Symbol* sym) {
+        if (!sym) return;
+        if (facts.used_global_vars.insert(sym).second) {
+            global_worklist.push_back(sym);
+        }
+    };
 
-    visit_expr_types = [&](ExprPtr expr) {
+    std::function<void(ExprPtr)> visit_expr_globals;
+    std::function<void(StmtPtr)> visit_stmt_globals;
+    visit_expr_globals = [&](ExprPtr expr) {
         if (!expr) return;
-        mark_type(expr->type);
+        if (expr->kind == Expr::Kind::Identifier) {
+            Symbol* sym = binding_for(expr);
+            if (sym && !sym->is_local && (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
+                note_global(sym);
+            }
+        }
         switch (expr->kind) {
             case Expr::Kind::Binary:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
+                visit_expr_globals(expr->left);
+                visit_expr_globals(expr->right);
                 break;
             case Expr::Kind::Unary:
             case Expr::Kind::Cast:
             case Expr::Kind::Length:
-                visit_expr_types(expr->operand);
+                visit_expr_globals(expr->operand);
                 break;
             case Expr::Kind::Call:
-                visit_expr_types(expr->operand);
-                for (const auto& rec : expr->receivers) visit_expr_types(rec);
-                for (const auto& arg : expr->args) visit_expr_types(arg);
+                for (const auto& rec : expr->receivers) visit_expr_globals(rec);
+                for (const auto& arg : expr->args) visit_expr_globals(arg);
+                visit_expr_globals(expr->operand);
                 break;
             case Expr::Kind::Index:
-                visit_expr_types(expr->operand);
-                if (!expr->args.empty()) visit_expr_types(expr->args[0]);
+                visit_expr_globals(expr->operand);
+                if (!expr->args.empty()) visit_expr_globals(expr->args[0]);
                 break;
             case Expr::Kind::Member:
-                visit_expr_types(expr->operand);
+                visit_expr_globals(expr->operand);
                 break;
             case Expr::Kind::ArrayLiteral:
             case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr_types(elem);
+                for (const auto& elem : expr->elements) visit_expr_globals(elem);
                 break;
             case Expr::Kind::Block:
-                for (const auto& stmt : expr->statements) visit_stmt_types(stmt);
-                visit_expr_types(expr->result_expr);
+                for (const auto& stmt : expr->statements) {
+                    visit_stmt_globals(stmt);
+                }
+                visit_expr_globals(expr->result_expr);
                 break;
             case Expr::Kind::Conditional:
-                if (auto cond = constexpr_condition(expr->condition)) {
-                    if (cond.value()) {
-                        visit_expr_types(expr->true_expr);
-                    } else if (expr->false_expr) {
-                        visit_expr_types(expr->false_expr);
-                    }
-                } else {
-                    visit_expr_types(expr->condition);
-                    visit_expr_types(expr->true_expr);
-                    visit_expr_types(expr->false_expr);
-                }
-                break;
-            case Expr::Kind::Assignment:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
+                visit_expr_globals(expr->condition);
+                visit_expr_globals(expr->true_expr);
+                visit_expr_globals(expr->false_expr);
                 break;
             case Expr::Kind::Range:
             case Expr::Kind::Iteration:
             case Expr::Kind::Repeat:
-                visit_expr_types(expr->left);
-                visit_expr_types(expr->right);
+                visit_expr_globals(expr->left);
+                visit_expr_globals(expr->right);
                 break;
             default:
                 break;
         }
     };
 
-    visit_stmt_types = [&](StmtPtr stmt) {
+    visit_stmt_globals = [&](StmtPtr stmt) {
         if (!stmt) return;
         switch (stmt->kind) {
-            case Stmt::Kind::VarDecl:
-                mark_type(stmt->var_type);
-                visit_expr_types(stmt->var_init);
-                break;
             case Stmt::Kind::Expr:
-                visit_expr_types(stmt->expr);
+                visit_expr_globals(stmt->expr);
                 break;
             case Stmt::Kind::Return:
-                visit_expr_types(stmt->return_expr);
+                visit_expr_globals(stmt->return_expr);
                 break;
-            case Stmt::Kind::ConditionalStmt:
-                if (auto cond = constexpr_condition(stmt->condition)) {
-                    if (cond.value()) {
-                        visit_stmt_types(stmt->true_stmt);
-                    }
-                } else {
-                    visit_expr_types(stmt->condition);
-                    visit_stmt_types(stmt->true_stmt);
-                }
-                break;
-            default:
-                break;
-        }
-    };
-
-    struct ScopeFrame {
-        std::unordered_set<std::string> vars;
-    };
-
-    auto is_local = [&](const std::string& name, const std::vector<ScopeFrame>& scopes) {
-        for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
-            if (it->vars.count(name)) return true;
-        }
-        return false;
-    };
-
-    std::deque<StmtPtr> global_worklist;
-
-    auto mark_global = [&](const std::string& name, int scope_id) {
-        std::string key = reachability_key(name, scope_id);
-        auto it = global_vars.find(key);
-        if (it == global_vars.end()) return;
-        if (facts.used_global_vars.insert(it->second.get()).second) {
-            global_worklist.push_back(it->second);
-        }
-    };
-
-    std::function<void(ExprPtr, std::vector<ScopeFrame>&)> visit_expr_globals;
-    std::function<void(StmtPtr, std::vector<ScopeFrame>&)> visit_stmt_globals;
-
-    visit_expr_globals = [&](ExprPtr expr, std::vector<ScopeFrame>& scopes) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Identifier:
-                if (!is_local(expr->name, scopes)) {
-                    mark_global(expr->name, expr->scope_instance_id);
-                }
-                break;
-            case Expr::Kind::Assignment:
-                if (expr->creates_new_variable &&
-                    expr->left && expr->left->kind == Expr::Kind::Identifier) {
-                    scopes.back().vars.insert(expr->left->name);
-                }
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            case Expr::Kind::Binary:
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr_globals(expr->operand, scopes);
-                break;
-            case Expr::Kind::Call:
-                visit_expr_globals(expr->operand, scopes);
-                for (const auto& rec : expr->receivers) visit_expr_globals(rec, scopes);
-                for (const auto& arg : expr->args) visit_expr_globals(arg, scopes);
-                break;
-            case Expr::Kind::Index:
-                visit_expr_globals(expr->operand, scopes);
-                if (!expr->args.empty()) visit_expr_globals(expr->args[0], scopes);
-                break;
-            case Expr::Kind::Member:
-                visit_expr_globals(expr->operand, scopes);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr_globals(elem, scopes);
-                break;
-            case Expr::Kind::Block:
-                scopes.emplace_back();
-                for (const auto& stmt : expr->statements) visit_stmt_globals(stmt, scopes);
-                visit_expr_globals(expr->result_expr, scopes);
-                scopes.pop_back();
-                break;
-            case Expr::Kind::Conditional:
-                if (auto cond = constexpr_condition(expr->condition)) {
-                    if (cond.value()) {
-                        visit_expr_globals(expr->true_expr, scopes);
-                    } else if (expr->false_expr) {
-                        visit_expr_globals(expr->false_expr, scopes);
-                    }
-                } else {
-                    visit_expr_globals(expr->condition, scopes);
-                    visit_expr_globals(expr->true_expr, scopes);
-                    visit_expr_globals(expr->false_expr, scopes);
-                }
-                break;
-            case Expr::Kind::Range:
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr_globals(expr->left, scopes);
-                visit_expr_globals(expr->right, scopes);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt_globals = [&](StmtPtr stmt, std::vector<ScopeFrame>& scopes) {
-        if (!stmt) return;
-        switch (stmt->kind) {
             case Stmt::Kind::VarDecl:
-                scopes.back().vars.insert(stmt->var_name);
-                visit_expr_globals(stmt->var_init, scopes);
-                break;
-            case Stmt::Kind::Expr:
-                visit_expr_globals(stmt->expr, scopes);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr_globals(stmt->return_expr, scopes);
+                visit_expr_globals(stmt->var_init);
                 break;
             case Stmt::Kind::ConditionalStmt:
-                if (auto cond = constexpr_condition(stmt->condition)) {
-                    if (cond.value()) {
-                        visit_stmt_globals(stmt->true_stmt, scopes);
-                    }
-                } else {
-                    visit_expr_globals(stmt->condition, scopes);
-                    visit_stmt_globals(stmt->true_stmt, scopes);
-                }
+                visit_expr_globals(stmt->condition);
+                visit_stmt_globals(stmt->true_stmt);
                 break;
             default:
                 break;
         }
     };
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind == Stmt::Kind::FuncDecl) {
-            std::string func_name = stmt->func_name;
-            if (!stmt->type_namespace.empty()) {
-                func_name = stmt->type_namespace + "::" + stmt->func_name;
-                add_type_name(stmt->type_namespace);
-            }
-            std::string key = reachability_key(func_name, stmt->scope_instance_id);
-            if (!facts.reachable_functions.count(key)) {
-                continue;
-            }
-
-            mark_type(stmt->return_type);
-            for (const auto& t : stmt->return_types) {
-                mark_type(t);
-            }
-            for (const auto& param : stmt->params) {
-                mark_type(param.type);
-            }
-            for (const auto& ref_type : stmt->ref_param_types) {
-                mark_type(ref_type);
-            }
-
-            if (stmt->body) {
-                if (is_foldable(key)) {
-                    continue;
+    // Seed used globals: exported globals and globals referenced from reachable functions.
+    for (const auto& instance : program->instances) {
+        current_instance_id = instance.id;
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || sym->is_local) continue;
+            if (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant) {
+                bool exported = false;
+                if (sym->declaration) {
+                    exported = std::any_of(sym->declaration->annotations.begin(), sym->declaration->annotations.end(),
+                                           [](const Annotation& a) { return a.name == "export"; });
                 }
-                visit_expr_types(stmt->body);
-                std::vector<ScopeFrame> scopes;
-                scopes.emplace_back();
-                for (const auto& param : stmt->params) {
-                    scopes.back().vars.insert(param.name);
+                if (exported) {
+                    note_global(sym);
                 }
-                for (const auto& ref : stmt->ref_params) {
-                    scopes.back().vars.insert(ref);
-                }
-                visit_expr_globals(stmt->body, scopes);
             }
-        } else if (stmt->kind == Stmt::Kind::Expr) {
-            visit_expr_types(stmt->expr);
-            std::vector<ScopeFrame> scopes;
-            scopes.emplace_back();
-            visit_expr_globals(stmt->expr, scopes);
         }
     }
 
+    for (const auto& func_sym : facts.reachable_functions) {
+        if (!func_sym || !func_sym->declaration || !func_sym->declaration->body) continue;
+        current_instance_id = func_sym->instance_id;
+        visit_expr_globals(func_sym->declaration->body);
+        // mark types from function signatures
+        for (const auto& param : func_sym->declaration->params) {
+            mark_type(param.type);
+        }
+        for (const auto& ref_type : func_sym->declaration->ref_param_types) {
+            mark_type(ref_type);
+        }
+        if (func_sym->declaration->return_type) {
+            mark_type(func_sym->declaration->return_type);
+        }
+        for (const auto& rt : func_sym->declaration->return_types) {
+            mark_type(rt);
+        }
+    }
+
+    // Propagate used globals through initializers.
     while (!global_worklist.empty()) {
-        StmtPtr global = global_worklist.front();
+        const Symbol* sym = global_worklist.front();
         global_worklist.pop_front();
-        if (!global) continue;
-        mark_type(global->var_type);
-        visit_expr_types(global->var_init);
-        std::vector<ScopeFrame> scopes;
-        scopes.emplace_back();
-        visit_expr_globals(global->var_init, scopes);
+        if (!sym || !sym->declaration) continue;
+        current_instance_id = sym->instance_id;
+        mark_type(sym->declaration->var_type);
+        visit_expr_globals(sym->declaration->var_init);
     }
 
     while (!type_worklist.empty()) {

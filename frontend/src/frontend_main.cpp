@@ -1,12 +1,13 @@
-#include "lexer.h"
-#include "parser.h"
 #include "typechecker.h"
+#include "resolver.h"
+#include "module_loader.h"
+#include "optimizer.h"
+#include "analysis.h"
 #include "lowered_printer.h"
 #include "lowerer.h"
 #include "monomorphizer.h"
 #include <iostream>
 #include <cstring>
-#include <fstream>
 
 // Minimal front-end CLI: lex/parse/type-check and emit lowered IR.
 static void print_usage(const char* prog) {
@@ -46,33 +47,46 @@ int main(int argc, char** argv) {
     }
 
     try {
-        if (verbose) std::cout << "Lexing...\n";
-        std::string source;
-        {
-            std::ifstream file(input_file);
-            if (!file) {
-                throw vexel::CompileError("Cannot open file: " + input_file, vexel::SourceLocation());
-            }
-            source.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-        }
+        std::string project_root = ".";
 
-        vexel::Lexer lexer(source, input_file);
-        std::vector<vexel::Token> tokens = lexer.tokenize();
-        if (verbose) std::cout << "Parsing...\n";
-        vexel::Parser parser(tokens);
-        vexel::Module mod = parser.parse_module(input_file, input_file);
+        if (verbose) std::cout << "Loading modules...\n";
+        vexel::ModuleLoader loader(project_root);
+        vexel::Program program = loader.load(input_file);
+
+        vexel::Bindings bindings;
+        if (verbose) std::cout << "Resolving...\n";
+        vexel::Resolver resolver(program, bindings, project_root);
+        resolver.resolve();
 
         if (verbose) std::cout << "Type checking...\n";
-        vexel::TypeChecker checker(".", allow_process);
-        checker.check_module(mod);
+        vexel::TypeChecker checker(project_root, allow_process, &resolver, &bindings, &program);
+        checker.check_program(program);
+
+        vexel::Module merged;
+        if (!program.modules.empty()) {
+            merged.name = program.modules.front().module.name;
+            merged.path = program.modules.front().path;
+            for (const auto& instance : program.instances) {
+                const auto& mod_info = program.modules[static_cast<size_t>(instance.module_id)];
+                for (const auto& stmt : mod_info.module.top_level) {
+                    merged.top_level.push_back(stmt);
+                }
+            }
+        }
 
         vexel::Monomorphizer monomorphizer(&checker);
-        monomorphizer.run(mod);
+        monomorphizer.run(merged);
 
         vexel::Lowerer lowerer(&checker);
-        lowerer.run(mod);
+        lowerer.run(merged);
 
-        std::cout << vexel::print_lowered_module(mod);
+        vexel::Optimizer optimizer(&checker);
+        vexel::OptimizationFacts optimization = optimizer.run(merged);
+        vexel::Analyzer analyzer(&checker, &optimization);
+        vexel::AnalysisFacts analysis = analyzer.run(merged);
+        checker.validate_type_usage(merged, analysis);
+
+        std::cout << vexel::print_lowered_module(merged);
         return 0;
     } catch (const vexel::CompileError& e) {
         std::cerr << "Error";

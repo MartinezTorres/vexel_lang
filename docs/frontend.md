@@ -10,7 +10,7 @@ The frontend performs lexing, parsing, type checking, constant evaluation, and l
 ## Pipeline & invariants
 
 1. Parse + AST build.
-2. Resolver: predeclare functions/types and validate annotations (binding stage).
+2. Resolver: handle imports, bind identifiers/decls, resolve named types, and validate annotations.
 3. TypeChecker: type inference and semantic validation.
 4. Monomorphizer: materialize pending generic instantiations into the module.
 5. Lowerer: simplify the AST (e.g., fold constexpr conditionals).

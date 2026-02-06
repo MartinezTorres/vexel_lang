@@ -1,19 +1,10 @@
 #include "typechecker.h"
 #include "evaluator.h"
 #include "constants.h"
-#include <filesystem>
 #include <limits>
 
 namespace vexel {
 
-void TypeChecker::verify_no_shadowing(const std::string& name, const SourceLocation& loc) {
-    if (name == "_") return; // Underscore can shadow
-
-    Symbol* existing = current_scope->lookup(name);
-    if (existing) {
-        throw CompileError("Name shadows existing definition: " + name, loc);
-    }
-}
 TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const SourceLocation& loc) {
     // Parse primitive types
     if (type_str == "i8") return Type::make_primitive(PrimitiveType::I8, loc);
@@ -31,7 +22,14 @@ TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const S
 
     // For now, return type variable for complex types
     // TODO: Handle array types, named types, etc.
-    return Type::make_named(type_str, loc);
+    TypePtr named = Type::make_named(type_str, loc);
+    if (bindings) {
+        Symbol* sym = lookup_global(type_str);
+        if (sym) {
+            bindings->bind(current_instance_id, named.get(), sym);
+        }
+    }
+    return named;
 }
 TypeChecker::TypeFamily TypeChecker::get_type_family(TypePtr type) {
     if (!type || type->kind != Type::Kind::Primitive) return TypeFamily::Other;
@@ -88,7 +86,13 @@ void TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
         }
         case Type::Kind::Named: {
             // Check for recursive types
-            Symbol* type_sym = current_scope->lookup(type->type_name);
+            Symbol* type_sym = nullptr;
+            if (bindings) {
+                type_sym = bindings->lookup(current_instance_id, type.get());
+            }
+            if (!type_sym) {
+                type_sym = lookup_global(type->type_name);
+            }
             if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
                 check_recursive_type(type->type_name, type_sym->declaration, loc);
             }
@@ -121,49 +125,6 @@ void TypeChecker::require_unsigned_integer(TypePtr type, const SourceLocation& l
     if (!type || type->kind != Type::Kind::Primitive || !is_unsigned_int(type->primitive)) {
         throw CompileError(context + " requires unsigned integer operands", loc);
     }
-}
-
-bool TypeChecker::try_resolve_relative_path(const std::string& relative,
-                                            const std::string& current_file,
-                                            std::string& out_path) {
-    std::filesystem::path rel_path(relative);
-
-    if (!project_root.empty()) {
-        std::filesystem::path full = std::filesystem::path(project_root) / rel_path;
-        if (std::filesystem::exists(full)) {
-            out_path = full.string();
-            return true;
-        }
-    }
-
-    if (!current_file.empty()) {
-        std::filesystem::path current_dir = std::filesystem::path(current_file).parent_path();
-        if (!current_dir.empty()) {
-            std::filesystem::path full = current_dir / rel_path;
-            if (std::filesystem::exists(full)) {
-                out_path = full.string();
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-bool TypeChecker::try_resolve_resource_path(const std::vector<std::string>& import_path,
-                                            const std::string& current_file,
-                                            std::string& out_path) {
-    std::string relative = join_import_path(import_path);
-    return try_resolve_relative_path(relative, current_file, out_path);
-}
-
-std::string TypeChecker::join_import_path(const std::vector<std::string>& import_path) {
-    std::string path;
-    for (size_t i = 0; i < import_path.size(); ++i) {
-        if (i > 0) path += "/";
-        path += import_path[i];
-    }
-    return path;
 }
 
 } // namespace vexel

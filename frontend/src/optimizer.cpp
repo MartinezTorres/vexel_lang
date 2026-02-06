@@ -1,5 +1,4 @@
 #include "optimizer.h"
-#include "function_key.h"
 
 namespace vexel {
 
@@ -12,33 +11,43 @@ OptimizationFacts Optimizer::run(const Module& mod) {
     CompileTimeEvaluator eval(type_checker);
     evaluator = &eval;
 
-    // Precompute foldable functions (no params/receivers, scalar result)
-    for (const auto& stmt : mod.top_level) {
-        if (!stmt || stmt->kind != Stmt::Kind::FuncDecl) continue;
-        if (stmt->is_external || !stmt->body) continue;
-        if (!stmt->params.empty() || !stmt->ref_params.empty()) continue;
+    Program* program = type_checker->get_program();
+    int saved_instance = type_checker->current_instance();
+    if (program) {
+        for (const auto& instance : program->instances) {
+            type_checker->set_current_instance(instance.id);
+            const Module& module = program->modules[static_cast<size_t>(instance.module_id)].module;
 
-        CompileTimeEvaluator func_eval(type_checker);
-        CTValue result;
-        if (!func_eval.try_evaluate(stmt->body, result)) {
-            continue;
+            // Precompute foldable functions for this instance.
+            for (const auto& pair : instance.symbols) {
+                const Symbol* sym = pair.second;
+                if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) continue;
+                if (sym->is_external || !sym->declaration->body) continue;
+                if (!sym->declaration->params.empty() || !sym->declaration->ref_params.empty()) continue;
+
+                CompileTimeEvaluator func_eval(type_checker);
+                CTValue result;
+                if (!func_eval.try_evaluate(sym->declaration->body, result)) {
+                    continue;
+                }
+                bool scalar = std::holds_alternative<int64_t>(result) ||
+                              std::holds_alternative<uint64_t>(result) ||
+                              std::holds_alternative<bool>(result) ||
+                              std::holds_alternative<double>(result);
+                if (!scalar) continue;
+                facts.foldable_functions.insert(sym);
+            }
+
+            for (const auto& stmt : module.top_level) {
+                visit_stmt(stmt, facts);
+            }
         }
-        bool scalar = std::holds_alternative<int64_t>(result) ||
-                      std::holds_alternative<uint64_t>(result) ||
-                      std::holds_alternative<bool>(result) ||
-                      std::holds_alternative<double>(result);
-        if (!scalar) continue;
-
-        std::string func_name = stmt->func_name;
-        if (!stmt->type_namespace.empty()) {
-            func_name = stmt->type_namespace + "::" + stmt->func_name;
+    } else {
+        for (const auto& stmt : mod.top_level) {
+            visit_stmt(stmt, facts);
         }
-        facts.foldable_functions.insert(reachability_key(func_name, stmt->scope_instance_id));
     }
-
-    for (const auto& stmt : mod.top_level) {
-        visit_stmt(stmt, facts);
-    }
+    type_checker->set_current_instance(saved_instance);
 
     evaluator = nullptr;
     return facts;

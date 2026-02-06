@@ -30,6 +30,7 @@ struct GeneratedFunctionInfo {
 
 struct GeneratedVarInfo {
     StmtPtr declaration;
+    const Symbol* symbol = nullptr;
     std::string code;
 };
 
@@ -42,6 +43,7 @@ struct CallTargetInfo {
     std::string name;
     std::string module_id_expr;
     char page = 'A';
+    bool name_is_mangled = false;
 };
 
 struct CodegenABI {
@@ -93,6 +95,9 @@ class CodeGenerator {
     std::string current_func_key;
     std::string current_variant_id;
     std::string current_variant_name_override;
+    int current_instance_id = -1;
+    int entry_instance_id = 0;
+    const Symbol* current_func_symbol = nullptr;
 
 public:
     CodeGenerator();
@@ -105,12 +110,13 @@ public:
                                                    const AnalysisFacts* analysis,
                                                    const OptimizationFacts* optimization_facts,
                                                    const CodegenABI& options,
+                                                   int instance_id,
                                                    const std::string& ref_key,
                                                    char reent_key,
                                                    const std::string& variant_name_override,
                                                    const std::string& variant_id_override);
     void set_abi(const CodegenABI& options) { abi = options; }
-    const std::unordered_set<std::string>& reachable() const { return facts.reachable_functions; }
+    const std::unordered_set<const Symbol*>& reachable() const { return facts.reachable_functions; }
     const std::vector<GeneratedFunctionInfo>& functions() const { return generated_functions; }
     const std::vector<GeneratedVarInfo>& variables() const { return generated_vars; }
     std::string type_to_c(TypePtr type) { return gen_type(type); }
@@ -157,9 +163,9 @@ private:
     std::string ref_variant_key(const ExprPtr& call, size_t ref_count) const;
     std::vector<std::string> ref_variant_keys_for(StmtPtr stmt) const;
     std::string ref_variant_name(const std::string& func_name, const std::string& ref_key) const;
-    std::vector<char> reentrancy_keys_for(const std::string& func_key) const;
-    std::string reentrancy_variant_name(const std::string& func_name, const std::string& func_key, char reent_key) const;
-    std::string variant_name(const std::string& func_name, const std::string& func_key, char reent_key, const std::string& ref_key) const;
+    std::vector<char> reentrancy_keys_for(const Symbol* func_sym) const;
+    std::string reentrancy_variant_name(const std::string& func_name, const Symbol* func_sym, char reent_key) const;
+    std::string variant_name(const std::string& func_name, const Symbol* func_sym, char reent_key, const std::string& ref_key) const;
     bool receiver_is_mutable_arg(ExprPtr expr) const;
     bool try_evaluate(ExprPtr expr, CTValue& out) const;
     bool is_addressable_lvalue(ExprPtr expr) const;
@@ -170,8 +176,10 @@ private:
     TypePtr resolve_type(TypePtr type) const;
     PtrKind ptr_kind_for_expr(const ExprPtr& expr) const;
     PtrKind ptr_kind_for_symbol(const std::string& name, int scope_id) const;
+    PtrKind ptr_kind_for_symbol(const Symbol* sym) const;
     std::string c_type_for_expr(ExprPtr expr);
     bool expr_has_side_effects(ExprPtr expr) const;
+    std::string require_type(TypePtr type, const SourceLocation& loc, const std::string& context);
     std::string gen_type(TypePtr type);
     std::string mangle_name(const std::string& name);
     std::string fresh_temp();
@@ -197,6 +205,12 @@ private:
     };
 
     bool allow_void_call = false;
+    Symbol* binding_for(const void* node) const;
+    Symbol* binding_for(ExprPtr expr) const { return binding_for(expr.get()); }
+    Symbol* binding_for(StmtPtr stmt) const { return binding_for(stmt.get()); }
+    std::string instance_suffix(const Symbol* sym) const;
+    std::string func_key_for(const Symbol* sym) const;
+    int scope_id_for_symbol(const Symbol* sym) const;
 };
 
 }

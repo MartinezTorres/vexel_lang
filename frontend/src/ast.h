@@ -4,6 +4,7 @@
 
 namespace vexel {
 
+struct Symbol;
 struct Type;
 struct Expr;
 struct Stmt;
@@ -22,6 +23,7 @@ struct Type {
     enum class Kind { Primitive, Array, Named, TypeVar };
     Kind kind;
     SourceLocation location;
+    Symbol* resolved_symbol = nullptr;
 
     // For Primitive
     PrimitiveType primitive;
@@ -66,6 +68,7 @@ struct Expr {
     bool creates_new_variable = false;  // True if this assignment creates a new variable
     int scope_instance_id = -1;  // For identifiers: which scope instance the symbol is from (-1 = not imported)
     bool is_mutable_binding = false;  // True if identifier refers to a mutable binding
+    Symbol* resolved_symbol = nullptr;
 
     // Binary/Unary
     std::string op;
@@ -128,6 +131,7 @@ struct Parameter {
     bool is_expression_param;
     SourceLocation location;
     std::vector<Annotation> annotations;
+    Symbol* resolved_symbol = nullptr;
 
     Parameter(const std::string& n, TypePtr t = nullptr, bool is_expr = false, const SourceLocation& loc = SourceLocation(),
               const std::vector<Annotation>& ann = {})
@@ -154,6 +158,8 @@ struct Stmt {
     SourceLocation location;
     int scope_instance_id = -1;  // For imported declarations: which scope instance (-1 = not imported)
     std::vector<Annotation> annotations;
+    Symbol* resolved_symbol = nullptr;
+    std::vector<Symbol*> ref_param_symbols;
 
     // Expr
     ExprPtr expr;
@@ -178,7 +184,8 @@ struct Stmt {
     ExprPtr body;
     bool is_external;
     bool is_exported;
-    bool is_generic;  // True if function has type parameters (params without types)
+    bool is_generic = false;  // True if function has type parameters (params without types)
+    bool is_instantiation = false;  // True if this is a concrete generic instantiation
 
     // TypeDecl
     std::string type_decl_name;

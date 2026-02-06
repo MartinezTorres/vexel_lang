@@ -10,8 +10,105 @@
 #include "lexer.h"
 #include "parser.h"
 #include "constants.h"
+#include "path_utils.h"
 
 namespace vexel {
+namespace {
+
+void assign_loop_symbol_stmt(StmtPtr stmt, TypePtr type, Bindings* bindings, int instance_id);
+
+void assign_loop_symbol_expr(ExprPtr expr, TypePtr type, Bindings* bindings, int instance_id) {
+    if (!expr) return;
+    if (expr->kind == Expr::Kind::Identifier && expr->name == "_" && bindings) {
+        if (Symbol* sym = bindings->lookup(instance_id, expr.get())) {
+            sym->type = type;
+        }
+    }
+    if (expr->kind == Expr::Kind::Iteration) {
+        return; // inner loop has its own '_'
+    }
+    switch (expr->kind) {
+        case Expr::Kind::Identifier:
+            break;
+        case Expr::Kind::Binary:
+            assign_loop_symbol_expr(expr->left, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Unary:
+        case Expr::Kind::Cast:
+        case Expr::Kind::Length:
+            assign_loop_symbol_expr(expr->operand, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Call:
+            assign_loop_symbol_expr(expr->operand, type, bindings, instance_id);
+            for (const auto& rec : expr->receivers) assign_loop_symbol_expr(rec, type, bindings, instance_id);
+            for (const auto& arg : expr->args) assign_loop_symbol_expr(arg, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Index:
+            assign_loop_symbol_expr(expr->operand, type, bindings, instance_id);
+            if (!expr->args.empty()) assign_loop_symbol_expr(expr->args[0], type, bindings, instance_id);
+            break;
+        case Expr::Kind::Member:
+            assign_loop_symbol_expr(expr->operand, type, bindings, instance_id);
+            break;
+        case Expr::Kind::ArrayLiteral:
+        case Expr::Kind::TupleLiteral:
+            for (const auto& elem : expr->elements) assign_loop_symbol_expr(elem, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Block:
+            for (const auto& st : expr->statements) assign_loop_symbol_stmt(st, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->result_expr, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Conditional:
+            assign_loop_symbol_expr(expr->condition, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->true_expr, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->false_expr, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Assignment:
+            assign_loop_symbol_expr(expr->left, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Range:
+            assign_loop_symbol_expr(expr->left, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Repeat:
+            assign_loop_symbol_expr(expr->condition, type, bindings, instance_id);
+            assign_loop_symbol_expr(expr->right, type, bindings, instance_id);
+            break;
+        case Expr::Kind::Iteration:
+        case Expr::Kind::Resource:
+        case Expr::Kind::Process:
+        case Expr::Kind::IntLiteral:
+        case Expr::Kind::FloatLiteral:
+        case Expr::Kind::StringLiteral:
+        case Expr::Kind::CharLiteral:
+            break;
+    }
+}
+
+void assign_loop_symbol_stmt(StmtPtr stmt, TypePtr type, Bindings* bindings, int instance_id) {
+    if (!stmt) return;
+    switch (stmt->kind) {
+        case Stmt::Kind::VarDecl:
+            assign_loop_symbol_expr(stmt->var_init, type, bindings, instance_id);
+            break;
+        case Stmt::Kind::Expr:
+            assign_loop_symbol_expr(stmt->expr, type, bindings, instance_id);
+            break;
+        case Stmt::Kind::Return:
+            assign_loop_symbol_expr(stmt->return_expr, type, bindings, instance_id);
+            break;
+        case Stmt::Kind::ConditionalStmt:
+            assign_loop_symbol_expr(stmt->condition, type, bindings, instance_id);
+            assign_loop_symbol_stmt(stmt->true_stmt, type, bindings, instance_id);
+            break;
+        default:
+            break;
+    }
+}
+
+} // namespace
 
 TypePtr TypeChecker::check_expr(ExprPtr expr) {
     if (!expr) return nullptr;
@@ -25,17 +122,31 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
             return expr->type;
 
         case Expr::Kind::Identifier: {
-            Symbol* sym = current_scope->lookup(expr->name);
+            Symbol* sym = lookup_binding(expr.get());
             if (!sym) {
-                throw CompileError("Undefined identifier: " + expr->name, expr->location);
+                sym = lookup_global(expr->name);
+                if (sym && bindings) {
+                    bindings->bind(current_instance_id, expr.get(), sym);
+                }
+            }
+            if (!sym) {
+                throw CompileError("Internal error: unresolved identifier: " + expr->name, expr->location);
+            }
+            if (!sym->type && sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
+                int saved_instance = current_instance_id;
+                if (sym->instance_id != current_instance_id) {
+                    set_current_instance(sym->instance_id);
+                }
+                check_stmt(sym->declaration);
+                if (current_instance_id != saved_instance) {
+                    set_current_instance(saved_instance);
+                }
             }
             if (expr->type) {
                 // Type annotation provided
                 return expr->type;
             }
             expr->type = sym->type;
-            // Track scope instance for imported symbols
-            expr->scope_instance_id = sym->scope_instance_id;
             expr->is_mutable_binding = sym->is_mutable;
             return expr->type;
         }
@@ -171,7 +282,7 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
     }
 
     std::string func_name = left_type->type_name + "::" + op;
-    Symbol* sym = current_scope->lookup(func_name);
+    Symbol* sym = lookup_global(func_name);
     if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
         return nullptr;
     }
@@ -201,6 +312,9 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
 
     expr->kind = Expr::Kind::Call;
     expr->operand = Expr::make_identifier(op, expr->location);
+    if (bindings) {
+        bindings->bind(current_instance_id, expr->operand.get(), sym);
+    }
     expr->receivers.clear();
     expr->receivers.push_back(receiver_expr);
     expr->args.clear();
@@ -221,7 +335,7 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
     std::string method_token = expr->is_sorted_iteration ? "@@" : "@";
     std::string method_name = iterable_type->type_name + "::" + method_token;
 
-    Symbol* sym = current_scope->lookup(method_name);
+    Symbol* sym = lookup_global(method_name);
     if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
         return false;
     }
@@ -246,24 +360,20 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
                            " must take exactly one expression parameter and no value parameters", sym->declaration->location);
     }
 
-    // Type-check loop body with '_' bound in a temporary scope
-    push_scope();
+    TypePtr loop_type = make_fresh_typevar();
+    assign_loop_symbol_expr(expr->right, loop_type, bindings, current_instance_id);
     loop_depth++;
-    Symbol underscore;
-    underscore.kind = Symbol::Kind::Variable;
-    underscore.type = make_fresh_typevar();
-    underscore.is_mutable = true;
-    current_scope->define("_", underscore);
     check_expr(expr->right);
     loop_depth--;
-    pop_scope();
 
     ExprPtr receiver_expr = expr->operand;
     ExprPtr body_expr = expr->right;
 
     expr->kind = Expr::Kind::Call;
     expr->operand = Expr::make_identifier(method_token, expr->location);
-    expr->operand->scope_instance_id = sym->scope_instance_id;
+    if (bindings) {
+        bindings->bind(current_instance_id, expr->operand.get(), sym);
+    }
     expr->receivers.clear();
     expr->receivers.push_back(receiver_expr);
     expr->args.clear();
@@ -339,12 +449,16 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
         }
 
-        sym = current_scope->lookup(func_name);
+        sym = lookup_binding(expr->operand.get());
+        if (!sym || expr->operand->name != func_name) {
+            sym = lookup_global(func_name);
+        }
         if (!sym) {
             throw CompileError("Undefined function: " + func_name, expr->location);
         }
-
-        expr->operand->scope_instance_id = sym->scope_instance_id;
+        if (bindings) {
+            bindings->bind(current_instance_id, expr->operand.get(), sym);
+        }
         has_symbol = true;
     }
 
@@ -374,6 +488,9 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         }
 
         expr->type = Type::make_named(expr->operand->name, expr->location);
+        if (bindings) {
+            bindings->bind(current_instance_id, expr->type.get(), sym);
+        }
         return expr->type;
     }
 
@@ -446,10 +563,17 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
 
             std::string mangled_name = get_or_create_instantiation(func_name, arg_types, sym->declaration);
             expr->operand->name = mangled_name;
+            if (bindings) {
+                Symbol* inst_sym = lookup_global(mangled_name);
+                if (inst_sym) {
+                    bindings->bind(current_instance_id, expr->operand.get(), inst_sym);
+                }
+            }
 
             TypeSignature sig;
             sig.param_types = arg_types;
-            auto func_it = instantiations.find(func_name);
+            std::string lookup_key = func_name + "_inst" + std::to_string(current_instance_id);
+            auto func_it = instantiations.find(lookup_key);
             if (func_it != instantiations.end()) {
                 auto inst_it = func_it->second.find(sig);
                 if (inst_it != func_it->second.end()) {
@@ -518,8 +642,7 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         return expr->type;
     }
 
-    expr->type = make_fresh_typevar();
-    return expr->type;
+    throw CompileError("Cannot call non-function: " + func_name, expr->location);
 }
 
 TypePtr TypeChecker::check_index(ExprPtr expr) {
@@ -591,7 +714,13 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
             return expr->type;
         }
 
-        Symbol* type_sym = current_scope->lookup(obj_type->type_name);
+        Symbol* type_sym = nullptr;
+        if (bindings) {
+            type_sym = bindings->lookup(current_instance_id, obj_type.get());
+        }
+        if (!type_sym) {
+            type_sym = lookup_global(obj_type->type_name);
+        }
         if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
             // Find the field in the type declaration
             for (const auto& field : type_sym->declaration->fields) {
@@ -663,7 +792,6 @@ TypePtr TypeChecker::check_tuple_literal(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_block(ExprPtr expr) {
-    push_scope();
     for (auto& stmt : expr->statements) {
         check_stmt(stmt);
     }
@@ -671,7 +799,6 @@ TypePtr TypeChecker::check_block(ExprPtr expr) {
     if (expr->result_expr) {
         result_type = check_expr(expr->result_expr);
     }
-    pop_scope();
     expr->type = result_type;
     return result_type;
 }
@@ -726,7 +853,13 @@ std::optional<bool> TypeChecker::evaluate_static_condition(ExprPtr expr) {
             case Expr::Kind::IntLiteral:
                 return node->uint_val != 0;
             case Expr::Kind::Identifier: {
-                Symbol* sym = current_scope->lookup(node->name);
+                Symbol* sym = nullptr;
+                if (bindings) {
+                    sym = bindings->lookup(current_instance_id, node.get());
+                }
+                if (!sym) {
+                    sym = lookup_global(node->name);
+                }
                 if (!sym) return std::nullopt;
                 if (sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
                     const Stmt* key = sym->declaration.get();
@@ -776,19 +909,15 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_assignment(ExprPtr expr) {
-    // Check if LHS is a new variable declaration (identifier that doesn't exist yet)
-    if (expr->left->kind == Expr::Kind::Identifier &&
-        !current_scope->lookup(expr->left->name)) {
-        // This is a local variable declaration with initialization
-
-        // Verify no shadowing (underscore is allowed to shadow)
-        if (expr->left->name != "_") {
-            verify_no_shadowing(expr->left->name, expr->location);
+    bool creates_new_variable = bindings && bindings->is_new_variable(current_instance_id, expr.get());
+    if (creates_new_variable) {
+        if (expr->left->kind != Expr::Kind::Identifier) {
+            throw CompileError("Internal error: invalid declaration assignment", expr->location);
         }
 
         // Check if RHS is a function reference (not allowed)
         if (expr->right->kind == Expr::Kind::Identifier) {
-            Symbol* rhs_sym = current_scope->lookup(expr->right->name);
+            Symbol* rhs_sym = lookup_binding(expr->right.get());
             if (rhs_sym && rhs_sym->kind == Symbol::Kind::Function) {
                 throw CompileError("Cannot assign function to variable (no function types): " + expr->right->name, expr->location);
             }
@@ -826,20 +955,15 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             }
         }
 
-        // Define the new variable in current scope
-        Symbol sym;
-        sym.kind = Symbol::Kind::Variable;
-        sym.type = var_type;
-        sym.is_mutable = true;
-        sym.is_external = false;
-        sym.is_exported = false;
-        sym.declaration = nullptr;
-        current_scope->define(expr->left->name, sym);
+        Symbol* lhs_sym = lookup_binding(expr->left.get());
+        if (!lhs_sym) {
+            throw CompileError("Internal error: unresolved declaration target", expr->location);
+        }
+        lhs_sym->kind = Symbol::Kind::Variable;
+        lhs_sym->type = var_type;
+        lhs_sym->is_mutable = true;
 
-        // Mark that this assignment creates a new variable
-        // Invariant: the identifier node on the LHS is not a typed value yet.
-        // We clear its type so later validation doesn't require a concrete type
-        // for a declaration site.
+        // Invariant: declaration-site LHS is not a typed value expression.
         expr->left->type = nullptr;
         expr->creates_new_variable = true;
 
@@ -847,18 +971,22 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         return var_type;
     }
 
-    // Regular assignment to existing variable
-    // If a prior declaration left a type annotation on the identifier node, clear it now
-    // Invariant: assignment LHS identifiers are not validated as value expressions.
-    // The type-use validator treats these as lvalues, not expressions requiring a concrete type.
     if (expr->left->kind == Expr::Kind::Identifier && expr->left->type) {
         expr->left->type = nullptr;
     }
 
-    // Check if trying to assign to an immutable constant
     if (expr->left->kind == Expr::Kind::Identifier) {
-        Symbol* sym = current_scope->lookup(expr->left->name);
-        if (sym && !sym->is_mutable) {
+        Symbol* sym = lookup_binding(expr->left.get());
+        if (!sym) {
+            sym = lookup_global(expr->left->name);
+            if (sym && bindings) {
+                bindings->bind(current_instance_id, expr->left.get(), sym);
+            }
+        }
+        if (!sym) {
+            throw CompileError("Internal error: unresolved assignment target", expr->location);
+        }
+        if (!sym->is_mutable) {
             std::string name = expr->left->name;
             if (name == "_") {
                 throw CompileError("Cannot assign to read-only loop variable '_'", expr->location);
@@ -867,9 +995,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         }
     }
 
-    // Check if RHS is a function reference (not allowed)
     if (expr->right->kind == Expr::Kind::Identifier) {
-        Symbol* rhs_sym = current_scope->lookup(expr->right->name);
+        Symbol* rhs_sym = lookup_binding(expr->right.get());
         if (rhs_sym && rhs_sym->kind == Symbol::Kind::Function) {
             throw CompileError("Cannot assign function to variable (no function types): " + expr->right->name, expr->location);
         }
@@ -890,9 +1017,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         throw CompileError("Type mismatch in assignment", expr->location);
     }
 
-    // This is assignment to existing variable
     expr->creates_new_variable = false;
-
     expr->type = lhs_type;
     return lhs_type;
 }
@@ -960,19 +1085,13 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
         throw CompileError("Cannot sort iteration over array with unknown element type", expr->location);
     }
 
-    push_scope();
-    loop_depth++;
-    Symbol underscore;
-    underscore.kind = Symbol::Kind::Variable;
-    underscore.type = iterable_type && iterable_type->element_type
+    TypePtr loop_type = iterable_type && iterable_type->element_type
         ? iterable_type->element_type
         : make_fresh_typevar();
-    underscore.is_mutable = false;
-    current_scope->define("_", underscore);
-
+    assign_loop_symbol_expr(expr->right, loop_type, bindings, current_instance_id);
+    loop_depth++;
     check_expr(expr->right);
     loop_depth--;
-    pop_scope();
 
     expr->type = nullptr;
     return nullptr;
@@ -991,7 +1110,7 @@ TypePtr TypeChecker::check_repeat(ExprPtr expr) {
 
 TypePtr TypeChecker::check_resource_expr(ExprPtr expr) {
     std::string resolved;
-    bool found = try_resolve_resource_path(expr->resource_path, expr->location.filename, resolved);
+    bool found = try_resolve_resource_path(expr->resource_path, expr->location.filename, project_root, resolved);
     const std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + "2_#s_#s";
     auto register_resource_tuple = [&](const SourceLocation& loc) {
         std::vector<TypePtr> elem_types = {

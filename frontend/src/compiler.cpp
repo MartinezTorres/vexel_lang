@@ -11,6 +11,8 @@
 #include "lowered_printer.h"
 #include "lowerer.h"
 #include "monomorphizer.h"
+#include "resolver.h"
+#include "module_loader.h"
 #include <functional>
 #include <queue>
 #include <fstream>
@@ -42,35 +44,48 @@ Compiler::OutputPaths Compiler::compile() {
         std::cout << "Compiling: " << options.input_file << std::endl;
     }
 
-    // Load main module
-    Module mod = load_module(options.input_file);
+    ModuleLoader loader(options.project_root);
+    Program program = loader.load(options.input_file);
 
-    // Import processing now handled per-scope by type checker
+    Bindings bindings;
+    Resolver resolver(program, bindings, options.project_root);
+    resolver.resolve();
 
     if (options.verbose) {
         std::cout << "Type checking..." << std::endl;
     }
 
-    // Type check
-    TypeChecker checker(options.project_root, options.allow_process);
-    checker.check_module(mod);
+    TypeChecker checker(options.project_root, options.allow_process, &resolver, &bindings, &program);
+    checker.check_program(program);
+
+    Module merged;
+    if (!program.modules.empty()) {
+        merged.name = program.modules.front().module.name;
+        merged.path = program.modules.front().path;
+        for (const auto& instance : program.instances) {
+            const auto& mod_info = program.modules[static_cast<size_t>(instance.module_id)];
+            for (const auto& stmt : mod_info.module.top_level) {
+                merged.top_level.push_back(stmt);
+            }
+        }
+    }
 
     Monomorphizer monomorphizer(&checker);
-    monomorphizer.run(mod);
+    monomorphizer.run(merged);
 
     Lowerer lowerer(&checker);
-    lowerer.run(mod);
+    lowerer.run(merged);
 
     Optimizer optimizer(&checker);
-    OptimizationFacts optimization = optimizer.run(mod);
+    OptimizationFacts optimization = optimizer.run(merged);
     Analyzer analyzer(&checker, &optimization);
-    AnalysisFacts analysis = analyzer.run(mod);
-    checker.validate_type_usage(mod, analysis);
+    AnalysisFacts analysis = analyzer.run(merged);
+    checker.validate_type_usage(merged, analysis);
 
     OutputPaths paths = resolve_output_paths(options.output_file);
     if (options.emit_lowered) {
         std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
-        std::string lowered = print_lowered_module(mod);
+        std::string lowered = print_lowered_module(merged);
         if (options.verbose) {
             std::cout << "Writing lowered module: " << lowered_path << std::endl;
         }
@@ -81,7 +96,7 @@ Compiler::OutputPaths Compiler::compile() {
         if (options.verbose) {
             std::cout << "Writing analysis report: " << analysis_path << std::endl;
         }
-        write_file(analysis_path.string(), format_analysis_report(mod, analysis, &optimization));
+        write_file(analysis_path.string(), format_analysis_report(merged, analysis, &optimization));
     }
 
     const Backend* backend = find_backend(options.backend);
@@ -91,7 +106,7 @@ Compiler::OutputPaths Compiler::compile() {
     if (options.verbose) {
         std::cout << "Generating backend: " << backend->info.name << std::endl;
     }
-    BackendContext ctx{mod, checker, options, paths, analysis, optimization};
+    BackendContext ctx{merged, checker, options, paths, analysis, optimization};
     backend->emit(ctx);
 
     if (options.verbose) {
@@ -184,7 +199,11 @@ std::string Compiler::build_param_list(CodeGenerator& codegen, StmtPtr func, boo
         first = false;
         std::string name = codegen.mangle(param.name);
         if (with_types) {
-            std::string type = param.type ? codegen.type_to_c(param.type) : "int";
+            if (!param.type) {
+                throw CompileError("Missing type for parameter '" + param.name +
+                                   "' when generating C signature", param.location);
+            }
+            std::string type = codegen.type_to_c(param.type);
             oss << type << " " << name;
         } else {
             oss << name;

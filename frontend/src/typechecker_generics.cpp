@@ -1,5 +1,6 @@
 #include "typechecker.h"
 #include "constants.h"
+#include "resolver.h"
 #include <unordered_map>
 
 namespace vexel {
@@ -51,13 +52,9 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
     TypeSignature sig;
     sig.param_types = arg_types;
 
-    // For imported functions with scope_instance_id, make lookups scope-specific
-    // by including scope_instance_id in the function name key
-    int scope_id = generic_func->scope_instance_id;
-    std::string lookup_key = func_name;
-    if (scope_id >= 0) {
-        lookup_key += "_scope" + std::to_string(scope_id);
-    }
+    // Keep instantiations per module instance.
+    int instance_id = current_instance_id;
+    std::string lookup_key = func_name + "_inst" + std::to_string(instance_id);
 
     // Check if instantiation already exists
     auto func_it = instantiations.find(lookup_key);
@@ -76,11 +73,13 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
     std::string mangled = mangle_generic_name(func_name, arg_types);
     cloned->func_name = mangled;
 
-    // Inherit scope_instance_id from the original function
-    cloned->scope_instance_id = generic_func->scope_instance_id;
-
     // Mark as non-generic since types have been substituted
     cloned->is_generic = false;
+    cloned->is_instantiation = true;
+
+    if (resolver) {
+        resolver->resolve_generated_function(cloned, instance_id);
+    }
 
     // Type check the instantiation immediately to infer return type
     check_func_decl(cloned);
@@ -120,6 +119,7 @@ StmtPtr TypeChecker::clone_function(StmtPtr func) {
     cloned->is_external = func->is_external;
     cloned->is_exported = func->is_exported;
     cloned->is_generic = func->is_generic;
+    cloned->is_instantiation = func->is_instantiation;
     cloned->type_namespace = func->type_namespace;
 
     // Clone parameters
@@ -146,7 +146,6 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     cloned->annotations = expr->annotations;
     // Don't copy type - let type-checker infer it fresh for the instantiation
     cloned->type = nullptr;
-
     // Clone literals
     cloned->uint_val = expr->uint_val;
     cloned->float_val = expr->float_val;
@@ -201,6 +200,8 @@ StmtPtr TypeChecker::clone_stmt(StmtPtr stmt) {
     cloned->kind = stmt->kind;
     cloned->location = stmt->location;
     cloned->annotations = stmt->annotations;
+    cloned->is_instantiation = stmt->is_instantiation;
+    cloned->ref_param_symbols.clear();
 
     // Clone based on statement type
     switch (stmt->kind) {

@@ -1,64 +1,90 @@
 #include "typechecker.h"
 #include "evaluator.h"
-#include "importer.h"
 #include "resolver.h"
 #include "type_use_validator.h"
 #include <algorithm>
 #include <array>
-#include <cstdio>
-#include <filesystem>
-#include <fstream>
 #include <limits>
-#include <iostream>
-#include "lexer.h"
-#include "parser.h"
 #include "constants.h"
 
 namespace vexel {
 
-TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs)
-    : current_scope(nullptr),
+TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs, Resolver* resolver,
+                         Bindings* bindings_in, Program* program_in)
+    : resolver(resolver),
+      bindings(bindings_in),
+      program(program_in),
+      global_scope(resolver ? resolver->instance_scope(current_instance_id) : nullptr),
       type_var_counter(0),
-      scope_counter(0),
       loop_depth(0),
       project_root(proj_root),
-      allow_process(allow_process_exprs),
-      current_module(nullptr) {
-    push_scope();
+      allow_process(allow_process_exprs) {}
+
+void TypeChecker::set_resolver(Resolver* resolver_in) {
+    resolver = resolver_in;
+    global_scope = resolver ? resolver->instance_scope(current_instance_id) : nullptr;
 }
 
-void TypeChecker::push_scope() {
-    scopes.push_back(std::make_unique<Scope>(current_scope, scope_counter++));
-    current_scope = scopes.back().get();
+void TypeChecker::set_bindings(Bindings* bindings_in) {
+    bindings = bindings_in;
 }
 
-void TypeChecker::pop_scope() {
-    if (current_scope->parent) {
-        current_scope = current_scope->parent;
+void TypeChecker::set_program(Program* program_in) {
+    program = program_in;
+}
+
+Symbol* TypeChecker::binding_for(int instance_id, const void* node) const {
+    if (!bindings) return nullptr;
+    return bindings->lookup(instance_id, node);
+}
+
+void TypeChecker::set_current_instance(int instance_id) {
+    current_instance_id = instance_id;
+    global_scope = resolver ? resolver->instance_scope(current_instance_id) : nullptr;
+}
+
+Symbol* TypeChecker::lookup_global(const std::string& name) const {
+    if (resolver) {
+        return resolver->lookup_in_instance(current_instance_id, name);
+    }
+    if (!global_scope) return nullptr;
+    return global_scope->lookup(name);
+}
+
+Symbol* TypeChecker::lookup_binding(const void* node) const {
+    if (!bindings) return nullptr;
+    return bindings->lookup(current_instance_id, node);
+}
+
+unsigned long long TypeChecker::stmt_key(const Stmt* stmt) const {
+    return (static_cast<unsigned long long>(static_cast<uint32_t>(current_instance_id)) << 32) ^
+           static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(stmt));
+}
+
+void TypeChecker::check_program(Program& program_in) {
+    set_program(&program_in);
+    for (const auto& instance : program_in.instances) {
+        set_current_instance(instance.id);
+        check_module(program_in.modules[static_cast<size_t>(instance.module_id)].module);
     }
 }
 
 void TypeChecker::check_module(Module& mod) {
-    current_module = &mod;
-    Resolver resolver(this);
-    resolver.predeclare(mod);
-
-    // Pass 2: Type-check all statements in order (constants, functions, variables)
+    // Pass: Type-check all statements in order (constants, functions, variables)
     // This enforces parse-order initialization for constants. Iterate by index
     // because imports/generic instantiations can append new statements.
     for (size_t i = 0; i < mod.top_level.size(); ++i) {
         StmtPtr stmt = mod.top_level[i];
         check_stmt(stmt);
     }
-
 }
 
 void TypeChecker::check_stmt(StmtPtr stmt) {
     if (!stmt) return;
-    if (checked_statements.count(stmt.get())) {
+    if (checked_statements.count(stmt_key(stmt.get()))) {
         return;
     }
-    checked_statements.insert(stmt.get());
+    checked_statements.insert(stmt_key(stmt.get()));
 
     switch (stmt->kind) {
         case Stmt::Kind::FuncDecl:
@@ -70,11 +96,8 @@ void TypeChecker::check_stmt(StmtPtr stmt) {
         case Stmt::Kind::VarDecl:
             check_var_decl(stmt);
             break;
-        case Stmt::Kind::Import: {
-            Importer importer(this);
-            importer.handle_import(stmt);
+        case Stmt::Kind::Import:
             break;
-        }
         case Stmt::Kind::Expr:
             if (stmt->expr) check_expr(stmt->expr);
             break;
@@ -111,11 +134,9 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
     }
 
     // Check if function is generic (has parameters without types)
-    // Don't recalculate if already explicitly set to false (for instantiations)
-    bool was_set_to_non_generic = !stmt->is_generic;
-    stmt->is_generic = is_generic_function(stmt);
-    // If it was explicitly marked as non-generic (e.g., instantiation), keep it that way
-    if (was_set_to_non_generic && stmt->is_generic) {
+    if (!stmt->is_instantiation) {
+        stmt->is_generic = is_generic_function(stmt);
+    } else {
         stmt->is_generic = false;
     }
 
@@ -123,18 +144,9 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         throw CompileError("Generic functions cannot be exported or external", stmt->location);
     }
 
-    // Check if already declared (from pass 1)
-    Symbol* existing = current_scope->lookup(func_name);
-    if (!existing || existing->kind != Symbol::Kind::Function) {
-        // Not declared yet - this must be a generic instantiation
-        verify_no_shadowing(func_name, stmt->location);
-
-        Symbol sym;
-        sym.kind = Symbol::Kind::Function;
-        sym.is_external = stmt->is_external;
-        sym.is_exported = stmt->is_exported;
-        sym.declaration = stmt;
-        current_scope->define(func_name, sym);
+    Symbol* func_sym = lookup_binding(stmt.get());
+    if (!func_sym) {
+        throw CompileError("Internal error: unresolved function '" + func_name + "'", stmt->location);
     }
 
     // Validate external function signatures (primitives only)
@@ -157,74 +169,59 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
     }
 
     if (!stmt->is_external && stmt->body) {
-        push_scope();
-
         if (stmt->ref_param_types.size() < stmt->ref_params.size()) {
             stmt->ref_param_types.resize(stmt->ref_params.size(), nullptr);
         }
-        // Add receiver parameters (mutable) if this is a reference-taking function
         for (size_t i = 0; i < stmt->ref_params.size(); ++i) {
-            const std::string& ref_param = stmt->ref_params[i];
-            Symbol rsym;
-            rsym.kind = Symbol::Kind::Variable;
-            // If this is a method, infer receiver type from type namespace
-            if (!stmt->type_namespace.empty() && i == 0) {
-                rsym.type = Type::make_named(stmt->type_namespace, stmt->location);
-            } else {
-                rsym.type = make_fresh_typevar();  // Type will be inferred from usage
+            Symbol* rsym = lookup_binding(&stmt->ref_params[i]);
+            if (!rsym) {
+                throw CompileError("Internal error: unresolved receiver '" + stmt->ref_params[i] + "'", stmt->location);
             }
-            rsym.is_mutable = true;
-            current_scope->define(ref_param, rsym);
-            stmt->ref_param_types[i] = rsym.type;
+            if (!stmt->type_namespace.empty() && i == 0) {
+                rsym->type = Type::make_named(stmt->type_namespace, stmt->location);
+                if (bindings) {
+                    Symbol* type_sym = lookup_global(stmt->type_namespace);
+                    if (type_sym) {
+                        bindings->bind(current_instance_id, rsym->type.get(), type_sym);
+                    }
+                }
+            } else if (!rsym->type) {
+                rsym->type = make_fresh_typevar();
+            }
+            rsym->is_mutable = true;
+            stmt->ref_param_types[i] = rsym->type;
         }
 
-        // Add regular parameters (immutable)
         for (auto& param : stmt->params) {
             if (!param.type) {
                 param.type = make_fresh_typevar();
             }
-            Symbol psym;
-            psym.kind = Symbol::Kind::Variable;
-            psym.type = param.type;
-            psym.is_mutable = false;
-            current_scope->define(param.name, psym);
+            Symbol* psym = lookup_binding(&param);
+            if (!psym) {
+                throw CompileError("Internal error: unresolved parameter '" + param.name + "'", param.location);
+            }
+            psym->type = param.type;
+            psym->is_mutable = false;
         }
 
         TypePtr body_type = check_expr(stmt->body);
 
-        // Handle tuple return types
         if (!stmt->return_types.empty()) {
-            // Generate anonymous tuple type: #__Tuple2_T1_T2(__0:T1, __1:T2)
-            // For now, just use the first return type (simplified)
-            // Full implementation would create the tuple type
             if (!stmt->return_type) {
-                stmt->return_type = stmt->return_types[0];  // Placeholder
+                stmt->return_type = stmt->return_types[0];
             }
         } else if (!stmt->return_type) {
             stmt->return_type = body_type;
-        } else {
-            if (!types_compatible(body_type, stmt->return_type)) {
-                throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
-                                   stmt->location);
-            }
+        } else if (!types_compatible(body_type, stmt->return_type)) {
+            throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                               stmt->location);
         }
-
-        pop_scope();
     }
 }
 
 void TypeChecker::check_type_decl(StmtPtr stmt) {
-    // Check if already declared (from pass 1)
-    Symbol* existing = current_scope->lookup(stmt->type_decl_name);
-    bool already_declared = (existing && existing->kind == Symbol::Kind::Type);
-
-    if (!already_declared) {
-        verify_no_shadowing(stmt->type_decl_name, stmt->location);
-
-        Symbol sym;
-        sym.kind = Symbol::Kind::Type;
-        sym.declaration = stmt;
-        current_scope->define(stmt->type_decl_name, sym);
+    if (!lookup_binding(stmt.get())) {
+        throw CompileError("Internal error: unresolved type '" + stmt->type_decl_name + "'", stmt->location);
     }
 
     // Check fields for type inference
@@ -239,9 +236,6 @@ void TypeChecker::check_type_decl(StmtPtr stmt) {
 }
 
 void TypeChecker::check_var_decl(StmtPtr stmt) {
-    // Verify no shadowing
-    verify_no_shadowing(stmt->var_name, stmt->location);
-
     TypePtr type = stmt->var_type;
     if (stmt->var_init) {
         TypePtr init_type = check_expr(stmt->var_init);
@@ -280,19 +274,29 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     // Validate the type
     validate_type(type, stmt->location);
 
-    // Define the variable/constant
-    Symbol sym;
-    sym.kind = stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;
-    sym.type = type;
-    sym.is_mutable = stmt->is_mutable;
-    sym.declaration = stmt;
-    current_scope->define(stmt->var_name, sym);
+    Symbol* sym = lookup_binding(stmt.get());
+    if (!sym) {
+        throw CompileError("Internal error: unresolved variable '" + stmt->var_name + "'", stmt->location);
+    }
+    sym->kind = stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;
+    sym->type = type;
+    sym->is_mutable = stmt->is_mutable;
+    sym->declaration = stmt;
 }
 
   void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& facts) {
     TypeUseContext ctx;
     ctx.resolve_type = [this](TypePtr type) { return resolve_type(type); };
-    ctx.constexpr_condition = [this](ExprPtr expr) { return constexpr_condition(expr); };
+    ctx.constexpr_condition = [this](int instance_id, ExprPtr expr) {
+        int saved = current_instance_id;
+        set_current_instance(instance_id);
+        auto result = constexpr_condition(expr);
+        set_current_instance(saved);
+        return result;
+    };
+    ctx.binding = [this](int instance_id, ExprPtr expr) {
+        return binding_for(instance_id, expr.get());
+    };
     ::vexel::validate_type_usage(mod, facts, ctx);
 }
 

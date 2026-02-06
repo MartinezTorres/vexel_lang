@@ -1,6 +1,5 @@
 #include "type_use_validator.h"
 #include "common.h"
-#include "function_key.h"
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -27,32 +26,44 @@ bool type_is_concrete(const TypeUseContext* ctx, TypePtr type) {
     }
 }
 
-std::string qualified_func_name(StmtPtr stmt) {
-    if (!stmt) return "";
-    std::string name = stmt->func_name;
-    if (!stmt->type_namespace.empty()) {
-        name = stmt->type_namespace + "::" + name;
-    }
-    return name;
+std::string qualified_func_name(const Symbol* sym) {
+    if (!sym) return "";
+    return sym->name;
 }
 
 struct CallCollector {
     const TypeUseContext* ctx = nullptr;
+    int instance_id = -1;
     bool return_required = false;
-    std::unordered_set<std::string> calls;
+    std::unordered_set<const Symbol*> calls;
 
     void collect_expr(ExprPtr expr, bool value_required) {
         if (!expr) return;
         switch (expr->kind) {
             case Expr::Kind::Call: {
                 if (value_required && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                    calls.insert(reachability_key(expr->operand->name, expr->operand->scope_instance_id));
+                    const Symbol* sym = ctx && ctx->binding ? ctx->binding(instance_id, expr->operand) : nullptr;
+                    if (sym) {
+                        calls.insert(sym);
+                    }
                 }
                 for (const auto& rec : expr->receivers) {
                     collect_expr(rec, true);
                 }
+                const Symbol* callee = nullptr;
+                if (ctx && ctx->binding && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                    callee = ctx->binding(instance_id, expr->operand);
+                }
+                size_t param_index = 0;
                 for (const auto& arg : expr->args) {
+                    if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
+                        param_index < callee->declaration->params.size() &&
+                        callee->declaration->params[param_index].is_expression_param) {
+                        ++param_index;
+                        continue;
+                    }
                     collect_expr(arg, true);
+                    ++param_index;
                 }
                 break;
             }
@@ -88,7 +99,7 @@ struct CallCollector {
                 break;
             case Expr::Kind::Conditional:
                 if (ctx && ctx->constexpr_condition) {
-                    auto cond = ctx->constexpr_condition(expr->condition);
+                    auto cond = ctx->constexpr_condition(instance_id, expr->condition);
                     if (cond.has_value()) {
                         // Invariant: skip compile-time-dead branches to avoid requiring
                         // concrete types for values that will never be used.
@@ -147,6 +158,7 @@ struct TypeUseValidator {
     const TypeUseContext* ctx = nullptr;
     bool return_required = false;
     std::string func_name;
+    int instance_id = -1;
 
     void validate_lvalue(ExprPtr expr) {
         if (!expr) return;
@@ -170,7 +182,8 @@ struct TypeUseValidator {
 
     void validate_expr(ExprPtr expr, bool value_required) {
         if (!expr) return;
-        if (value_required && !expr->is_expr_param_ref && !type_is_concrete(ctx, expr->type)) {
+        bool allow_untyped = expr->kind == Expr::Kind::ArrayLiteral && expr->elements.empty();
+        if (value_required && !expr->is_expr_param_ref && !allow_untyped && !type_is_concrete(ctx, expr->type)) {
             if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
                 std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
                           << " type=" << (expr->type ? expr->type->to_string() : "<null>");
@@ -197,8 +210,22 @@ struct TypeUseValidator {
                 for (const auto& rec : expr->receivers) {
                     validate_expr(rec, true);
                 }
-                for (const auto& arg : expr->args) {
-                    validate_expr(arg, true);
+                {
+                    const Symbol* callee = nullptr;
+                    if (ctx && ctx->binding && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                        callee = ctx->binding(instance_id, expr->operand);
+                    }
+                    size_t param_index = 0;
+                    for (const auto& arg : expr->args) {
+                        if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
+                            param_index < callee->declaration->params.size() &&
+                            callee->declaration->params[param_index].is_expression_param) {
+                            ++param_index;
+                            continue;
+                        }
+                        validate_expr(arg, true);
+                        ++param_index;
+                    }
                 }
                 break;
             case Expr::Kind::Index:
@@ -224,7 +251,7 @@ struct TypeUseValidator {
                 break;
             case Expr::Kind::Conditional:
                 if (ctx && ctx->constexpr_condition) {
-                    auto cond = ctx->constexpr_condition(expr->condition);
+                    auto cond = ctx->constexpr_condition(instance_id, expr->condition);
                     if (cond.has_value()) {
                         // Invariant: compile-time-dead branch is ignored by type-use validation.
                         validate_expr(cond.value() ? expr->true_expr : expr->false_expr, value_required);
@@ -286,26 +313,22 @@ struct TypeUseValidator {
 void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const TypeUseContext& ctx) {
     // Invariant: this pass runs after Analyzer, so reachability/used-globals are known.
     // Only *used* values must have concrete types; unused chains are allowed.
-    std::unordered_map<std::string, StmtPtr> functions;
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::FuncDecl) continue;
-        std::string func_name = qualified_func_name(stmt);
-        std::string key = reachability_key(func_name, stmt->scope_instance_id);
-        functions[key] = stmt;
+    std::unordered_map<const Symbol*, StmtPtr> functions;
+    for (const auto& sym : facts.reachable_functions) {
+        if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) continue;
+        functions[sym] = sym->declaration;
     }
 
-    std::unordered_map<std::string, std::unordered_set<std::string>> calls_always;
-    std::unordered_map<std::string, std::unordered_set<std::string>> calls_if_return;
-    std::unordered_set<std::string> return_required;
+    std::unordered_map<const Symbol*, std::unordered_set<const Symbol*>> calls_always;
+    std::unordered_map<const Symbol*, std::unordered_set<const Symbol*>> calls_if_return;
+    std::unordered_set<const Symbol*> return_required;
 
     for (const auto& pair : functions) {
-        const std::string& key = pair.first;
+        const Symbol* sym = pair.first;
         const StmtPtr& func = pair.second;
-        if (!facts.reachable_functions.count(key)) {
-            continue;
-        }
         CallCollector collect_false;
         collect_false.ctx = &ctx;
+        collect_false.instance_id = sym->instance_id;
         collect_false.return_required = false;
         if (func->body) {
             if (func->body->kind == Expr::Kind::Block) {
@@ -319,6 +342,7 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         }
         CallCollector collect_true;
         collect_true.ctx = &ctx;
+        collect_true.instance_id = sym->instance_id;
         collect_true.return_required = true;
         if (func->body) {
             if (func->body->kind == Expr::Kind::Block) {
@@ -331,33 +355,29 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
             }
         }
 
-        calls_always[key] = collect_false.calls;
-        std::unordered_set<std::string> diff;
+        calls_always[sym] = collect_false.calls;
+        std::unordered_set<const Symbol*> diff;
         for (const auto& callee : collect_true.calls) {
             if (!collect_false.calls.count(callee)) {
                 diff.insert(callee);
             }
         }
-        calls_if_return[key] = std::move(diff);
+        calls_if_return[sym] = std::move(diff);
 
         for (const auto& callee : collect_false.calls) {
             return_required.insert(callee);
         }
     }
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::VarDecl) continue;
-        bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                                       [](const Annotation& a) { return a.name == "export"; });
-        if (!facts.used_global_vars.count(stmt.get()) && !is_exported) {
-            continue;
-        }
+    for (const auto& sym : facts.used_global_vars) {
+        if (!sym || !sym->declaration) continue;
         // Invariant: used globals must have concrete types, and their initializers
         // are treated as value-required.
         CallCollector collector;
         collector.ctx = &ctx;
+        collector.instance_id = sym->instance_id;
         collector.return_required = true;
-        collector.collect_expr(stmt->var_init, true);
+        collector.collect_expr(sym->declaration->var_init, true);
         for (const auto& callee : collector.calls) {
             return_required.insert(callee);
         }
@@ -368,7 +388,7 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         changed = false;
         // Invariant: if a function's return is required, then any callee
         // reachable only in the "return value used" context also becomes required.
-        for (const auto& key : std::vector<std::string>(return_required.begin(), return_required.end())) {
+        for (const auto& key : std::vector<const Symbol*>(return_required.begin(), return_required.end())) {
             auto it = calls_if_return.find(key);
             if (it == calls_if_return.end()) {
                 continue;
@@ -383,7 +403,7 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
 
     for (const auto& stmt : mod.top_level) {
         if (stmt->kind != Stmt::Kind::TypeDecl) continue;
-        if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
+        if (!facts.used_type_names.count(stmt->type_decl_name)) {
             continue;
         }
         for (const auto& field : stmt->fields) {
@@ -394,23 +414,20 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
     }
 
     for (const auto& pair : functions) {
-        const std::string& key = pair.first;
+        const Symbol* sym = pair.first;
         const StmtPtr& func = pair.second;
-        if (!facts.reachable_functions.count(key)) {
-            continue;
-        }
         if (func->is_generic) {
             continue;
         }
 
-        bool ret_required = return_required.count(key) > 0;
+        bool ret_required = return_required.count(sym) > 0;
         for (const auto& param : func->params) {
             if (param.is_expression_param) {
                 continue;
             }
             if (!type_is_concrete(&ctx, param.type)) {
                 throw CompileError("Parameter '" + param.name + "' in function '" +
-                                   qualified_func_name(func) + "' requires a concrete type",
+                                   qualified_func_name(sym) + "' requires a concrete type",
                                    param.location);
             }
         }
@@ -425,7 +442,7 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
             }
             if (!type_is_concrete(&ctx, ref_type)) {
                 throw CompileError("Receiver '" + func->ref_params[i] + "' in function '" +
-                                   qualified_func_name(func) + "' requires a concrete type",
+                                   qualified_func_name(sym) + "' requires a concrete type",
                                    func->location);
             }
         }
@@ -433,13 +450,13 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         if (!func->return_types.empty()) {
             for (const auto& rt : func->return_types) {
                 if (!type_is_concrete(&ctx, rt)) {
-                    throw CompileError("Return type in function '" + qualified_func_name(func) +
+                    throw CompileError("Return type in function '" + qualified_func_name(sym) +
                                        "' requires a concrete type", func->location);
                 }
             }
         } else if (ret_required) {
             if (!type_is_concrete(&ctx, func->return_type)) {
-                throw CompileError("Return value of function '" + qualified_func_name(func) +
+                throw CompileError("Return value of function '" + qualified_func_name(sym) +
                                    "' is used but its return type is unresolved",
                                    func->location);
             }
@@ -451,7 +468,8 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         TypeUseValidator validator;
         validator.ctx = &ctx;
         validator.return_required = ret_required;
-        validator.func_name = qualified_func_name(func);
+        validator.func_name = qualified_func_name(sym);
+        validator.instance_id = sym->instance_id;
         if (func->body->kind == Expr::Kind::Block) {
             for (const auto& stmt : func->body->statements) {
                 validator.validate_stmt(stmt);
@@ -462,20 +480,16 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         }
     }
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::VarDecl) continue;
-        bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                                       [](const Annotation& a) { return a.name == "export"; });
-        if (!facts.used_global_vars.count(stmt.get()) && !is_exported) {
-            continue;
-        }
-        if (!type_is_concrete(&ctx, stmt->var_type)) {
-            throw CompileError("Global '" + stmt->var_name + "' requires a concrete type", stmt->location);
+    for (const auto& sym : facts.used_global_vars) {
+        if (!sym || !sym->declaration) continue;
+        if (!type_is_concrete(&ctx, sym->declaration->var_type)) {
+            throw CompileError("Global '" + sym->name + "' requires a concrete type", sym->declaration->location);
         }
         TypeUseValidator validator;
         validator.ctx = &ctx;
         validator.return_required = true;
-        validator.validate_expr(stmt->var_init, true);
+        validator.instance_id = sym->instance_id;
+        validator.validate_expr(sym->declaration->var_init, true);
     }
 }
 

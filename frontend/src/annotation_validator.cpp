@@ -1,24 +1,26 @@
-#include "typechecker.h"
+#include "annotation_validator.h"
 #include <iostream>
 
 namespace vexel {
 
-static bool ann_is(const Annotation& ann, const std::string& name) {
+namespace {
+
+bool ann_is(const Annotation& ann, const std::string& name) {
     return ann.name == name;
 }
-void TypeChecker::warn_annotation(const Annotation& ann, const std::string& msg) {
+
+void warn_annotation(const Annotation& ann, const std::string& msg) {
     std::cerr << "Warning: " << msg;
     if (!ann.location.filename.empty()) {
         std::cerr << " at " << ann.location.filename << ":" << ann.location.line << ":" << ann.location.column;
     }
     std::cerr << " [[" << ann.name << "]]" << std::endl;
 }
-void TypeChecker::validate_annotations(const Module& mod) {
-    for (const auto& stmt : mod.top_level) {
-        validate_stmt_annotations(stmt);
-    }
-}
-void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
+
+void validate_expr_annotations(ExprPtr expr);
+void validate_stmt_annotations(StmtPtr stmt);
+
+void validate_stmt_annotations(StmtPtr stmt) {
     if (!stmt) return;
 
     auto warn_if = [&](const Annotation& ann, bool condition, const std::string& msg) {
@@ -94,7 +96,8 @@ void TypeChecker::validate_stmt_annotations(StmtPtr stmt) {
             break;
     }
 }
-void TypeChecker::validate_expr_annotations(ExprPtr expr) {
+
+void validate_expr_annotations(ExprPtr expr) {
     if (!expr) return;
 
     auto warn_all = [&](const Annotation& ann) {
@@ -118,6 +121,14 @@ void TypeChecker::validate_expr_annotations(ExprPtr expr) {
     for (const auto& elem : expr->elements) validate_expr_annotations(elem);
     for (const auto& st : expr->statements) validate_stmt_annotations(st);
     validate_expr_annotations(expr->result_expr);
+}
+
+} // namespace
+
+void validate_annotations(const Module& mod) {
+    for (const auto& stmt : mod.top_level) {
+        validate_stmt_annotations(stmt);
+    }
 }
 
 } // namespace vexel
