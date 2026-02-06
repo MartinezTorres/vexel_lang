@@ -22,6 +22,12 @@ public:
     Symbol* lookup_in_instance(int instance_id, const std::string& name) const;
 
 private:
+    // Resolver invariants (after resolve()):
+    // - Each ModuleInstance has a top-level scope stored in instance_scopes.
+    // - Declarations are bound in Bindings; identifiers are bound when resolvable
+    //   in the current scope (unresolved identifiers may be fixed by the typechecker).
+    // - Assignment expressions that introduce new variables are flagged in Bindings.
+    // - Compile-time-known conditional branches are resolved on the taken side only.
     Program& program;
     Bindings& bindings;
     Scope* current_scope;

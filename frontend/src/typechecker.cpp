@@ -4,6 +4,7 @@
 #include "type_use_validator.h"
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <limits>
 #include "constants.h"
 
@@ -77,6 +78,7 @@ void TypeChecker::check_module(Module& mod) {
         StmtPtr stmt = mod.top_level[i];
         check_stmt(stmt);
     }
+    validate_invariants(mod);
 }
 
 void TypeChecker::check_stmt(StmtPtr stmt) {
@@ -284,7 +286,231 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     sym->declaration = stmt;
 }
 
-  void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& facts) {
+void TypeChecker::validate_invariants(const Module& mod) {
+    std::function<void(ExprPtr)> validate_expr;
+    std::function<void(StmtPtr)> validate_stmt;
+
+    validate_expr = [&](ExprPtr expr) -> void {
+        if (!expr) return;
+
+        bool untyped_ok = false;
+        if (expr->kind == Expr::Kind::Iteration || expr->kind == Expr::Kind::Repeat) {
+            untyped_ok = true;
+        } else if (expr->kind == Expr::Kind::Block) {
+            if (!expr->result_expr || !expr->result_expr->type) {
+                untyped_ok = true;
+            }
+        } else if (expr->kind == Expr::Kind::Call && !expr->type) {
+            // Void calls are permitted in statement position; type-use validation
+            // will reject them if their value is consumed.
+            untyped_ok = true;
+        } else if (expr->kind == Expr::Kind::Assignment && !expr->type) {
+            // Assignment expressions can be used as statements even when the RHS is void.
+            untyped_ok = true;
+        }
+
+        if (!expr->type && !untyped_ok) {
+            throw CompileError("Internal error: missing type after type checking", expr->location);
+        }
+        if (expr->type && untyped_ok) {
+            throw CompileError("Internal error: unexpected type on statement expression", expr->location);
+        }
+
+        switch (expr->kind) {
+            case Expr::Kind::Binary:
+                validate_expr(expr->left);
+                validate_expr(expr->right);
+                break;
+            case Expr::Kind::Unary:
+            case Expr::Kind::Cast:
+            case Expr::Kind::Length:
+                validate_expr(expr->operand);
+                break;
+            case Expr::Kind::Call:
+                {
+                    if (expr->operand && expr->operand->kind != Expr::Kind::Identifier) {
+                        validate_expr(expr->operand);
+                    }
+                    for (const auto& rec : expr->receivers) validate_expr(rec);
+                    Symbol* call_sym = nullptr;
+                    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                        call_sym = lookup_binding(expr->operand.get());
+                        if (!call_sym) {
+                            call_sym = lookup_global(expr->operand->name);
+                        }
+                    }
+                    for (size_t i = 0; i < expr->args.size(); ++i) {
+                        bool skip_arg = false;
+                        if (call_sym && call_sym->kind == Symbol::Kind::Function && call_sym->declaration) {
+                            if (i < call_sym->declaration->params.size() &&
+                                call_sym->declaration->params[i].is_expression_param) {
+                                skip_arg = true;
+                            }
+                        }
+                        if (!skip_arg) {
+                            validate_expr(expr->args[i]);
+                        }
+                    }
+                    break;
+                }
+            case Expr::Kind::Index:
+                validate_expr(expr->operand);
+                if (!expr->args.empty()) validate_expr(expr->args[0]);
+                break;
+            case Expr::Kind::Member:
+                validate_expr(expr->operand);
+                break;
+            case Expr::Kind::ArrayLiteral:
+            case Expr::Kind::TupleLiteral:
+                for (const auto& elem : expr->elements) validate_expr(elem);
+                break;
+            case Expr::Kind::Block:
+                for (const auto& st : expr->statements) {
+                    if (!st) continue;
+                    validate_stmt(st);
+                }
+                if (expr->result_expr) validate_expr(expr->result_expr);
+                break;
+            case Expr::Kind::Conditional:
+                validate_expr(expr->condition);
+                if (auto static_value = evaluate_static_condition(expr->condition)) {
+                    if (static_value.value()) {
+                        validate_expr(expr->true_expr);
+                    } else {
+                        validate_expr(expr->false_expr);
+                    }
+                } else {
+                    validate_expr(expr->true_expr);
+                    validate_expr(expr->false_expr);
+                }
+                break;
+            case Expr::Kind::Assignment:
+                if (expr->left && expr->left->kind != Expr::Kind::Identifier) {
+                    validate_expr(expr->left);
+                }
+                validate_expr(expr->right);
+                break;
+            case Expr::Kind::Range:
+                validate_expr(expr->left);
+                validate_expr(expr->right);
+                break;
+            case Expr::Kind::Iteration:
+                validate_expr(expr->operand);
+                validate_expr(expr->right);
+                break;
+            case Expr::Kind::Repeat:
+                validate_expr(expr->condition);
+                validate_expr(expr->right);
+                break;
+            case Expr::Kind::Resource:
+            case Expr::Kind::Process:
+            case Expr::Kind::Identifier:
+            case Expr::Kind::IntLiteral:
+            case Expr::Kind::FloatLiteral:
+            case Expr::Kind::StringLiteral:
+            case Expr::Kind::CharLiteral:
+                break;
+        }
+    };
+
+    validate_stmt = [&](StmtPtr stmt) -> void {
+        if (!stmt) return;
+        switch (stmt->kind) {
+            case Stmt::Kind::VarDecl:
+                if (!stmt->var_type) {
+                    throw CompileError("Internal error: variable '" + stmt->var_name +
+                                       "' has no type after type checking", stmt->location);
+                }
+                if (stmt->var_init) {
+                    validate_expr(stmt->var_init);
+                    if (!stmt->var_init->type) {
+                        throw CompileError("Internal error: variable '" + stmt->var_name +
+                                           "' initializer has no type", stmt->location);
+                    }
+                }
+                break;
+            case Stmt::Kind::FuncDecl: {
+                if (stmt->is_generic && !stmt->is_instantiation) {
+                    return;
+                }
+                if (!stmt->is_external && !stmt->body) {
+                    throw CompileError("Internal error: missing function body for '" +
+                                       stmt->func_name + "'", stmt->location);
+                }
+                if (stmt->type_namespace.empty() && !stmt->ref_params.empty()) {
+                    // Ref params are allowed on free functions, but must be typed.
+                }
+                if (stmt->ref_param_types.size() < stmt->ref_params.size()) {
+                    throw CompileError("Internal error: receiver types missing for '" +
+                                       stmt->func_name + "'", stmt->location);
+                }
+                for (size_t i = 0; i < stmt->ref_params.size(); ++i) {
+                    if (!stmt->ref_param_types[i]) {
+                        throw CompileError("Internal error: receiver '" + stmt->ref_params[i] +
+                                           "' has no type after type checking", stmt->location);
+                    }
+                }
+                for (const auto& param : stmt->params) {
+                    if (param.is_expression_param) continue;
+                    if (!param.type) {
+                        throw CompileError("Internal error: parameter '" + param.name +
+                                           "' has no type after type checking", param.location);
+                    }
+                }
+                if (stmt->is_external) {
+                    for (const auto& param : stmt->params) {
+                        if (param.is_expression_param) continue;
+                        if (!param.type) {
+                            throw CompileError("External function parameter '" + param.name +
+                                               "' must have a type", param.location);
+                        }
+                    }
+                }
+                for (const auto& rt : stmt->return_types) {
+                    if (!rt) {
+                        throw CompileError("Internal error: tuple return type missing in '" +
+                                           stmt->func_name + "'", stmt->location);
+                    }
+                }
+                if (stmt->body) {
+                    validate_expr(stmt->body);
+                }
+                break;
+            }
+            case Stmt::Kind::TypeDecl:
+                for (const auto& field : stmt->fields) {
+                    if (!field.type) {
+                        throw CompileError("Internal error: field '" + field.name +
+                                           "' missing type in '" + stmt->type_decl_name + "'",
+                                           field.location);
+                    }
+                }
+                break;
+            case Stmt::Kind::Expr:
+                validate_expr(stmt->expr);
+                break;
+            case Stmt::Kind::Return:
+                if (stmt->return_expr) {
+                    validate_expr(stmt->return_expr);
+                }
+                break;
+            case Stmt::Kind::ConditionalStmt:
+                validate_expr(stmt->condition);
+                validate_stmt(stmt->true_stmt);
+                break;
+            case Stmt::Kind::Import:
+            case Stmt::Kind::Break:
+            case Stmt::Kind::Continue:
+                break;
+        }
+    };
+
+    for (const auto& stmt : mod.top_level) {
+        validate_stmt(stmt);
+    }
+}
+
+void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& facts) {
     TypeUseContext ctx;
     ctx.resolve_type = [this](TypePtr type) { return resolve_type(type); };
     ctx.constexpr_condition = [this](int instance_id, ExprPtr expr) {

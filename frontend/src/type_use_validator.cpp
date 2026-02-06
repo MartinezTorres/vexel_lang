@@ -311,8 +311,11 @@ struct TypeUseValidator {
 } // namespace
 
 void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const TypeUseContext& ctx) {
-    // Invariant: this pass runs after Analyzer, so reachability/used-globals are known.
-    // Only *used* values must have concrete types; unused chains are allowed.
+    // Invariants:
+    // - This pass runs after Analyzer, so reachability/used-globals are known.
+    // - Only *used* values must have concrete types; unused chains are allowed.
+    // - Compile-time-dead branches are ignored (via ctx.constexpr_condition).
+    // - Expression-parameter arguments are treated as opaque and skipped.
     std::unordered_map<const Symbol*, StmtPtr> functions;
     for (const auto& sym : facts.reachable_functions) {
         if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) continue;

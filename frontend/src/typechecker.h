@@ -100,9 +100,17 @@ public:
     void register_tuple_type(const std::string& name, const std::vector<TypePtr>& elem_types);
 
 private:
+    // TypeChecker invariants (enforced after check_module):
+    // - All non-generic declarations have bindings and non-null type slots (TypeVar allowed).
+    // - Non-external functions have bodies; external params must be typed.
+    // - Value-producing expressions have expr->type set; only Iteration/Repeat and
+    //   block expressions without a result are untyped.
+    // - TypeVars are permitted to remain unresolved, but only when their values are
+    //   never used in a concrete context (enforced later by type-use validation).
     Symbol* lookup_global(const std::string& name) const;
     Symbol* lookup_binding(const void* node) const;
     unsigned long long stmt_key(const Stmt* stmt) const;
+    void validate_invariants(const Module& mod);
 
     void check_stmt(StmtPtr stmt);
     void check_func_decl(StmtPtr stmt);
