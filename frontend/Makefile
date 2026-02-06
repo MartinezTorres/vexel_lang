@@ -15,7 +15,7 @@ TEST_TARGETS := $(patsubst %/test.vx,$(BUILD_DIR)/frontend-%/test_report.md,$(ca
 TEST_TARGETS += $(patsubst %/test.sh,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.sh))
 TEST_CHECK_TARGETS := $(patsubst %.md,%.checked,$(TEST_TARGETS))
 
-.PHONY: all clean test update-test-reports
+.PHONY: all clean test update-test-reports debug-invariants-test
 
 all: $(BUILD_DIR)/vexel-frontend $(BUILD_DIR)/lib/libvexelfrontend.a
 
@@ -34,6 +34,10 @@ $(BUILD_DIR)/frontend/%.o: src/%.cpp
 
 test: $(TEST_CHECK_TARGETS)
 	@echo "All tests passed!"
+
+debug-invariants-test:
+	+$(MAKE) clean
+	+$(MAKE) CXXFLAGS="$(CXXFLAGS) -O0 -g -DVEXEL_DEBUG_PASS_INVARIANTS" test
 
 update-test-reports: $(TEST_TARGETS)
 	@echo "Updating test reports..."
@@ -109,7 +113,7 @@ $(BUILD_DIR)/frontend-tests/%/test_report.checked: $(BUILD_DIR)/frontend-tests/%
 clean:
 	rm -f $(OBJECTS)
 	rm -f $(OBJECTS:.o=.d)
-	rmdir $(BUILD_DIR)/frontend
+	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/frontend
 	rm -f $(BUILD_DIR)/lib/libvexelfrontend.a
 	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/lib
 	rm -f $(BUILD_DIR)/vexel-frontend

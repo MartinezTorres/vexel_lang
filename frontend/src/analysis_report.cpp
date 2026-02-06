@@ -43,6 +43,23 @@ std::string format_analysis_report(const Module& mod, const AnalysisFacts& analy
         out << "- Constexpr inits: " << optimization->constexpr_inits.size() << "\n";
         out << "- Foldable functions: " << optimization->foldable_functions.size() << "\n";
         out << "- Constexpr conditions: " << optimization->constexpr_conditions.size() << "\n\n";
+
+        std::vector<const Symbol*> skipped;
+        skipped.reserve(optimization->fold_skip_reasons.size());
+        for (const auto& pair : optimization->fold_skip_reasons) {
+            skipped.push_back(pair.first);
+        }
+        std::sort(skipped.begin(), skipped.end(), [](const Symbol* a, const Symbol* b) {
+            if (!a || !b) return a < b;
+            if (a->name == b->name) return a->instance_id < b->instance_id;
+            return a->name < b->name;
+        });
+
+        out << "## Fold Skip Reasons\n";
+        for (const auto& sym : skipped) {
+            out << "- " << symbol_label(sym) << ": " << optimization->fold_skip_reasons.at(sym) << "\n";
+        }
+        out << "\n";
     }
 
     std::vector<const Symbol*> reachable(analysis.reachable_functions.begin(),
@@ -71,8 +88,10 @@ std::string format_analysis_report(const Module& mod, const AnalysisFacts& analy
     out << "## Reentrancy Variants\n";
     for (const auto& sym : reent_keys) {
         const auto& variants = analysis.reentrancy_variants.at(sym);
+        std::vector<char> sorted(variants.begin(), variants.end());
+        std::sort(sorted.begin(), sorted.end());
         std::string tags;
-        for (char v : variants) {
+        for (char v : sorted) {
             if (!tags.empty()) tags += ",";
             tags.push_back(v);
         }

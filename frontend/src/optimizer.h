@@ -13,6 +13,7 @@ struct OptimizationFacts {
     std::unordered_set<const Stmt*> constexpr_inits;
     std::unordered_set<const Symbol*> foldable_functions;
     std::unordered_map<const Expr*, bool> constexpr_conditions;
+    std::unordered_map<const Symbol*, std::string> fold_skip_reasons;
 };
 
 class Optimizer {

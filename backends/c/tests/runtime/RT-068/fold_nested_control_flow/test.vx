@@ -1,0 +1,25 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Nested loops/conditionals/function chains that are compile-time known are fully folded. | Nested compile-time control flow folds fully
+// @expect-exit: 46
+// @run-generated: true
+// @command: {VEXEL_C} test.vx && rg -n "return 46;" out.c && ! rg -n "vx_compute|vx_step" out.c
+
+
+&step(x:#i32) -> #i32 {
+    (x > 2) ? x + 7 : x + 1
+}
+
+&compute() -> #i32 {
+    i:#i32 = 0;
+    acc:#i32 = 0;
+    (i < 4)@{
+        v:#i32 = step(i + 1);
+        acc = acc + ((v > 3) ? v : (v + 10));
+        i = i + 1;
+    };
+    acc
+}
+
+&^main() -> #i32 {
+    compute()
+}

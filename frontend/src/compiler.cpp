@@ -6,6 +6,7 @@
 #include "analysis.h"
 #include "optimizer.h"
 #include "analysis_report.h"
+#include "pass_invariants.h"
 #include "backend_registry.h"
 #include "constants.h"
 #include "lowered_printer.h"
@@ -24,6 +25,20 @@
 namespace vexel {
 
 Compiler::Compiler(const Options& opts) : options(opts) {}
+
+namespace {
+#ifdef VEXEL_DEBUG_PASS_INVARIANTS
+void validate_program_stage(const Program& program, const char* stage) {
+    validate_program_invariants(program, stage);
+}
+void validate_module_stage(const Module& mod, const char* stage) {
+    validate_module_invariants(mod, stage);
+}
+#else
+void validate_program_stage(const Program&, const char*) {}
+void validate_module_stage(const Module&, const char*) {}
+#endif
+}
 
 Compiler::OutputPaths Compiler::resolve_output_paths(const std::string& output_file) {
     std::filesystem::path base_path(output_file);
@@ -46,10 +61,12 @@ Compiler::OutputPaths Compiler::compile() {
 
     ModuleLoader loader(options.project_root);
     Program program = loader.load(options.input_file);
+    validate_program_stage(program, "post-load");
 
     Bindings bindings;
     Resolver resolver(program, bindings, options.project_root);
     resolver.resolve();
+    validate_program_stage(program, "post-resolve");
 
     if (options.verbose) {
         std::cout << "Type checking..." << std::endl;
@@ -57,6 +74,7 @@ Compiler::OutputPaths Compiler::compile() {
 
     TypeChecker checker(options.project_root, options.allow_process, &resolver, &bindings, &program);
     checker.check_program(program);
+    validate_program_stage(program, "post-typecheck");
 
     Module merged;
     if (!program.modules.empty()) {
@@ -69,18 +87,24 @@ Compiler::OutputPaths Compiler::compile() {
             }
         }
     }
+    validate_module_stage(merged, "post-merge");
 
     Monomorphizer monomorphizer(&checker);
     monomorphizer.run(merged);
+    validate_module_stage(merged, "post-monomorphize");
 
     Lowerer lowerer(&checker);
     lowerer.run(merged);
+    validate_module_stage(merged, "post-lower");
 
     Optimizer optimizer(&checker);
     OptimizationFacts optimization = optimizer.run(merged);
+    validate_module_stage(merged, "post-optimize");
     Analyzer analyzer(&checker, &optimization);
     AnalysisFacts analysis = analyzer.run(merged);
+    validate_module_stage(merged, "post-analysis");
     checker.validate_type_usage(merged, analysis);
+    validate_module_stage(merged, "post-type-use");
 
     OutputPaths paths = resolve_output_paths(options.output_file);
     if (options.emit_lowered) {

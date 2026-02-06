@@ -1,0 +1,22 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time iteration over compile-time arrays through function calls is fully folded. | Iteration + call chain folds fully
+// @expect-exit: 20
+// @run-generated: true
+// @command: {VEXEL_C} test.vx && rg -n "return 20;" out.c && ! rg -n "vx_sum_array|vx_build" out.c
+
+
+&sum_array(arr:#i32[4]) -> #i32 {
+    s:#i32 = 0;
+    arr@{
+        s = s + _;
+    };
+    s
+}
+
+&build() -> #i32[4] {
+    [2, 4, 6, 8]
+}
+
+&^main() -> #i32 {
+    sum_array(build())
+}

@@ -2,7 +2,7 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 BUILD_DIR ?= $(abspath ../build)
 
-BACKEND_DIRS := $(filter-out ../backends/common/ ../backends/_template/ ../backends/ext/,$(wildcard ../backends/*/ ../backends/ext/*/))
+BACKEND_DIRS := $(filter-out ../backends/common/ ../backends/_template/ ../backends/ext/ ../backends/tests/,$(wildcard ../backends/*/ ../backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))src/$(name)_backend.h)

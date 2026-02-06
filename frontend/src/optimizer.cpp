@@ -23,20 +23,35 @@ OptimizationFacts Optimizer::run(const Module& mod) {
             for (const auto& pair : instance.symbols) {
                 const Symbol* sym = pair.second;
                 if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) continue;
-                if (sym->is_external || !sym->declaration->body) continue;
-                if (!sym->declaration->params.empty() || !sym->declaration->ref_params.empty()) continue;
+                if (sym->is_external || !sym->declaration->body) {
+                    facts.fold_skip_reasons[sym] = "external-or-no-body";
+                    continue;
+                }
+                if (!sym->declaration->params.empty()) {
+                    facts.fold_skip_reasons[sym] = "parameterized";
+                    continue;
+                }
+                if (!sym->declaration->ref_params.empty()) {
+                    facts.fold_skip_reasons[sym] = "has-receivers";
+                    continue;
+                }
 
                 CompileTimeEvaluator func_eval(type_checker);
                 CTValue result;
                 if (!func_eval.try_evaluate(sym->declaration->body, result)) {
+                    facts.fold_skip_reasons[sym] = "evaluation-failed";
                     continue;
                 }
                 bool scalar = std::holds_alternative<int64_t>(result) ||
                               std::holds_alternative<uint64_t>(result) ||
                               std::holds_alternative<bool>(result) ||
                               std::holds_alternative<double>(result);
-                if (!scalar) continue;
+                if (!scalar) {
+                    facts.fold_skip_reasons[sym] = "non-scalar-result";
+                    continue;
+                }
                 facts.foldable_functions.insert(sym);
+                facts.fold_skip_reasons.erase(sym);
             }
 
             for (const auto& stmt : module.top_level) {

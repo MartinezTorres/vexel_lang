@@ -1,0 +1,13 @@
+// @rfc: docs/vexel-rfc.md#backend-contract
+// @desc: Analysis report includes categorized fold-skip diagnostics for non-foldable functions. | Fold-skip reasons are reported
+// @expect-exit: 0
+// @command: {VEXEL_C} --emit-analysis test.vx && rg -n "## Fold Skip Reasons" out.analysis.txt && rg -n "needs_arg@0: parameterized" out.analysis.txt
+
+
+&needs_arg(x:#i32) -> #i32 {
+    x + 1
+}
+
+&^main() -> #i32 {
+    needs_arg(41)
+}

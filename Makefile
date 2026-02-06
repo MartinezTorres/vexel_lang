@@ -25,7 +25,7 @@ driver-clean:
 	+$(MAKE) -C driver clean
 
 # Build frontend
-.PHONY: frontend frontend-test
+.PHONY: frontend frontend-test frontend-debug-invariants-test
 frontend: $(BUILD_DIR)/vexel-frontend
 
 $(BUILD_DIR)/vexel-frontend: FORCE
@@ -34,11 +34,14 @@ $(BUILD_DIR)/vexel-frontend: FORCE
 frontend-test:
 	+$(MAKE) -C frontend test
 
+frontend-debug-invariants-test:
+	+$(MAKE) -C frontend debug-invariants-test
+
 frontend-clean:
 	+$(MAKE) -C frontend clean
 
 # Backends
-BACKEND_DIRS := $(filter-out backends/common/ backends/_template/ backends/ext/,$(wildcard backends/*/ backends/ext/*/))
+BACKEND_DIRS := $(filter-out backends/common/ backends/_template/ backends/ext/ backends/tests/,$(wildcard backends/*/ backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 BACKENDS_TARGETS := $(addprefix backend-,$(BACKEND_NAMES))
 BACKENDS_TEST_TARGETS := $(addprefix backend-,$(addsuffix -test,$(BACKEND_NAMES)))
@@ -65,8 +68,12 @@ backend-%-clean: FORCE
 	$(MAKE) -C "$$dir" clean
 
 	
+backend-conformance-test:
+	@bash backends/tests/run_conformance.sh
+
 #tests
-test: driver-test frontend-test $(BACKENDS_TEST_TARGETS)
+.PHONY: backend-conformance-test
+test: driver-test frontend-test backend-conformance-test $(BACKENDS_TEST_TARGETS)
 
 # CLEAN
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)

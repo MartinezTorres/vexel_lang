@@ -823,6 +823,9 @@ void CodeGenerator::gen_module(const Module& mod) {
     }
 
     if (!tuple_decls.empty()) {
+        std::sort(tuple_decls.begin(), tuple_decls.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
         // Save current header and body
         std::string header_str = header.str();
         std::string body_str = body.str();
