@@ -8,6 +8,7 @@
 namespace vexel {
 
 struct AnalysisFacts;
+class Resolver;
 
 // Type signature for generic instantiations
 struct TypeSignature {
@@ -84,6 +85,7 @@ public:
 };
 
 class TypeChecker {
+    friend class Resolver;
     Scope* current_scope;
     std::vector<std::unique_ptr<Scope>> scopes;
     int type_var_counter;

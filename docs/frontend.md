@@ -10,9 +10,10 @@ The frontend performs lexing, parsing, type checking, constant evaluation, and l
 ## Pipeline & invariants
 
 1. Parse + AST build.
-2. TypeChecker: name resolution, type inference, and semantic validation.
-3. Optimizer: constant folding + simplifications on the typed AST.
-4. Analyzer: reachability, used globals/types, and reentrancy analysis.
-5. Type-use validation: any *used* value must have a concrete type; unresolved types are allowed only when the value is unused. Compile-time-dead branches are ignored in this pass.
+2. Resolver: predeclare functions/types and validate annotations (binding stage).
+3. TypeChecker: type inference and semantic validation.
+4. Optimizer: constant folding + simplifications on the typed AST.
+5. Analyzer: reachability, used globals/types, and reentrancy analysis.
+6. Type-use validation: any *used* value must have a concrete type; unresolved types are allowed only when the value is unused. Compile-time-dead branches are ignored in this pass.
 
 The validator depends on `Analyzer` facts; if pass ordering changes, update this contract.
