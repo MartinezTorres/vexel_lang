@@ -48,6 +48,7 @@ private:
     void mark_reachable(const Symbol* func_sym,
                         const Module& mod, AnalysisFacts& facts);
     void collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls);
+    void collect_calls_stmt(StmtPtr stmt, std::unordered_set<const Symbol*>& calls);
 
     Symbol* binding_for(ExprPtr expr) const;
     std::optional<const Symbol*> base_identifier_symbol(ExprPtr expr) const;

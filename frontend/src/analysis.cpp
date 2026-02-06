@@ -1,4 +1,5 @@
 #include "analysis.h"
+#include "ast_walk.h"
 #include "evaluator.h"
 #include "expr_access.h"
 #include "optimizer.h"
@@ -158,112 +159,60 @@ void Analyzer::mark_reachable(const Symbol* func_sym,
     current_instance_id = saved_instance;
 }
 
+void Analyzer::collect_calls_stmt(StmtPtr stmt, std::unordered_set<const Symbol*>& calls) {
+    if (!stmt) return;
+    if (stmt->kind == Stmt::Kind::ConditionalStmt) {
+        if (auto cond = constexpr_condition(stmt->condition)) {
+            if (cond.value()) {
+                collect_calls_stmt(stmt->true_stmt, calls);
+            }
+        } else {
+            collect_calls(stmt->condition, calls);
+            collect_calls_stmt(stmt->true_stmt, calls);
+        }
+        return;
+    }
+
+    for_each_stmt_child(
+        stmt,
+        [&](const ExprPtr& child) { collect_calls(child, calls); },
+        [&](const StmtPtr& child) { collect_calls_stmt(child, calls); });
+}
+
 void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls) {
     if (!expr) return;
 
-    switch (expr->kind) {
-        case Expr::Kind::Call:
-            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                Symbol* sym = binding_for(expr->operand);
-                if (sym && sym->kind == Symbol::Kind::Function) {
-                    calls.insert(sym);
-                }
-            }
-            for (const auto& rec : expr->receivers) {
-                collect_calls(rec, calls);
-            }
-            for (const auto& arg : expr->args) {
-                collect_calls(arg, calls);
-            }
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Binary:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Unary:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Index:
-            collect_calls(expr->operand, calls);
-            if (!expr->args.empty()) collect_calls(expr->args[0], calls);
-            break;
-
-        case Expr::Kind::Member:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::ArrayLiteral:
-        case Expr::Kind::TupleLiteral:
-            for (const auto& elem : expr->elements) {
-                collect_calls(elem, calls);
-            }
-            break;
-
-        case Expr::Kind::Block:
-            for (const auto& stmt : expr->statements) {
-                if (stmt->kind == Stmt::Kind::Expr && stmt->expr) {
-                    collect_calls(stmt->expr, calls);
-                } else if (stmt->kind == Stmt::Kind::Return && stmt->return_expr) {
-                    collect_calls(stmt->return_expr, calls);
-                } else if (stmt->kind == Stmt::Kind::VarDecl && stmt->var_init) {
-                    collect_calls(stmt->var_init, calls);
-                }
-            }
-            if (expr->result_expr) {
-                collect_calls(expr->result_expr, calls);
-            }
-            break;
-
-        case Expr::Kind::Conditional: {
-            auto cond = constexpr_condition(expr->condition);
-            if (cond.has_value()) {
-                if (cond.value()) {
-                    collect_calls(expr->true_expr, calls);
-                } else if (expr->false_expr) {
-                    collect_calls(expr->false_expr, calls);
-                }
-            } else {
-                collect_calls(expr->condition, calls);
-                collect_calls(expr->true_expr, calls);
-                if (expr->false_expr) collect_calls(expr->false_expr, calls);
-            }
-            break;
+    if (expr->kind == Expr::Kind::Call &&
+        expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+        Symbol* sym = binding_for(expr->operand);
+        if (sym && sym->kind == Symbol::Kind::Function) {
+            calls.insert(sym);
         }
-
-        case Expr::Kind::Cast:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Assignment:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Range:
-            collect_calls(expr->left, calls);
-            collect_calls(expr->right, calls);
-            break;
-
-        case Expr::Kind::Length:
-            collect_calls(expr->operand, calls);
-            break;
-
-        case Expr::Kind::Iteration:
-        case Expr::Kind::Repeat:
-            collect_calls(loop_subject(expr), calls);
-            if (loop_body(expr)) collect_calls(loop_body(expr), calls);
-            break;
-
-        default:
-            break;
     }
+
+    if (expr->kind == Expr::Kind::Conditional) {
+        auto cond = constexpr_condition(expr->condition);
+        if (cond.has_value()) {
+            if (cond.value()) {
+                collect_calls(expr->true_expr, calls);
+            } else if (expr->false_expr) {
+                collect_calls(expr->false_expr, calls);
+            }
+        } else {
+            collect_calls(expr->condition, calls);
+            collect_calls(expr->true_expr, calls);
+            if (expr->false_expr) collect_calls(expr->false_expr, calls);
+        }
+        return;
+    }
+
+    for_each_expr_child(
+        expr,
+        [&](const ExprPtr& child) { collect_calls(child, calls); },
+        [&](const StmtPtr& child) { collect_calls_stmt(child, calls); });
 }
 
-void Analyzer::analyze_reentrancy(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
     Program* program = type_checker ? type_checker->get_program() : nullptr;
     if (!program) return;
 
@@ -392,7 +341,7 @@ void Analyzer::analyze_reentrancy(const Module& mod, AnalysisFacts& facts) {
     }
 }
 
-void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.var_mutability.clear();
     facts.receiver_mutates.clear();
 
@@ -733,7 +682,7 @@ void Analyzer::analyze_mutability(const Module& mod, AnalysisFacts& facts) {
         }
     }
 }
-void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_ref_variants(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.ref_variants.clear();
 
     Program* program = type_checker ? type_checker->get_program() : nullptr;
@@ -897,7 +846,7 @@ void Analyzer::analyze_ref_variants(const Module& mod, AnalysisFacts& facts) {
         }
     }
 }
-void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_effects(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.function_writes_global.clear();
     facts.function_is_pure.clear();
 
@@ -1171,7 +1120,7 @@ void Analyzer::analyze_effects(const Module& mod, AnalysisFacts& facts) {
         }
     }
 }
-void Analyzer::analyze_usage(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.used_global_vars.clear();
     facts.used_type_names.clear();
 

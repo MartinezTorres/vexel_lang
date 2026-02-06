@@ -615,7 +615,6 @@ ExprPtr Parser::parse_conditional() {
         // If it fails or there's no ':', backtrack (it's a statement conditional)
         size_t saved = pos;
         pos++; // consume '?'
-        size_t true_start = pos;
         ExprPtr true_expr = nullptr;
         bool parsed_true = false;
 

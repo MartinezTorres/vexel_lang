@@ -1,5 +1,6 @@
 #include "resolver.h"
 #include "annotation_validator.h"
+#include "ast_walk.h"
 #include "expr_access.h"
 #include "path_utils.h"
 #include <algorithm>
@@ -231,6 +232,7 @@ Symbol* Resolver::create_symbol(Symbol::Kind kind, const std::string& name, Stmt
 }
 
 ModuleInstance& Resolver::get_or_create_instance(int module_id, int scope_id, const SourceLocation& loc) {
+    (void)loc;
     long long key = scope_module_key(scope_id, module_id);
     auto it = instance_by_scope_module.find(key);
     if (it != instance_by_scope_module.end()) {
@@ -685,97 +687,21 @@ void Resolver::build_module_imports() {
 
 void Resolver::collect_imports(StmtPtr stmt, std::vector<std::vector<std::string>>& out) const {
     if (!stmt) return;
-    switch (stmt->kind) {
-        case Stmt::Kind::Import:
-            out.push_back(stmt->import_path);
-            break;
-        case Stmt::Kind::Expr:
-            collect_imports_expr(stmt->expr, out);
-            break;
-        case Stmt::Kind::Return:
-            collect_imports_expr(stmt->return_expr, out);
-            break;
-        case Stmt::Kind::ConditionalStmt:
-            collect_imports_expr(stmt->condition, out);
-            collect_imports(stmt->true_stmt, out);
-            break;
-        case Stmt::Kind::FuncDecl:
-            collect_imports_expr(stmt->body, out);
-            break;
-        case Stmt::Kind::VarDecl:
-            collect_imports_expr(stmt->var_init, out);
-            break;
-        case Stmt::Kind::TypeDecl:
-        case Stmt::Kind::Break:
-        case Stmt::Kind::Continue:
-            break;
+    if (stmt->kind == Stmt::Kind::Import) {
+        out.push_back(stmt->import_path);
     }
+    for_each_stmt_child(
+        stmt,
+        [&](const ExprPtr& child) { collect_imports_expr(child, out); },
+        [&](const StmtPtr& child) { collect_imports(child, out); });
 }
 
 void Resolver::collect_imports_expr(ExprPtr expr, std::vector<std::vector<std::string>>& out) const {
     if (!expr) return;
-    switch (expr->kind) {
-        case Expr::Kind::Block:
-            for (const auto& st : expr->statements) {
-                collect_imports(st, out);
-            }
-            collect_imports_expr(expr->result_expr, out);
-            break;
-        case Expr::Kind::Conditional:
-            collect_imports_expr(expr->condition, out);
-            collect_imports_expr(expr->true_expr, out);
-            collect_imports_expr(expr->false_expr, out);
-            break;
-        case Expr::Kind::Binary:
-            collect_imports_expr(expr->left, out);
-            collect_imports_expr(expr->right, out);
-            break;
-        case Expr::Kind::Unary:
-        case Expr::Kind::Cast:
-        case Expr::Kind::Length:
-            collect_imports_expr(expr->operand, out);
-            break;
-        case Expr::Kind::Call:
-            collect_imports_expr(expr->operand, out);
-            for (const auto& rec : expr->receivers) collect_imports_expr(rec, out);
-            for (const auto& arg : expr->args) collect_imports_expr(arg, out);
-            break;
-        case Expr::Kind::Index:
-            collect_imports_expr(expr->operand, out);
-            if (!expr->args.empty()) collect_imports_expr(expr->args[0], out);
-            break;
-        case Expr::Kind::Member:
-            collect_imports_expr(expr->operand, out);
-            break;
-        case Expr::Kind::ArrayLiteral:
-        case Expr::Kind::TupleLiteral:
-            for (const auto& elem : expr->elements) collect_imports_expr(elem, out);
-            break;
-        case Expr::Kind::Assignment:
-            collect_imports_expr(expr->left, out);
-            collect_imports_expr(expr->right, out);
-            break;
-        case Expr::Kind::Range:
-            collect_imports_expr(expr->left, out);
-            collect_imports_expr(expr->right, out);
-            break;
-        case Expr::Kind::Iteration:
-            collect_imports_expr(loop_subject(expr), out);
-            collect_imports_expr(loop_body(expr), out);
-            break;
-        case Expr::Kind::Repeat:
-            collect_imports_expr(loop_subject(expr), out);
-            collect_imports_expr(loop_body(expr), out);
-            break;
-        case Expr::Kind::Resource:
-        case Expr::Kind::Process:
-        case Expr::Kind::Identifier:
-        case Expr::Kind::IntLiteral:
-        case Expr::Kind::FloatLiteral:
-        case Expr::Kind::StringLiteral:
-        case Expr::Kind::CharLiteral:
-            break;
-    }
+    for_each_expr_child(
+        expr,
+        [&](const ExprPtr& child) { collect_imports_expr(child, out); },
+        [&](const StmtPtr& child) { collect_imports(child, out); });
 }
 
 bool Resolver::module_depends_on(int module_id, int target_module_id) const {
