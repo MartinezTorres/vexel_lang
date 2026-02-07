@@ -1,17 +1,83 @@
 #include "analysis.h"
 #include "ast_walk.h"
 #include "evaluator.h"
-#include "expr_access.h"
 #include "optimizer.h"
+#include "program.h"
 #include "typechecker.h"
 
 #include <optional>
 
 namespace vexel {
 
+Analyzer::AnalysisContext Analyzer::context() const {
+    AnalysisContext ctx;
+    ctx.program = type_checker ? type_checker->get_program() : nullptr;
+    return ctx;
+}
+
+Analyzer::InstanceScope Analyzer::scoped_instance(int instance_id) {
+    return InstanceScope(*this, instance_id);
+}
+
 bool Analyzer::is_foldable(const Symbol* func_sym) const {
     if (!optimization) return false;
     return optimization->foldable_functions.count(func_sym) > 0;
+}
+
+bool Analyzer::global_initializer_runs_at_runtime(const Symbol* sym) const {
+    if (!sym || !sym->declaration || !sym->declaration->var_init) {
+        return false;
+    }
+    if (!type_checker) {
+        return true;
+    }
+    CompileTimeEvaluator evaluator(type_checker);
+    CTValue result;
+    return !evaluator.try_evaluate(sym->declaration->var_init, result);
+}
+
+void Analyzer::build_run_summary(const AnalysisFacts& facts) {
+    run_summary_ = AnalysisRunSummary{};
+    run_summary_.program = context().program;
+    if (!run_summary_.program) {
+        return;
+    }
+
+    for (const auto& instance : run_summary_.program->instances) {
+        auto instance_scope = scoped_instance(instance.id);
+        (void)instance_scope;
+
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || !sym->declaration) {
+                continue;
+            }
+
+            if (sym->kind == Symbol::Kind::Function) {
+                if (!sym->is_external && facts.reachable_functions.count(sym)) {
+                    run_summary_.reachable_function_decls[sym] = sym->declaration;
+                    if (sym->declaration->body && !is_foldable(sym)) {
+                        std::unordered_set<const Symbol*> calls;
+                        collect_calls(sym->declaration->body, calls);
+                        run_summary_.reachable_calls[sym] = std::move(calls);
+                    }
+                }
+                continue;
+            }
+
+            if (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant) {
+                continue;
+            }
+            if (!global_initializer_runs_at_runtime(sym)) {
+                continue;
+            }
+
+            run_summary_.runtime_initialized_globals.insert(sym);
+            std::unordered_set<const Symbol*> calls;
+            collect_calls(sym->declaration->var_init, calls);
+            run_summary_.global_initializer_calls[sym] = std::move(calls);
+        }
+    }
 }
 
 std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
@@ -21,6 +87,55 @@ std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
         return it->second;
     }
     return std::nullopt;
+}
+
+void Analyzer::walk_pruned_expr(ExprPtr expr, const ExprVisitor& on_expr, const StmtVisitor& on_stmt) {
+    if (!expr) return;
+    on_expr(expr);
+
+    if (expr->kind == Expr::Kind::Conditional) {
+        if (auto cond = constexpr_condition(expr->condition)) {
+            if (cond.value()) {
+                walk_pruned_expr(expr->true_expr, on_expr, on_stmt);
+            } else if (expr->false_expr) {
+                walk_pruned_expr(expr->false_expr, on_expr, on_stmt);
+            }
+        } else {
+            walk_pruned_expr(expr->condition, on_expr, on_stmt);
+            walk_pruned_expr(expr->true_expr, on_expr, on_stmt);
+            if (expr->false_expr) {
+                walk_pruned_expr(expr->false_expr, on_expr, on_stmt);
+            }
+        }
+        return;
+    }
+
+    for_each_expr_child(
+        expr,
+        [&](const ExprPtr& child) { walk_pruned_expr(child, on_expr, on_stmt); },
+        [&](const StmtPtr& child) { walk_pruned_stmt(child, on_expr, on_stmt); });
+}
+
+void Analyzer::walk_pruned_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const StmtVisitor& on_stmt) {
+    if (!stmt) return;
+    on_stmt(stmt);
+
+    if (stmt->kind == Stmt::Kind::ConditionalStmt) {
+        if (auto cond = constexpr_condition(stmt->condition)) {
+            if (cond.value()) {
+                walk_pruned_stmt(stmt->true_stmt, on_expr, on_stmt);
+            }
+        } else {
+            walk_pruned_expr(stmt->condition, on_expr, on_stmt);
+            walk_pruned_stmt(stmt->true_stmt, on_expr, on_stmt);
+        }
+        return;
+    }
+
+    for_each_stmt_child(
+        stmt,
+        [&](const ExprPtr& child) { walk_pruned_expr(child, on_expr, on_stmt); },
+        [&](const StmtPtr& child) { walk_pruned_stmt(child, on_expr, on_stmt); });
 }
 
 Symbol* Analyzer::binding_for(ExprPtr expr) const {
@@ -79,7 +194,9 @@ std::optional<const Symbol*> Analyzer::base_identifier_symbol(ExprPtr expr) cons
 
 AnalysisFacts Analyzer::run(const Module& mod) {
     AnalysisFacts facts;
+    run_summary_ = AnalysisRunSummary{};
     analyze_reachability(mod, facts);
+    build_run_summary(facts);
     analyze_reentrancy(mod, facts);
     analyze_mutability(mod, facts);
     analyze_ref_variants(mod, facts);
@@ -89,11 +206,12 @@ AnalysisFacts Analyzer::run(const Module& mod) {
 }
 
 void Analyzer::analyze_reachability(const Module& mod, AnalysisFacts& facts) {
-    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    Program* program = context().program;
     if (!program) return;
 
     for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
+        auto instance_scope = scoped_instance(instance.id);
+        (void)instance_scope;
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || sym->kind != Symbol::Kind::Function) continue;
@@ -103,25 +221,18 @@ void Analyzer::analyze_reachability(const Module& mod, AnalysisFacts& facts) {
     }
 
     for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
+        auto instance_scope = scoped_instance(instance.id);
+        (void)instance_scope;
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
             if (!sym->declaration || !sym->declaration->var_init) continue;
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-            if (!evaluated_at_compile_time) {
-                std::unordered_set<const Symbol*> calls;
-                collect_calls(sym->declaration->var_init, calls);
-                for (const Symbol* callee : calls) {
-                    mark_reachable(callee, mod, facts);
-                }
+            if (!global_initializer_runs_at_runtime(sym)) continue;
+
+            std::unordered_set<const Symbol*> calls;
+            collect_calls(sym->declaration->var_init, calls);
+            for (const Symbol* callee : calls) {
+                mark_reachable(callee, mod, facts);
             }
         }
     }
@@ -144,8 +255,8 @@ void Analyzer::mark_reachable(const Symbol* func_sym,
         return;
     }
 
-    int saved_instance = current_instance_id;
-    current_instance_id = func_sym->instance_id;
+    auto callee_scope = scoped_instance(func_sym->instance_id);
+    (void)callee_scope;
 
     std::unordered_set<const Symbol*> calls;
     collect_calls(func_sym->declaration->body, calls);
@@ -153,60 +264,23 @@ void Analyzer::mark_reachable(const Symbol* func_sym,
         mark_reachable(called_sym, mod, facts);
     }
 
-    current_instance_id = saved_instance;
-}
-
-void Analyzer::collect_calls_stmt(StmtPtr stmt, std::unordered_set<const Symbol*>& calls) {
-    if (!stmt) return;
-    if (stmt->kind == Stmt::Kind::ConditionalStmt) {
-        if (auto cond = constexpr_condition(stmt->condition)) {
-            if (cond.value()) {
-                collect_calls_stmt(stmt->true_stmt, calls);
-            }
-        } else {
-            collect_calls(stmt->condition, calls);
-            collect_calls_stmt(stmt->true_stmt, calls);
-        }
-        return;
-    }
-
-    for_each_stmt_child(
-        stmt,
-        [&](const ExprPtr& child) { collect_calls(child, calls); },
-        [&](const StmtPtr& child) { collect_calls_stmt(child, calls); });
 }
 
 void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls) {
-    if (!expr) return;
-
-    if (expr->kind == Expr::Kind::Call &&
-        expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-        Symbol* sym = binding_for(expr->operand);
-        if (sym && sym->kind == Symbol::Kind::Function) {
-            calls.insert(sym);
-        }
-    }
-
-    if (expr->kind == Expr::Kind::Conditional) {
-        auto cond = constexpr_condition(expr->condition);
-        if (cond.has_value()) {
-            if (cond.value()) {
-                collect_calls(expr->true_expr, calls);
-            } else if (expr->false_expr) {
-                collect_calls(expr->false_expr, calls);
-            }
-        } else {
-            collect_calls(expr->condition, calls);
-            collect_calls(expr->true_expr, calls);
-            if (expr->false_expr) collect_calls(expr->false_expr, calls);
-        }
-        return;
-    }
-
-    for_each_expr_child(
+    walk_pruned_expr(
         expr,
-        [&](const ExprPtr& child) { collect_calls(child, calls); },
-        [&](const StmtPtr& child) { collect_calls_stmt(child, calls); });
+        [&](ExprPtr node) {
+            if (!node) return;
+            if (node->kind != Expr::Kind::Call || !node->operand ||
+                node->operand->kind != Expr::Kind::Identifier) {
+                return;
+            }
+            Symbol* sym = binding_for(node->operand);
+            if (sym && sym->kind == Symbol::Kind::Function) {
+                calls.insert(sym);
+            }
+        },
+        [&](StmtPtr) {});
 }
 
 } // namespace vexel

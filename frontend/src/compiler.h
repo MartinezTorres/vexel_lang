@@ -30,7 +30,7 @@ public:
         std::unordered_map<std::string, std::string> backend_options; // Backend-specific key=value options
 
         Options() : verbose(false), project_root("."), emit_lowered(false), emit_analysis(false),
-                    allow_process(false), backend("c") {}
+                    allow_process(false), backend("") {}
     };
 
     struct OutputPaths {
@@ -45,10 +45,6 @@ private:
     Options options;
 
     OutputPaths resolve_output_paths(const std::string& output_file);
-
-    std::string build_param_list(CodeGenerator& codegen, StmtPtr func, bool with_types);
-    std::string build_arg_list(CodeGenerator& codegen, StmtPtr func);
-    std::string build_return_type(CodeGenerator& codegen, StmtPtr func);
 };
 
 }

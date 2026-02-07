@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Compile-time-dead call branches do not keep callees reachable. | Dead branch calls are pruned from reachability/codegen
+
+&dead_leaf() -> #i32 {
+    99
+}
+
+&dead_branch() -> #i32 {
+    dead_leaf()
+}
+
+ALWAYS_TRUE:#b = 1;
+
+&^main() -> #i32 {
+    ALWAYS_TRUE ? 7 : dead_branch()
+}

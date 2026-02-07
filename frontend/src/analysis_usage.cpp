@@ -1,6 +1,5 @@
 #include "analysis.h"
 
-#include "expr_access.h"
 #include "typechecker.h"
 
 #include <algorithm>
@@ -13,7 +12,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.used_global_vars.clear();
     facts.used_type_names.clear();
 
-    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    Program* program = context().program;
     if (!program) return;
 
     std::unordered_map<std::string, StmtPtr> type_decls;
@@ -58,90 +57,9 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     };
 
-    std::function<void(ExprPtr)> visit_expr_globals;
-    std::function<void(StmtPtr)> visit_stmt_globals;
-    visit_expr_globals = [&](ExprPtr expr) {
-        if (!expr) return;
-        if (expr->kind == Expr::Kind::Identifier) {
-            Symbol* sym = binding_for(expr);
-            if (sym && !sym->is_local && (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
-                note_global(sym);
-            }
-        }
-        switch (expr->kind) {
-            case Expr::Kind::Binary:
-                visit_expr_globals(expr->left);
-                visit_expr_globals(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr_globals(expr->operand);
-                break;
-            case Expr::Kind::Call:
-                for (const auto& rec : expr->receivers) visit_expr_globals(rec);
-                for (const auto& arg : expr->args) visit_expr_globals(arg);
-                visit_expr_globals(expr->operand);
-                break;
-            case Expr::Kind::Index:
-                visit_expr_globals(expr->operand);
-                if (!expr->args.empty()) visit_expr_globals(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr_globals(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr_globals(elem);
-                break;
-            case Expr::Kind::Block:
-                for (const auto& stmt : expr->statements) {
-                    visit_stmt_globals(stmt);
-                }
-                visit_expr_globals(expr->result_expr);
-                break;
-            case Expr::Kind::Conditional:
-                visit_expr_globals(expr->condition);
-                visit_expr_globals(expr->true_expr);
-                visit_expr_globals(expr->false_expr);
-                break;
-            case Expr::Kind::Range:
-                visit_expr_globals(expr->left);
-                visit_expr_globals(expr->right);
-                break;
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr_globals(loop_subject(expr));
-                visit_expr_globals(loop_body(expr));
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt_globals = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::Expr:
-                visit_expr_globals(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr_globals(stmt->return_expr);
-                break;
-            case Stmt::Kind::VarDecl:
-                visit_expr_globals(stmt->var_init);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                visit_expr_globals(stmt->condition);
-                visit_stmt_globals(stmt->true_stmt);
-                break;
-            default:
-                break;
-        }
-    };
-
     for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
+        auto instance_scope = scoped_instance(instance.id);
+        (void)instance_scope;
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || sym->is_local) continue;
@@ -160,8 +78,19 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
 
     for (const auto& func_sym : facts.reachable_functions) {
         if (!func_sym || !func_sym->declaration || !func_sym->declaration->body) continue;
-        current_instance_id = func_sym->instance_id;
-        visit_expr_globals(func_sym->declaration->body);
+        auto func_scope = scoped_instance(func_sym->instance_id);
+        (void)func_scope;
+        walk_pruned_expr(
+            func_sym->declaration->body,
+            [&](ExprPtr expr) {
+                if (!expr || expr->kind != Expr::Kind::Identifier) return;
+                Symbol* sym = binding_for(expr);
+                if (sym && !sym->is_local &&
+                    (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
+                    note_global(sym);
+                }
+            },
+            [&](StmtPtr) {});
         for (const auto& param : func_sym->declaration->params) {
             mark_type(param.type);
         }
@@ -180,9 +109,20 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         const Symbol* sym = global_worklist.front();
         global_worklist.pop_front();
         if (!sym || !sym->declaration) continue;
-        current_instance_id = sym->instance_id;
+        auto global_scope = scoped_instance(sym->instance_id);
+        (void)global_scope;
         mark_type(sym->declaration->var_type);
-        visit_expr_globals(sym->declaration->var_init);
+        walk_pruned_expr(
+            sym->declaration->var_init,
+            [&](ExprPtr expr) {
+                if (!expr || expr->kind != Expr::Kind::Identifier) return;
+                Symbol* used = binding_for(expr);
+                if (used && !used->is_local &&
+                    (used->kind == Symbol::Kind::Variable || used->kind == Symbol::Kind::Constant)) {
+                    note_global(used);
+                }
+            },
+            [&](StmtPtr) {});
     }
 
     while (!type_worklist.empty()) {

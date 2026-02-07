@@ -1,7 +1,5 @@
 #include "analysis.h"
-
-#include "evaluator.h"
-#include "typechecker.h"
+#include "program.h"
 
 #include <algorithm>
 #include <deque>
@@ -9,19 +7,19 @@
 namespace vexel {
 
 void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
-    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    const AnalysisRunSummary& summary = run_summary();
+    Program* program = summary.program;
     if (!program) return;
 
     auto has_ann = [](const std::vector<Annotation>& anns, const std::string& name) {
         return std::any_of(anns.begin(), anns.end(), [&](const Annotation& a) { return a.name == name; });
     };
 
-    std::unordered_map<const Symbol*, StmtPtr> function_map;
+    std::unordered_map<const Symbol*, StmtPtr> function_map = summary.reachable_function_decls;
     std::unordered_set<const Symbol*> external_reentrant;
     std::unordered_set<const Symbol*> external_nonreentrant;
 
     for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || sym->kind != Symbol::Kind::Function) continue;
@@ -39,15 +37,12 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
                 }
                 continue;
             }
-            if (!facts.reachable_functions.count(sym)) continue;
-            function_map[sym] = sym->declaration;
         }
     }
 
     std::deque<std::pair<const Symbol*, char>> work;
 
     for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || sym->kind != Symbol::Kind::Function) continue;
@@ -68,29 +63,13 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     }
 
-    for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
-        for (const auto& pair : instance.symbols) {
-            const Symbol* sym = pair.second;
-            if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
-            if (!sym->declaration || !sym->declaration->var_init) continue;
-
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-            if (evaluated_at_compile_time) continue;
-            std::unordered_set<const Symbol*> calls;
-            collect_calls(sym->declaration->var_init, calls);
-            for (const auto& callee_sym : calls) {
-                if (!callee_sym) continue;
-                if (facts.reentrancy_variants[callee_sym].insert('N').second) {
-                    work.emplace_back(callee_sym, 'N');
-                }
+    for (const Symbol* sym : summary.runtime_initialized_globals) {
+        auto calls_it = summary.global_initializer_calls.find(sym);
+        if (calls_it == summary.global_initializer_calls.end()) continue;
+        for (const auto& callee_sym : calls_it->second) {
+            if (!callee_sym) continue;
+            if (facts.reentrancy_variants[callee_sym].insert('N').second) {
+                work.emplace_back(callee_sym, 'N');
             }
         }
     }
@@ -110,12 +89,9 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         if (!func || !func->body) continue;
         if (is_foldable(func_sym)) continue;
 
-        int saved_instance = current_instance_id;
-        current_instance_id = func_sym->instance_id;
-
-        std::unordered_set<const Symbol*> calls;
-        collect_calls(func->body, calls);
-        for (const auto& callee_sym : calls) {
+        auto calls_it = summary.reachable_calls.find(func_sym);
+        if (calls_it == summary.reachable_calls.end()) continue;
+        for (const auto& callee_sym : calls_it->second) {
             if (!callee_sym) continue;
             if (ctx == 'R' && external_nonreentrant.count(callee_sym)) {
                 throw CompileError("Reentrant path calls non-reentrant external function '" + callee_sym->name + "'",
@@ -125,8 +101,6 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
                 work.emplace_back(callee_sym, ctx);
             }
         }
-
-        current_instance_id = saved_instance;
     }
 
     for (const auto& entry : function_map) {

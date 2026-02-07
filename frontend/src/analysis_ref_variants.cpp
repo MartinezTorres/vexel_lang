@@ -1,17 +1,13 @@
 #include "analysis.h"
-
-#include "evaluator.h"
-#include "expr_access.h"
-#include "typechecker.h"
-
-#include <functional>
+#include "program.h"
 
 namespace vexel {
 
 void Analyzer::analyze_ref_variants(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.ref_variants.clear();
 
-    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    const AnalysisRunSummary& summary = run_summary();
+    Program* program = summary.program;
     if (!program) return;
 
     std::unordered_map<const Symbol*, StmtPtr> function_map;
@@ -49,127 +45,29 @@ void Analyzer::analyze_ref_variants(const Module& /*mod*/, AnalysisFacts& facts)
         facts.ref_variants[callee].insert(key);
     };
 
-    std::function<void(ExprPtr)> visit_expr;
-    std::function<void(StmtPtr)> visit_stmt;
-
-    visit_expr = [&](ExprPtr expr) {
-        if (!expr) return;
-        switch (expr->kind) {
-            case Expr::Kind::Call:
-                record_call(expr);
-                for (const auto& rec : expr->receivers) visit_expr(rec);
-                for (const auto& arg : expr->args) visit_expr(arg);
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Binary:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Unary:
-            case Expr::Kind::Cast:
-            case Expr::Kind::Length:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::Index:
-                visit_expr(expr->operand);
-                if (!expr->args.empty()) visit_expr(expr->args[0]);
-                break;
-            case Expr::Kind::Member:
-                visit_expr(expr->operand);
-                break;
-            case Expr::Kind::ArrayLiteral:
-            case Expr::Kind::TupleLiteral:
-                for (const auto& elem : expr->elements) visit_expr(elem);
-                break;
-            case Expr::Kind::Block:
-                for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                visit_expr(expr->result_expr);
-                break;
-            case Expr::Kind::Conditional:
-                if (auto cond = constexpr_condition(expr->condition)) {
-                    if (cond.value()) {
-                        visit_expr(expr->true_expr);
-                    } else if (expr->false_expr) {
-                        visit_expr(expr->false_expr);
-                    }
-                } else {
-                    visit_expr(expr->condition);
-                    visit_expr(expr->true_expr);
-                    visit_expr(expr->false_expr);
-                }
-                break;
-            case Expr::Kind::Range:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            case Expr::Kind::Iteration:
-            case Expr::Kind::Repeat:
-                visit_expr(loop_subject(expr));
-                visit_expr(loop_body(expr));
-                break;
-            case Expr::Kind::Assignment:
-                visit_expr(expr->left);
-                visit_expr(expr->right);
-                break;
-            default:
-                break;
-        }
-    };
-
-    visit_stmt = [&](StmtPtr stmt) {
-        if (!stmt) return;
-        switch (stmt->kind) {
-            case Stmt::Kind::Expr:
-                visit_expr(stmt->expr);
-                break;
-            case Stmt::Kind::Return:
-                visit_expr(stmt->return_expr);
-                break;
-            case Stmt::Kind::VarDecl:
-                visit_expr(stmt->var_init);
-                break;
-            case Stmt::Kind::ConditionalStmt:
-                if (auto cond = constexpr_condition(stmt->condition)) {
-                    if (cond.value()) {
-                        visit_stmt(stmt->true_stmt);
-                    }
-                } else {
-                    visit_expr(stmt->condition);
-                    visit_stmt(stmt->true_stmt);
-                }
-                break;
-            default:
-                break;
-        }
-    };
-
-    for (const auto& func_sym : facts.reachable_functions) {
-        if (!func_sym || !func_sym->declaration) continue;
+    for (const auto& entry : summary.reachable_function_decls) {
+        const Symbol* func_sym = entry.first;
+        const StmtPtr& func_decl = entry.second;
+        if (!func_sym || !func_decl) continue;
         if (is_foldable(func_sym)) continue;
-        current_instance_id = func_sym->instance_id;
-        if (func_sym->declaration->body) {
-            visit_expr(func_sym->declaration->body);
+        auto func_scope = scoped_instance(func_sym->instance_id);
+        (void)func_scope;
+        if (func_decl->body) {
+            walk_pruned_expr(
+                func_decl->body,
+                [&](ExprPtr expr) { record_call(expr); },
+                [&](StmtPtr) {});
         }
     }
 
-    for (const auto& instance : program->instances) {
-        current_instance_id = instance.id;
-        for (const auto& pair : instance.symbols) {
-            const Symbol* sym = pair.second;
-            if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
-            if (!sym->declaration || !sym->declaration->var_init) continue;
-            bool evaluated_at_compile_time = false;
-            if (type_checker) {
-                CompileTimeEvaluator evaluator(type_checker);
-                CTValue result;
-                if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
-                    evaluated_at_compile_time = true;
-                }
-            }
-            if (!evaluated_at_compile_time) {
-                visit_expr(sym->declaration->var_init);
-            }
-        }
+    for (const Symbol* sym : summary.runtime_initialized_globals) {
+        if (!sym || !sym->declaration || !sym->declaration->var_init) continue;
+        auto global_scope = scoped_instance(sym->instance_id);
+        (void)global_scope;
+        walk_pruned_expr(
+            sym->declaration->var_init,
+            [&](ExprPtr expr) { record_call(expr); },
+            [&](StmtPtr) {});
     }
 }
 

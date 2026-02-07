@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "symbols.h"
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
@@ -8,6 +9,7 @@
 
 namespace vexel {
 
+struct Program;
 class TypeChecker;
 struct OptimizationFacts;
 
@@ -25,6 +27,15 @@ struct AnalysisFacts {
     std::unordered_map<const Symbol*, std::unordered_set<char>> reentrancy_variants;
 };
 
+// Shared data computed once per analysis run and reused across passes.
+struct AnalysisRunSummary {
+    Program* program = nullptr;
+    std::unordered_map<const Symbol*, StmtPtr> reachable_function_decls;
+    std::unordered_map<const Symbol*, std::unordered_set<const Symbol*>> reachable_calls;
+    std::unordered_set<const Symbol*> runtime_initialized_globals;
+    std::unordered_map<const Symbol*, std::unordered_set<const Symbol*>> global_initializer_calls;
+};
+
 class Analyzer {
 public:
     explicit Analyzer(TypeChecker* tc, const OptimizationFacts* opt = nullptr)
@@ -32,12 +43,53 @@ public:
     AnalysisFacts run(const Module& mod);
 
 private:
+    struct AnalysisContext {
+        Program* program = nullptr;
+    };
+
+    using ExprVisitor = std::function<void(ExprPtr)>;
+    using StmtVisitor = std::function<void(StmtPtr)>;
+
+    class InstanceScope {
+    public:
+        InstanceScope(Analyzer& analyzer, int instance_id)
+            : analyzer_(&analyzer), saved_instance_(analyzer.current_instance_id) {
+            analyzer_->current_instance_id = instance_id;
+        }
+
+        ~InstanceScope() {
+            if (analyzer_) {
+                analyzer_->current_instance_id = saved_instance_;
+            }
+        }
+
+        InstanceScope(const InstanceScope&) = delete;
+        InstanceScope& operator=(const InstanceScope&) = delete;
+
+        InstanceScope(InstanceScope&& other) noexcept
+            : analyzer_(other.analyzer_), saved_instance_(other.saved_instance_) {
+            other.analyzer_ = nullptr;
+        }
+
+    private:
+        Analyzer* analyzer_;
+        int saved_instance_;
+    };
+
     TypeChecker* type_checker;
     const OptimizationFacts* optimization;
     int current_instance_id = -1;
+    AnalysisRunSummary run_summary_;
 
+    AnalysisContext context() const;
+    const AnalysisRunSummary& run_summary() const { return run_summary_; }
+    InstanceScope scoped_instance(int instance_id);
     bool is_foldable(const Symbol* func_sym) const;
+    bool global_initializer_runs_at_runtime(const Symbol* sym) const;
+    void build_run_summary(const AnalysisFacts& facts);
     std::optional<bool> constexpr_condition(ExprPtr expr) const;
+    void walk_pruned_expr(ExprPtr expr, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
+    void walk_pruned_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
     void analyze_reachability(const Module& mod, AnalysisFacts& facts);
     void analyze_reentrancy(const Module& mod, AnalysisFacts& facts);
     void analyze_mutability(const Module& mod, AnalysisFacts& facts);
@@ -48,7 +100,6 @@ private:
     void mark_reachable(const Symbol* func_sym,
                         const Module& mod, AnalysisFacts& facts);
     void collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls);
-    void collect_calls_stmt(StmtPtr stmt, std::unordered_set<const Symbol*>& calls);
 
     Symbol* binding_for(ExprPtr expr) const;
     std::optional<const Symbol*> base_identifier_symbol(ExprPtr expr) const;

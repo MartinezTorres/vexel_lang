@@ -13,7 +13,6 @@
 #include <iostream>
 #include <filesystem>
 #include <algorithm>
-#include <sstream>
 
 namespace vexel {
 
@@ -81,73 +80,6 @@ Compiler::OutputPaths Compiler::compile() {
     }
 
     return paths;
-}
-
-std::string Compiler::build_return_type(CodeGenerator& codegen, StmtPtr func) {
-    if (!func) return "void";
-    if (!func->return_types.empty()) {
-        std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + std::to_string(func->return_types.size());
-        for (const auto& t : func->return_types) {
-            tuple_name += "_";
-            if (t) {
-                tuple_name += t->to_string();
-            } else {
-                tuple_name += "unknown";
-            }
-        }
-        return codegen.mangle(tuple_name);
-    }
-    if (func->return_type) {
-        return codegen.type_to_c(func->return_type);
-    }
-    return "void";
-}
-
-std::string Compiler::build_param_list(CodeGenerator& codegen, StmtPtr func, bool with_types) {
-    if (!func) return "";
-    std::ostringstream oss;
-    bool first = true;
-
-    for (size_t i = 0; i < func->ref_params.size(); ++i) {
-        if (!first) oss << ", ";
-        first = false;
-        std::string name = codegen.mangle(func->ref_params[i]);
-        if (with_types) {
-            std::string ref_type = "void*";
-            if (!func->type_namespace.empty() && i == 0) {
-                ref_type = codegen.mangle(func->type_namespace) + "*";
-            }
-            oss << ref_type << " " << name;
-        } else {
-            oss << name;
-        }
-    }
-
-    for (const auto& param : func->params) {
-        if (param.is_expression_param) continue;
-        if (!first) oss << ", ";
-        first = false;
-        std::string name = codegen.mangle(param.name);
-        if (with_types) {
-            if (!param.type) {
-                throw CompileError("Missing type for parameter '" + param.name +
-                                   "' when generating C signature", param.location);
-            }
-            std::string type = codegen.type_to_c(param.type);
-            oss << type << " " << name;
-        } else {
-            oss << name;
-        }
-    }
-
-    if (first && with_types) {
-        oss << "void";
-    }
-    return oss.str();
-}
-
-std::string Compiler::build_arg_list(CodeGenerator& codegen, StmtPtr func) {
-    return build_param_list(codegen, func, false);
 }
 
 }

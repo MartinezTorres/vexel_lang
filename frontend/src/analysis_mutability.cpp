@@ -1,11 +1,9 @@
 #include "analysis.h"
 
 #include "evaluator.h"
-#include "expr_access.h"
 #include "typechecker.h"
 
 #include <algorithm>
-#include <functional>
 
 namespace vexel {
 
@@ -13,7 +11,7 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
     facts.var_mutability.clear();
     facts.receiver_mutates.clear();
 
-    Program* program = type_checker ? type_checker->get_program() : nullptr;
+    Program* program = context().program;
     if (!program) return;
 
     std::unordered_map<const Symbol*, StmtPtr> function_map;
@@ -46,7 +44,8 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
             const StmtPtr& func = entry.second;
             if (!func || func->is_external || !func->body || func->ref_params.empty()) continue;
 
-            current_instance_id = func_sym->instance_id;
+            auto func_scope = scoped_instance(func_sym->instance_id);
+            (void)func_scope;
 
             std::vector<bool> updated = facts.receiver_mutates[func_sym];
             std::unordered_map<std::string, size_t> receiver_index;
@@ -55,13 +54,11 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
                 receiver_index[func->ref_params[i]] = i;
             }
 
-            std::function<void(ExprPtr)> visit_expr;
-            std::function<void(StmtPtr)> visit_stmt;
-
-            visit_expr = [&](ExprPtr expr) {
-                if (!expr) return;
-                switch (expr->kind) {
-                    case Expr::Kind::Assignment: {
+            walk_pruned_expr(
+                func->body,
+                [&](ExprPtr expr) {
+                    if (!expr) return;
+                    if (expr->kind == Expr::Kind::Assignment) {
                         auto base = base_identifier_symbol(expr->left);
                         if (base) {
                             auto it = receiver_index.find((*base)->name);
@@ -69,15 +66,15 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
                                 updated[it->second] = true;
                             }
                         }
-                        visit_expr(expr->right);
-                        break;
+                        return;
                     }
-                    case Expr::Kind::Call: {
+                    if (expr->kind == Expr::Kind::Call) {
                         Symbol* callee_sym = nullptr;
                         if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
                             callee_sym = binding_for(expr->operand);
                         }
-                        auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym) : facts.receiver_mutates.end();
+                        auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym)
+                                                    : facts.receiver_mutates.end();
                         for (size_t i = 0; i < expr->receivers.size(); i++) {
                             ExprPtr rec_expr = expr->receivers[i];
                             auto base = base_identifier_symbol(rec_expr);
@@ -92,94 +89,9 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
                                 updated[rec_it->second] = true;
                             }
                         }
-                        for (const auto& rec : expr->receivers) {
-                            visit_expr(rec);
-                        }
-                        for (const auto& arg : expr->args) {
-                            visit_expr(arg);
-                        }
-                        visit_expr(expr->operand);
-                        break;
                     }
-                    case Expr::Kind::Binary:
-                        visit_expr(expr->left);
-                        visit_expr(expr->right);
-                        break;
-                    case Expr::Kind::Unary:
-                    case Expr::Kind::Cast:
-                    case Expr::Kind::Length:
-                        visit_expr(expr->operand);
-                        break;
-                    case Expr::Kind::Index:
-                        visit_expr(expr->operand);
-                        if (!expr->args.empty()) visit_expr(expr->args[0]);
-                        break;
-                    case Expr::Kind::Member:
-                        visit_expr(expr->operand);
-                        break;
-                    case Expr::Kind::ArrayLiteral:
-                    case Expr::Kind::TupleLiteral:
-                        for (const auto& elem : expr->elements) visit_expr(elem);
-                        break;
-                    case Expr::Kind::Block:
-                        for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                        visit_expr(expr->result_expr);
-                        break;
-                    case Expr::Kind::Conditional:
-                        if (auto cond = constexpr_condition(expr->condition)) {
-                            if (cond.value()) {
-                                visit_expr(expr->true_expr);
-                            } else {
-                                visit_expr(expr->false_expr);
-                            }
-                        } else {
-                            visit_expr(expr->condition);
-                            visit_expr(expr->true_expr);
-                            visit_expr(expr->false_expr);
-                        }
-                        break;
-                    case Expr::Kind::Range:
-                        visit_expr(expr->left);
-                        visit_expr(expr->right);
-                        break;
-                    case Expr::Kind::Iteration:
-                    case Expr::Kind::Repeat:
-                        visit_expr(loop_subject(expr));
-                        visit_expr(loop_body(expr));
-                        break;
-                    default:
-                        break;
-                }
-            };
-
-            visit_stmt = [&](StmtPtr stmt) {
-                if (!stmt) return;
-                switch (stmt->kind) {
-                    case Stmt::Kind::Expr:
-                        visit_expr(stmt->expr);
-                        break;
-                    case Stmt::Kind::Return:
-                        visit_expr(stmt->return_expr);
-                        break;
-                    case Stmt::Kind::VarDecl:
-                        visit_expr(stmt->var_init);
-                        break;
-                    case Stmt::Kind::ConditionalStmt:
-                        if (auto cond = constexpr_condition(stmt->condition)) {
-                            if (cond.value()) {
-                                visit_stmt(stmt->true_stmt);
-                            }
-                        } else {
-                            visit_expr(stmt->condition);
-                            visit_stmt(stmt->true_stmt);
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            };
-
-            visit_expr(func->body);
+                },
+                [&](StmtPtr) {});
 
             if (updated != facts.receiver_mutates[func_sym]) {
                 facts.receiver_mutates[func_sym] = updated;
@@ -194,29 +106,28 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
         if (!func || !func->body) continue;
         if (!facts.reachable_functions.count(func_sym)) continue;
 
-        current_instance_id = func_sym->instance_id;
+        auto func_scope = scoped_instance(func_sym->instance_id);
+        (void)func_scope;
 
-        std::function<void(ExprPtr)> visit_expr;
-        std::function<void(StmtPtr)> visit_stmt;
-
-        visit_expr = [&](ExprPtr expr) {
-            if (!expr) return;
-            switch (expr->kind) {
-                case Expr::Kind::Assignment: {
+        walk_pruned_expr(
+            func->body,
+            [&](ExprPtr expr) {
+                if (!expr) return;
+                if (expr->kind == Expr::Kind::Assignment) {
                     auto base = base_identifier_symbol(expr->left);
                     if (base && !(*base)->is_local &&
                         ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
                         global_written[*base] = true;
                     }
-                    visit_expr(expr->right);
-                    break;
+                    return;
                 }
-                case Expr::Kind::Call: {
+                if (expr->kind == Expr::Kind::Call) {
                     Symbol* callee_sym = nullptr;
                     if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
                         callee_sym = binding_for(expr->operand);
                     }
-                    auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym) : facts.receiver_mutates.end();
+                    auto callee_it = callee_sym ? facts.receiver_mutates.find(callee_sym)
+                                                : facts.receiver_mutates.end();
                     for (size_t i = 0; i < expr->receivers.size(); i++) {
                         bool mut = true;
                         if (callee_it != facts.receiver_mutates.end() && i < callee_it->second.size()) {
@@ -234,90 +145,9 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
                             global_written[*base] = true;
                         }
                     }
-                    for (const auto& rec : expr->receivers) visit_expr(rec);
-                    for (const auto& arg : expr->args) visit_expr(arg);
-                    visit_expr(expr->operand);
-                    break;
                 }
-                case Expr::Kind::Binary:
-                    visit_expr(expr->left);
-                    visit_expr(expr->right);
-                    break;
-                case Expr::Kind::Unary:
-                case Expr::Kind::Cast:
-                case Expr::Kind::Length:
-                    visit_expr(expr->operand);
-                    break;
-                case Expr::Kind::Index:
-                    visit_expr(expr->operand);
-                    if (!expr->args.empty()) visit_expr(expr->args[0]);
-                    break;
-                case Expr::Kind::Member:
-                    visit_expr(expr->operand);
-                    break;
-                case Expr::Kind::ArrayLiteral:
-                case Expr::Kind::TupleLiteral:
-                    for (const auto& elem : expr->elements) visit_expr(elem);
-                    break;
-                case Expr::Kind::Block:
-                    for (const auto& stmt : expr->statements) visit_stmt(stmt);
-                    visit_expr(expr->result_expr);
-                    break;
-                case Expr::Kind::Conditional:
-                    if (auto cond = constexpr_condition(expr->condition)) {
-                        if (cond.value()) {
-                            visit_expr(expr->true_expr);
-                        } else {
-                            visit_expr(expr->false_expr);
-                        }
-                    } else {
-                        visit_expr(expr->condition);
-                        visit_expr(expr->true_expr);
-                        visit_expr(expr->false_expr);
-                    }
-                    break;
-                case Expr::Kind::Range:
-                    visit_expr(expr->left);
-                    visit_expr(expr->right);
-                    break;
-                case Expr::Kind::Iteration:
-                case Expr::Kind::Repeat:
-                    visit_expr(loop_subject(expr));
-                    visit_expr(loop_body(expr));
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        visit_stmt = [&](StmtPtr stmt) {
-            if (!stmt) return;
-            switch (stmt->kind) {
-                case Stmt::Kind::Expr:
-                    visit_expr(stmt->expr);
-                    break;
-                case Stmt::Kind::Return:
-                    visit_expr(stmt->return_expr);
-                    break;
-                case Stmt::Kind::VarDecl:
-                    visit_expr(stmt->var_init);
-                    break;
-                case Stmt::Kind::ConditionalStmt:
-                    if (auto cond = constexpr_condition(stmt->condition)) {
-                        if (cond.value()) {
-                            visit_stmt(stmt->true_stmt);
-                        }
-                    } else {
-                        visit_expr(stmt->condition);
-                        visit_stmt(stmt->true_stmt);
-                    }
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        visit_expr(func->body);
+            },
+            [&](StmtPtr) {});
     }
 
     for (const auto& entry : global_written) {
