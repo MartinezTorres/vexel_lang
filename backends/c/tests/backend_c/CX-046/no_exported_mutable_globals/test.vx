@@ -1,5 +1,5 @@
 // @rfc: backends/c/README.md#code-generation-contract
-// @desc: Exported mutable globals are not allowed by the language. | Exported mutable globals are not allowed by language
+// @desc: Mutable globals are supported only as internal static storage. | Mutable globals remain internal
 // @expect-exit: 0
 // @command: {VEXEL_C} -b c test.vx
 

@@ -57,25 +57,6 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     };
 
-    for (const auto& instance : program->instances) {
-        auto instance_scope = scoped_instance(instance.id);
-        (void)instance_scope;
-        for (const auto& pair : instance.symbols) {
-            const Symbol* sym = pair.second;
-            if (!sym || sym->is_local) continue;
-            if (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant) {
-                bool exported = false;
-                if (sym->declaration) {
-                    exported = std::any_of(sym->declaration->annotations.begin(), sym->declaration->annotations.end(),
-                                           [](const Annotation& a) { return a.name == "export"; });
-                }
-                if (exported) {
-                    note_global(sym);
-                }
-            }
-        }
-    }
-
     for (const auto& func_sym : facts.reachable_functions) {
         if (!func_sym || !func_sym->declaration || !func_sym->declaration->body) continue;
         auto func_scope = scoped_instance(func_sym->instance_id);

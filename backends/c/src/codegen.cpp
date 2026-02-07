@@ -69,6 +69,33 @@ static std::string render_annotation_comment(const std::vector<Annotation>& anns
     return os.str();
 }
 
+static std::string render_function_traits_comment(bool is_external,
+                                                  bool is_exported,
+                                                  char reent_key,
+                                                  const std::string& ref_key,
+                                                  bool is_pure,
+                                                  bool no_global_write,
+                                                  bool has_inline,
+                                                  bool has_noinline,
+                                                  bool frame_abi) {
+    std::ostringstream os;
+    os << "// VEXEL: kind=" << (is_external ? "extern" : "function");
+    os << " export=" << (is_exported ? "yes" : "no");
+    os << " reentrant=" << ((reent_key == 'R') ? "yes" : "no");
+    os << " ref_mask=" << (ref_key.empty() ? "-" : ref_key);
+    if (has_noinline) {
+        os << " inline=noinline";
+    } else if (has_inline) {
+        os << " inline=inline";
+    } else {
+        os << " inline=default";
+    }
+    os << " pure=" << (is_pure ? "yes" : "no");
+    os << " no_global_write=" << (no_global_write ? "yes" : "no");
+    os << " abi=" << (frame_abi ? "nonreentrant_frame" : "native");
+    return os.str();
+}
+
 CodeGenerator::CodeGenerator() : temp_counter(0), in_function(false) {
     output_stack.push(&body);
 }
@@ -136,30 +163,6 @@ CCodegenResult CodeGenerator::generate(const Module& mod, const AnalyzedProgram&
     emit_header("#endif");
     emit_header("#ifndef VX_CONSTEXPR");
     emit_header("#define VX_CONSTEXPR const");
-    emit_header("#endif");
-    emit_header("#ifndef VX_REENTRANT");
-    emit_header("#define VX_REENTRANT");
-    emit_header("#endif");
-    emit_header("#ifndef VX_NON_REENTRANT");
-    emit_header("#define VX_NON_REENTRANT");
-    emit_header("#endif");
-    emit_header("#ifndef VX_REF_MASK");
-    emit_header("#define VX_REF_MASK(x)");
-    emit_header("#endif");
-    emit_header("#ifndef VX_ENTRYPOINT");
-    emit_header("#define VX_ENTRYPOINT");
-    emit_header("#endif");
-    emit_header("#ifndef VX_INLINE");
-    emit_header("#define VX_INLINE");
-    emit_header("#endif");
-    emit_header("#ifndef VX_NOINLINE");
-    emit_header("#define VX_NOINLINE");
-    emit_header("#endif");
-    emit_header("#ifndef VX_PURE");
-    emit_header("#define VX_PURE");
-    emit_header("#endif");
-    emit_header("#ifndef VX_NO_GLOBAL_WRITE");
-    emit_header("#define VX_NO_GLOBAL_WRITE");
     emit_header("#endif");
     emit_header("");
 
@@ -432,10 +435,8 @@ void CodeGenerator::validate_codegen_invariants_impl(const std::vector<StmtPtr>&
                 }
                 bool skip = false;
                 if (is_top_level && use_facts) {
-                    bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                                                   [](const Annotation& a) { return a.name == "export"; });
                     Symbol* sym = binding_for(stmt);
-                    if (sym && !facts.used_global_vars.count(sym) && !is_exported) {
+                    if (sym && !facts.used_global_vars.count(sym)) {
                         skip = true;
                     }
                 }
@@ -503,26 +504,25 @@ void CodeGenerator::gen_module(const Module& mod) {
                     throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
                                        stmt->func_name + "'", stmt->location);
                 }
-                std::string reent_prefix = is_reentrant ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
+                char reent_key = is_reentrant ? 'R' : 'N';
                 bool has_inline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
                                               [](const Annotation& a) { return a.name == "inline"; });
                 bool has_noinline = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
                                                 [](const Annotation& a) { return a.name == "noinline"; });
-                std::string label_prefix;
-                if (!stmt->ref_params.empty()) {
-                    std::string ref_key(stmt->ref_params.size(), 'M');
-                    label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
-                }
-                if (stmt->is_exported) {
-                    label_prefix += "VX_ENTRYPOINT ";
-                }
-                if (has_noinline) {
-                    label_prefix += "VX_NOINLINE ";
-                } else if (has_inline) {
-                    label_prefix += "VX_INLINE ";
-                }
+                std::string ref_key(stmt->ref_params.size(), 'M');
+                std::string ann_comment = render_annotation_comment(stmt->annotations);
+                if (!ann_comment.empty()) emit_header(ann_comment);
+                emit_header(render_function_traits_comment(true,
+                                                          stmt->is_exported,
+                                                          reent_key,
+                                                          ref_key,
+                                                          false,
+                                                          false,
+                                                          has_inline,
+                                                          has_noinline,
+                                                          false));
                 std::string ret_type = stmt->return_type ? gen_type(stmt->return_type) : "void";
-                emit_header(label_prefix + reent_prefix + ret_type + " " + mangle_name(func_name) + "(");
+                emit_header(ret_type + " " + mangle_name(func_name) + "(");
                 for (size_t i = 0; i < stmt->params.size(); i++) {
                     if (i > 0) emit_header(", ");
                     std::string ptype = require_type(stmt->params[i].type,
@@ -666,36 +666,28 @@ void CodeGenerator::gen_module(const Module& mod) {
             auto ref_keys = ref_variant_keys_for(stmt);
             auto reent_keys = reentrancy_keys_for(sym);
             for (const auto& reent_key : reent_keys) {
-                std::string reent_prefix = (reent_key == 'R') ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
                 for (const auto& ref_key : ref_keys) {
                     std::string variant = variant_name(func_name, sym, reent_key, ref_key);
                     std::string codegen_name = mangle_name(variant) + instance_suffix(sym);
                     bool frame_abi_variant = (reent_key == 'N' && !stmt->is_exported);
-                    std::string label_prefix;
-                    if (!ref_key.empty()) {
-                        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
-                    }
-                    if (stmt->is_exported) {
-                        label_prefix += "VX_ENTRYPOINT ";
-                    }
-                    if (is_pure) {
-                        label_prefix += "VX_PURE ";
-                    }
-                    if (no_global_write) {
-                        label_prefix += "VX_NO_GLOBAL_WRITE ";
-                    }
-                    if (has_noinline) {
-                        label_prefix += "VX_NOINLINE ";
-                    } else if (has_inline) {
-                        label_prefix += "VX_INLINE ";
-                    }
+                    std::string ann_comment = render_annotation_comment(stmt->annotations);
+                    if (!ann_comment.empty()) emit_header(ann_comment);
+                    emit_header(render_function_traits_comment(false,
+                                                              stmt->is_exported,
+                                                              reent_key,
+                                                              ref_key,
+                                                              is_pure,
+                                                              no_global_write,
+                                                              has_inline,
+                                                              has_noinline,
+                                                              frame_abi_variant));
 
                     if (frame_abi_variant) {
-                        emit_header(label_prefix + reent_prefix + storage + "void " + codegen_name + "(void);");
+                        emit_header(storage + "void " + codegen_name + "(void);");
                         continue;
                     }
 
-                    emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
+                    emit_header(storage + ret_type + " " + codegen_name + "(");
 
                     bool first_param = true;
                     if (returns_aggregate) {
@@ -1034,7 +1026,6 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
 
     current_reentrancy_key = reent_key;
     current_function_non_reentrant = (reent_key == 'N');
-    std::string reent_prefix = (reent_key == 'R') ? "VX_REENTRANT " : "VX_NON_REENTRANT ";
 
     // Skip unreachable functions (dead code elimination)
     if (!facts.reachable_functions.count(sym)) {
@@ -1265,28 +1256,19 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     emit("");
     std::string ann_comment = render_annotation_comment(stmt->annotations);
     if (!ann_comment.empty()) emit(ann_comment);
-    std::string label_prefix;
-    if (!ref_key.empty()) {
-        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
-    }
-    if (stmt->is_exported) {
-        label_prefix += "VX_ENTRYPOINT ";
-    }
-    if (is_pure) {
-        label_prefix += "VX_PURE ";
-    }
-    if (no_global_write) {
-        label_prefix += "VX_NO_GLOBAL_WRITE ";
-    }
-    if (has_noinline) {
-        label_prefix += "VX_NOINLINE ";
-    } else if (has_inline) {
-        label_prefix += "VX_INLINE ";
-    }
+    emit(render_function_traits_comment(false,
+                                        stmt->is_exported,
+                                        reent_key,
+                                        ref_key,
+                                        is_pure,
+                                        no_global_write,
+                                        has_inline,
+                                        has_noinline,
+                                        current_nonreentrant_frame_abi));
     if (current_nonreentrant_frame_abi) {
-        emit(label_prefix + reent_prefix + storage + attr + "void " + codegen_name + "(void) {");
+        emit(storage + attr + "void " + codegen_name + "(void) {");
     } else {
-        emit(label_prefix + reent_prefix + storage + attr + ret_type + " " + codegen_name + "(");
+        emit(storage + attr + ret_type + " " + codegen_name + "(");
 
         bool first_param = true;
         if (current_returns_aggregate) {
@@ -1424,17 +1406,12 @@ void CodeGenerator::gen_type_decl(StmtPtr stmt) {
 
 void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     bool is_local = in_function;
-    bool is_exported = std::any_of(stmt->annotations.begin(), stmt->annotations.end(),
-                                   [](const Annotation& a) { return a.name == "export"; });
     Symbol* sym = binding_for(stmt);
-    if (!is_local && sym && !facts.used_global_vars.count(sym) && !is_exported) {
+    if (!is_local && sym && !facts.used_global_vars.count(sym)) {
         return;
     }
     // Top-level mutable globals must be internal to the translation unit
     std::string storage = (!is_local && stmt->is_mutable) ? "static " : "";
-    if (!is_local && is_exported && !stmt->is_mutable) {
-        storage = "extern ";
-    }
     std::ostringstream var_stream;
     output_stack.push(&var_stream);
     std::string ann_comment = render_annotation_comment(stmt->annotations);
@@ -1477,19 +1454,6 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
         }
     }
     std::string mutability = mutability_prefix(stmt);
-    if (!is_local && is_exported) {
-        if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
-            std::string elem_type = gen_type(stmt->var_type->element_type);
-            std::string size_str;
-            if (stmt->var_type->array_size) {
-                size_str = std::to_string(resolve_array_length(stmt->var_type, stmt->location));
-            }
-            std::string suffix = size_str.empty() ? "[]" : ("[" + size_str + "]");
-            emit_header("extern " + mutability + elem_type + " " + mangle_name(var_name) + suffix + ";");
-        } else {
-            emit_header("extern " + mutability + vtype + " " + mangle_name(var_name) + ";");
-        }
-    }
     if (stmt->var_init) {
         // Special handling for array literals and ranges
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&

@@ -44,10 +44,10 @@ Source-of-truth integration points:
 - When both reentrant and non-reentrant call paths reach a function, the backend emits two variants (`__reent` and `__nonreent`) and call sites select the appropriate variant.
 - Exported (`&^`) functions are non-`static` and declared in the header; internal functions are `static`.
 - External (`&!`) declarations emit as `extern` prototypes only.
-- Function declarations/definitions are annotated with `VX_REENTRANT`/`VX_NON_REENTRANT`, `VX_REF_MASK("<mask>")`, `VX_ENTRYPOINT` (exports), `VX_INLINE`/`VX_NOINLINE` (from annotations), and `VX_PURE`/`VX_NO_GLOBAL_WRITE` when proven; all macros default to empty in the generated header and are intended for backend visibility.
+- Function declarations/definitions are preceded by `// VEXEL: ...` line comments carrying backend-visible traits (`reentrant`, receiver ref-mask, export, inline/noinline, purity, no-global-write, ABI shape).
 
 ## Globals & Data
-- Immutable globals emit as `const` in the `.c` file; mutable globals emit as `static` unless exported (language forbids exported mutables).
+- Immutable globals emit as `const` in the `.c` file; mutable globals emit as `static`.
 - Strings and read-only data are placed in `.rodata` via `const`.
 - No per-backend runtime state beyond standard C.
 - The C output annotates variables with `VX_MUTABLE`, `VX_NON_MUTABLE`, and `VX_CONSTEXPR` for visibility. Defaults live in the generated header (`VX_MUTABLE` empty, others `const`) and can be overridden before inclusion.
