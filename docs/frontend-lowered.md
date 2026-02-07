@@ -26,4 +26,10 @@ Use `-L/--emit-lowered` to write `<output>.lowered.vx` after Stage 1; backends s
 - Tuples lowered to concrete tuple types; return types explicit.
 - Annotations preserved verbatim on all nodes.
 
-The lowered printer (`print_lowered_module`) outputs a readable Vexel subset meant for Stage-2 consumption and debugging.***
+## Normalized shape invariants
+- Iteration (`@`, `@@`) and repeat bodies are always lowered as block expressions. If source uses a non-block body, lowering rewrites it to a block containing the expression as a statement.
+- Iteration and repeat remain statement-only forms in lowered output (`type == null`), so consumers must not treat them as value-producing expressions.
+- Blocks without a trailing value keep `result_expr = null`; there is no implicit unit/zero value in lowered form.
+- Compile-time-known conditionals are collapsed to the selected branch before printing lowered output, so dead branches are absent from the lowered module.
+
+The lowered printer (`print_lowered_module`) outputs a readable Vexel subset meant for Stage-2 consumption and debugging.

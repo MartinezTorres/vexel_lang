@@ -10,20 +10,10 @@ BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))sr
 BACKEND_SOURCES := $(foreach dir,$(BACKEND_DIRS),$(filter-out $(dir)src/%_main.cpp,$(wildcard $(dir)src/*.cpp)))
 BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I$(dir)src)
 AUTO_REGISTER := $(VEXEL_ROOT_DIR)/build/playground/autoregister.cpp
+FRONTEND_SOURCES := $(sort $(filter-out $(VEXEL_ROOT_DIR)/frontend/src/frontend_main.cpp,$(wildcard $(VEXEL_ROOT_DIR)/frontend/src/*.cpp)))
 
 SOURCES := \
-  $(VEXEL_ROOT_DIR)/frontend/src/ast.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/analysis.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/analysis_report.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/backend_registry.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/codegen.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/compiler.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/evaluator.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/lexer.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/lowered_printer.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/optimizer.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/parser.cpp \
-  $(VEXEL_ROOT_DIR)/frontend/src/typechecker.cpp \
+  $(FRONTEND_SOURCES) \
   $(BACKEND_SOURCES) \
   $(AUTO_REGISTER) \
   $(VEXEL_ROOT_DIR)/playground/web_main.cpp
