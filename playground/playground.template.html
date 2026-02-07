@@ -310,6 +310,9 @@
           <option value="hello">Hello</option>
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
+          <option value="banked">Banked Calls + Globals</option>
+          <option value="reentrant">Recursive (Reentrant)</option>
+          <option value="globals">ROM + RAM Globals</option>
         </select>
         <span class="status"><span class="status-dot loading" id="statusDot"></span><span id="statusText">Loading</span></span>
       </div>
@@ -384,6 +387,27 @@
           name: "main.vx",
           content:
             "arr:#i32[4] = [1, 2, 3, 4];\n\n&^main() -> #i32 {\n  sum:#i32 = 0;\n  arr@{\n    sum = sum + _\n  };\n  sum\n}\n"
+        }
+      ],
+      banked: [
+        {
+          name: "main.vx",
+          content:
+            "G1:#i32 = 5;\nG2:#i32 = 7;\nGM:#i32;\n\n&reader() -> #i32 {\n  GM = GM + 1;\n  x:#i32 = G1;\n  x + GM\n}\n\n&callee(n:#i32) -> #i32 {\n  n + GM + G2\n}\n\n&caller1() -> #i32 {\n  reader() + callee(1)\n}\n\n&caller2() -> #i32 {\n  callee(2)\n}\n\n&^entry_add(n:#i32) -> #i32 {\n  callee(n)\n}\n\n&^main() -> #i32 {\n  GM = 0;\n  caller1() + caller2()\n}\n"
+        }
+      ],
+      reentrant: [
+        {
+          name: "main.vx",
+          content:
+            "&fib(n:#i32) -> #i32 {\n  n < 2 ? n : fib(n - 1) + fib(n - 2)\n}\n\n&^main() -> #i32 {\n  fib(8)\n}\n"
+        }
+      ],
+      globals: [
+        {
+          name: "main.vx",
+          content:
+            "LUT:#i32[6] = [2, 4, 6, 8, 10, 12];\nstate:#i32;\n\n&accumulate() -> #i32 {\n  sum:#i32 = 0;\n  LUT@{ sum = sum + _ };\n  state = state + 1;\n  sum + state\n}\n\n&^main() -> #i32 {\n  state = 10;\n  accumulate()\n}\n"
         }
       ]
     };
