@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time-false statement conditionals are ignored by type-use validation. | Dead statement branch is ignored
+
+&!foo();
+
+&^main() -> #i32 {
+    false ? {
+        tmp:#i32 = foo()
+    }
+    0
+}

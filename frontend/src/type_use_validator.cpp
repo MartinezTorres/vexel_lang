@@ -32,6 +32,42 @@ std::string qualified_func_name(const Symbol* sym) {
     return sym->name;
 }
 
+const Symbol* bound_callee(const TypeUseContext* ctx, int instance_id, ExprPtr call_expr) {
+    if (!ctx || !ctx->binding || !call_expr || call_expr->kind != Expr::Kind::Call ||
+        !call_expr->operand || call_expr->operand->kind != Expr::Kind::Identifier) {
+        return nullptr;
+    }
+    return ctx->binding(instance_id, call_expr->operand);
+}
+
+template <typename ArgFn>
+void for_each_call_value_arg(const Symbol* callee, ExprPtr call_expr, const ArgFn& fn) {
+    if (!call_expr) return;
+    size_t param_index = 0;
+    for (const auto& arg : call_expr->args) {
+        bool is_expr_param = callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
+                             param_index < callee->declaration->params.size() &&
+                             callee->declaration->params[param_index].is_expression_param;
+        if (!is_expr_param) {
+            fn(arg);
+        }
+        ++param_index;
+    }
+}
+
+template <typename StmtFn, typename ExprFn>
+void visit_function_body(const ExprPtr& body, bool result_required, const StmtFn& on_stmt, const ExprFn& on_expr) {
+    if (!body) return;
+    if (body->kind == Expr::Kind::Block) {
+        for (const auto& stmt : body->statements) {
+            on_stmt(stmt);
+        }
+        on_expr(body->result_expr, result_required);
+        return;
+    }
+    on_expr(body, result_required);
+}
+
 struct CallCollector {
     const TypeUseContext* ctx = nullptr;
     int instance_id = -1;
@@ -51,21 +87,8 @@ struct CallCollector {
                 for (const auto& rec : expr->receivers) {
                     collect_expr(rec, true);
                 }
-                const Symbol* callee = nullptr;
-                if (ctx && ctx->binding && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                    callee = ctx->binding(instance_id, expr->operand);
-                }
-                size_t param_index = 0;
-                for (const auto& arg : expr->args) {
-                    if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
-                        param_index < callee->declaration->params.size() &&
-                        callee->declaration->params[param_index].is_expression_param) {
-                        ++param_index;
-                        continue;
-                    }
-                    collect_expr(arg, true);
-                    ++param_index;
-                }
+                const Symbol* callee = bound_callee(ctx, instance_id, expr);
+                for_each_call_value_arg(callee, expr, [&](ExprPtr arg) { collect_expr(arg, true); });
                 break;
             }
             case Expr::Kind::Binary:
@@ -146,6 +169,15 @@ struct CallCollector {
                 collect_expr(stmt->return_expr, return_required);
                 break;
             case Stmt::Kind::ConditionalStmt:
+                if (ctx && ctx->constexpr_condition) {
+                    auto cond = ctx->constexpr_condition(instance_id, stmt->condition);
+                    if (cond.has_value()) {
+                        if (cond.value()) {
+                            collect_stmt(stmt->true_stmt);
+                        }
+                        break;
+                    }
+                }
                 collect_expr(stmt->condition, true);
                 collect_stmt(stmt->true_stmt);
                 break;
@@ -189,16 +221,16 @@ struct TypeUseValidator {
                 throw CompileError("Expression produces no value", expr->location);
             }
             if (!type_is_concrete(ctx, expr->type)) {
-            if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
-                std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
-                          << " type=" << (expr->type ? expr->type->to_string() : "<null>");
-                if (expr->kind == Expr::Kind::Identifier) {
-                    std::cerr << " name=" << expr->name;
+                if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
+                    std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
+                              << " type=" << (expr->type ? expr->type->to_string() : "<null>");
+                    if (expr->kind == Expr::Kind::Identifier) {
+                        std::cerr << " name=" << expr->name;
+                    }
+                    std::cerr << " at " << expr->location.filename << ":" << expr->location.line
+                              << ":" << expr->location.column << "\n";
                 }
-                std::cerr << " at " << expr->location.filename << ":" << expr->location.line
-                          << ":" << expr->location.column << "\n";
-            }
-            throw CompileError("Expression requires a concrete type", expr->location);
+                throw CompileError("Expression requires a concrete type", expr->location);
             }
         }
 
@@ -217,21 +249,8 @@ struct TypeUseValidator {
                     validate_expr(rec, true);
                 }
                 {
-                    const Symbol* callee = nullptr;
-                    if (ctx && ctx->binding && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                        callee = ctx->binding(instance_id, expr->operand);
-                    }
-                    size_t param_index = 0;
-                    for (const auto& arg : expr->args) {
-                        if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
-                            param_index < callee->declaration->params.size() &&
-                            callee->declaration->params[param_index].is_expression_param) {
-                            ++param_index;
-                            continue;
-                        }
-                        validate_expr(arg, true);
-                        ++param_index;
-                    }
+                    const Symbol* callee = bound_callee(ctx, instance_id, expr);
+                    for_each_call_value_arg(callee, expr, [&](ExprPtr arg) { validate_expr(arg, true); });
                 }
                 break;
             case Expr::Kind::Index:
@@ -305,6 +324,15 @@ struct TypeUseValidator {
                 validate_expr(stmt->return_expr, return_required);
                 break;
             case Stmt::Kind::ConditionalStmt:
+                if (ctx && ctx->constexpr_condition) {
+                    auto cond = ctx->constexpr_condition(instance_id, stmt->condition);
+                    if (cond.has_value()) {
+                        if (cond.value()) {
+                            validate_stmt(stmt->true_stmt);
+                        }
+                        break;
+                    }
+                }
                 validate_expr(stmt->condition, true);
                 validate_stmt(stmt->true_stmt);
                 break;
@@ -339,30 +367,20 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         collect_false.ctx = &ctx;
         collect_false.instance_id = sym->instance_id;
         collect_false.return_required = false;
-        if (func->body) {
-            if (func->body->kind == Expr::Kind::Block) {
-                for (const auto& stmt : func->body->statements) {
-                    collect_false.collect_stmt(stmt);
-                }
-                collect_false.collect_expr(func->body->result_expr, false);
-            } else {
-                collect_false.collect_expr(func->body, false);
-            }
-        }
+        visit_function_body(
+            func->body,
+            false,
+            [&](StmtPtr stmt) { collect_false.collect_stmt(stmt); },
+            [&](ExprPtr expr, bool required) { collect_false.collect_expr(expr, required); });
         CallCollector collect_true;
         collect_true.ctx = &ctx;
         collect_true.instance_id = sym->instance_id;
         collect_true.return_required = true;
-        if (func->body) {
-            if (func->body->kind == Expr::Kind::Block) {
-                for (const auto& stmt : func->body->statements) {
-                    collect_true.collect_stmt(stmt);
-                }
-                collect_true.collect_expr(func->body->result_expr, true);
-            } else {
-                collect_true.collect_expr(func->body, true);
-            }
-        }
+        visit_function_body(
+            func->body,
+            true,
+            [&](StmtPtr stmt) { collect_true.collect_stmt(stmt); },
+            [&](ExprPtr expr, bool required) { collect_true.collect_expr(expr, required); });
 
         calls_always[sym] = collect_false.calls;
         std::unordered_set<const Symbol*> diff;
@@ -479,14 +497,11 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         validator.return_required = ret_required;
         validator.func_name = qualified_func_name(sym);
         validator.instance_id = sym->instance_id;
-        if (func->body->kind == Expr::Kind::Block) {
-            for (const auto& stmt : func->body->statements) {
-                validator.validate_stmt(stmt);
-            }
-            validator.validate_expr(func->body->result_expr, ret_required);
-        } else {
-            validator.validate_expr(func->body, ret_required);
-        }
+        visit_function_body(
+            func->body,
+            ret_required,
+            [&](StmtPtr stmt) { validator.validate_stmt(stmt); },
+            [&](ExprPtr expr, bool required) { validator.validate_expr(expr, required); });
     }
 
     for (const auto& sym : facts.used_global_vars) {

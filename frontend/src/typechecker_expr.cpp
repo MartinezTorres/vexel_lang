@@ -134,13 +134,12 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
                 throw CompileError("Internal error: unresolved identifier: " + expr->name, expr->location);
             }
             if (!sym->type && sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
-                int saved_instance = current_instance_id;
                 if (sym->instance_id != current_instance_id) {
-                    set_current_instance(sym->instance_id);
-                }
-                check_stmt(sym->declaration);
-                if (current_instance_id != saved_instance) {
-                    set_current_instance(saved_instance);
+                    auto scope = scoped_instance(sym->instance_id);
+                    (void)scope;
+                    check_stmt(sym->declaration);
+                } else {
+                    check_stmt(sym->declaration);
                 }
             }
             if (expr->type) {
@@ -260,16 +259,6 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
     // Comparison operators
     if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
         expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
-        expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
-        return expr->type;
-    }
-
-    // Logical operators
-    if (expr->op == "&&" || expr->op == "||") {
-        require_boolean(left_type, expr->left ? expr->left->location : expr->location,
-                        "Logical operator " + expr->op);
-        require_boolean(right_type, expr->right ? expr->right->location : expr->location,
-                        "Logical operator " + expr->op);
         expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
         return expr->type;
     }

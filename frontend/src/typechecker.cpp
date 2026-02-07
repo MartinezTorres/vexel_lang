@@ -515,10 +515,9 @@ void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& fa
     TypeUseContext ctx;
     ctx.resolve_type = [this](TypePtr type) { return resolve_type(type); };
     ctx.constexpr_condition = [this](int instance_id, ExprPtr expr) {
-        int saved = current_instance_id;
-        set_current_instance(instance_id);
+        auto scope = scoped_instance(instance_id);
+        (void)scope;
         auto result = constexpr_condition(expr);
-        set_current_instance(saved);
         return result;
     };
     ctx.binding = [this](int instance_id, ExprPtr expr) {

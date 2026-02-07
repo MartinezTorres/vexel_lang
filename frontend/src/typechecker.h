@@ -74,6 +74,32 @@ class TypeChecker {
     int current_instance_id = -1;
 
 public:
+    class InstanceScope {
+    public:
+        InstanceScope(TypeChecker& tc, int instance_id)
+            : checker_(&tc), saved_instance_(tc.current_instance()) {
+            checker_->set_current_instance(instance_id);
+        }
+
+        ~InstanceScope() {
+            if (checker_) {
+                checker_->set_current_instance(saved_instance_);
+            }
+        }
+
+        InstanceScope(const InstanceScope&) = delete;
+        InstanceScope& operator=(const InstanceScope&) = delete;
+
+        InstanceScope(InstanceScope&& other) noexcept
+            : checker_(other.checker_), saved_instance_(other.saved_instance_) {
+            other.checker_ = nullptr;
+        }
+
+    private:
+        TypeChecker* checker_;
+        int saved_instance_;
+    };
+
     TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false,
                 Resolver* resolver = nullptr, Bindings* bindings = nullptr, Program* program = nullptr);
     void check_program(Program& program);
@@ -87,6 +113,7 @@ public:
     Symbol* binding_for(int instance_id, const void* node) const;
     int current_instance() const { return current_instance_id; }
     void set_current_instance(int instance_id);
+    InstanceScope scoped_instance(int instance_id) { return InstanceScope(*this, instance_id); }
     Program* get_program() const { return program; }
     TypePtr resolve_type(TypePtr type);
     std::optional<bool> constexpr_condition(ExprPtr expr);
