@@ -5,6 +5,11 @@ namespace vexel {
 
 class TypeChecker;
 
+// Lowerer normalizes typed AST shape for backend consumption.
+// Canonical lowered contract is defined by this pass plus lowered_printer:
+// - no generics/expression parameters in emitted lowered module
+// - iteration/repeat bodies normalized to blocks
+// - statement-only forms keep null value type
 class Lowerer {
 public:
     explicit Lowerer(TypeChecker* checker);

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Backend conformance source of truth:
+# validates minimum build/CLI contract for every discovered backend directory.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 discover_backends() {

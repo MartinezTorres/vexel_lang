@@ -1,6 +1,12 @@
 # Vexel Backend Specification – C x86 (v0.2.1)
 
-This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the lowered, monomorphized, annotation-preserving IR described in `docs/frontend-lowered.md`.
+This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the lowered, monomorphized, annotation-preserving frontend output.
+
+Source-of-truth integration points:
+
+- Frontend lowering contract: `frontend/src/lowerer.h`, `frontend/src/lowered_printer.h`
+- Frontend pipeline order: `frontend/src/compiler.cpp`
+- Backend plugin API: `frontend/src/backend_registry.h`
 
 ## Scope & Versioning
 - Targets language semantics in `vexel-rfc.md` v0.2.1.

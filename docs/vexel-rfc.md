@@ -22,8 +22,8 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Identifiers**: `[A-Za-z_][A-Za-z0-9_]*` (no length limit)
 - **Comments**: `//` to end-of-line
 - **Literals**:
-  - Integers: `123`, `0xFF`. Default: `#i32`
-  - Floats: `1.23`. Default: `#f32`
+  - Integers: `123`, `0xFF`. Inferred as the smallest fitting integer type (see literal inference rules).
+  - Floats: `1.23`. Default: `#f64`
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
 - **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external), `&^` (exported), `#` (type)

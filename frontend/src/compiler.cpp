@@ -55,6 +55,10 @@ Compiler::OutputPaths Compiler::resolve_output_paths(const std::string& output_f
 }
 
 Compiler::OutputPaths Compiler::compile() {
+    // Frontend pass order contract (source of truth):
+    // load -> resolve -> typecheck -> monomorphize -> lower ->
+    // optimize -> analyze -> type-use validation -> backend emit.
+    // If order changes, update pass invariants and any stage-dependent consumers.
     if (options.verbose) {
         std::cout << "Compiling: " << options.input_file << std::endl;
     }

@@ -7,6 +7,14 @@
 
 namespace vexel {
 
+static bool parse_c_backend_option(int, char**, int&, Compiler::Options&, std::string&) {
+    return false;
+}
+
+static void print_c_backend_usage(std::ostream& os) {
+    os << "  (none)\n";
+}
+
 static void write_file(const std::string& path, const std::string& content) {
     std::ofstream file(path);
     if (!file) {
@@ -39,6 +47,8 @@ void register_backend_c() {
     backend.info.description = "Portable C11 backend";
     backend.info.version = "v0.2.1";
     backend.emit = emit_c_backend;
+    backend.parse_option = parse_c_backend_option;
+    backend.print_usage = print_c_backend_usage;
     (void)register_backend(backend);
 }
 
