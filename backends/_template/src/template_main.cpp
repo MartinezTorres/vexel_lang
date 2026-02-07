@@ -1,5 +1,5 @@
 #include "template_backend.h"
-#include "compiler.h"
+#include "cli_utils.h"
 #include <cstring>
 #include <iostream>
 
@@ -28,54 +28,42 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             return 0;
-        } else if (std::strcmp(argv[i], "-v") == 0) {
-            opts.verbose = true;
-        } else if (std::strcmp(argv[i], "-L") == 0 || std::strcmp(argv[i], "--emit-lowered") == 0) {
-            opts.emit_lowered = true;
-        } else if (std::strcmp(argv[i], "--emit-analysis") == 0) {
-            opts.emit_analysis = true;
-        } else if (std::strcmp(argv[i], "--allow-process") == 0) {
-            opts.allow_process = true;
-        } else if (std::strcmp(argv[i], "--backend-opt") == 0 || std::strncmp(argv[i], "--backend-opt=", 14) == 0) {
-            const char* opt = nullptr;
-            if (std::strncmp(argv[i], "--backend-opt=", 14) == 0) {
-                opt = argv[i] + 14;
-            } else if (i + 1 < argc) {
-                opt = argv[++i];
-            } else {
-                std::cerr << "Error: --backend-opt requires an argument\n";
+        }
+
+        std::string parse_error;
+        if (vexel::try_parse_common_compiler_option(argc, argv, i, opts, parse_error)) {
+            if (!parse_error.empty()) {
+                std::cerr << "Error: " << parse_error << "\n";
                 return 1;
             }
-            const char* eq = std::strchr(opt, '=');
-            if (!eq || eq == opt || *(eq + 1) == '\0') {
-                std::cerr << "Error: --backend-opt expects key=value\n";
-                return 1;
-            }
-            std::string key(opt, eq - opt);
-            std::string value(eq + 1);
-            opts.backend_options[key] = value;
-        } else if (std::strcmp(argv[i], "-o") == 0) {
-            if (i + 1 < argc) {
-                opts.output_file = argv[++i];
-            } else {
-                std::cerr << "Error: -o requires an argument\n";
+        } else if (vexel::try_parse_backend_opt_arg(argc, argv, i, opts, parse_error)) {
+            if (!parse_error.empty()) {
+                std::cerr << "Error: " << parse_error << "\n";
                 return 1;
             }
         } else if (std::strcmp(argv[i], "-b") == 0 || std::strcmp(argv[i], "--backend") == 0) {
-            if (i + 1 < argc) {
-                const char* backend = argv[++i];
-                if (std::strcmp(backend, "template") != 0) {
-                    std::cerr << "Error: template CLI only supports backend=template\n";
-                    return 1;
-                }
-            } else {
-                std::cerr << "Error: -b/--backend requires an argument\n";
+            std::string backend_name;
+            if (!vexel::try_read_backend_arg(argc, argv, i, backend_name, parse_error)) {
+                std::cerr << "Error: Failed to parse backend argument\n";
+                return 1;
+            }
+            if (!parse_error.empty()) {
+                std::cerr << "Error: " << parse_error << "\n";
+                return 1;
+            }
+            if (backend_name != "template") {
+                std::cerr << "Error: template CLI only supports backend=template\n";
                 return 1;
             }
         } else if (argv[i][0] == '-') {
             std::cerr << "Error: Unknown option: " << argv[i] << "\n";
             return 1;
         } else {
+            if (!opts.input_file.empty()) {
+                std::cerr << "Error: Multiple input files specified ('" << opts.input_file
+                          << "' and '" << argv[i] << "')\n";
+                return 1;
+            }
             opts.input_file = argv[i];
         }
     }
@@ -86,21 +74,5 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    try {
-        vexel::Compiler compiler(opts);
-        (void)compiler.compile();
-        return 0;
-    } catch (const vexel::CompileError& e) {
-        std::cerr << "Error";
-        if (!e.location.filename.empty()) {
-            std::cerr << " at " << e.location.filename
-                      << ":" << e.location.line
-                      << ":" << e.location.column;
-        }
-        std::cerr << ": " << e.what() << "\n";
-        return 1;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
-        return 1;
-    }
+    return vexel::run_compiler_with_diagnostics(opts, std::cerr);
 }

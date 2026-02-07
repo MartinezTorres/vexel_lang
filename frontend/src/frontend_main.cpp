@@ -1,11 +1,8 @@
 #include "typechecker.h"
 #include "resolver.h"
 #include "module_loader.h"
-#include "optimizer.h"
-#include "analysis.h"
+#include "frontend_pipeline.h"
 #include "lowered_printer.h"
-#include "lowerer.h"
-#include "monomorphizer.h"
 #include <iostream>
 #include <cstring>
 
@@ -36,6 +33,11 @@ int main(int argc, char** argv) {
             std::cerr << "Error: Unknown option: " << argv[i] << "\n";
             return 1;
         } else {
+            if (!input_file.empty()) {
+                std::cerr << "Error: Multiple input files specified ('" << input_file
+                          << "' and '" << argv[i] << "')\n";
+                return 1;
+            }
             input_file = argv[i];
         }
     }
@@ -56,37 +58,10 @@ int main(int argc, char** argv) {
         vexel::Bindings bindings;
         if (verbose) std::cout << "Resolving...\n";
         vexel::Resolver resolver(program, bindings, project_root);
-        resolver.resolve();
 
-        if (verbose) std::cout << "Type checking...\n";
         vexel::TypeChecker checker(project_root, allow_process, &resolver, &bindings, &program);
-        checker.check_program(program);
-
-        vexel::Module merged;
-        if (!program.modules.empty()) {
-            merged.name = program.modules.front().module.name;
-            merged.path = program.modules.front().path;
-            for (const auto& instance : program.instances) {
-                const auto& mod_info = program.modules[static_cast<size_t>(instance.module_id)];
-                for (const auto& stmt : mod_info.module.top_level) {
-                    merged.top_level.push_back(stmt);
-                }
-            }
-        }
-
-        vexel::Monomorphizer monomorphizer(&checker);
-        monomorphizer.run(merged);
-
-        vexel::Lowerer lowerer(&checker);
-        lowerer.run(merged);
-
-        vexel::Optimizer optimizer(&checker);
-        vexel::OptimizationFacts optimization = optimizer.run(merged);
-        vexel::Analyzer analyzer(&checker, &optimization);
-        vexel::AnalysisFacts analysis = analyzer.run(merged);
-        checker.validate_type_usage(merged, analysis);
-
-        std::cout << vexel::print_lowered_module(merged);
+        vexel::FrontendPipelineResult pipeline = vexel::run_frontend_pipeline(program, resolver, checker, verbose);
+        std::cout << vexel::print_lowered_module(pipeline.merged);
         return 0;
     } catch (const vexel::CompileError& e) {
         std::cerr << "Error";

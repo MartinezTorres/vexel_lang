@@ -1,8 +1,8 @@
 #include "c_backend.h"
 #include "backend_registry.h"
 #include "codegen.h"
+#include "io_utils.h"
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 
 namespace vexel {
@@ -13,14 +13,6 @@ static bool parse_c_backend_option(int, char**, int&, Compiler::Options&, std::s
 
 static void print_c_backend_usage(std::ostream& os) {
     os << "  (none)\n";
-}
-
-static void write_file(const std::string& path, const std::string& content) {
-    std::ofstream file(path);
-    if (!file) {
-        throw CompileError("Cannot write file: " + path, SourceLocation());
-    }
-    file << content;
 }
 
 static void emit_c_backend(const BackendContext& ctx) {
@@ -35,10 +27,10 @@ static void emit_c_backend(const BackendContext& ctx) {
         std::cout << "Writing source: " << source_path << std::endl;
     }
 
-    write_file(header_path.string(), result.header);
+    write_text_file_or_throw(header_path.string(), result.header);
     std::string source_with_include =
         "#include \"" + header_path.filename().string() + "\"\n\n" + result.source;
-    write_file(source_path.string(), source_with_include);
+    write_text_file_or_throw(source_path.string(), source_with_include);
 }
 
 void register_backend_c() {

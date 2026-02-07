@@ -44,10 +44,6 @@ public:
 private:
     Options options;
 
-    std::string read_file(const std::string& path);
-    void write_file(const std::string& path, const std::string& content);
-    Module load_module(const std::string& path);
-
     OutputPaths resolve_output_paths(const std::string& output_file);
 
     std::string build_param_list(CodeGenerator& codegen, StmtPtr func, bool with_types);

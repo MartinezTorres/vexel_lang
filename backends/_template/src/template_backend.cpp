@@ -1,17 +1,13 @@
 #include "template_backend.h"
 #include "backend_registry.h"
+#include "io_utils.h"
 #include <filesystem>
-#include <fstream>
 
 namespace vexel {
 
 static void emit_template(const BackendContext& ctx) {
     std::filesystem::path out_path = ctx.outputs.dir / (ctx.outputs.stem + ".txt");
-    std::ofstream out(out_path);
-    if (!out) {
-        throw CompileError("Cannot write output: " + out_path.string(), SourceLocation());
-    }
-    out << "backend=" << ctx.options.backend << "\n";
+    write_text_file_or_throw(out_path.string(), "backend=" + ctx.options.backend + "\n");
 }
 
 void register_backend_template() {
