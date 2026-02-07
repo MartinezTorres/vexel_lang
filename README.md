@@ -36,7 +36,7 @@ Implementation index:
 - Backend plugin API: `frontend/src/support/backend_registry.h`
 - Driver CLI contract: `driver/src/vexel_main.cpp`
 - Backend discovery/build wiring: `Makefile`, `driver/Makefile`, `playground/Makefile`
-- Test harnesses: `frontend/Makefile`, `backends/c/tests/run_tests.py`, `tools/backend_conformance.sh`
+- Test harnesses: `frontend/Makefile`, `backends/c/tests/run_tests.py`, `backends/conformance_test.sh`
 
 ## Frontend Pipeline
 
@@ -92,7 +92,7 @@ Placement/discovery:
 - Required Makefile targets: `all`, `test`, `clean`
 - Dedicated backend CLI: `build/vexel-<name>`
 
-Conformance script: `tools/backend_conformance.sh`.
+Conformance script: `backends/conformance_test.sh`.
 
 ### Process Expressions (Safety)
 
@@ -100,7 +100,7 @@ Process expressions execute host commands. They are **disabled by default**; pas
 
 ## Requirements & Testing
 
-- Suites live under `frontend/tests` and `backends/*/tests` (plus backend conformance in `tools/backend_conformance.sh`).
+- Suites live under `frontend/tests` and `backends/*/tests` (plus backend conformance in `backends/conformance_test.sh`).
 - Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
 - `make test` builds and runs the full suite.
 - `make frontend-test`, `make backend-c-test`, and `make backend-conformance-test` run focused suites.

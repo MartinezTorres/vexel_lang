@@ -69,7 +69,7 @@ backend-%-clean: FORCE
 
 	
 backend-conformance-test:
-	@bash tools/backend_conformance.sh
+	@bash backends/conformance_test.sh
 
 #tests
 .PHONY: backend-conformance-test
