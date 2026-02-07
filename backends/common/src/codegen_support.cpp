@@ -147,7 +147,36 @@ std::string CodeGenerator::storage_prefix() const {
     return current_function_non_reentrant ? "static " : "";
 }
 
+bool CodeGenerator::use_nonreentrant_frame_abi(bool is_exported) const {
+    // ABI boundaries stay native; frame ABI is only for internal non-reentrant functions.
+    return current_function_non_reentrant && !is_exported;
+}
+
+std::string CodeGenerator::nonreentrant_arg_slot_name(const std::string& c_name, size_t index) const {
+    return "__vx_nr_arg_" + c_name + "_" + std::to_string(index);
+}
+
+std::string CodeGenerator::nonreentrant_ret_slot_name(const std::string& c_name) const {
+    return "__vx_nr_ret_" + c_name;
+}
+
 void CodeGenerator::emit_return_stmt(const std::string& expr) {
+    if (current_nonreentrant_frame_abi) {
+        if (!expr.empty()) {
+            if (current_nonreentrant_returns_value && !current_nonreentrant_return_slot.empty()) {
+                emit(current_nonreentrant_return_slot + " = " + expr + ";");
+            } else {
+                // Preserve side effects for `return expr` in void/non-value contexts.
+                emit(expr + ";");
+            }
+        }
+        if (!abi.return_prefix.empty()) {
+            emit(abi.return_prefix);
+        }
+        emit("return;");
+        return;
+    }
+
     if (current_returns_aggregate) {
         if (!expr.empty()) {
             emit("*" + aggregate_out_param + " = " + expr + ";");

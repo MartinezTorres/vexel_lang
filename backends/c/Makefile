@@ -2,8 +2,11 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 BUILD_DIR ?= $(abspath ../../build)
 FRONTEND_INCLUDE_DIRS := $(shell find ../../frontend/src -type d -print)
+COMMON_DIR ?= ../common
+COMMON_INCLUDE_DIR := $(COMMON_DIR)/src
+COMMON_LIB := $(BUILD_DIR)/backends/common/libvexel-backend-common.a
 
-CXXFLAGS += -I../c/src $(addprefix -I,$(FRONTEND_INCLUDE_DIRS))
+CXXFLAGS += -I../c/src -I$(COMMON_INCLUDE_DIR) $(addprefix -I,$(FRONTEND_INCLUDE_DIRS))
 
 TARGET = $(BUILD_DIR)/backends/c/libvexel-c.a
 CLI = $(BUILD_DIR)/vexel-c
@@ -20,9 +23,12 @@ $(TARGET): $(LIB_OBJECTS)
 	@mkdir -p $(@D)
 	ar rcs $@ $^
 
-$(CLI): $(CLI_OBJECT) $(TARGET) $(FRONTEND_LIB)
+$(CLI): $(CLI_OBJECT) $(TARGET) $(FRONTEND_LIB) $(COMMON_LIB)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(CLI_OBJECT) -Wl,--start-group $(TARGET) $(FRONTEND_LIB) -Wl,--end-group -o $@
+	$(CXX) $(CXXFLAGS) $(CLI_OBJECT) -Wl,--start-group $(TARGET) $(COMMON_LIB) $(FRONTEND_LIB) -Wl,--end-group -o $@
+
+$(COMMON_LIB):
+	+$(MAKE) -C $(COMMON_DIR)
 
 $(BUILD_DIR)/backends/c/%.o: src/%.cpp
 	@mkdir -p $(@D)

@@ -97,6 +97,9 @@ CCodegenResult CodeGenerator::generate(const Module& mod, TypeChecker* tc,
     current_instance_id = -1;
     current_func_symbol = nullptr;
     current_returns_aggregate = false;
+    current_nonreentrant_frame_abi = false;
+    current_nonreentrant_returns_value = false;
+    current_nonreentrant_return_slot.clear();
     aggregate_out_param.clear();
     aggregate_out_type.clear();
     current_aggregate_params.clear();
@@ -228,6 +231,9 @@ GeneratedFunctionInfo CodeGenerator::generate_single_function(const Module& mod,
     current_instance_id = instance_id;
     current_func_symbol = nullptr;
     current_returns_aggregate = false;
+    current_nonreentrant_frame_abi = false;
+    current_nonreentrant_returns_value = false;
+    current_nonreentrant_return_slot.clear();
     aggregate_out_param.clear();
     aggregate_out_type.clear();
     tuple_types.clear();
@@ -704,6 +710,7 @@ void CodeGenerator::gen_module(const Module& mod) {
                 for (const auto& ref_key : ref_keys) {
                     std::string variant = variant_name(func_name, sym, reent_key, ref_key);
                     std::string codegen_name = mangle_name(variant) + instance_suffix(sym);
+                    bool frame_abi_variant = (reent_key == 'N' && !stmt->is_exported);
                     std::string label_prefix;
                     if (!ref_key.empty()) {
                         label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
@@ -722,6 +729,12 @@ void CodeGenerator::gen_module(const Module& mod) {
                     } else if (has_inline) {
                         label_prefix += "VX_INLINE ";
                     }
+
+                    if (frame_abi_variant) {
+                        emit_header(label_prefix + reent_prefix + storage + "void " + codegen_name + "(void);");
+                        continue;
+                    }
+
                     emit_header(label_prefix + reent_prefix + storage + ret_type + " " + codegen_name + "(");
 
                     bool first_param = true;
@@ -1074,6 +1087,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     if (!facts.reachable_functions.count(sym)) {
         current_function_non_reentrant = false;
         current_reentrancy_key = 'N';
+        current_nonreentrant_frame_abi = false;
+        current_nonreentrant_returns_value = false;
+        current_nonreentrant_return_slot.clear();
         return;
     }
 
@@ -1112,6 +1128,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         if (param.is_expression_param) {
             current_function_non_reentrant = false;
             current_reentrancy_key = 'N';
+            current_nonreentrant_frame_abi = false;
+            current_nonreentrant_returns_value = false;
+            current_nonreentrant_return_slot.clear();
             return;
         }
     }
@@ -1217,44 +1236,14 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         }
     }
 
-    bool prev_in_function = in_function;
-    in_function = true;
-    std::ostringstream func_stream;
-    output_stack.push(&func_stream);
-
-    emit("");
-    std::string ann_comment = render_annotation_comment(stmt->annotations);
-    if (!ann_comment.empty()) emit(ann_comment);
     std::string codegen_name = mangle_name(variant_id) + instance_suffix(sym);
-    std::string label_prefix;
-    if (!ref_key.empty()) {
-        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
-    }
-    if (stmt->is_exported) {
-        label_prefix += "VX_ENTRYPOINT ";
-    }
-    if (is_pure) {
-        label_prefix += "VX_PURE ";
-    }
-    if (no_global_write) {
-        label_prefix += "VX_NO_GLOBAL_WRITE ";
-    }
-    if (has_noinline) {
-        label_prefix += "VX_NOINLINE ";
-    } else if (has_inline) {
-        label_prefix += "VX_INLINE ";
-    }
-    emit(label_prefix + reent_prefix + storage + attr + ret_type + " " + codegen_name + "(");
+    current_nonreentrant_frame_abi = use_nonreentrant_frame_abi(stmt->is_exported);
+    current_nonreentrant_returns_value = false;
+    current_nonreentrant_return_slot.clear();
 
-    bool first_param = true;
-    if (current_returns_aggregate) {
-        emit(aggregate_out_type + "* " + aggregate_out_param);
-        first_param = false;
-    }
-
+    std::vector<std::pair<std::string, std::string>> frame_params;
+    frame_params.reserve(stmt->ref_params.size() + stmt->params.size());
     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
-        if (!first_param) emit(", ");
-        first_param = false;
         std::string ref_type;
         TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
         bool by_ref = true;
@@ -1276,13 +1265,10 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         } else if (ref_type == "void") {
             ref_type = "void*";
         }
-        emit(ref_type + " " + mangle_name(stmt->ref_params[i]));
+        frame_params.emplace_back(ref_type, mangle_name(stmt->ref_params[i]));
     }
-
     for (size_t i = 0; i < stmt->params.size(); i++) {
         if (stmt->params[i].is_expression_param) continue;
-        if (!first_param) emit(", ");
-        first_param = false;
         std::string ptype = require_type(stmt->params[i].type,
                                          stmt->params[i].location,
                                          "parameter '" + stmt->params[i].name +
@@ -1296,10 +1282,80 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
         if (abi.lower_aggregates && stmt->params[i].type && is_aggregate_type(stmt->params[i].type)) {
             ptype = gen_type(stmt->params[i].type) + "*";
         }
-        emit(ptype + " " + mangle_name(stmt->params[i].name));
+        frame_params.emplace_back(ptype, mangle_name(stmt->params[i].name));
     }
 
-    emit(") {");
+    if (current_nonreentrant_frame_abi) {
+        emit("");
+        for (size_t i = 0; i < frame_params.size(); ++i) {
+            emit("static " + frame_params[i].first + " " +
+                 nonreentrant_arg_slot_name(codegen_name, i) + ";");
+        }
+
+        if (current_returns_aggregate) {
+            current_nonreentrant_returns_value = true;
+            current_nonreentrant_return_slot = nonreentrant_ret_slot_name(codegen_name);
+            emit("static " + aggregate_out_type + " " + current_nonreentrant_return_slot + ";");
+            current_returns_aggregate = false;
+        } else if (ret_type != "void") {
+            current_nonreentrant_returns_value = true;
+            current_nonreentrant_return_slot = nonreentrant_ret_slot_name(codegen_name);
+            emit("static " + ret_type + " " + current_nonreentrant_return_slot + ";");
+        }
+    }
+
+    bool prev_in_function = in_function;
+    in_function = true;
+    std::ostringstream func_stream;
+    output_stack.push(&func_stream);
+
+    emit("");
+    std::string ann_comment = render_annotation_comment(stmt->annotations);
+    if (!ann_comment.empty()) emit(ann_comment);
+    std::string label_prefix;
+    if (!ref_key.empty()) {
+        label_prefix += "VX_REF_MASK(\"" + ref_key + "\") ";
+    }
+    if (stmt->is_exported) {
+        label_prefix += "VX_ENTRYPOINT ";
+    }
+    if (is_pure) {
+        label_prefix += "VX_PURE ";
+    }
+    if (no_global_write) {
+        label_prefix += "VX_NO_GLOBAL_WRITE ";
+    }
+    if (has_noinline) {
+        label_prefix += "VX_NOINLINE ";
+    } else if (has_inline) {
+        label_prefix += "VX_INLINE ";
+    }
+    if (current_nonreentrant_frame_abi) {
+        emit(label_prefix + reent_prefix + storage + attr + "void " + codegen_name + "(void) {");
+    } else {
+        emit(label_prefix + reent_prefix + storage + attr + ret_type + " " + codegen_name + "(");
+
+        bool first_param = true;
+        if (current_returns_aggregate) {
+            emit(aggregate_out_type + "* " + aggregate_out_param);
+            first_param = false;
+        }
+
+        for (size_t i = 0; i < frame_params.size(); i++) {
+            if (!first_param) emit(", ");
+            first_param = false;
+            emit(frame_params[i].first + " " + frame_params[i].second);
+        }
+
+        emit(") {");
+    }
+
+    if (current_nonreentrant_frame_abi) {
+        for (size_t i = 0; i < frame_params.size(); ++i) {
+            emit(frame_params[i].first + " " + frame_params[i].second +
+                 " = " + nonreentrant_arg_slot_name(codegen_name, i) + ";");
+        }
+    }
 
     bool handled_body = false;
 
@@ -1369,6 +1425,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     current_function_non_reentrant = false;
     current_reentrancy_key = 'N';
     current_returns_aggregate = false;
+    current_nonreentrant_frame_abi = false;
+    current_nonreentrant_returns_value = false;
+    current_nonreentrant_return_slot.clear();
     aggregate_out_param.clear();
     aggregate_out_type.clear();
     current_aggregate_params.clear();

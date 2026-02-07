@@ -9,6 +9,7 @@ backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))src/$(name)_backend.h)
 BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I$(dir)src)
 FRONTEND_INCLUDE_DIRS := $(shell find ../frontend/src -type d -print)
+BACKEND_COMMON_INCLUDE := -I../backends/common/src
 PKG_CONFIG ?= pkg-config
 LIBTCC_CFLAGS := $(shell $(PKG_CONFIG) --cflags libtcc 2>/dev/null)
 LIBTCC_LIBS := $(shell $(PKG_CONFIG) --libs libtcc 2>/dev/null)
@@ -27,7 +28,7 @@ ifeq ($(strip $(LIBTCC_LIBS)),)
   endif
 endif
 
-CXXFLAGS += -Isrc $(addprefix -I,$(FRONTEND_INCLUDE_DIRS)) $(BACKEND_INCLUDES)
+CXXFLAGS += -Isrc $(addprefix -I,$(FRONTEND_INCLUDE_DIRS)) $(BACKEND_INCLUDES) $(BACKEND_COMMON_INCLUDE)
 
 ifneq ($(strip $(LIBTCC_LIBS)),)
   CXXFLAGS += $(LIBTCC_CFLAGS) -DVEXEL_HAS_LIBTCC=1
@@ -47,6 +48,7 @@ endif
 BIN = $(BUILD_DIR)/vexel
 FRONTEND_LIB = $(BUILD_DIR)/lib/libvexelfrontend.a
 BACKEND_LIBS = $(foreach name,$(BACKEND_NAMES),$(BUILD_DIR)/backends/$(name)/libvexel-$(name).a)
+BACKEND_COMMON_LIB = $(BUILD_DIR)/backends/common/libvexel-backend-common.a
 
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(patsubst src/%.cpp,$(BUILD_DIR)/driver/%.o,$(SOURCES))
@@ -61,9 +63,12 @@ all: $(BIN)
 test:
 	@echo "No tests defined for driver yet."
 
-$(BIN): $(OBJECTS) $(FRONTEND_LIB) $(BACKEND_LIBS)
+$(BIN): $(OBJECTS) $(FRONTEND_LIB) $(BACKEND_LIBS) $(BACKEND_COMMON_LIB)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -Wl,--start-group $(BACKEND_LIBS) $(FRONTEND_LIB) -Wl,--end-group $(LDFLAGS) -o $@
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -Wl,--start-group $(BACKEND_LIBS) $(BACKEND_COMMON_LIB) $(FRONTEND_LIB) -Wl,--end-group $(LDFLAGS) -o $@
+
+$(BACKEND_COMMON_LIB):
+	+$(MAKE) -C ../backends/common
 
 $(BUILD_DIR)/driver/%.o: src/%.cpp
 	@mkdir -p $(@D)

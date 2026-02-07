@@ -129,6 +129,9 @@ private:
     std::string underscore_var;  // Current loop underscore variable name (empty when not in iteration)
     bool current_function_non_reentrant = false;
     bool current_returns_aggregate = false;
+    bool current_nonreentrant_frame_abi = false;
+    bool current_nonreentrant_returns_value = false;
+    std::string current_nonreentrant_return_slot;
     std::string aggregate_out_param;
     std::string aggregate_out_type;
     std::unordered_set<std::string> current_aggregate_params;
@@ -188,6 +191,9 @@ private:
 
     std::optional<std::pair<int64_t, int64_t>> evaluate_range(ExprPtr range_expr);
     std::string storage_prefix() const;
+    bool use_nonreentrant_frame_abi(bool is_exported) const;
+    std::string nonreentrant_arg_slot_name(const std::string& c_name, size_t index) const;
+    std::string nonreentrant_ret_slot_name(const std::string& c_name) const;
     std::string ensure_comparator(TypePtr type);
     int64_t resolve_array_length(TypePtr type, const SourceLocation& loc);
     void emit_return_stmt(const std::string& expr);

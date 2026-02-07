@@ -15,7 +15,7 @@ all: driver
 .PHONY: driver driver-test
 driver: $(BUILD_DIR)/vexel
 
-$(BUILD_DIR)/vexel: frontend backends FORCE
+$(BUILD_DIR)/vexel: frontend backend-common backends FORCE
 	+$(MAKE) -C driver
 
 driver-test:
@@ -50,7 +50,10 @@ BACKENDS_CLEAN_TARGETS := $(addprefix backend-,$(addsuffix -clean,$(BACKEND_NAME
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 .PHONY: backends
 
-backends: $(BACKENDS_TARGETS)
+backend-common: FORCE
+	+$(MAKE) -C backends/common
+
+backends: backend-common $(BACKENDS_TARGETS)
 
 backend-%: frontend FORCE
 	@dir="$(call backend_dir,$*)"; \
@@ -73,11 +76,17 @@ backend-conformance-test:
 
 #tests
 .PHONY: backend-conformance-test
-test: driver-test frontend-test backend-conformance-test $(BACKENDS_TEST_TARGETS)
+test: driver-test frontend-test backend-conformance-test backend-common-test $(BACKENDS_TEST_TARGETS)
+
+backend-common-test: FORCE
+	+$(MAKE) -C backends/common test
 
 # CLEAN
-clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
+clean: driver-clean frontend-clean backend-common-clean $(BACKENDS_CLEAN_TARGETS)
 	rmdir $(BUILD_DIR)
+
+backend-common-clean: FORCE
+	+$(MAKE) -C backends/common clean
 
 # Web playground (WASM build)
 .PHONY: web

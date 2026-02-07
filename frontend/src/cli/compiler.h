@@ -1,6 +1,5 @@
 #pragma once
 #include "ast.h"
-#include "codegen.h"
 #include "typechecker.h"
 #include <string>
 #include <unordered_set>

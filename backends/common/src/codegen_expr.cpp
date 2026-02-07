@@ -193,10 +193,30 @@ std::string CodeGenerator::gen_binary(ExprPtr expr) {
              cmp_type->kind == Type::Kind::Named ||
              (cmp_type->kind == Type::Kind::Primitive && cmp_type->primitive == PrimitiveType::String))) {
             std::string cmp_name = ensure_comparator(cmp_type);
-            return "(" + cmp_name + "(" + left + ", " + right + ") " + expr->op + " 0)";
+            if (!expr->type || expr->type->kind == Type::Kind::TypeVar) {
+                return "(" + cmp_name + "(" + left + ", " + right + ") " + expr->op + " 0)";
+            }
+            std::string tmp = fresh_temp();
+            std::string result_type = c_type_for_expr(expr);
+            if (!declared_temps.count(tmp)) {
+                emit(storage_prefix() + result_type + " " + tmp + ";");
+                declared_temps.insert(tmp);
+            }
+            emit(tmp + " = (" + cmp_name + "(" + left + ", " + right + ") " + expr->op + " 0);");
+            return tmp;
         }
     }
-    return "(" + left + " " + expr->op + " " + right + ")";
+    if (!expr->type || expr->type->kind == Type::Kind::TypeVar) {
+        return "(" + left + " " + expr->op + " " + right + ")";
+    }
+    std::string tmp = fresh_temp();
+    std::string result_type = c_type_for_expr(expr);
+    if (!declared_temps.count(tmp)) {
+        emit(storage_prefix() + result_type + " " + tmp + ";");
+        declared_temps.insert(tmp);
+    }
+    emit(tmp + " = (" + left + " " + expr->op + " " + right + ");");
+    return tmp;
 }
 
 std::string CodeGenerator::gen_unary(ExprPtr expr) {
@@ -205,7 +225,17 @@ std::string CodeGenerator::gen_unary(ExprPtr expr) {
         VoidCallGuard guard(*this, false);
         operand = gen_expr(expr->operand);
     }
-    return "(" + expr->op + operand + ")";
+    if (!expr->type || expr->type->kind == Type::Kind::TypeVar) {
+        return "(" + expr->op + operand + ")";
+    }
+    std::string tmp = fresh_temp();
+    std::string result_type = c_type_for_expr(expr);
+    if (!declared_temps.count(tmp)) {
+        emit(storage_prefix() + result_type + " " + tmp + ";");
+        declared_temps.insert(tmp);
+    }
+    emit(tmp + " = (" + expr->op + operand + ");");
+    return tmp;
 }
 
 std::string CodeGenerator::gen_call(ExprPtr expr) {
@@ -345,10 +375,11 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
     }
 
     bool returns_aggregate = false;
+    bool returns_value = false;
     std::string agg_out_type;
+    TypePtr return_type_ptr = nullptr;
     if (abi.lower_aggregates && callee_decl && !is_external) {
         bool returns_tuple = !callee_decl->return_types.empty();
-        TypePtr return_type_ptr = nullptr;
         if (!returns_tuple) {
             if (callee_decl->return_type) {
                 return_type_ptr = callee_decl->return_type;
@@ -356,6 +387,7 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                 return_type_ptr = callee_decl->body->type;
             }
         }
+        returns_value = returns_tuple || (return_type_ptr && return_type_ptr->kind != Type::Kind::TypeVar);
         if (returns_tuple || is_aggregate_type(return_type_ptr)) {
             returns_aggregate = true;
             if (returns_tuple) {
@@ -373,7 +405,20 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                 agg_out_type = gen_type(return_type_ptr);
             }
         }
+    } else if (callee_decl && !is_external) {
+        bool returns_tuple = !callee_decl->return_types.empty();
+        if (!returns_tuple) {
+            if (callee_decl->return_type) {
+                return_type_ptr = callee_decl->return_type;
+            } else if (callee_decl->body && callee_decl->body->type) {
+                return_type_ptr = callee_decl->body->type;
+            }
+        }
+        returns_value = returns_tuple || (return_type_ptr && return_type_ptr->kind != Type::Kind::TypeVar);
     }
+
+    bool call_nonreentrant_frame =
+        (!is_external && callee_decl && !callee_decl->is_exported && current_reentrancy_key == 'N');
 
     std::vector<bool> param_is_aggregate;
     if (abi.lower_aggregates && callee_decl) {
@@ -401,7 +446,14 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                         VoidCallGuard guard(*this, false);
                         rec_expr = gen_expr(rec);
                     }
-                    all_args.push_back("&" + rec_expr);
+                    if (!rec || !rec->type || rec->type->kind == Type::Kind::TypeVar) {
+                        all_args.push_back("&" + rec_expr);
+                    } else {
+                        std::string ptr_temp = fresh_temp();
+                        std::string rtype = gen_type(rec->type);
+                        emit(rtype + "* " + ptr_temp + " = &" + rec_expr + ";");
+                        all_args.push_back(ptr_temp);
+                    }
                 } else {
                     std::string temp = fresh_temp();
                     if (!rec || !rec->type) {
@@ -422,7 +474,14 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                     VoidCallGuard guard(*this, false);
                     rec_expr = gen_expr(rec);
                 }
-                all_args.push_back(rec_expr);
+                if (!rec || !rec->type || rec->type->kind == Type::Kind::TypeVar) {
+                    all_args.push_back(rec_expr);
+                } else {
+                    std::string staged = fresh_temp();
+                    std::string stype = c_type_for_expr(rec);
+                    emit(stype + " " + staged + " = " + rec_expr + ";");
+                    all_args.push_back(staged);
+                }
             }
         }
     }
@@ -449,7 +508,14 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
         }
         if (by_ref) {
             if (is_addressable_lvalue(expr->args[i])) {
-                all_args.push_back("&" + arg_expr);
+                if (!expr->args[i] || !expr->args[i]->type || expr->args[i]->type->kind == Type::Kind::TypeVar) {
+                    all_args.push_back("&" + arg_expr);
+                } else {
+                    std::string temp = fresh_temp();
+                    std::string atype = gen_type(expr->args[i]->type);
+                    emit(atype + "* " + temp + " = &" + arg_expr + ";");
+                    all_args.push_back(temp);
+                }
             } else {
                 std::string temp = fresh_temp();
                 if (!expr->args[i] || !expr->args[i]->type) {
@@ -460,14 +526,21 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                 all_args.push_back("&" + temp);
             }
         } else {
-            all_args.push_back(arg_expr);
+            if (!expr->args[i] || !expr->args[i]->type || expr->args[i]->type->kind == Type::Kind::TypeVar) {
+                all_args.push_back(arg_expr);
+            } else {
+                std::string temp = fresh_temp();
+                std::string atype = c_type_for_expr(expr->args[i]);
+                emit(atype + " " + temp + " = " + arg_expr + ";");
+                all_args.push_back(temp);
+            }
         }
         param_idx++;
         agg_idx++;
     }
 
     std::string out_temp;
-    if (returns_aggregate) {
+    if (returns_aggregate && !call_nonreentrant_frame) {
         out_temp = fresh_temp();
         if (!declared_temps.count(out_temp)) {
             emit(storage_prefix() + agg_out_type + " " + out_temp + ";");
@@ -479,6 +552,24 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
     if (!target.module_id_expr.empty()) {
         std::string load_fn = (target.page == 'A') ? "vx_load_module_id_a" : "vx_load_module_id_b";
         emit(load_fn + "(" + target.module_id_expr + ");");
+    }
+
+    if (call_nonreentrant_frame) {
+        for (size_t i = 0; i < all_args.size(); ++i) {
+            emit(nonreentrant_arg_slot_name(func_name, i) + " = " + all_args[i] + ";");
+        }
+        emit(func_name + "();");
+        if (returns_aggregate || returns_value) {
+            std::string ret_temp = fresh_temp();
+            std::string ret_type = returns_aggregate ? agg_out_type : c_type_for_expr(expr);
+            if (!declared_temps.count(ret_temp)) {
+                emit(storage_prefix() + ret_type + " " + ret_temp + ";");
+                declared_temps.insert(ret_temp);
+            }
+            emit(ret_temp + " = " + nonreentrant_ret_slot_name(func_name) + ";");
+            return ret_temp;
+        }
+        return "";
     }
 
     std::string result = func_name + "(";
