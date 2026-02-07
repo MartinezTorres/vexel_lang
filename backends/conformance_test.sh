@@ -32,6 +32,8 @@ check_backend_dir() {
   local dir="$1"
   local name
   name="$(basename "$dir")"
+  local rel
+  rel="${dir#$ROOT/}"
   local mk="$dir/Makefile"
   local backend_cpp="$dir/src/${name}_backend.cpp"
   local cli="$ROOT/build/vexel-${name}"
@@ -49,6 +51,33 @@ check_backend_dir() {
   fi
   if ! rg -n "backend\\.info\\.name\\s*=\\s*\"${name}\"" "$backend_cpp" >/dev/null 2>&1; then
     echo "FAIL: backend name mismatch in $backend_cpp (expected '${name}')" >&2
+    exit 1
+  fi
+
+  # Backend isolation contract:
+  # - no shared backend code directory
+  # - no direct references to another backend's source tree
+  if [[ -d "$ROOT/backends/common" ]]; then
+    echo "FAIL: backends/common is not allowed; keep codegen backend-owned" >&2
+    exit 1
+  fi
+
+  mapfile -t refs < <(rg -n "backends/(common|c/|ext/[^/]+/)" "$mk" "$dir/src" 2>/dev/null || true)
+  local ref
+  for ref in "${refs[@]}"; do
+    if [[ "$ref" == *"backends/common/"* ]]; then
+      echo "FAIL: backend '$name' references removed shared backend path: $ref" >&2
+      exit 1
+    fi
+    if [[ "$ref" == *"$rel/"* ]]; then
+      continue
+    fi
+    echo "FAIL: backend '$name' references another backend path: $ref" >&2
+    exit 1
+  done
+
+  if rg -n "BackendContext" "$mk" "$dir/src" >/dev/null 2>&1; then
+    echo "FAIL: backend '$name' references legacy BackendContext instead of AnalyzedProgram contract" >&2
     exit 1
   fi
 
