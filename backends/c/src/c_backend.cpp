@@ -7,6 +7,9 @@
 
 namespace vexel {
 
+using c_backend_codegen::CCodegenResult;
+using c_backend_codegen::CodeGenerator;
+
 static bool parse_c_backend_option(int, char**, int&, Compiler::Options&, std::string&) {
     return false;
 }
@@ -15,14 +18,14 @@ static void print_c_backend_usage(std::ostream& os) {
     os << "  (none)\n";
 }
 
-static void emit_c_backend(const BackendContext& ctx) {
+static void emit_c_backend(const BackendInput& input) {
+    const AnalyzedProgram& program = input.program;
     CodeGenerator codegen;
-    CCodegenResult result = codegen.generate(ctx.module, &ctx.checker, &ctx.analysis, &ctx.optimization);
+    CCodegenResult result = codegen.generate(*program.module, program);
 
-    std::filesystem::path header_path = ctx.outputs.dir / (ctx.outputs.stem + ".h");
-    std::filesystem::path source_path = ctx.outputs.dir / (ctx.outputs.stem + ".c");
-
-    if (ctx.options.verbose) {
+    std::filesystem::path header_path = input.outputs.dir / (input.outputs.stem + ".h");
+    std::filesystem::path source_path = input.outputs.dir / (input.outputs.stem + ".c");
+    if (input.options.verbose) {
         std::cout << "Writing header: " << header_path << std::endl;
         std::cout << "Writing source: " << source_path << std::endl;
     }

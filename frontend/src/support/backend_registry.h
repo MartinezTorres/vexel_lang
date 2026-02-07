@@ -1,7 +1,6 @@
 #pragma once
+#include "analyzed_program.h"
 #include "compiler.h"
-#include "analysis.h"
-#include "optimizer.h"
 #include <ostream>
 #include <string>
 #include <vector>
@@ -14,16 +13,13 @@ struct BackendInfo {
     std::string version;
 };
 
-struct BackendContext {
-    const Module& module;
-    TypeChecker& checker;
+struct BackendInput {
+    const AnalyzedProgram& program;
     const Compiler::Options& options;
     const Compiler::OutputPaths& outputs;
-    const AnalysisFacts& analysis;
-    const OptimizationFacts& optimization;
 };
 
-using BackendEmitFn = void (*)(const BackendContext& ctx);
+using BackendEmitFn = void (*)(const BackendInput& input);
 // Driver option delegation contract:
 // - Called only for options unknown to the frontend driver.
 // - `index` points at argv[index]; backends may advance it if they consume extra args.

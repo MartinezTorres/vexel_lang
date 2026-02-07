@@ -5,7 +5,7 @@ EMXX ?= em++
 
 rwildcard = $(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
-BACKEND_DIRS := $(filter-out $(VEXEL_ROOT_DIR)/backends/common/ $(VEXEL_ROOT_DIR)/backends/ext/ $(VEXEL_ROOT_DIR)/backends/tests/,$(wildcard $(VEXEL_ROOT_DIR)/backends/*/ $(VEXEL_ROOT_DIR)/backends/ext/*/))
+BACKEND_DIRS := $(filter-out $(VEXEL_ROOT_DIR)/backends/ext/ $(VEXEL_ROOT_DIR)/backends/tests/,$(wildcard $(VEXEL_ROOT_DIR)/backends/*/ $(VEXEL_ROOT_DIR)/backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))src/$(name)_backend.h)

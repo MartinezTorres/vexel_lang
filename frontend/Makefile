@@ -115,13 +115,13 @@ $(BUILD_DIR)/frontend-tests/%/test_report.checked: $(BUILD_DIR)/frontend-tests/%
 clean:
 	rm -f $(OBJECTS)
 	rm -f $(OBJECTS:.o=.d)
-	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/frontend
+	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/frontend 2>/dev/null || true
 	rm -f $(BUILD_DIR)/lib/libvexelfrontend.a
-	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/lib
+	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)/lib 2>/dev/null || true
 	rm -f $(BUILD_DIR)/vexel-frontend
 	rm -f $(TEST_TARGETS) $(TEST_CHECK_TARGETS)
 	find $(BUILD_DIR)/frontend-tests -type d -empty -delete 2>/dev/null || true
-	rmdir --ignore-fail-on-non-empty $(BUILD_DIR)
+	rmdir --ignore-fail-on-non-empty $(BUILD_DIR) 2>/dev/null || true
 	
 
 -include $(OBJECTS:.o=.d)

@@ -1,4 +1,5 @@
 #pragma once
+#include "analyzed_program.h"
 #include "ast.h"
 #include "analysis.h"
 #include "evaluator.h"
@@ -10,10 +11,7 @@
 #include <optional>
 #include <functional>
 
-namespace vexel {
-
-class TypeChecker;
-struct OptimizationFacts;
+namespace vexel::c_backend_codegen {
 
 struct CCodegenResult {
     std::string header;
@@ -81,7 +79,7 @@ class CodeGenerator {
     std::unordered_set<std::string> live_temps;
     std::unordered_set<std::string> declared_temps;
     std::unordered_map<std::string, std::string> type_map;
-    TypeChecker* type_checker;
+    const AnalyzedProgram* analyzed_program = nullptr;
     std::stack<std::ostringstream*> output_stack;
     std::unordered_map<std::string, std::string> comparator_cache;
     std::vector<std::string> comparator_definitions;
@@ -101,14 +99,10 @@ class CodeGenerator {
 
 public:
     CodeGenerator();
-    CCodegenResult generate(const Module& mod, TypeChecker* tc = nullptr,
-                            const AnalysisFacts* analysis = nullptr,
-                            const OptimizationFacts* optimization_facts = nullptr);
+    CCodegenResult generate(const Module& mod, const AnalyzedProgram& analyzed);
     GeneratedFunctionInfo generate_single_function(const Module& mod,
                                                    StmtPtr func,
-                                                   TypeChecker* tc,
-                                                   const AnalysisFacts* analysis,
-                                                   const OptimizationFacts* optimization_facts,
+                                                   const AnalyzedProgram& analyzed,
                                                    const CodegenABI& options,
                                                    int instance_id,
                                                    const std::string& ref_key,
@@ -214,7 +208,17 @@ private:
         ~VoidCallGuard() { gen.allow_void_call = prev; }
     };
 
+    struct FoldGuard {
+        CodeGenerator& gen;
+        bool prev;
+        explicit FoldGuard(CodeGenerator& g, bool allow) : gen(g), prev(g.allow_constexpr_fold) {
+            gen.allow_constexpr_fold = allow;
+        }
+        ~FoldGuard() { gen.allow_constexpr_fold = prev; }
+    };
+
     bool allow_void_call = false;
+    bool allow_constexpr_fold = true;
     Symbol* binding_for(const void* node) const;
     Symbol* binding_for(ExprPtr expr) const { return binding_for(expr.get()); }
     Symbol* binding_for(StmtPtr stmt) const { return binding_for(stmt.get()); }

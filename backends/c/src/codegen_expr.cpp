@@ -51,7 +51,7 @@ std::string escape_c_string(const std::string& input) {
 
 } // namespace
 
-namespace vexel {
+namespace vexel::c_backend_codegen {
 std::string CodeGenerator::gen_expr(ExprPtr expr) {
     if (!expr) return "";
     std::string void_name;
@@ -61,6 +61,64 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
             "' has no return type; its result cannot be used as a value. "
             "Declare a return type or call it as a statement.",
             expr->location);
+    }
+
+    bool fold_side_effect_free =
+        expr->kind != Expr::Kind::Assignment &&
+        expr->kind != Expr::Kind::Iteration &&
+        expr->kind != Expr::Kind::Repeat &&
+        expr->kind != Expr::Kind::Block;
+    if (allow_constexpr_fold && fold_side_effect_free) {
+        CTValue folded;
+        if (try_evaluate(expr, folded)) {
+            auto scalar_literal = [&](const CTValue& value) -> std::optional<std::string> {
+                if (std::holds_alternative<int64_t>(value)) {
+                    return std::to_string(std::get<int64_t>(value));
+                }
+                if (std::holds_alternative<uint64_t>(value)) {
+                    return std::to_string(std::get<uint64_t>(value));
+                }
+                if (std::holds_alternative<bool>(value)) {
+                    return std::get<bool>(value) ? "1" : "0";
+                }
+                if (std::holds_alternative<double>(value)) {
+                    return std::to_string(std::get<double>(value));
+                }
+                return std::nullopt;
+            };
+
+            if (auto lit = scalar_literal(folded)) {
+                return *lit;
+            }
+
+            if (std::holds_alternative<std::shared_ptr<CTArray>>(folded) &&
+                expr->type && expr->type->kind == Type::Kind::Array &&
+                expr->type->element_type) {
+                auto array_value = std::get<std::shared_ptr<CTArray>>(folded);
+                if (array_value) {
+                    std::string temp = fresh_temp();
+                    std::string elem_type = gen_type(expr->type->element_type);
+                    std::ostringstream init;
+                    init << storage_prefix() << elem_type << " " << temp << "["
+                         << array_value->elements.size() << "] = {";
+                    for (size_t i = 0; i < array_value->elements.size(); ++i) {
+                        auto lit = scalar_literal(array_value->elements[i]);
+                        if (!lit.has_value()) {
+                            init.str("");
+                            break;
+                        }
+                        if (i > 0) init << ", ";
+                        init << *lit;
+                    }
+                    if (!init.str().empty()) {
+                        init << "};";
+                        emit(init.str());
+                        return temp;
+                    }
+                }
+            }
+
+        }
     }
 
     switch (expr->kind) {
@@ -171,10 +229,40 @@ std::string CodeGenerator::gen_expr(ExprPtr expr) {
 
 std::string CodeGenerator::gen_binary(ExprPtr expr) {
     std::string left;
-    std::string right;
     {
         VoidCallGuard guard(*this, false);
         left = gen_expr(expr->left);
+    }
+
+    // Preserve runtime short-circuit semantics for logical operators.
+    if (expr->op == "&&" || expr->op == "||") {
+        std::string tmp = fresh_temp();
+        std::string result_type = c_type_for_expr(expr);
+        if (!declared_temps.count(tmp)) {
+            emit(storage_prefix() + result_type + " " + tmp + ";");
+            declared_temps.insert(tmp);
+        }
+        emit(tmp + " = " + left + ";");
+
+        if (expr->op == "&&") {
+            emit("if (" + tmp + ") {");
+        } else {
+            emit("if (!" + tmp + ") {");
+        }
+
+        std::string right;
+        {
+            VoidCallGuard guard(*this, false);
+            right = gen_expr(expr->right);
+        }
+        emit(tmp + " = " + right + ";");
+        emit("}");
+        return tmp;
+    }
+
+    std::string right;
+    {
+        VoidCallGuard guard(*this, false);
         right = gen_expr(expr->right);
     }
     if (expr->op == "==" || expr->op == "!=") {
@@ -444,6 +532,7 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
                     std::string rec_expr;
                     {
                         VoidCallGuard guard(*this, false);
+                        FoldGuard fold_guard(*this, false);
                         rec_expr = gen_expr(rec);
                     }
                     if (!rec || !rec->type || rec->type->kind == Type::Kind::TypeVar) {
@@ -508,6 +597,11 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
         }
         if (by_ref) {
             if (is_addressable_lvalue(expr->args[i])) {
+                {
+                    VoidCallGuard guard(*this, false);
+                    FoldGuard fold_guard(*this, false);
+                    arg_expr = gen_expr(expr->args[i]);
+                }
                 if (!expr->args[i] || !expr->args[i]->type || expr->args[i]->type->kind == Type::Kind::TypeVar) {
                     all_args.push_back("&" + arg_expr);
                 } else {
@@ -769,7 +863,9 @@ std::string CodeGenerator::gen_block(ExprPtr expr) {
     }
     emit(temp + " = " + result + ";");
     // Release the result temp if it's a temporary
-    if (result.substr(0, 3) == "tmp") {
+    if (result.rfind("tmp", 0) == 0 &&
+        (!expr->result_expr || !expr->result_expr->type ||
+         expr->result_expr->type->kind != Type::Kind::Array)) {
         release_temp(result);
     }
     emit("}");
@@ -778,94 +874,7 @@ std::string CodeGenerator::gen_block(ExprPtr expr) {
 }
 
 std::string CodeGenerator::gen_block_optimized(ExprPtr expr) {
-    if (!type_checker) return "";
-
-    CompileTimeEvaluator evaluator(type_checker);
-    std::ostringstream optimized;
-
-    // Process each statement
-    for (const auto& stmt : expr->statements) {
-        if (stmt->kind == Stmt::Kind::Expr && stmt->expr) {
-            // Handle assignment expressions
-            if (stmt->expr->kind == Expr::Kind::Assignment &&
-                stmt->expr->left->kind == Expr::Kind::Identifier) {
-
-                std::string var_name = stmt->expr->left->name;
-
-                // Try to evaluate RHS at compile-time
-                CTValue rhs_val;
-                if (evaluator.try_evaluate(stmt->expr->right, rhs_val)) {
-                    // Store compile-time value in evaluator, don't generate code
-                    evaluator.set_constant(var_name, rhs_val);
-                    continue;
-                }
-                // Can't evaluate - must generate runtime code
-                return "";
-            }
-
-            // Handle other expressions (like function calls)
-            // Check if it's a call to external function
-            if (stmt->expr->kind == Expr::Kind::Call) {
-                // Try to evaluate arguments and generate optimized call
-                std::string call_str = gen_call_optimized_with_evaluator(stmt->expr, evaluator);
-                if (!call_str.empty()) {
-                    optimized << call_str << ";\n";
-                    continue;
-                }
-                // Can't optimize, bail out
-                return "";
-            }
-
-            // Try to evaluate other expressions with current compile-time context
-            CTValue stmt_val;
-            if (!evaluator.try_evaluate(stmt->expr, stmt_val)) {
-                return "";
-            }
-        } else if (stmt->kind == Stmt::Kind::VarDecl) {
-            // Try to evaluate initializer
-            if (stmt->var_init) {
-                CTValue init_val;
-                if (evaluator.try_evaluate(stmt->var_init, init_val)) {
-                    evaluator.set_constant(stmt->var_name, init_val);
-                    continue;
-                } else {
-                    // Can't evaluate (e.g., array literal)
-                    // Store a placeholder so references to this variable won't fail
-                    evaluator.set_constant(stmt->var_name, (int64_t)0);
-                    // Don't generate code for it - we'll inline everything
-                    continue;
-                }
-            }
-        } else {
-            // Can't handle this statement type
-            return "";
-        }
-    }
-
-    // Try to evaluate result expression
-    if (expr->result_expr) {
-        CTValue result_val;
-        if (evaluator.try_evaluate(expr->result_expr, result_val)) {
-            std::string value;
-            if (std::holds_alternative<int64_t>(result_val)) {
-                value = std::to_string(std::get<int64_t>(result_val));
-            } else if (std::holds_alternative<uint64_t>(result_val)) {
-                value = std::to_string(std::get<uint64_t>(result_val));
-            }
-            if (!value.empty()) {
-                if (current_returns_aggregate) {
-                    optimized << "*" << aggregate_out_param << " = " << value << ";\n";
-                    append_return_prefix(optimized);
-                    optimized << "return;\n";
-                } else {
-                    append_return_prefix(optimized);
-                    optimized << "return " << value << ";\n";
-                }
-                return optimized.str();
-            }
-        }
-    }
-
+    (void)expr;
     return "";
 }
 
@@ -1064,13 +1073,7 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
             std::string elem_type = gen_type(var_type->element_type);
 
             // Get array size
-            std::string size_str = "0";
-            if (var_type->array_size) {
-                CTValue size_val;
-                if (try_evaluate(var_type->array_size, size_val)) {
-                    size_str = std::to_string(std::get<int64_t>(size_val));
-                }
-            }
+            std::string size_str = std::to_string(resolve_array_length(var_type, expr->location));
 
             emit(elem_type + " " + var_name + "[" + size_str + "] = {");
             {
@@ -1093,7 +1096,8 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
             rhs = gen_expr(expr->right);
         }
         // Release RHS temp if it's a temporary
-        if (rhs.substr(0, 3) == "tmp") {
+        if (rhs.rfind("tmp", 0) == 0 &&
+            (!expr->right || !expr->right->type || expr->right->type->kind != Type::Kind::Array)) {
             release_temp(rhs);
         }
         std::string temp = fresh_temp();
@@ -1107,11 +1111,16 @@ std::string CodeGenerator::gen_assignment(ExprPtr expr) {
     std::string rhs;
     {
         VoidCallGuard guard(*this, false);
+        FoldGuard lhs_guard(*this, false);
         lhs = gen_expr(expr->left);
+    }
+    {
+        VoidCallGuard guard(*this, false);
         rhs = gen_expr(expr->right);
     }
     // Release RHS temp if it's a temporary
-    if (rhs.substr(0, 3) == "tmp") {
+    if (rhs.rfind("tmp", 0) == 0 &&
+        (!expr->right || !expr->right->type || expr->right->type->kind != Type::Kind::Array)) {
         release_temp(rhs);
     }
     return "(" + lhs + " = " + rhs + ")";
@@ -1180,13 +1189,7 @@ std::string CodeGenerator::gen_length(ExprPtr expr) {
     if (expr->operand->type) {
         if (expr->operand->type->kind == Type::Kind::Array) {
             // Array length - try to evaluate at compile time
-            if (expr->operand->type->array_size) {
-                CTValue size_val;
-                if (try_evaluate(expr->operand->type->array_size, size_val)) {
-                    return std::to_string(std::get<int64_t>(size_val));
-                }
-            }
-            throw CompileError("Array length must be a compile-time constant", expr->location);
+            return std::to_string(resolve_array_length(expr->operand->type, expr->location));
         } else if (expr->operand->type->kind == Type::Kind::Primitive &&
                    expr->operand->type->primitive == PrimitiveType::String) {
             // String length - compile time constant
@@ -1262,14 +1265,7 @@ std::string CodeGenerator::gen_iteration(ExprPtr expr) {
         }
         size_str = std::to_string(element_count);
     } else {
-        if (!array_type->array_size) {
-            throw CompileError("Array size must be compile-time constant for iteration", expr->location);
-        }
-        CTValue size_val;
-        if (!try_evaluate(array_type->array_size, size_val)) {
-            throw CompileError("Array size must be compile-time constant for iteration", expr->location);
-        }
-        element_count = value_to_int64(size_val, array_type->array_size->location);
+        element_count = resolve_array_length(array_type, expr->location);
         if (element_count < 0) {
             throw CompileError("Array size cannot be negative", expr->location);
         }
@@ -1358,4 +1354,4 @@ std::string CodeGenerator::gen_repeat(ExprPtr expr) {
 }
 
 
-} // namespace vexel
+} // namespace vexel::c_backend_codegen

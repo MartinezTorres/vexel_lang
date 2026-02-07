@@ -1,7 +1,8 @@
 #include "native_tcc_runner.h"
 
 #include "analysis_report.h"
-#include "codegen.h"
+#include "backends/c/src/codegen.h"
+#include "analyzed_program_builder.h"
 #include "frontend_pipeline.h"
 #include "io_utils.h"
 #include "lowered_printer.h"
@@ -23,6 +24,9 @@
 #endif
 
 namespace vexel {
+
+using c_backend_codegen::CCodegenResult;
+using c_backend_codegen::CodeGenerator;
 
 namespace {
 
@@ -64,8 +68,10 @@ int compile_to_c(const Compiler::Options& opts, CCodegenResult& out, std::ostrea
                                                             &pipeline.optimization));
         }
 
+        AnalyzedProgram analyzed =
+            make_analyzed_program(pipeline.merged, checker, pipeline.analysis, pipeline.optimization);
         CodeGenerator codegen;
-        out = codegen.generate(pipeline.merged, &checker, &pipeline.analysis, &pipeline.optimization);
+        out = codegen.generate(pipeline.merged, analyzed);
         return 0;
     } catch (const CompileError& e) {
         err << "Error";

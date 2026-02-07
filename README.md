@@ -17,7 +17,7 @@ gcc out.c -o simple -lm
 
 - `frontend/` - lexer/parser/typechecker/evaluator/AST + analysis pipeline (`libvexelfrontend.a`, `build/vexel-frontend`, tests).
 - `backends/c/` - portable C backend (`libvexel-c.a`, `build/vexel-c`, tests).
-- `backends/common/` - shared backend code emission library (`libvexel-backend-common.a`).
+- `backends/ext/megalinker/` - banked megalinker backend (WIP).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
 - `docs/` - language RFC (`docs/vexel-rfc.md`) and generated playground page (`docs/index.html`).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
@@ -34,7 +34,8 @@ Implementation index:
 - Frontend pipeline and pass order: `frontend/src/cli/compiler.cpp`
 - Frontend invariant checks: `frontend/src/pipeline/pass_invariants.h`, `frontend/src/pipeline/pass_invariants.cpp`
 - Lowered output contract: `frontend/src/transform/lowerer.h`, `frontend/src/codegen/lowered_printer.h`
-- Shared backend code generator core: `backends/common/src/codegen.h`
+- C backend code generator core: `backends/c/src/codegen.h`
+- Megalinker backend code generator core: `backends/ext/megalinker/src/codegen.h`
 - Backend plugin API: `frontend/src/support/backend_registry.h`
 - Driver CLI contract: `driver/src/vexel_main.cpp`
 - Backend discovery/build wiring: `Makefile`, `driver/Makefile`, `playground/Makefile`

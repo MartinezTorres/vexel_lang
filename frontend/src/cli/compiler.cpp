@@ -6,6 +6,7 @@
 #include "io_utils.h"
 #include "lowered_printer.h"
 #include "module_loader.h"
+#include "analyzed_program_builder.h"
 #include "resolver.h"
 #include "typechecker.h"
 
@@ -71,8 +72,10 @@ Compiler::OutputPaths Compiler::compile() {
     if (options.verbose) {
         std::cout << "Generating backend: " << backend->info.name << std::endl;
     }
-    BackendContext ctx{pipeline.merged, checker, options, paths, pipeline.analysis, pipeline.optimization};
-    backend->emit(ctx);
+    AnalyzedProgram analyzed =
+        make_analyzed_program(pipeline.merged, checker, pipeline.analysis, pipeline.optimization);
+    BackendInput input{analyzed, options, paths};
+    backend->emit(input);
 
     if (options.verbose) {
         std::cout << "Compilation successful!" << std::endl;

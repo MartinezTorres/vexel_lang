@@ -11,6 +11,7 @@
 #include <functional>
 #include <iomanip>
 #include <cctype>
+#include <cstdlib>
 #include <tuple>
 #include <sstream>
 #include <deque>
@@ -35,7 +36,7 @@ std::string sanitize_identifier(const std::string& input) {
 
 } // namespace
 
-namespace vexel {
+namespace vexel::c_backend_codegen {
 std::string CodeGenerator::require_type(TypePtr type, const SourceLocation& loc, const std::string& context) {
     if (!type) {
         throw CompileError("Missing type during code generation: " + context, loc);
@@ -210,7 +211,34 @@ int64_t CodeGenerator::resolve_array_length(TypePtr type, const SourceLocation& 
     }
     CTValue size_val;
     if (!try_evaluate(type->array_size, size_val)) {
-        throw CompileError("Array length must be compile-time constant", loc);
+        if (type->array_size->kind == Expr::Kind::Identifier) {
+            if (Symbol* size_sym = binding_for(type->array_size)) {
+                if (!size_sym->is_mutable &&
+                    size_sym->declaration &&
+                    size_sym->declaration->var_init &&
+                    try_evaluate(size_sym->declaration->var_init, size_val)) {
+                    // resolved through immutable declaration initializer
+                } else {
+                    throw CompileError("Array length must be compile-time constant", loc);
+                }
+            } else {
+                throw CompileError("Array length must be compile-time constant", loc);
+            }
+        } else
+        if (type->array_size->kind == Expr::Kind::IntLiteral &&
+            !type->array_size->raw_literal.empty()) {
+            std::string raw = type->array_size->raw_literal;
+            raw.erase(std::remove(raw.begin(), raw.end(), '_'), raw.end());
+            char* end = nullptr;
+            unsigned long long parsed = std::strtoull(raw.c_str(), &end, 0);
+            if (end && *end == '\0') {
+                return static_cast<int64_t>(parsed);
+            }
+            throw CompileError("Array length must be compile-time constant", loc);
+        }
+        else {
+            throw CompileError("Array length must be compile-time constant", loc);
+        }
     }
 
     if (std::holds_alternative<int64_t>(size_val)) {
@@ -268,10 +296,11 @@ std::string CodeGenerator::ensure_comparator(TypePtr type) {
             break;
         }
         case Type::Kind::Named: {
-            if (!type_checker) {
-                throw CompileError("Internal error: comparator generation without type checker", type->location);
+            if (!analyzed_program || !analyzed_program->lookup_type_symbol) {
+                throw CompileError("Internal error: comparator generation without type lookup",
+                                   type->location);
             }
-            Symbol* sym = type_checker->get_scope()->lookup(type->type_name);
+            Symbol* sym = analyzed_program->lookup_type_symbol(current_instance_id, type->type_name);
             if (!sym || sym->kind != Symbol::Kind::Type || !sym->declaration || sym->declaration->kind != Stmt::Kind::TypeDecl) {
                 throw CompileError("Cannot compare values of type " + type->type_name, type->location);
             }
@@ -298,4 +327,4 @@ std::string CodeGenerator::ensure_comparator(TypePtr type) {
 }
 
 
-} // namespace vexel
+} // namespace vexel::c_backend_codegen
