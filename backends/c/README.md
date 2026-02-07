@@ -4,9 +4,9 @@ This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the
 
 Source-of-truth integration points:
 
-- Frontend lowering contract: `frontend/src/lowerer.h`, `frontend/src/lowered_printer.h`
-- Frontend pipeline order: `frontend/src/compiler.cpp`
-- Backend plugin API: `frontend/src/backend_registry.h`
+- Frontend lowering contract: `frontend/src/transform/lowerer.h`, `frontend/src/codegen/lowered_printer.h`
+- Frontend pipeline order: `frontend/src/cli/compiler.cpp`
+- Backend plugin API: `frontend/src/support/backend_registry.h`
 
 ## Scope & Versioning
 - Targets language semantics in `vexel-rfc.md` v0.2.1.

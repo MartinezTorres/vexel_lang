@@ -41,7 +41,7 @@ frontend-clean:
 	+$(MAKE) -C frontend clean
 
 # Backends
-BACKEND_DIRS := $(filter-out backends/common/ backends/_template/ backends/ext/ backends/tests/,$(wildcard backends/*/ backends/ext/*/))
+BACKEND_DIRS := $(filter-out backends/common/ backends/ext/ backends/tests/,$(wildcard backends/*/ backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 BACKENDS_TARGETS := $(addprefix backend-,$(BACKEND_NAMES))
 BACKENDS_TEST_TARGETS := $(addprefix backend-,$(addsuffix -test,$(BACKEND_NAMES)))
@@ -69,7 +69,7 @@ backend-%-clean: FORCE
 
 	
 backend-conformance-test:
-	@bash backends/tests/run_conformance.sh
+	@bash tools/backend_conformance.sh
 
 #tests
 .PHONY: backend-conformance-test

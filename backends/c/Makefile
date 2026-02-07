@@ -1,8 +1,9 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 BUILD_DIR ?= $(abspath ../../build)
+FRONTEND_INCLUDE_DIRS := $(shell find ../../frontend/src -type d -print)
 
-CXXFLAGS += -I../c/src -I../../frontend/src
+CXXFLAGS += -I../c/src $(addprefix -I,$(FRONTEND_INCLUDE_DIRS))
 
 TARGET = $(BUILD_DIR)/backends/c/libvexel-c.a
 CLI = $(BUILD_DIR)/vexel-c

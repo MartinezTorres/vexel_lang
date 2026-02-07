@@ -2,14 +2,16 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 BUILD_DIR ?= $(abspath ../build)
 
-CXXFLAGS += -Isrc
-
-OBJECTS = $(patsubst src/%.cpp,$(BUILD_DIR)/frontend/%.o,$(wildcard src/*.cpp))
-LIB_OBJECTS = $(filter-out $(BUILD_DIR)/frontend/frontend_main.o,$(OBJECTS))
-CLI_OBJECT = $(BUILD_DIR)/frontend/frontend_main.o
-
 # Recursive wildcard function
 rwildcard = $(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
+
+SRC_DIRS := $(shell find src -type d -print)
+CXXFLAGS += $(addprefix -I,$(SRC_DIRS))
+
+SOURCES := $(sort $(call rwildcard,src/,*.cpp))
+OBJECTS := $(patsubst src/%.cpp,$(BUILD_DIR)/frontend/%.o,$(SOURCES))
+LIB_OBJECTS = $(filter-out $(BUILD_DIR)/frontend/cli/frontend_main.o,$(OBJECTS))
+CLI_OBJECT = $(BUILD_DIR)/frontend/cli/frontend_main.o
 
 TEST_TARGETS := $(patsubst %/test.vx,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.vx))
 TEST_TARGETS += $(patsubst %/test.sh,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.sh))

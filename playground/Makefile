@@ -3,14 +3,17 @@ OUT_DIR ?= $(abspath .)
 DOCS_DIR ?= $(VEXEL_ROOT_DIR)/docs
 EMXX ?= em++
 
-BACKEND_DIRS := $(filter-out $(VEXEL_ROOT_DIR)/backends/common/ $(VEXEL_ROOT_DIR)/backends/_template/ $(VEXEL_ROOT_DIR)/backends/ext/,$(wildcard $(VEXEL_ROOT_DIR)/backends/*/ $(VEXEL_ROOT_DIR)/backends/ext/*/))
+rwildcard = $(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
+
+BACKEND_DIRS := $(filter-out $(VEXEL_ROOT_DIR)/backends/common/ $(VEXEL_ROOT_DIR)/backends/ext/ $(VEXEL_ROOT_DIR)/backends/tests/,$(wildcard $(VEXEL_ROOT_DIR)/backends/*/ $(VEXEL_ROOT_DIR)/backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))src/$(name)_backend.h)
 BACKEND_SOURCES := $(foreach dir,$(BACKEND_DIRS),$(filter-out $(dir)src/%_main.cpp,$(wildcard $(dir)src/*.cpp)))
 BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I$(dir)src)
 AUTO_REGISTER := $(VEXEL_ROOT_DIR)/build/playground/autoregister.cpp
-FRONTEND_SOURCES := $(sort $(filter-out $(VEXEL_ROOT_DIR)/frontend/src/frontend_main.cpp,$(wildcard $(VEXEL_ROOT_DIR)/frontend/src/*.cpp)))
+FRONTEND_INCLUDE_DIRS := $(shell find $(VEXEL_ROOT_DIR)/frontend/src -type d -print)
+FRONTEND_SOURCES := $(sort $(filter-out $(VEXEL_ROOT_DIR)/frontend/src/cli/frontend_main.cpp,$(call rwildcard,$(VEXEL_ROOT_DIR)/frontend/src/,*.cpp)))
 
 SOURCES := \
   $(FRONTEND_SOURCES) \
@@ -20,7 +23,7 @@ SOURCES := \
 
 INCLUDES := \
   -I$(VEXEL_ROOT_DIR) \
-  -I$(VEXEL_ROOT_DIR)/frontend/src \
+  $(addprefix -I,$(FRONTEND_INCLUDE_DIRS)) \
   $(BACKEND_INCLUDES)
 
 EMXXFLAGS ?= -std=c++17 -O2 -fexceptions

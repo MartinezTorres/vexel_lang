@@ -19,7 +19,6 @@ gcc out.c -o simple -lm
 - `backends/c/` - portable C backend (`libvexel-c.a`, `build/vexel-c`, tests).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
 - `docs/` - language RFC (`docs/vexel-rfc.md`) and generated playground page (`docs/index.html`).
-- `tutorial/` - step-by-step Vexel tutorial (Markdown, browsable on GitHub).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
 - `examples/` - sample programs plus `examples/lib/` helper modules.
 
@@ -31,17 +30,17 @@ gcc out.c -o simple -lm
 
 Implementation index:
 
-- Frontend pipeline and pass order: `frontend/src/compiler.cpp`
-- Frontend invariant checks: `frontend/src/pass_invariants.h`, `frontend/src/pass_invariants.cpp`
-- Lowered output contract: `frontend/src/lowerer.h`, `frontend/src/lowered_printer.h`
-- Backend plugin API: `frontend/src/backend_registry.h`
+- Frontend pipeline and pass order: `frontend/src/cli/compiler.cpp`
+- Frontend invariant checks: `frontend/src/pipeline/pass_invariants.h`, `frontend/src/pipeline/pass_invariants.cpp`
+- Lowered output contract: `frontend/src/transform/lowerer.h`, `frontend/src/codegen/lowered_printer.h`
+- Backend plugin API: `frontend/src/support/backend_registry.h`
 - Driver CLI contract: `driver/src/vexel_main.cpp`
 - Backend discovery/build wiring: `Makefile`, `driver/Makefile`, `playground/Makefile`
-- Test harnesses: `frontend/Makefile`, `backends/c/tests/run_tests.py`, `backends/tests/run_conformance.sh`
+- Test harnesses: `frontend/Makefile`, `backends/c/tests/run_tests.py`, `tools/backend_conformance.sh`
 
 ## Frontend Pipeline
 
-Canonical stage order in `frontend/src/compiler.cpp`:
+Canonical stage order in `frontend/src/cli/compiler.cpp`:
 
 1. Module load (`ModuleLoader`)
 2. Resolve symbols/scopes (`Resolver`)
@@ -53,8 +52,8 @@ Canonical stage order in `frontend/src/compiler.cpp`:
 8. Validate concrete type usage (`TypeChecker::validate_type_usage`)
 9. Emit backend output
 
-Lowered output contract lives in `frontend/src/lowerer.h` and `frontend/src/lowered_printer.h`.
-Debug invariant checks live in `frontend/src/pass_invariants.h`.
+Lowered output contract lives in `frontend/src/transform/lowerer.h` and `frontend/src/codegen/lowered_printer.h`.
+Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 
 ## Usage
 
@@ -73,7 +72,7 @@ The unified driver forwards unknown options to the selected backend. If neither 
 
 ## Backend Extension Contract
 
-Backend plugin API is defined in `frontend/src/backend_registry.h`.
+Backend plugin API is defined in `frontend/src/support/backend_registry.h`.
 
 Each backend must provide:
 
@@ -93,7 +92,7 @@ Placement/discovery:
 - Required Makefile targets: `all`, `test`, `clean`
 - Dedicated backend CLI: `build/vexel-<name>`
 
-Conformance script: `backends/tests/run_conformance.sh`.
+Conformance script: `tools/backend_conformance.sh`.
 
 ### Process Expressions (Safety)
 
@@ -101,7 +100,7 @@ Process expressions execute host commands. They are **disabled by default**; pas
 
 ## Requirements & Testing
 
-- Suites live under `frontend/tests`, `backends/*/tests`, and `backends/tests` (conformance).
+- Suites live under `frontend/tests` and `backends/*/tests` (plus backend conformance in `tools/backend_conformance.sh`).
 - Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
 - `make test` builds and runs the full suite.
 - `make frontend-test`, `make backend-c-test`, and `make backend-conformance-test` run focused suites.

@@ -30,9 +30,9 @@ check_file() {
   fi
 }
 
-check_file "$ROOT/frontend/src/analysis.cpp"
-check_file "$ROOT/frontend/src/optimizer.cpp"
-check_file "$ROOT/frontend/src/resolver.cpp"
-check_file "$ROOT/frontend/src/module_loader.cpp"
+check_file "$ROOT/frontend/src/analysis/analysis.cpp"
+check_file "$ROOT/frontend/src/transform/optimizer.cpp"
+check_file "$ROOT/frontend/src/resolve/resolver.cpp"
+check_file "$ROOT/frontend/src/resolve/module_loader.cpp"
 
 echo "ok"

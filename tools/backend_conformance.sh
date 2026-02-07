@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Backend conformance source of truth:
 # validates minimum build/CLI contract for every discovered backend directory.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 discover_backends() {
   local dirs=()
@@ -11,7 +11,7 @@ discover_backends() {
   for d in "$ROOT"/backends/*/ "$ROOT"/backends/ext/*/; do
     [[ -d "$d" ]] || continue
     base="$(basename "$d")"
-    if [[ "$base" == "common" || "$base" == "_template" || "$base" == "ext" || "$base" == "tests" ]]; then
+    if [[ "$base" == "common" || "$base" == "ext" || "$base" == "tests" ]]; then
       continue
     fi
     dirs+=("${d%/}")
