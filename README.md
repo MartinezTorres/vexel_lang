@@ -79,6 +79,12 @@ The unified driver forwards unknown options to the selected backend. If neither 
 
 Backend plugin API is defined in `frontend/src/support/backend_registry.h`.
 
+Backend architecture rule:
+
+- The frontend/backend boundary is the `AnalyzedProgram` contract.
+- Backend code generation is intentionally backend-owned; no shared codegen layer.
+- C and megalinker are expected to diverge in lowering strategy and target behavior.
+
 Each backend must provide:
 
 - `register_backend_<name>()`

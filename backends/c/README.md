@@ -1,6 +1,6 @@
-# Vexel Backend Specification – C x86 (v0.2.1)
+# Vexel Backend Specification – C (v0.2.1)
 
-This backend emits portable C targeting 32-bit x86 System V ABI. It consumes the lowered, monomorphized, annotation-preserving frontend output.
+This backend emits portable C as the reference backend. It consumes the lowered, monomorphized, annotation-preserving frontend output.
 
 Source-of-truth integration points:
 
@@ -19,11 +19,11 @@ Source-of-truth integration points:
 - Diagnostics from parsing/type checking are backend-agnostic; this backend emits only C-emission errors.
 
 ## Target & ABI
-- Platform: 32-bit Linux on x86, System V ABI.
-- Integer widths: `i8/u8 → int8_t/uint8_t`, `i16/u16 → int16_t/uint16_t`, `i32/u32 → int32_t/uint32_t`, `i64/u64 → int64_t/uint64_t`.
+- Target: portable C output for host C11 toolchains.
+- Integer widths in generated code: `i8/u8 → int8_t/uint8_t`, `i16/u16 → int16_t/uint16_t`, `i32/u32 → int32_t/uint32_t`, `i64/u64 → int64_t/uint64_t`.
 - Floats: `f32 → float`, `f64 → double`.
 - Bool: `_Bool`.
-- Pointers: native 32-bit pointers; no packed/segmented memory model.
+- Pointers: emitted as native C pointers for the host toolchain.
 
 ## Name Mangling & Identifiers
 - Mangled identifiers use the `__` prefix defined in `constants.h` (`MANGLED_PREFIX`).
@@ -64,7 +64,7 @@ Source-of-truth integration points:
 
 ## Diagnostics Specific to This Backend
 - Emit errors when C emission would be invalid (e.g., pass-by-value of zero-sized struct).
-- Warn if integer widths exceed host platform limits (should not occur on 32-bit x86).
+- Warn if integer widths exceed host platform limits.
 
 ## Testing Notes
 - Default test mode targets this backend. Regression tests exercise emitted C structure (single source/header, mappings above) and linkage via host gcc.
