@@ -1,5 +1,6 @@
 #include "backend_registry.h"
 #include "cli_utils.h"
+#include "native_tcc_runner.h"
 #include <iostream>
 #include <cstring>
 #include <vector>
@@ -14,6 +15,7 @@ namespace {
 void print_usage(const char* prog,
                  const std::vector<vexel::BackendInfo>& backends,
                  const vexel::Backend* selected_backend = nullptr) {
+    const bool has_native_tcc = vexel::native_tcc_supported();
     std::cout << "Vexel Compiler (multi-backend)\n";
     std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
     std::cout << "Options:\n";
@@ -28,6 +30,10 @@ void print_usage(const char* prog,
     std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
     std::cout << "  --backend-opt <k=v> Backend-specific option (repeatable)\n";
+    if (has_native_tcc) {
+        std::cout << "  --run         Compile with backend c and run in-process via libtcc (no .c/.h output)\n";
+        std::cout << "  --emit-exe    Compile with backend c and emit native executable via libtcc\n";
+    }
     std::cout << "  -v           Verbose output\n";
     std::cout << "  -h           Show this help\n";
     if (selected_backend && selected_backend->print_usage) {
@@ -46,10 +52,20 @@ int main(int argc, char** argv) {
     }
 
     bool help_requested = false;
+    bool run_requested = false;
+    bool emit_exe_requested = false;
     std::string selected_backend_name;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
             help_requested = true;
+            continue;
+        }
+        if (std::strcmp(argv[i], "--run") == 0) {
+            run_requested = true;
+            continue;
+        }
+        if (std::strcmp(argv[i], "--emit-exe") == 0) {
+            emit_exe_requested = true;
             continue;
         }
         std::string parsed_backend;
@@ -70,12 +86,26 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (run_requested && emit_exe_requested) {
+        std::cerr << "Error: --run and --emit-exe cannot be used together\n";
+        print_usage(argv[0], available_backends);
+        return 1;
+    }
+    bool native_mode = run_requested || emit_exe_requested;
+
     const vexel::Backend* selected_backend = nullptr;
     if (!selected_backend_name.empty()) {
         selected_backend = vexel::find_backend(selected_backend_name);
         if (!selected_backend) {
             std::cerr << "Error: Unknown backend '" << selected_backend_name << "'\n";
             print_usage(argv[0], available_backends);
+            return 1;
+        }
+    } else if (native_mode) {
+        selected_backend_name = "c";
+        selected_backend = vexel::find_backend(selected_backend_name);
+        if (!selected_backend) {
+            std::cerr << "Error: Native mode requires backend 'c', but it is not registered\n";
             return 1;
         }
     } else if (!help_requested) {
@@ -88,6 +118,17 @@ int main(int argc, char** argv) {
         print_usage(argv[0], available_backends, selected_backend);
         return 0;
     }
+    if (native_mode) {
+        if (selected_backend_name != "c") {
+            std::cerr << "Error: --run/--emit-exe require backend 'c'\n";
+            print_usage(argv[0], available_backends, selected_backend);
+            return 1;
+        }
+        if (!vexel::native_tcc_supported()) {
+            std::cerr << "Error: --run/--emit-exe are unavailable in this build (libtcc+tcc runtime not detected)\n";
+            return 1;
+        }
+    }
 
     vexel::Compiler::Options opts;
     opts.output_file = "out";
@@ -95,6 +136,9 @@ int main(int argc, char** argv) {
 
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
+            continue;
+        }
+        if (std::strcmp(argv[i], "--run") == 0 || std::strcmp(argv[i], "--emit-exe") == 0) {
             continue;
         }
         std::string parse_error;
@@ -163,6 +207,12 @@ int main(int argc, char** argv) {
         std::cerr << "Error: No input file specified\n";
         print_usage(argv[0], available_backends, selected_backend);
         return 1;
+    }
+
+    if (native_mode) {
+        vexel::NativeTccMode mode = run_requested ? vexel::NativeTccMode::Run
+                                                  : vexel::NativeTccMode::EmitExe;
+        return vexel::run_native_with_tcc(opts, mode, std::cerr);
     }
 
     return vexel::run_compiler_with_diagnostics(opts, std::cerr);

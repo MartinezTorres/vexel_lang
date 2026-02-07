@@ -61,6 +61,8 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ./build/vexel -b c input.vx                     # unified driver (backend selection is required)
 ./build/vexel -b c --emit-analysis input.vx     # emit analysis report
 ./build/vexel -b c -L input.vx                  # emit lowered Vexel + backend output
+./build/vexel --run input.vx                    # optional: run via libtcc (backend c)
+./build/vexel --emit-exe -o app input.vx        # optional: emit native exe via libtcc (backend c)
 ./build/vexel-c input.vx                        # backend-specific CLI (portable C)
 ./build/vexel-frontend input.vx                 # frontend-only lowered output
 ./build/vexel-frontend --allow-process foo.vx   # opt in to process expressions
@@ -125,6 +127,7 @@ Playground build and embed logic live in `playground/Makefile`, `playground/embe
 - Builds require a C++17 compiler. The Makefiles honor `CXX`, so you can run `CXX=clang++ make` to select a toolchain.
 - Generated C is compiled with a host C11 toolchain during runtime tests; defaults assume `gcc -std=c11 -O2 -lm`.
 - Backends: c (portable C) is stable.
+- Optional native mode: if `libtcc` and `tcc` runtime files (`libtcc1.a`) are detected at build time, `build/vexel` supports `--run` and `--emit-exe` using backend c.
 
 ## Licensing & Releases
 

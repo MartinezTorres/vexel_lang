@@ -1,5 +1,6 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
+LDFLAGS ?=
 BUILD_DIR ?= $(abspath ../build)
 
 BACKEND_DIRS := $(filter-out ../backends/common/ ../backends/ext/ ../backends/tests/,$(wildcard ../backends/*/ ../backends/ext/*/))
@@ -8,8 +9,40 @@ backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
 BACKEND_HEADERS := $(foreach name,$(BACKEND_NAMES),$(call backend_dir,$(name))src/$(name)_backend.h)
 BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I$(dir)src)
 FRONTEND_INCLUDE_DIRS := $(shell find ../frontend/src -type d -print)
+PKG_CONFIG ?= pkg-config
+LIBTCC_CFLAGS := $(shell $(PKG_CONFIG) --cflags libtcc 2>/dev/null)
+LIBTCC_LIBS := $(shell $(PKG_CONFIG) --libs libtcc 2>/dev/null)
+GCC_SYS_INCLUDE_DIR := $(shell $(CXX) -print-file-name=include 2>/dev/null)
+LIBTCC_HEADER_FALLBACK := $(firstword $(wildcard /usr/include/libtcc.h /usr/local/include/libtcc.h))
+LIBTCC_STATIC_FALLBACK := $(firstword $(wildcard /usr/lib/x86_64-linux-gnu/libtcc.a /usr/lib64/libtcc.a /usr/lib/libtcc.a /usr/local/lib/libtcc.a /usr/local/lib64/libtcc.a))
+TCC_RUNTIME_ARCHIVE_FALLBACK := $(firstword $(wildcard /usr/lib/x86_64-linux-gnu/tcc/libtcc1.a /usr/lib/tcc/libtcc1.a /usr/local/lib/tcc/libtcc1.a))
+TCC_RUNTIME_DIR ?= $(patsubst %/,%,$(dir $(TCC_RUNTIME_ARCHIVE_FALLBACK)))
+
+ifeq ($(strip $(LIBTCC_LIBS)),)
+  ifneq ($(strip $(LIBTCC_HEADER_FALLBACK)),)
+    ifneq ($(strip $(LIBTCC_STATIC_FALLBACK)),)
+      LIBTCC_CFLAGS += -I$(dir $(LIBTCC_HEADER_FALLBACK))
+      LIBTCC_LIBS += $(LIBTCC_STATIC_FALLBACK) -ldl -lm
+    endif
+  endif
+endif
 
 CXXFLAGS += -Isrc $(addprefix -I,$(FRONTEND_INCLUDE_DIRS)) $(BACKEND_INCLUDES)
+
+ifneq ($(strip $(LIBTCC_LIBS)),)
+  CXXFLAGS += $(LIBTCC_CFLAGS) -DVEXEL_HAS_LIBTCC=1
+  ifneq ($(strip $(GCC_SYS_INCLUDE_DIR)),)
+    CXXFLAGS += -DVEXEL_GCC_SYS_INCLUDE_DIR=\"$(GCC_SYS_INCLUDE_DIR)\"
+  endif
+  ifneq ($(strip $(TCC_RUNTIME_DIR)),)
+    CXXFLAGS += -DVEXEL_HAS_TCC_RUNTIME=1 -DVEXEL_TCC_RUNTIME_DIR=\"$(TCC_RUNTIME_DIR)\"
+  else
+    CXXFLAGS += -DVEXEL_HAS_TCC_RUNTIME=0
+  endif
+  LDFLAGS += $(LIBTCC_LIBS)
+else
+  CXXFLAGS += -DVEXEL_HAS_LIBTCC=0
+endif
 
 BIN = $(BUILD_DIR)/vexel
 FRONTEND_LIB = $(BUILD_DIR)/lib/libvexelfrontend.a
@@ -30,7 +63,7 @@ test:
 
 $(BIN): $(OBJECTS) $(FRONTEND_LIB) $(BACKEND_LIBS)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) $(OBJECTS) -Wl,--start-group $(BACKEND_LIBS) $(FRONTEND_LIB) -Wl,--end-group -o $@
+	$(CXX) $(CXXFLAGS) $(OBJECTS) -Wl,--start-group $(BACKEND_LIBS) $(FRONTEND_LIB) -Wl,--end-group $(LDFLAGS) -o $@
 
 $(BUILD_DIR)/driver/%.o: src/%.cpp
 	@mkdir -p $(@D)
