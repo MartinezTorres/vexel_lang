@@ -6,7 +6,7 @@
     Wrapper(w.v + 1)
 }
 &^main() -> #i32 {
-    mut w: #Wrapper = Wrapper(1);
+    w = Wrapper(1);
     w = Wrapper::inc();
     w = Wrapper::inc();
     w.v

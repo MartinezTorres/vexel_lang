@@ -18,7 +18,7 @@
     result = a == 1 && b == 0 ? ( #i32 ) 0 : ( #i32 ) 1;
     -> result;
 }
-mut state: #i32;
+state: #i32;
 &reset() -> #i32 {
     state = 0
 }
@@ -28,7 +28,7 @@ mut state: #i32;
 &getState() -> #i32 {
     state
 }
-mut state: #i32;
+state: #i32;
 &reset() -> #i32 {
     state = 0
 }

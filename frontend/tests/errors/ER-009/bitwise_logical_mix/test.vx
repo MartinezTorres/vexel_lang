@@ -4,6 +4,6 @@
 
 &^main() -> #i32 {
     // Mixing comparisons inside logical expressions without parentheses is ambiguous
-    result:#b = true && 1 < 2 < 3;
+    result:#b = 1 && 1 < 2 < 3;
     0;
 }

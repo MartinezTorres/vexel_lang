@@ -7,7 +7,7 @@
 }
 
 &^main() -> #i32 {
-    mut len #i32 = compute();
+    len:#i32 = compute();
     len = len + 1;
     data:#i32[len];
     0;

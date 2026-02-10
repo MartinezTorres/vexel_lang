@@ -8,16 +8,16 @@
 // RT-002: Logical AND operator (&&) short-circuits evaluation
 // If left operand is false, right operand should NOT be evaluated
 
-mut evaluated #b = false;
+evaluated:#b = 0;
 
 &trigger() -> #b {
-    evaluated = true;
-    true;
+    evaluated = 1;
+    1;
 }
 
 &^main() -> #i32 {
     // false && trigger() should not call trigger()
-    false && trigger();
+    0 && trigger();
 
     // evaluated should still be false
     evaluated ? 1 : 0

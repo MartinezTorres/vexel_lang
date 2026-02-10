@@ -8,7 +8,7 @@
     a = 0;
     b = 0;
     {
-        mut __tuple_tmp_0: #__Tuple2_i32_i32 = get_pair();
+        __tuple_tmp_0: #__Tuple2_i32_i32 = get_pair();
         a = __tuple_tmp_0.__0;
         b = __tuple_tmp_0.__1;
     };

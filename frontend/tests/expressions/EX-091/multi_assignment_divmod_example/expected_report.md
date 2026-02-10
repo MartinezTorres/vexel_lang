@@ -5,10 +5,10 @@
     (a / b, a % b)
 }
 &^main() -> #i32 {
-    mut q: #u32;
-    mut r: #u32;
+    q: #u32;
+    r: #u32;
     {
-        mut __tuple_tmp_0: #__Tuple2_u32_u32 = divmod(10, 3);
+        __tuple_tmp_0: #__Tuple2_u32_u32 = divmod(10, 3);
         q = __tuple_tmp_0.__0;
         r = __tuple_tmp_0.__1;
     };

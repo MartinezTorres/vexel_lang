@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/modules/NR-032/closure_capture/test.vx
 &^main() -> #i32 {
-    mut total: #i32 = 0;
+    total = 0;
     &add_one() -> #i32 {
         total = total + 1;
         total

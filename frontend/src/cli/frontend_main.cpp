@@ -2,11 +2,10 @@
 #include "resolver.h"
 #include "module_loader.h"
 #include "frontend_pipeline.h"
-#include "lowered_printer.h"
 #include <iostream>
 #include <cstring>
 
-// Minimal front-end CLI: lex/parse/type-check and emit lowered IR.
+// Minimal front-end CLI: lex/parse/type-check and report diagnostics only.
 static void print_usage(const char* prog) {
     std::cout << "Vexel Frontend\n";
     std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
@@ -60,8 +59,7 @@ int main(int argc, char** argv) {
         vexel::Resolver resolver(program, bindings, project_root);
 
         vexel::TypeChecker checker(project_root, allow_process, &resolver, &bindings, &program);
-        vexel::FrontendPipelineResult pipeline = vexel::run_frontend_pipeline(program, resolver, checker, verbose);
-        std::cout << vexel::print_lowered_module(pipeline.merged);
+        (void)vexel::run_frontend_pipeline(program, resolver, checker, verbose);
         return 0;
     } catch (const vexel::CompileError& e) {
         std::cerr << "Error";

@@ -4,7 +4,6 @@
 #include "constants.h"
 #include "frontend_pipeline.h"
 #include "io_utils.h"
-#include "lowered_printer.h"
 #include "module_loader.h"
 #include "analyzed_program_builder.h"
 #include "resolver.h"
@@ -46,14 +45,6 @@ Compiler::OutputPaths Compiler::compile() {
     FrontendPipelineResult pipeline = run_frontend_pipeline(program, resolver, checker, options.verbose);
 
     OutputPaths paths = resolve_output_paths(options.output_file);
-    if (options.emit_lowered) {
-        std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
-        std::string lowered = print_lowered_module(pipeline.merged);
-        if (options.verbose) {
-            std::cout << "Writing lowered module: " << lowered_path << std::endl;
-        }
-        write_text_file_or_throw(lowered_path.string(), lowered);
-    }
     if (options.emit_analysis) {
         std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
         if (options.verbose) {

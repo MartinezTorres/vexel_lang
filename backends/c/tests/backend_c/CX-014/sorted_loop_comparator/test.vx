@@ -6,7 +6,7 @@
 
 &^main() -> #i32 {
     arr:#i32[3] = [3, 1, 2];
-    mut first:#i32 = 0;
+    first:#i32 = 0;
     arr @@ { first = _; first };
     first  // Should be 1 (sorted)
 }

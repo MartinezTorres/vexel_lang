@@ -8,7 +8,7 @@
 // RT-021: Accessing uninitialized values during compile-time execution triggers compile-time error
 
 &bad_func() -> #i32 {
-    mut x #i32;
+    x:#i32;
     // Accessing uninitialized variable
     x;
 }

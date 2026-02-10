@@ -15,7 +15,7 @@
         -> result;
     }
 }
-mut value: #i32;
+value: #i32;
 &reset() -> #i32 {
     value = 0
 }
@@ -25,7 +25,7 @@ mut value: #i32;
 &get() -> #i32 {
     value
 }
-mut value: #i32;
+value: #i32;
 &reset() -> #i32 {
     value = 0
 }

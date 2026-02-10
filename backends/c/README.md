@@ -4,7 +4,7 @@ This backend emits portable C as the reference backend. It consumes the lowered,
 
 Source-of-truth integration points:
 
-- Frontend lowering contract: `frontend/src/transform/lowerer.h`, `frontend/src/codegen/lowered_printer.h`
+- Frontend lowering contract: `frontend/src/transform/lowerer.h`
 - Frontend pipeline order: `frontend/src/cli/compiler.cpp`
 - Backend plugin API: `frontend/src/support/backend_registry.h`
 

@@ -5,7 +5,6 @@
 #include "analyzed_program_builder.h"
 #include "frontend_pipeline.h"
 #include "io_utils.h"
-#include "lowered_printer.h"
 #include "module_loader.h"
 #include "resolver.h"
 #include "typechecker.h"
@@ -56,10 +55,6 @@ int compile_to_c(const Compiler::Options& opts, CCodegenResult& out, std::ostrea
         FrontendPipelineResult pipeline = run_frontend_pipeline(program, resolver, checker, opts.verbose);
 
         Compiler::OutputPaths paths = resolve_output_paths(opts.output_file);
-        if (opts.emit_lowered) {
-            std::filesystem::path lowered_path = paths.dir / (paths.stem + ".lowered.vx");
-            write_text_file_or_throw(lowered_path.string(), print_lowered_module(pipeline.merged));
-        }
         if (opts.emit_analysis) {
             std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
             write_text_file_or_throw(analysis_path.string(),

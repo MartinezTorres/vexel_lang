@@ -6,7 +6,7 @@
 #Box(val:#i32);
 
 const_box:#Box = Box(2);
-mut bump:#i32 = 0;
+bump:#i32;
 
 &(self)#Box::get() -> #i32 {
     self.val
@@ -14,5 +14,6 @@ mut bump:#i32 = 0;
 
 &^main() -> #i32 {
     a:#Box = Box(1);
+    bump = 0;
     a.get() + const_box.get() + bump
 }

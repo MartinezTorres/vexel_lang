@@ -77,7 +77,7 @@ test: driver-test frontend-test backend-conformance-test $(BACKENDS_TEST_TARGETS
 
 # CLEAN
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
-	find . -type f \( -name 'out.analysis.txt' -o -name 'out.lowered.vx' \) -delete
+	find . -type f -name 'out.analysis.txt' -delete
 	rmdir --ignore-fail-on-non-empty $(BUILD_DIR) 2>/dev/null || true
 
 # Web playground (WASM build)

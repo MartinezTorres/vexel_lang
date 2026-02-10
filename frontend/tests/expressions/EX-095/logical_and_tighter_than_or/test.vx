@@ -5,6 +5,6 @@
 // EX-095: AND tighter than OR
 &^main() -> #i32 {
     // false || true && false is false || (true && false)
-    result:#b = false || true && false
+    result:#b = 0 || 1 && 0
     result ? 1 : 0  // 0
 }

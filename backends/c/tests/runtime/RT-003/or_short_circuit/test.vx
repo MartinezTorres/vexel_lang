@@ -8,16 +8,16 @@
 // RT-003: Logical OR operator (||) short-circuits evaluation
 // If left operand is true, right operand should NOT be evaluated
 
-mut evaluated #b = false;
+evaluated:#b = 0;
 
 &trigger() -> #b {
-    evaluated = true;
-    false;
+    evaluated = 1;
+    0;
 }
 
 &^main() -> #i32 {
     // true || trigger() should not call trigger()
-    true || trigger();
+    1 || trigger();
 
     // evaluated should still be false
     evaluated ? 1 : 0

@@ -7,10 +7,10 @@
     (q, r)
 }
 &^main() -> #i32 {
-    mut quotient: #i32;
-    mut remainder: #i32;
+    quotient: #i32;
+    remainder: #i32;
     {
-        mut __tuple_tmp_0: #__Tuple2_i32_i32 = divide(17, 5);
+        __tuple_tmp_0: #__Tuple2_i32_i32 = divide(17, 5);
         quotient = __tuple_tmp_0.__0;
         remainder = __tuple_tmp_0.__1;
     };

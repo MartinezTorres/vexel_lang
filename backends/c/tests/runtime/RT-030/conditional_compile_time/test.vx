@@ -7,7 +7,7 @@
 
 // RT-030: Conditional expression compiler attempts to evaluate condition at compile time
 
-USE_FAST:#b = true;
+USE_FAST:#b = 1;
 
 &fast_impl() -> #i32 { 100; }
 &slow_impl() -> #i32 { 50; }

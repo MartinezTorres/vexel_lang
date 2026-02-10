@@ -7,7 +7,7 @@
 
 // RT-026: Compile-time conditionals eliminate dead branches before type checking
 
-DEBUG:#b = false;
+DEBUG:#b = 0;
 
 &^main() -> #i32 {
     // When DEBUG is false, the true branch is eliminated

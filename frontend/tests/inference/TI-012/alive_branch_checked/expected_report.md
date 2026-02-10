@@ -1,11 +1,14 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/inference/TI-012/alive_branch_checked/test.vx
+&^main() -> #i32 {
+    1
+}
 ```
 
 ## Stderr
 ```
-Error at tests/inference/TI-012/alive_branch_checked/test.vx:5:1: Return type mismatch in function 'main'
 ```
 
 ## Exit Code
-1
+0

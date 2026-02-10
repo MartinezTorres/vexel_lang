@@ -7,7 +7,7 @@
 
 // RT-031: If condition is compile-time constant, branches can have different types
 
-DEBUG:#b = false;
+DEBUG:#b = 0;
 
 &^main() -> #i32 {
     // When DEBUG is false, only false branch type matters

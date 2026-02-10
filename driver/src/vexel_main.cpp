@@ -26,7 +26,6 @@ void print_usage(const char* prog,
         if (i + 1 < backends.size()) std::cout << ", ";
     }
     std::cout << "\n";
-    std::cout << "  -L           Emit lowered Vexel subset alongside backend output\n";
     std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
     std::cout << "  --backend-opt <k=v> Backend-specific option (repeatable)\n";

@@ -3,7 +3,7 @@
 
 
 &^main() -> #i32 {
-    mut len #i32 = 5;
+    len:#i32 = 5;
     data:#i32[len];
     0;
 }

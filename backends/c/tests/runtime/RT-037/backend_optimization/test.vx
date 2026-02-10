@@ -10,7 +10,7 @@
 // (backend optimizations are transparent to the programmer)
 
 &^main() -> #i32 {
-    mut arr #i32[3] = [0, 0, 0];
+    arr:#i32[3] = [0, 0, 0];
     arr[1] = 42;
     // Even with a large array, semantics are value-based
     arr[1]

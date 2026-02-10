@@ -8,8 +8,8 @@
 // RT-036: Assignment always creates independent copy (no aliasing)
 
 &^main() -> #i32 {
-    mut x #i32[2] = [10, 20];
-    mut y #i32[2] = x;  // Copy, not alias
+    x:#i32[2] = [10, 20];
+    y:#i32[2] = x;  // Copy, not alias
     y[0] = 99;
     x[0] + x[1]  // Should be 10 + 20 = 30
 }

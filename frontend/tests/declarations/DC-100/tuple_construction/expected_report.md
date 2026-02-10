@@ -5,10 +5,10 @@
     (42, 84)
 }
 &^main() -> #i32 {
-    mut x: #i32;
-    mut y: #i32;
+    x: #i32;
+    y: #i32;
     {
-        mut __tuple_tmp_0: #__Tuple2_i32_i32 = get_coords();
+        __tuple_tmp_0: #__Tuple2_i32_i32 = get_coords();
         x = __tuple_tmp_0.__0;
         y = __tuple_tmp_0.__1;
     };

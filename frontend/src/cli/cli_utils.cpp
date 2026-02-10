@@ -56,10 +56,6 @@ bool try_parse_common_compiler_option(int argc,
         opts.verbose = true;
         return true;
     }
-    if (std::strcmp(argv[index], "-L") == 0 || std::strcmp(argv[index], "--emit-lowered") == 0) {
-        opts.emit_lowered = true;
-        return true;
-    }
     if (std::strcmp(argv[index], "--emit-analysis") == 0) {
         opts.emit_analysis = true;
         return true;

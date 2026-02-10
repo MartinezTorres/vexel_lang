@@ -196,6 +196,7 @@ private:
     void substitute_types_in_expr(ExprPtr expr, const std::unordered_map<std::string, TypePtr>& type_map);
     std::string mangle_generic_name(const std::string& base_name, const std::vector<TypePtr>& types);
     void require_boolean(TypePtr type, const SourceLocation& loc, const std::string& context);
+    void require_boolean_expr(ExprPtr expr, TypePtr type, const SourceLocation& loc, const std::string& context);
     void require_unsigned_integer(TypePtr type, const SourceLocation& loc, const std::string& context);
 };
 

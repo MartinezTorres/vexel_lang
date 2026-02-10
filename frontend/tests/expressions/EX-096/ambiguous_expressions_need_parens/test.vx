@@ -5,6 +5,6 @@
 // EX-096: Explicit parentheses for clarity
 &^main() -> #i32 {
     // Clear precedence with parentheses
-    result:#b = (true || false) && true
+    result:#b = (1 || 0) && 1
     result ? 1 : 0
 }

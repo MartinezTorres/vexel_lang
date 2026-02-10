@@ -9,5 +9,5 @@
 // false || true && false should be false || (true && false) = false || false = false
 
 &^main() -> #i32 {
-    (false || true && false) ? 1 : 0
+    (0 || 1 && 0) ? 1 : 0
 }

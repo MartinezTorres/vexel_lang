@@ -3,6 +3,6 @@
 
 
 &^main() -> #i32 {
-    choice:#i32 = true ? 1 : (false ? 2 : 3);
+    choice:#i32 = 1 ? 1 : (0 ? 2 : 3);
     choice;
 }

@@ -3,7 +3,7 @@
 
 
 &^main() -> #i32 {
-    mut counter #i32 = 0;
+    counter:#i32 = 0;
 
     &increment() -> #i32 {
         counter = counter + 1;

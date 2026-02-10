@@ -9,7 +9,7 @@
 // Type mismatches are caught at compile time
 
 &^main() -> #i32 {
-    mut x #i32 = 42;
+    x:#i32 = 42;
     y:#s = "hello";
 
     // This should fail: cannot assign string to integer

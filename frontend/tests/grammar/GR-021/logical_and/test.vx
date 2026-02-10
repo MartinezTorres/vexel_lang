@@ -3,6 +3,6 @@
 
 
 &^main() -> #i32 {
-  result:#b = true && false
+  result:#b = 1 && 0
   result ? 1 : 0
 }

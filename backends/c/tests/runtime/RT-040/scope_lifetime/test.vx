@@ -9,8 +9,8 @@
 // This is a positive test showing scoped variables work correctly
 
 &^main() -> #i32 {
-    mut result #i32 = 0;
-    true ? {
+    result:#i32 = 0;
+    1 ? {
         scoped:#i32 = 42;
         result = scoped;
     }

@@ -4,7 +4,7 @@
 &!foo();
 
 &^main() -> #i32 {
-    false ? {
+    0 ? {
         tmp:#i32 = foo()
     }
     0

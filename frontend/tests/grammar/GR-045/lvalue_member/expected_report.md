@@ -4,7 +4,7 @@
 #Inner(v: #i32);
 #Holder(field: #i32, inner: #Inner);
 &^main() -> #i32 {
-    mut obj: #Holder = Holder(0, Inner(0));
+    obj = Holder(0, Inner(0));
     obj.field = 10;
     obj.inner.v = 20;
     obj.field + obj.inner.v

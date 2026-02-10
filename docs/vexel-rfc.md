@@ -12,7 +12,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Whole-program compilation**: All source available at compile time. Aggressive optimization and dead code elimination. Only exported functions (`&^`) callable externally.
 
-**Compilation model**: Backend specifications define target language, type mappings, calling conventions, code organization. Compiler can generate executables, libraries, or C source for integration. The toolchain can optionally emit a lowered Vexel subset after full type checking/monomorphization for backend consumption (`-L/--emit-lowered`).
+**Compilation model**: Backend specifications define target language, type mappings, calling conventions, code organization. Compiler can generate executables, libraries, or C source for integration.
 
 ---
 
@@ -337,7 +337,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - `[[reentrant]]`: marks an entry/exit function as requiring reentrant behavior; backends may propagate this requirement through the call graph.
   - `[[nonreentrant]]`: explicit non-reentrant entry/exit marker (default if neither is provided).
   - `[[nonbanked]]`: forces globals into RAM in the banked backend, even if immutable.
-- Lowered pipeline: the compiler can emit a fully type-checked, monomorphized “lowered Vexel” subset (`-L/--emit-lowered`) with annotations preserved. The lowered form contains no generics or expression parameters; all types are explicit.
+- Lowering is internal to the frontend pipeline. Backends consume the lowered, fully type-checked, monomorphized module contract; no frontend textual lowered output is part of the CLI surface.
 
 ---
 

@@ -3,6 +3,6 @@
 
 
 &^main() -> #i32 {
-    cond:#b = true
+    cond:#b = 1
     cond ? 10 : 20
 }

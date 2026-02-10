@@ -216,11 +216,19 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     TypePtr left_type = check_expr(expr->left);
     TypePtr right_type = check_expr(expr->right);
+    auto is_numeric_primitive = [](TypePtr t) {
+        return t &&
+               t->kind == Type::Kind::Primitive &&
+               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) || is_float(t->primitive));
+    };
+    auto is_numeric_like = [&](TypePtr t) {
+        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive(t);
+    };
 
     if (expr->op == "&&" || expr->op == "||") {
         std::string context = expr->op == "&&" ? "Logical operator &&" : "Logical operator ||";
-        require_boolean(left_type, expr->left->location, context);
-        require_boolean(right_type, expr->right->location, context);
+        require_boolean_expr(expr->left, left_type, expr->left->location, context);
+        require_boolean_expr(expr->right, right_type, expr->right->location, context);
         expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
         return expr->type;
     }
@@ -234,6 +242,9 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     // Arithmetic operators
     if (expr->op == "+" || expr->op == "-" || expr->op == "*" || expr->op == "/") {
+        if (!is_numeric_like(left_type) || !is_numeric_like(right_type)) {
+            throw CompileError("Operator " + expr->op + " requires numeric operands", expr->location);
+        }
         TypePtr result = unify_types(left_type, right_type);
         expr->type = result;
         return result;
@@ -384,13 +395,27 @@ void TypeChecker::register_tuple_type(const std::string& name, const std::vector
 
 TypePtr TypeChecker::check_unary(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
+    auto is_numeric_primitive = [](TypePtr t) {
+        return t &&
+               t->kind == Type::Kind::Primitive &&
+               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) || is_float(t->primitive));
+    };
+    auto is_numeric_like = [&](TypePtr t) {
+        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive(t);
+    };
 
     if (expr->op == "-") {
+        if (!is_numeric_like(operand_type)) {
+            throw CompileError("Unary - requires numeric operand", expr->location);
+        }
         expr->type = operand_type;
         return operand_type;
     }
 
     if (expr->op == "!") {
+        require_boolean_expr(expr->operand, operand_type,
+                             expr->operand ? expr->operand->location : expr->location,
+                             "Logical operator !");
         expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
         return expr->type;
     }
@@ -795,8 +820,9 @@ TypePtr TypeChecker::check_block(ExprPtr expr) {
 
 TypePtr TypeChecker::check_conditional(ExprPtr expr) {
     TypePtr cond_type = check_expr(expr->condition);
-    require_boolean(cond_type, expr->condition ? expr->condition->location : expr->location,
-                    "Conditional expression");
+    require_boolean_expr(expr->condition, cond_type,
+                         expr->condition ? expr->condition->location : expr->location,
+                         "Conditional expression");
 
     // Invariant: compile-time known condition short-circuits type requirements
     // for the dead branch. The type-use validator mirrors this by skipping
@@ -977,6 +1003,18 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Internal error: unresolved assignment target", expr->location);
         }
         if (!sym->is_mutable) {
+            bool can_promote_global =
+                !sym->is_local &&
+                sym->declaration &&
+                sym->declaration->kind == Stmt::Kind::VarDecl &&
+                sym->declaration->var_type;
+            if (can_promote_global) {
+                sym->kind = Symbol::Kind::Variable;
+                sym->is_mutable = true;
+                sym->declaration->is_mutable = true;
+            }
+        }
+        if (!sym->is_mutable) {
             std::string name = expr->left->name;
             if (name == "_") {
                 throw CompileError("Cannot assign to read-only loop variable '_'", expr->location);
@@ -1015,6 +1053,14 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
 TypePtr TypeChecker::check_range(ExprPtr expr) {
     TypePtr start_type = check_expr(expr->left);
     TypePtr end_type = check_expr(expr->right);
+    auto is_integer_primitive = [](TypePtr t) {
+        return t &&
+               t->kind == Type::Kind::Primitive &&
+               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive));
+    };
+    if (!is_integer_primitive(start_type) || !is_integer_primitive(end_type)) {
+        throw CompileError("Range bounds must be integer expressions", expr->location);
+    }
 
     // Check if bounds are equal (would create empty array)
     if (expr->left->kind == Expr::Kind::IntLiteral &&
@@ -1089,8 +1135,9 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
 
 TypePtr TypeChecker::check_repeat(ExprPtr expr) {
     TypePtr cond_type = check_expr(expr->condition);
-    require_boolean(cond_type, expr->condition ? expr->condition->location : expr->location,
-                    "Repeat loop");
+    require_boolean_expr(expr->condition, cond_type,
+                         expr->condition ? expr->condition->location : expr->location,
+                         "Repeat loop");
     loop_depth++;
     check_expr(expr->right);
     loop_depth--;
@@ -1336,10 +1383,10 @@ TypePtr TypeChecker::bind_typevar(TypePtr var, TypePtr target) {
 TypePtr TypeChecker::infer_literal_type(ExprPtr expr) {
     switch (expr->kind) {
         case Expr::Kind::IntLiteral: {
-            uint64_t raw = expr->uint_val;
-            if (expr->raw_literal == "true" || expr->raw_literal == "false") {
+            if (expr->uint_val <= 1u) {
                 return Type::make_primitive(PrimitiveType::Bool, expr->location);
             }
+            uint64_t raw = expr->uint_val;
 
             if (expr->literal_is_unsigned) {
                 if (raw <= 0xFFull) return Type::make_primitive(PrimitiveType::U8, expr->location);

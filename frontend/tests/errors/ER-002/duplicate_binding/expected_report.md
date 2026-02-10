@@ -1,11 +1,16 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/errors/ER-002/duplicate_binding/test.vx
+&^main() -> #i32 {
+    x = 5;
+    x = 10;
+    x
+}
 ```
 
 ## Stderr
 ```
-Error at tests/errors/ER-002/duplicate_binding/test.vx:7:5: Name shadows existing definition: x
 ```
 
 ## Exit Code
-1
+0

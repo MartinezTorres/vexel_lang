@@ -7,6 +7,6 @@
 // RT-052: Length operator |expr| rejects other operand types (except arrays, strings, signed/unsigned ints)
 
 &^main() -> #i32 {
-    b #bool = true
+    b #bool = 1
     |b|  // Should fail - bool doesn't support length operator
 }

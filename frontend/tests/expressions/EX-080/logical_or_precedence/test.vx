@@ -5,6 +5,6 @@
 // EX-080: Logical OR precedence
 &^main() -> #i32 {
     // false && true || true is (false && true) || true
-    result:#b = false && true || true
+    result:#b = 0 && 1 || 1
     result ? 1 : 0  // 1
 }

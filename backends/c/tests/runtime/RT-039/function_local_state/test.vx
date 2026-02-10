@@ -8,7 +8,7 @@
 // RT-039: All mutable state is function-local (except through references)
 
 &compute() -> #i32 {
-    mut local #i32 = 10;
+    local:#i32 = 10;
     local = local + 5;
     local
 }

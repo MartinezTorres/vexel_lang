@@ -8,7 +8,7 @@
 // RT-064: Function call evaluation: receiver expressions evaluate left-to-right before argument list,
 // then arguments evaluate left-to-right
 
-mut counter:#i32 = 0;
+counter:#i32 = 0;
 
 &get_value(id:#i32) -> #i32 {
     counter = counter + 1;

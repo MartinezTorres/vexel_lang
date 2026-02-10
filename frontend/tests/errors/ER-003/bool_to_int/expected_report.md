@@ -1,11 +1,15 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/errors/ER-003/bool_to_int/test.vx
+&^main() -> #i32 {
+    x = 1;
+    x
+}
 ```
 
 ## Stderr
 ```
-Error at tests/errors/ER-003/bool_to_int/test.vx:6:5: Type mismatch in variable initialization
 ```
 
 ## Exit Code
-1
+0

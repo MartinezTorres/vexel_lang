@@ -4,7 +4,7 @@
 // @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); sys.exit(0 if re.search(r'\\bstatic\\s+VX_MUTABLE\\s+int32_t\\s+vx_global_counter\\s*=', src) else 1)" {VEXEL_C}
 
 
-mut global_counter:#i32 = 0;
+global_counter:#i32 = 0;
 
 &increment() -> #i32 {
     global_counter = global_counter + 1;

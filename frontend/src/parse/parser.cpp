@@ -44,7 +44,6 @@ void Parser::synchronize() {
                 case TokenType::AmpersandCaret:
                 case TokenType::Hash:
                 case TokenType::DoubleColon:
-                case TokenType::Mut:
                 case TokenType::Identifier:
                     // Valid statement start, we're synchronized
                     return;
@@ -61,7 +60,6 @@ void Parser::synchronize() {
                 case TokenType::AmpersandCaret:
                 case TokenType::Hash:
                 case TokenType::DoubleColon:
-                case TokenType::Mut:
                     return;
                 default:
                     pos++;
@@ -382,7 +380,6 @@ StmtPtr Parser::parse_import() {
 
 StmtPtr Parser::parse_global() {
     SourceLocation loc = current().location;
-    bool explicit_mut = match(TokenType::Mut);
     std::string name = consume(TokenType::Identifier, "Expected variable name").lexeme;
 
     TypePtr type = nullptr;
@@ -397,11 +394,11 @@ StmtPtr Parser::parse_global() {
         init = parse_expr();
     }
 
-    if (!type && (explicit_mut || !init)) {
-        throw CompileError("Mutable global must have type annotation", loc);
+    if (!type && !init) {
+        throw CompileError("Global declaration without initializer must have type annotation", loc);
     }
 
-    bool is_mut = explicit_mut || (!init && type);
+    bool is_mut = (!init && type);
     return Stmt::make_var(name, type, init, is_mut, loc);
 }
 
@@ -415,30 +412,6 @@ StmtPtr Parser::parse_stmt() {
 
 StmtPtr Parser::parse_stmt_no_semi() {
     SourceLocation loc = current().location;
-
-    if (check(TokenType::Mut)) {
-        SourceLocation mut_loc = current().location;
-        match(TokenType::Mut);
-        std::string name = consume(TokenType::Identifier, "Expected variable name after 'mut'").lexeme;
-
-        TypePtr type = nullptr;
-        if (match(TokenType::Colon)) {
-            type = parse_type();
-        } else if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
-            type = parse_type();
-        }
-
-        if (!type) {
-            throw CompileError("Mutable variable must specify a type", mut_loc);
-        }
-
-        ExprPtr init = nullptr;
-        if (match(TokenType::Assign)) {
-            init = parse_expr();
-        }
-
-        return Stmt::make_var(name, type, init, true, mut_loc);
-    }
 
     if (match(TokenType::Arrow)) {
         if (match(TokenType::BitOr)) {
@@ -816,7 +789,18 @@ ExprPtr Parser::parse_unary() {
     if (check(TokenType::Minus) || check(TokenType::LogicalNot) || check(TokenType::BitNot)) {
         std::string op = current().lexeme;
         pos++;
-        return Expr::make_unary(op, parse_unary(), loc);
+        ExprPtr operand = parse_unary();
+        if (op == "-" &&
+            operand &&
+            operand->kind == Expr::Kind::IntLiteral &&
+            !operand->literal_is_unsigned) {
+            int64_t val = static_cast<int64_t>(operand->uint_val);
+            std::string raw = operand->raw_literal.empty()
+                ? std::string("-") + std::to_string(val)
+                : std::string("-") + operand->raw_literal;
+            return Expr::make_int(-val, loc, raw);
+        }
+        return Expr::make_unary(op, operand, loc);
     }
 
     if (match(TokenType::BitOr)) {

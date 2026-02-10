@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/expressions/EX-024/statement_conditional_boolean/test.vx
 &!print(arg0: #i32);
 &^main() -> #i32 {
-    flag = true;
+    flag = 1;
     flag ? 
         print(1);
     0

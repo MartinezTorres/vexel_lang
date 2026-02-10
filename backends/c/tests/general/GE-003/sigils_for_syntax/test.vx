@@ -11,6 +11,6 @@
 &^main() -> #i32 {
     base:#i32 = 2;
     extra:#i32 = 8;
-    condition:#b = true;
+    condition:#b = 1;
     condition ? (base + extra) : base;
 }

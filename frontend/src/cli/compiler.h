@@ -22,13 +22,12 @@ public:
         std::string output_file;      // Base name for output files
         bool verbose;                 // Enable verbose output
         std::string project_root;     // Root directory for module resolution
-        bool emit_lowered;            // Emit lowered Vexel subset alongside backend output
         bool emit_analysis;           // Emit analysis report alongside backend output
         bool allow_process = false;   // Process expressions execute host commands; keep disabled by default
         std::string backend; // Backend name (registered via backend registry)
         std::unordered_map<std::string, std::string> backend_options; // Backend-specific key=value options
 
-        Options() : verbose(false), project_root("."), emit_lowered(false), emit_analysis(false),
+        Options() : verbose(false), project_root("."), emit_analysis(false),
                     allow_process(false), backend("") {}
     };
 

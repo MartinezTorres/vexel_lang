@@ -120,6 +120,21 @@ void TypeChecker::require_boolean(TypePtr type, const SourceLocation& loc, const
         throw CompileError(context + " requires a boolean expression", loc);
     }
 }
+
+void TypeChecker::require_boolean_expr(ExprPtr expr, TypePtr type, const SourceLocation& loc, const std::string& context) {
+    if (type && type->kind == Type::Kind::Primitive && type->primitive == PrimitiveType::Bool) {
+        return;
+    }
+
+    TypePtr bool_type = Type::make_primitive(PrimitiveType::Bool, loc);
+    if (expr && literal_assignable_to(bool_type, expr)) {
+        expr->type = bool_type;
+        return;
+    }
+
+    throw CompileError(context + " requires a boolean expression", loc);
+}
+
 void TypeChecker::require_unsigned_integer(TypePtr type, const SourceLocation& loc, const std::string& context) {
     if (!type || type->kind != Type::Kind::Primitive || !is_unsigned_int(type->primitive)) {
         throw CompileError(context + " requires unsigned integer operands", loc);

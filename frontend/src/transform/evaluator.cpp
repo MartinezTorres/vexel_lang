@@ -262,6 +262,12 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
 bool CompileTimeEvaluator::eval_literal(ExprPtr expr, CTValue& result) {
     switch (expr->kind) {
         case Expr::Kind::IntLiteral:
+            if (expr->type &&
+                expr->type->kind == Type::Kind::Primitive &&
+                expr->type->primitive == PrimitiveType::Bool) {
+                result = (expr->uint_val != 0u);
+                return true;
+            }
             if (expr->literal_is_unsigned) {
                 result = (uint64_t)expr->uint_val;
             } else {
@@ -319,11 +325,11 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         }
 
         if (expr->op == "&&" && !left_bool) {
-            result = (int64_t)0;
+            result = false;
             return true;
         }
         if (expr->op == "||" && left_bool) {
-            result = (int64_t)1;
+            result = true;
             return true;
         }
 
@@ -333,7 +339,7 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             error_msg = "Unsupported operand types for logical operation";
             return false;
         }
-        result = (int64_t)((expr->op == "&&") ? (left_bool && right_bool) : (left_bool || right_bool));
+        result = (expr->op == "&&") ? (left_bool && right_bool) : (left_bool || right_bool);
         return true;
     }
 
@@ -525,7 +531,7 @@ bool CompileTimeEvaluator::eval_unary(ExprPtr expr, CTValue& result) {
     if (std::holds_alternative<int64_t>(operand_val)) {
         int64_t v = std::get<int64_t>(operand_val);
         if (expr->op == "-") result = -v;
-        else if (expr->op == "!") result = (int64_t)!v;
+        else if (expr->op == "!") result = !v;
         else {
             error_msg = "Unsupported unary operator: " + expr->op;
             return false;
@@ -536,7 +542,7 @@ bool CompileTimeEvaluator::eval_unary(ExprPtr expr, CTValue& result) {
     if (std::holds_alternative<double>(operand_val)) {
         double v = std::get<double>(operand_val);
         if (expr->op == "-") result = -v;
-        else if (expr->op == "!") result = (int64_t)!v;
+        else if (expr->op == "!") result = !v;
         else {
             error_msg = "Unsupported unary operator: " + expr->op;
             return false;
@@ -547,7 +553,7 @@ bool CompileTimeEvaluator::eval_unary(ExprPtr expr, CTValue& result) {
     if (std::holds_alternative<bool>(operand_val)) {
         bool v = std::get<bool>(operand_val);
         if (expr->op == "!") {
-            result = (int64_t)!v;
+            result = !v;
             return true;
         }
     }

@@ -7,7 +7,7 @@
 // RT-029: No side effects allowed during compile-time execution
 // Test that mutable global modification is rejected
 
-mut global_state #i32 = 0
+global_state:#i32 = 0
 
 modify_state() -> #i32 {
     global_state = 42

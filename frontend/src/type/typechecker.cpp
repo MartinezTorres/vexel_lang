@@ -119,8 +119,9 @@ void TypeChecker::check_stmt(StmtPtr stmt) {
             break;
         case Stmt::Kind::ConditionalStmt: {
             TypePtr cond_type = stmt->condition ? check_expr(stmt->condition) : nullptr;
-            require_boolean(cond_type, stmt->condition ? stmt->condition->location : stmt->location,
-                            "Conditional statement");
+            require_boolean_expr(stmt->condition, cond_type,
+                                 stmt->condition ? stmt->condition->location : stmt->location,
+                                 "Conditional statement");
             check_stmt(stmt->true_stmt);
             break;
         }
@@ -216,8 +217,19 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         } else if (!stmt->return_type) {
             stmt->return_type = body_type;
         } else if (!types_compatible(body_type, stmt->return_type)) {
-            throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
-                               stmt->location);
+            ExprPtr return_expr = stmt->body;
+            if (return_expr && return_expr->kind == Expr::Kind::Block && return_expr->result_expr) {
+                return_expr = return_expr->result_expr;
+            }
+            if (return_expr && literal_assignable_to(stmt->return_type, return_expr)) {
+                return_expr->type = stmt->return_type;
+                if (stmt->body) {
+                    stmt->body->type = stmt->return_type;
+                }
+            } else {
+                throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                                   stmt->location);
+            }
         }
     }
 }

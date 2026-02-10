@@ -8,7 +8,7 @@
 }
 
 &^main() -> #i32 {
-  mut p:#Point = Point(0,0)
+  p:#Point = Point(0,0)
   p = p.move(1, 2)
   p.x + p.y
 }

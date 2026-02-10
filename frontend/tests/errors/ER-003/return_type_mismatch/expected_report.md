@@ -1,11 +1,14 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/errors/ER-003/return_type_mismatch/test.vx
+&^main() -> #i32 {
+    1
+}
 ```
 
 ## Stderr
 ```
-Error at tests/errors/ER-003/return_type_mismatch/test.vx:5:1: Return type mismatch in function 'main'
 ```
 
 ## Exit Code
-1
+0

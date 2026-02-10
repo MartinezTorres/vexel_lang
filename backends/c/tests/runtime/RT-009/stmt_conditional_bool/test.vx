@@ -8,7 +8,7 @@
 // RT-009: Statement conditionals require boolean conditions
 
 &^main() -> #i32 {
-    mut x #i32 = 0;
+    x:#i32 = 0;
     // Try to use non-boolean as condition (should fail)
     2 ? x = 5;
     x

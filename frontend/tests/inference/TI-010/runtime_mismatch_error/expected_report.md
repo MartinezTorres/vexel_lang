@@ -1,11 +1,15 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/inference/TI-010/runtime_mismatch_error/test.vx
+&^main() -> #i32 {
+    cond = 1;
+    cond ? 10 : 0
+}
 ```
 
 ## Stderr
 ```
-Error at tests/inference/TI-010/runtime_mismatch_error/test.vx:7:5: Conditional branches must have matching types at runtime (type mismatch: i8 vs b)
 ```
 
 ## Exit Code
-1
+0

@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-027/iterable_evaluates_once/test.vx
 &!print(arg0: #i32);
-mut counter: #i32;
+counter: #i32;
 &get_array() -> #i32[3] {
     counter = counter + 1;
     print(counter);

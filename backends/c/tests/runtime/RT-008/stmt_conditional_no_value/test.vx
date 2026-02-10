@@ -8,8 +8,8 @@
 // This should fail if we try to use result of statement conditional
 
 &^main() -> #i32 {
-    mut x #i32 = 0
+    x:#i32 = 0
     // Try to assign the result of a statement conditional (should fail)
-    y #i32 = (true ? x = 5)
+    y #i32 = (1 ? x = 5)
     y
 }

@@ -3,6 +3,6 @@
 
 
 &^main() -> #i32 {
-    combined:#b = true || 1 < 2 < 0;
+    combined:#b = 1 || 1 < 2 < 0;
     0;
 }

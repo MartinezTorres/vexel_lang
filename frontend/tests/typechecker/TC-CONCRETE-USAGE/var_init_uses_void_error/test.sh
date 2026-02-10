@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd ../../../../.. && pwd)"
 
 cleanup() {
-  rm -f out.c out.h out.lowered.vx out.analysis.txt stdout.txt stderr.txt
+  rm -f out.c out.h out.analysis.txt stdout.txt stderr.txt
 }
 trap cleanup EXIT
 

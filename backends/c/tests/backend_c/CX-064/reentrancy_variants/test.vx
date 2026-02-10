@@ -11,7 +11,7 @@
     helper(2)
 }
 
-mut g:#i32 = 0;
+g:#i32 = 0;
 
 &helper(x:#i32) -> #i32 {
     g = g + x;

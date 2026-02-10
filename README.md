@@ -33,7 +33,7 @@ Implementation index:
 
 - Frontend pipeline and pass order: `frontend/src/cli/compiler.cpp`
 - Frontend invariant checks: `frontend/src/pipeline/pass_invariants.h`, `frontend/src/pipeline/pass_invariants.cpp`
-- Lowered output contract: `frontend/src/transform/lowerer.h`, `frontend/src/codegen/lowered_printer.h`
+- Lowered frontend contract: `frontend/src/transform/lowerer.h`
 - C backend code generator core: `backends/c/src/codegen.h`
 - Megalinker backend code generator core: `backends/ext/megalinker/src/codegen.h`
 - Backend plugin API: `frontend/src/support/backend_registry.h`
@@ -55,7 +55,7 @@ Canonical stage order in `frontend/src/cli/compiler.cpp`:
 8. Validate concrete type usage (`TypeChecker::validate_type_usage`)
 9. Emit backend output
 
-Lowered output contract lives in `frontend/src/transform/lowerer.h` and `frontend/src/codegen/lowered_printer.h`.
+Lowered frontend contract lives in `frontend/src/transform/lowerer.h`.
 Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 
 ## Usage
@@ -63,11 +63,10 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ```bash
 ./build/vexel -b c input.vx                     # unified driver (backend selection is required)
 ./build/vexel -b c --emit-analysis input.vx     # emit analysis report
-./build/vexel -b c -L input.vx                  # emit lowered Vexel + backend output
 ./build/vexel --run input.vx                    # optional: run via libtcc (backend c)
 ./build/vexel --emit-exe -o app input.vx        # optional: emit native exe via libtcc (backend c)
 ./build/vexel-c input.vx                        # backend-specific CLI (portable C)
-./build/vexel-frontend input.vx                 # frontend-only lowered output
+./build/vexel-frontend input.vx                 # frontend-only validation (no backend emission)
 ./build/vexel-frontend --allow-process foo.vx   # opt in to process expressions
 ```
 

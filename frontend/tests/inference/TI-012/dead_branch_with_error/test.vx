@@ -3,5 +3,5 @@
 
 
 &^main() -> #i32 {
-    false ? undefined_variable : 100
+    0 ? undefined_variable : 100
 }

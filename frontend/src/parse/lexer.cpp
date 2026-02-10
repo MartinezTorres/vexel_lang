@@ -187,19 +187,6 @@ Token Lexer::read_identifier() {
     while (isalnum(peek()) || peek() == '_') {
         id += advance();
     }
-    if (id == "true") {
-        Token t(TokenType::IntLiteral, id, loc);
-        t.value = static_cast<int64_t>(1);
-        return t;
-    }
-    if (id == "false") {
-        Token t(TokenType::IntLiteral, id, loc);
-        t.value = static_cast<int64_t>(0);
-        return t;
-    }
-    if (id == "mut") {
-        return Token(TokenType::Mut, id, loc);
-    }
     return Token(TokenType::Identifier, id, loc);
 }
 

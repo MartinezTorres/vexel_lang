@@ -6,7 +6,7 @@
     Point(p.x + dx, p.y + dy)
 }
 &^main() -> #i32 {
-    mut p: #Point = Point(0, 0);
+    p = Point(0, 0);
     p = Point::move(1, 2);
     p.x + p.y
 }

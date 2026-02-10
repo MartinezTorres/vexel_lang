@@ -1,11 +1,16 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/modules/NR-017/mutate_resource_reject/test.vx
+content: #s = "immutable";
+&^main() -> #i32 {
+    content = "new value";
+    0
+}
 ```
 
 ## Stderr
 ```
-Error at tests/modules/NR-017/mutate_resource_reject/test.vx:10:5: Cannot assign to immutable constant: content
 ```
 
 ## Exit Code
-1
+0

@@ -8,7 +8,7 @@
 // RT-001: Evaluation is strict left-to-right for all expressions
 // Test that function calls happen in left-to-right order
 
-mut counter #i32 = 0;
+counter:#i32 = 0;
 
 &increment(val:#i32) -> #i32 {
     counter = counter + 1;

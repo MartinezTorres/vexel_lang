@@ -12,7 +12,6 @@ static void print_usage(const char* prog) {
     std::cout << "Options:\n";
     std::cout << "  -o <path>    Output path (base name for generated files, default: out)\n";
     std::cout << "  -b <name>    Backend (optional compatibility flag: accepts c only)\n";
-    std::cout << "  -L           Emit lowered Vexel subset alongside backend output\n";
     std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
     std::cout << "  -v           Verbose output\n";

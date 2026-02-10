@@ -10,7 +10,6 @@ enum class TokenType {
     IntLiteral, FloatLiteral, StringLiteral, CharLiteral,
     // Identifiers
     Identifier,
-    Mut,
     // Sigils
     Dollar, At, DoubleAt, Ampersand, Hash,
     // Operators

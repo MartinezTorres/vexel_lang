@@ -8,8 +8,8 @@
 // RT-041: Assignment (b = a) creates independent copy; modifying b doesn't affect a
 
 &^main() -> #i32 {
-    mut a [3]#i32 = [1, 2, 3]
-    mut b [3]#i32 = a  // Independent copy
+    a:[3]#i32 = [1, 2, 3]
+    b:[3]#i32 = a  // Independent copy
     b[1] = 99
     a[0] + a[1] + a[2]  // Should be 1 + 2 + 3 = 6
 }

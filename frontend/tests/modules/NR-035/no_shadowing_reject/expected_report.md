@@ -1,11 +1,16 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/modules/NR-035/no_shadowing_reject/test.vx
+x: #i32 = 10;
+&^main() -> #i32 {
+    x = 20;
+    x
+}
 ```
 
 ## Stderr
 ```
-Error at tests/modules/NR-035/no_shadowing_reject/test.vx:10:5: Cannot assign to immutable constant: x
 ```
 
 ## Exit Code
-1
+0

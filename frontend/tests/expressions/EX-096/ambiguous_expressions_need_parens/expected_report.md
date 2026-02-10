@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-096/ambiguous_expressions_need_parens/test.vx
 &^main() -> #i32 {
-    result = true || false && true;
+    result = 1 || 0 && 1;
     result ? 1 : 0
 }
 ```

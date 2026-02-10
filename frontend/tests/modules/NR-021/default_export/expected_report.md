@@ -14,7 +14,7 @@
 &publicFunc() -> #i32 {
     42
 }
-mut VALUE: #i32;
+VALUE: #i32;
 ```
 
 ## Stderr
