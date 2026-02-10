@@ -252,6 +252,7 @@ void TypeChecker::check_type_decl(StmtPtr stmt) {
 
 void TypeChecker::check_var_decl(StmtPtr stmt) {
     TypePtr type = stmt->var_type;
+    bool constexpr_init = false;
     if (stmt->var_init) {
         TypePtr init_type = check_expr(stmt->var_init);
         if (!type) {
@@ -296,7 +297,6 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
 
     bool inferred_mutable = stmt->is_mutable;
     if (!sym->is_local && !inferred_mutable) {
-        bool constexpr_init = false;
         if (stmt->var_init) {
             if (type && type->kind == Type::Kind::Array &&
                 (stmt->var_init->kind == Expr::Kind::ArrayLiteral ||
@@ -310,6 +310,19 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
         }
         inferred_mutable = !constexpr_init;
         stmt->is_mutable = inferred_mutable;
+    }
+
+    if (!sym->is_local && stmt->is_exported) {
+        if (!stmt->var_init) {
+            throw CompileError("Exported global '" + stmt->var_name +
+                               "' must have a compile-time initializer",
+                               stmt->location);
+        }
+        if (inferred_mutable || !constexpr_init) {
+            throw CompileError("Exported global '" + stmt->var_name +
+                               "' must be immutable and compile-time constant",
+                               stmt->location);
+        }
     }
 
     sym->kind = inferred_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;

@@ -427,7 +427,7 @@ void CodeGenerator::validate_codegen_invariants_impl(const std::vector<StmtPtr>&
                 bool skip = false;
                 if (is_top_level && use_facts) {
                     Symbol* sym = binding_for(stmt);
-                    if (sym && !facts.used_global_vars.count(sym)) {
+                    if (sym && !stmt->is_exported && !facts.used_global_vars.count(sym)) {
                         skip = true;
                     }
                 }
@@ -511,6 +511,48 @@ void CodeGenerator::gen_module(const Module& mod) {
                     emit_header(ptype + " " + mangle_name(stmt->params[i].name));
                 }
                 emit_header(");");
+            }
+        }
+    });
+    emit_header("");
+
+    // Exported global declarations
+    std::unordered_set<std::string> emitted_exported_globals;
+    for_instances([&](const Module& module) {
+        for (const auto& stmt : module.top_level) {
+            if (stmt->kind != Stmt::Kind::VarDecl || !stmt->is_exported) {
+                continue;
+            }
+            Symbol* sym = binding_for(stmt);
+            if (!sym) {
+                continue;
+            }
+            std::string var_name = mangle_name(stmt->var_name) + instance_suffix(sym);
+            if (!emitted_exported_globals.insert(var_name).second) {
+                continue;
+            }
+
+            std::string mutability = mutability_prefix(stmt);
+            if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
+                std::string elem_type = require_type(stmt->var_type->element_type,
+                                                     stmt->location,
+                                                     "exported global '" + stmt->var_name + "' element type");
+                int64_t length = resolve_array_length(stmt->var_type, stmt->location);
+                emit_header("extern " + mutability + elem_type + " " + var_name +
+                            "[" + std::to_string(length) + "];");
+            } else {
+                std::string vtype = require_type(stmt->var_type,
+                                                 stmt->location,
+                                                 "exported global '" + stmt->var_name + "'");
+                if (stmt->var_type) {
+                    TypePtr resolved = resolve_type(stmt->var_type);
+                    if (resolved && is_pointer_like(resolved) && resolved->kind != Type::Kind::Array) {
+                        if (ptr_kind_for_symbol(sym) == PtrKind::Far) {
+                            vtype = "uint32_t";
+                        }
+                    }
+                }
+                emit_header("extern " + mutability + vtype + " " + var_name + ";");
             }
         }
     });
@@ -1288,11 +1330,11 @@ void CodeGenerator::gen_type_decl(StmtPtr stmt) {
 void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     bool is_local = in_function;
     Symbol* sym = binding_for(stmt);
-    if (!is_local && sym && !facts.used_global_vars.count(sym)) {
+    if (!is_local && sym && !stmt->is_exported && !facts.used_global_vars.count(sym)) {
         return;
     }
-    // Top-level mutable globals must be internal to the translation unit
-    std::string storage = (!is_local && stmt->is_mutable) ? "static " : "";
+    // Non-exported globals stay translation-unit local in the C backend.
+    std::string storage = (!is_local && !stmt->is_exported) ? "static " : "";
     std::ostringstream var_stream;
     output_stack.push(&var_stream);
     std::string ann_comment = render_annotation_comment(stmt->annotations);

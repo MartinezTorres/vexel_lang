@@ -211,6 +211,7 @@ void Resolver::predeclare_instance_symbols(ModuleInstance& instance) {
                                         stmt,
                                         stmt->is_mutable,
                                         false);
+            sym->is_exported = stmt->is_exported;
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
             instance.symbols[stmt->var_name] = sym;
@@ -405,6 +406,7 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
     }
 
     if (sym && !sym->is_local) {
+        sym->is_exported = stmt->is_exported;
         defined_globals.insert(sym);
     }
 }

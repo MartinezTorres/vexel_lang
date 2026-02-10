@@ -57,6 +57,16 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     };
 
+    // Exported globals are ABI roots and must always be retained.
+    for (const auto& instance : program->instances) {
+        for (const auto& pair : instance.symbols) {
+            const Symbol* sym = pair.second;
+            if (!sym || !sym->is_exported || sym->is_local) continue;
+            if (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant) continue;
+            note_global(sym);
+        }
+    }
+
     for (const auto& func_sym : facts.reachable_functions) {
         if (!func_sym || !func_sym->declaration || !func_sym->declaration->body) continue;
         auto func_scope = scoped_instance(func_sym->instance_id);

@@ -380,6 +380,7 @@ StmtPtr Parser::parse_import() {
 
 StmtPtr Parser::parse_global() {
     SourceLocation loc = current().location;
+    bool is_exported = match(TokenType::BitXor);
     std::string name = consume(TokenType::Identifier, "Expected variable name").lexeme;
 
     TypePtr type = nullptr;
@@ -399,7 +400,7 @@ StmtPtr Parser::parse_global() {
     }
 
     bool is_mut = (!init && type);
-    return Stmt::make_var(name, type, init, is_mut, loc);
+    return Stmt::make_var(name, type, init, is_mut, loc, is_exported);
 }
 
 StmtPtr Parser::parse_stmt() {

@@ -53,7 +53,9 @@ Source-of-truth integration points:
 - Internal non-reentrant variants may use frame ABI; ABI boundaries remain native C ABI.
 
 ## Globals & Data
-- Immutable globals emit as `const` in the `.c` file; mutable globals emit as `static`.
+- Non-exported globals emit as `static` in the `.c` file.
+- Exported immutable globals (`^name = ...`) emit as `const` with external linkage and are declared in the generated header.
+- Exported globals must be compile-time constants (enforced in the frontend).
 - Strings and read-only data are placed in `.rodata` via `const`.
 - No per-backend runtime state beyond standard C.
 - The C output annotates variables with `VX_MUTABLE`, `VX_NON_MUTABLE`, and `VX_CONSTEXPR` for visibility. Defaults live in the generated header (`VX_MUTABLE` empty, others `const`) and can be overridden before inclusion.
@@ -61,7 +63,7 @@ Source-of-truth integration points:
 ## File Structure
 - Exactly one `.c` and one `.h` file per compilation unit.
   - Default names: `<module>.c` / `<module>.h`; overrides via `-o` adjust the stem.
-  - `.h` declares exported and external functions and any exported types.
+  - `.h` declares exported/external functions, exported globals, and any exported types.
   - `.c` includes the header and defines all functions, globals, tuple types, and comparator helpers.
 
 ## Toolchain Assumptions

@@ -1,0 +1,12 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported immutable globals use ^, are declared in the header, and keep external linkage in C output.
+// @expect-exit: 0
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); hdr = pathlib.Path('out.h').read_text(); src = pathlib.Path('out.c').read_text(); ok = re.search(r'extern\\s+VX_CONSTEXPR\\s+int32_t\\s+vx_table\\s*;', hdr) and re.search(r'\\bVX_CONSTEXPR\\s+int32_t\\s+vx_table\\s*=\\s*7\\b', src) and not re.search(r'\\bstatic\\s+VX_CONSTEXPR\\s+int32_t\\s+vx_table\\b', src); sys.exit(0 if ok else 1)" {VEXEL}
+
+^table:#i32 = 7;
+
+local:#i32 = 3;
+
+&^main() -> #i32 {
+    local
+}

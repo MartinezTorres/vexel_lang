@@ -179,7 +179,11 @@ private:
                 out << indent(level) << "->>;\n";
                 return;
             case Stmt::Kind::VarDecl:
-                out << indent(level) << stmt->var_name;
+                out << indent(level);
+                if (stmt->is_exported) {
+                    out << "^";
+                }
+                out << stmt->var_name;
                 if (stmt->var_type) {
                     out << ": " << format_type(stmt->var_type);
                 }

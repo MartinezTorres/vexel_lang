@@ -10,7 +10,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **No error handling**: Language provides no explicit error handling mechanism (no exceptions, result types, or error codes). Runtime errors trap and exit.
 
-**Whole-program compilation**: All source available at compile time. Aggressive optimization and dead code elimination. Only exported functions (`&^`) callable externally.
+**Whole-program compilation**: All source available at compile time. Aggressive optimization and dead code elimination. Only explicitly exported declarations are callable/visible externally (`&^` functions, `^` globals).
 
 **Compilation model**: Backend specifications define target language, type mappings, calling conventions, code organization. Compiler can generate executables, libraries, or C source for integration.
 
@@ -26,7 +26,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Floats: `1.23`. Default: `#f64`
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
-- **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external), `&^` (exported), `#` (type)
+- **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external), `&^` (exported function), `^` (exported global), `#` (type)
 - **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` (user types may overload `+ - * / % == != < <= > >=` via operator methods)
   - Note: `|` serves as both unary (length/absolute) and binary (bitwise OR) operator
 - **Statement termination**: `;` or any whitespace when unambiguous (see Section 8 for ambiguous parsing rules)
@@ -143,6 +143,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Pure functions can compute initial values at compile time
   - **Initialized in parse order (top-to-bottom)**
   - Can only reference globals defined earlier in the file
+- **Exported immutable global**: `^name[:Type] = expr`
+  - ABI-visible symbol
+  - Must be immutable and compile-time constant
 - **Mutable (variables)**: `name:Type`
   - No initialization at declaration
   - Can be modified at runtime
@@ -347,7 +350,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Process imports: `::"command" -> name;` execute `command` at compile time (via the host shell) and bind its captured stdout as an immutable `#s` named `name`
   - Resource expressions are immutable constants and may appear in initializers or expressions; attempting to mutate them is a compile-time error
   - Example: `font:#s = ::assets::font.bin;` embeds `assets/font.bin` as a string, while `sprites = ::assets::tiles;` embeds the contents of each file within `assets/tiles/`
-- Symbols exported by default
+- Symbols are internal by default; export explicitly with `&^` (functions) or `^` (globals)
 - Resolution: `::a::b;` maps to `a/b.vx` (case-sensitive, relative to project root)
 - Scoped imports instantiate their module once per lexical scope; instances do not share mutable state
 - Re-importing the same module in the same scope is permitted only when every top-level definition is identical (functions/types textually equal; constants equal after compile-time evaluation); otherwise it is a compile error
@@ -433,6 +436,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Execution**:
 - Exported functions (`&^`) are entry points
+- Exported globals (`^name = ...`) are ABI-visible data symbols
 - Compiler mode determines execution:
   - Executable: compiler specifies entry point from exports
   - Library: all exports visible
@@ -476,8 +480,8 @@ params       ::= param { ',' param }
 param        ::= [ '$' ] ident [ ':' type ]
 refparams    ::= ident { ',' ident }
 
-global       ::= ident [ ':' type ] '=' expr    // immutable constant
-             |   ident ':' type                  // mutable variable
+global       ::= [ '^' ] ident [ ':' type ] '=' expr    // immutable constant
+             |   ident ':' type                          // mutable variable
 type_decl    ::= '#' ident '(' [ fields ] ')' ';'
 fields       ::= ident [ ':' type ] { ',' ident [ ':' type ] }
 

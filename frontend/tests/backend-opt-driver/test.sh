@@ -46,6 +46,64 @@ if ! rg -q "Backend must be specified with -b/--backend" missing_b.err; then
 fi
 
 set +e
+"$ROOT/build/vexel" --run -o out input.vx >missing_b_run.out 2>missing_b_run.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected missing backend failure for --run"
+  exit 1
+fi
+if ! rg -q "Backend must be specified with -b/--backend" missing_b_run.err; then
+  echo "missing required backend error for --run"
+  exit 1
+fi
+
+set +e
+"$ROOT/build/vexel" --emit-exe -o out input.vx >missing_b_exe.out 2>missing_b_exe.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected missing backend failure for --emit-exe"
+  exit 1
+fi
+if ! rg -q "Backend must be specified with -b/--backend" missing_b_exe.err; then
+  echo "missing required backend error for --emit-exe"
+  exit 1
+fi
+
+set +e
+"$ROOT/build/vexel" -b vexel --run -o out input.vx >wrong_backend_run.out 2>wrong_backend_run.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected backend requirement failure for --run"
+  exit 1
+fi
+if ! rg -q -- "--run/--emit-exe require backend 'c'" wrong_backend_run.err; then
+  echo "missing backend-c requirement error for --run"
+  exit 1
+fi
+
+set +e
+"$ROOT/build/vexel" -b vexel --emit-exe -o out input.vx >wrong_backend_exe.out 2>wrong_backend_exe.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected backend requirement failure for --emit-exe"
+  exit 1
+fi
+if ! rg -q -- "--run/--emit-exe require backend 'c'" wrong_backend_exe.err; then
+  echo "missing backend-c requirement error for --emit-exe"
+  exit 1
+fi
+
+"$ROOT/build/vexel" --backend=c -o out input.vx >/dev/null 2>/dev/null
+if [[ ! -f out.c ]]; then
+  echo "missing out.c when backend passed as --backend=c"
+  exit 1
+fi
+
+set +e
 "$ROOT/build/vexel" -b c --unknown-backend-opt -o out input.vx >unknown.out 2>unknown.err
 status=$?
 set -e
@@ -61,7 +119,14 @@ if ! rg -q "Backend-specific options \\(c\\):" unknown.out; then
   echo "missing backend usage section"
   exit 1
 fi
-rm -f bad.out bad.err missing_b.out missing_b.err unknown.out unknown.err
+rm -f \
+  bad.out bad.err \
+  missing_b.out missing_b.err \
+  missing_b_run.out missing_b_run.err \
+  missing_b_exe.out missing_b_exe.err \
+  wrong_backend_run.out wrong_backend_run.err \
+  wrong_backend_exe.out wrong_backend_exe.err \
+  unknown.out unknown.err
 
 help_out=$("$ROOT/build/vexel" --help 2>/dev/null || true)
 if printf "%s" "$help_out" | rg -q -- "--run"; then

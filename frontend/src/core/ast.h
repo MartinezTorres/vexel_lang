@@ -187,8 +187,8 @@ struct Stmt {
     TypePtr return_type;
     std::vector<TypePtr> return_types;  // For tuple returns (empty if single return)
     ExprPtr body;
-    bool is_external;
-    bool is_exported;
+    bool is_external = false;
+    bool is_exported = false;
     bool is_generic = false;  // True if function has type parameters (params without types)
     bool is_instantiation = false;  // True if this is a concrete generic instantiation
 
@@ -207,7 +207,9 @@ struct Stmt {
     static StmtPtr make_return(ExprPtr e, const SourceLocation& loc = SourceLocation());
     static StmtPtr make_break(const SourceLocation& loc = SourceLocation());
     static StmtPtr make_continue(const SourceLocation& loc = SourceLocation());
-    static StmtPtr make_var(const std::string& name, TypePtr type, ExprPtr init, bool mut, const SourceLocation& loc = SourceLocation());
+    static StmtPtr make_var(const std::string& name, TypePtr type, ExprPtr init, bool mut,
+                            const SourceLocation& loc = SourceLocation(),
+                            bool exported = false);
     static StmtPtr make_func(const std::string& name, std::vector<Parameter> params, std::vector<std::string> ref_params,
                              TypePtr ret, ExprPtr body, bool external, bool exported, const SourceLocation& loc = SourceLocation(),
                              const std::string& type_ns = "", const std::vector<TypePtr>& ret_types = {});

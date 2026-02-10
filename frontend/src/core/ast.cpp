@@ -293,13 +293,19 @@ StmtPtr Stmt::make_continue(const SourceLocation& loc) {
     return s;
 }
 
-StmtPtr Stmt::make_var(const std::string& name, TypePtr type, ExprPtr init, bool mut, const SourceLocation& loc) {
+StmtPtr Stmt::make_var(const std::string& name,
+                       TypePtr type,
+                       ExprPtr init,
+                       bool mut,
+                       const SourceLocation& loc,
+                       bool exported) {
     auto s = std::make_shared<Stmt>();
     s->kind = Kind::VarDecl;
     s->var_name = name;
     s->var_type = type;
     s->var_init = init;
     s->is_mutable = mut;
+    s->is_exported = exported;
     s->location = loc;
     return s;
 }
