@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Backend conformance source of truth:
-# validates minimum build/CLI contract for every discovered backend directory.
+# validates minimum backend build/registration contract for every discovered backend directory.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 discover_backends() {
@@ -36,7 +36,7 @@ check_backend_dir() {
   rel="${dir#$ROOT/}"
   local mk="$dir/Makefile"
   local backend_cpp="$dir/src/${name}_backend.cpp"
-  local cli="$ROOT/build/vexel-${name}"
+  local driver="$ROOT/build/vexel"
 
   [[ -f "$mk" ]] || { echo "FAIL: missing Makefile in $dir" >&2; exit 1; }
   [[ -f "$backend_cpp" ]] || { echo "FAIL: missing $backend_cpp" >&2; exit 1; }
@@ -82,9 +82,13 @@ check_backend_dir() {
   fi
 
   make -s -C "$dir" all >/dev/null
-  [[ -x "$cli" ]] || { echo "FAIL: expected CLI $cli not found/executable" >&2; exit 1; }
+  make -s -C "$ROOT" driver >/dev/null
+  [[ -x "$driver" ]] || { echo "FAIL: expected unified driver $driver not found/executable" >&2; exit 1; }
 
-  "$cli" -h >/dev/null 2>&1 || { echo "FAIL: $cli -h failed" >&2; exit 1; }
+  "$driver" -b "$name" -h >/dev/null 2>&1 || {
+    echo "FAIL: $driver -b $name -h failed" >&2
+    exit 1
+  }
 
   local tmp
   tmp="$(mktemp -d)"
@@ -93,8 +97,8 @@ check_backend_dir() {
     0
 }
 EOF
-  "$cli" -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>&1 || {
-    echo "FAIL: $cli failed to compile minimal program" >&2
+  "$driver" -b "$name" -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>&1 || {
+    echo "FAIL: $driver failed to compile minimal program with backend '$name'" >&2
     rm -rf "$tmp"
     exit 1
   }

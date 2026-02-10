@@ -2,7 +2,7 @@
 // @desc: Executable mode: compiler specifies entry point from exports | Executable mode: compiler specifies entry point from exports
 // @expect-exit: 7
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-061: Executable mode: compiler specifies entry point from exports

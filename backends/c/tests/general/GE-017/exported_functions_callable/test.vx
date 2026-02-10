@@ -2,7 +2,7 @@
 // @desc: Only exported functions (declared with &^) are callable externally | Exported functions callable - &^ marks external visibility
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-017: Only exported functions (declared with &^) are callable externally

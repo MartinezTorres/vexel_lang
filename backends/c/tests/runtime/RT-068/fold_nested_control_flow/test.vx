@@ -2,7 +2,7 @@
 // @desc: Nested loops/conditionals/function chains that are compile-time known are fully folded. | Nested compile-time control flow folds fully
 // @expect-exit: 46
 // @run-generated: true
-// @command: {VEXEL_C} test.vx && rg -n "return 46;" out.c && ! rg -n "vx_compute|vx_step" out.c
+// @command: {VEXEL} -b c test.vx && rg -n "return 46;" out.c && ! rg -n "vx_compute|vx_step" out.c
 
 
 &step(x:#i32) -> #i32 {

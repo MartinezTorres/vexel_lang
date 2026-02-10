@@ -2,7 +2,7 @@
 // @desc: Global initializers must be compile-time constants | Global initializers must be compile-time constants
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-011: Global initializers must be compile-time constants

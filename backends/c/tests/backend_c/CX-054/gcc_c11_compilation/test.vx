@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#toolchain-assumptions
 // @desc: Generated sources must be compiled with gcc -std=c11 or later. | Generated sources must compile with gcc -std=c11 or later
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

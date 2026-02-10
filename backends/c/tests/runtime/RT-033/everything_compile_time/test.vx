@@ -2,7 +2,7 @@
 // @desc: Everything is compile-time unless it cannot be | Everything is compile-time unless it cannot be
 // @expect-exit: 55
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-033: Everything is compile-time unless it cannot be

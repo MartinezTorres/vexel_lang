@@ -2,7 +2,7 @@
 // @desc: Statement conditionals require boolean conditions | Statement conditionals require boolean conditions
 // @expect-exit: 1
 // @expect-stderr: boolean
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-009: Statement conditionals require boolean conditions

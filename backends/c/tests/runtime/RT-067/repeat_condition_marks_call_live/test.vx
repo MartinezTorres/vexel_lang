@@ -2,7 +2,7 @@
 // @desc: Calls used only as repeat conditions in (cond)@ loops are reachable and must be emitted | Repeat condition calls remain reachable
 // @expect-exit: 6
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &cond(i:#i32) -> #b {

@@ -2,7 +2,7 @@
 // @desc: Compile-time execution can only read immutable globals defined earlier | Compile-time execution can only read immutable globals defined earlier
 // @expect-exit: 30
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-019: Compile-time execution can only read immutable globals defined earlier

@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
 // @desc: Boolean type #b must map to C _Bool. | Boolean type #b must map to C _Bool
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: Backend code generation sees only already-evaluated constants. | Backend sees only already-evaluated constants
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 CONST:#i32 = 100 + 50;

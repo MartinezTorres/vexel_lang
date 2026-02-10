@@ -2,7 +2,7 @@
 // @desc: The language uses whole-program compilation where all source is available at compile time | Whole-program compilation - forward references work
 // @expect-exit: 88
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-014: All source is available at compile time

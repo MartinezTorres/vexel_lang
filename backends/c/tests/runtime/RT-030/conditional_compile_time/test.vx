@@ -2,7 +2,7 @@
 // @desc: Conditional expression compiler attempts to evaluate condition at compile time | Conditional expression compiler attempts to evaluate condition at compile time
 // @expect-exit: 100
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-030: Conditional expression compiler attempts to evaluate condition at compile time

@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#calling--dispatch-rules
 // @desc: Tail calls may be optimised but are not required. | Tail calls may be optimised but not required
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &factorial(n:#i32, acc:#i32) -> #i32 {

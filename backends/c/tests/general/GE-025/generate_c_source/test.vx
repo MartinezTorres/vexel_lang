@@ -2,7 +2,7 @@
 // @desc: The compiler can generate C source code for integration with existing C codebases | Compiler generates C source code
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-025: The compiler can generate C source code for integration with existing C codebases

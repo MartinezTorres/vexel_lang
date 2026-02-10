@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Compile-time execution cannot modify mutable globals | Compile-time execution cannot modify mutable globals
 // @expect-exit: 1
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-018: Compile-time execution cannot modify mutable globals

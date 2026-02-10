@@ -7,8 +7,8 @@ C++ implementation of the Vexel language front-end plus the portable C backend. 
 ## Quick Start
 
 ```bash
-make                                  # build libs + all CLIs
-./build/vexel-c examples/simple.vx    # emit out.c/out.h with the c backend
+make                                  # build compiler + backends
+./build/vexel -b c examples/simple.vx # emit out.c/out.h with the c backend
 gcc out.c -o simple -lm
 ./simple
 ```
@@ -16,7 +16,7 @@ gcc out.c -o simple -lm
 ## Components & Layout
 
 - `frontend/` - lexer/parser/typechecker/evaluator/AST + analysis pipeline (`libvexelfrontend.a`, `build/vexel-frontend`, tests).
-- `backends/c/` - portable C backend (`libvexel-c.a`, `build/vexel-c`, tests).
+- `backends/c/` - portable C backend (`libvexel-c.a`, tests).
 - `backends/ext/megalinker/` - banked megalinker backend (WIP).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
 - `docs/` - language RFC (`docs/vexel-rfc.md`) and generated playground page (`docs/index.html`).
@@ -63,9 +63,9 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ```bash
 ./build/vexel -b c input.vx                     # unified driver (backend selection is required)
 ./build/vexel -b c --emit-analysis input.vx     # emit analysis report
-./build/vexel --run input.vx                    # optional: run via libtcc (backend c)
-./build/vexel --emit-exe -o app input.vx        # optional: emit native exe via libtcc (backend c)
-./build/vexel-c input.vx                        # backend-specific CLI (portable C)
+./build/vexel -b megalinker --backend-opt caller_limit=8 input.vx
+./build/vexel -b c --run input.vx               # optional: run via libtcc
+./build/vexel -b c --emit-exe -o app input.vx   # optional: emit native exe via libtcc
 ./build/vexel-frontend input.vx                 # frontend-only validation (no backend emission)
 ./build/vexel-frontend --allow-process foo.vx   # opt in to process expressions
 ```
@@ -73,6 +73,7 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 Vexel emits C; compile the generated `.c` with your host toolchain (e.g., `gcc -std=c11 -O2 -lm`).
 
 The unified driver forwards unknown options to the selected backend. If neither the frontend nor that backend recognizes an option, compilation fails with combined usage output.
+Backend selection is always explicit: pass `-b <name>` for every compile mode (`--run` / `--emit-exe` included).
 
 ## Backend Extension Contract
 
@@ -83,6 +84,12 @@ Backend architecture rule:
 - The frontend/backend boundary is the `AnalyzedProgram` contract.
 - Backend code generation is intentionally backend-owned; no shared codegen layer.
 - C and megalinker are expected to diverge in lowering strategy and target behavior.
+- Reentrancy is analyzed in the frontend graph pass; each backend documents its boundary defaults and whether it consumes `[[nonreentrant]]`.
+
+Current reentrancy contract:
+
+- C backend (`backends/c/README.md`): recognizes `[[nonreentrant]]`; defaults to reentrant entry/exit boundaries (`R/R`).
+- Megalinker backend (`backends/ext/megalinker/README.md`): recognizes `[[nonreentrant]]`; defaults to reentrant entry/exit boundaries (`R/R`) and uses `[[nonreentrant]]` to opt specific boundaries into non-reentrant mode.
 
 Each backend must provide:
 
@@ -100,7 +107,6 @@ Placement/discovery:
 - In-tree: `backends/<name>/`
 - Local external: `backends/ext/<name>/`
 - Required Makefile targets: `all`, `test`, `clean`
-- Dedicated backend CLI: `build/vexel-<name>`
 
 Conformance script: `backends/conformance_test.sh`.
 
@@ -117,7 +123,7 @@ Process expressions execute host commands. They are **disabled by default**; pas
 
 ## Web Playground
 
-The web playground runs `vexel-c` in WebAssembly and emits C for visualization. The built `docs/index.html` is self-contained (compiler embedded).
+The web playground runs the unified compiler in WebAssembly with backend `c` selected, and emits C for visualization. The built `docs/index.html` is self-contained (compiler embedded).
 
 Live playground: https://martineztorres.github.io/vexel_lang/
 

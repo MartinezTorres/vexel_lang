@@ -2,7 +2,7 @@
 // @desc: Mutable receiver lowering must not take addresses of folded literals. | By-ref receiver args stay lvalues
 // @expect-exit: 12
 // @run-generated: true
-// @command: {VEXEL_C} -b c test.vx && ! rg -n "=[[:space:]]*&[0-9]+;" out.c
+// @command: {VEXEL} -b c test.vx && ! rg -n "=[[:space:]]*&[0-9]+;" out.c
 
 
 &(lhs, rhs)shift(delta:#i8) {

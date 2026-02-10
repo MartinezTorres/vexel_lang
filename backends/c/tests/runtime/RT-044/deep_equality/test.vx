@@ -2,7 +2,7 @@
 // @desc: Equality uses value-based deep comparison | Equality uses value-based deep comparison
 // @expect-exit: 1
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-044: Equality uses value-based deep comparison

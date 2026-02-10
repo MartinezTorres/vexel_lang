@@ -2,7 +2,7 @@
 // @desc: Immutable globals (initialized at declaration) are compile-time constants | Immutable globals (initialized at declaration) are compile-time constants
 // @expect-exit: 30
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-012: Immutable globals (initialized at declaration) are compile-time constants

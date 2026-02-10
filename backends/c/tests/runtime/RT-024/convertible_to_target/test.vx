@@ -2,7 +2,7 @@
 // @desc: Compile-time execution results must be convertible to target types | Compile-time execution results must be convertible to target types
 // @expect-exit: 100
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-024: Compile-time execution results must be convertible to target types

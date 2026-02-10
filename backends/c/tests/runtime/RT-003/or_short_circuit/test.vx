@@ -2,7 +2,7 @@
 // @desc: Logical OR operator (||) short-circuits evaluation | Logical OR operator (||) short-circuits evaluation
 // @expect-exit: 0
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-003: Logical OR operator (||) short-circuits evaluation

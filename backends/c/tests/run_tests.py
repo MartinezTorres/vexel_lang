@@ -11,7 +11,7 @@ def find_repo_root(start: Path) -> Path:
     for parent in [start] + list(start.parents):
         if (parent / ".git").exists():
             return parent
-        if (parent / "doc" / "vexel-rfc.md").is_file():
+        if (parent / "docs" / "vexel-rfc.md").is_file():
             return parent
     raise RuntimeError("Could not locate repo root")
 
@@ -50,7 +50,6 @@ def parse_metadata(path: Path):
 def replace_macros(command: str, root: Path) -> str:
     replacements = {
         "{VEXEL}": str(root / "build" / "vexel"),
-        "{VEXEL_C}": str(root / "build" / "vexel-c"),
         "{VEXEL_FRONTEND}": str(root / "build" / "vexel-frontend"),
     }
     for key, value in replacements.items():

@@ -2,7 +2,7 @@
 // @desc: Length operator |x| on signed integers/floats returns absolute value (runtime calculation) | Length operator |x| on signed integers/floats returns absolute value (runtime calculation)
 // @expect-exit: 45
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-058: Length operator |x| on signed integers/floats returns absolute value (runtime calculation)

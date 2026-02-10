@@ -2,7 +2,7 @@
 // @desc: Logical AND (&&) binds tighter than logical OR (||) | Logical AND (&&) binds tighter than logical OR (||)
 // @expect-exit: 0
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-005: Logical AND (&&) binds tighter than logical OR (||)

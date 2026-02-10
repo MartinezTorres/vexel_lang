@@ -2,7 +2,7 @@
 // @desc: Multi-receiver functions must lower to plain functions that accept pointers for each receiver. | Multi-receiver functions lower to plain functions with receiver pointers
 // @expect-exit: 12
 // @run-generated: true
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // CX-052: multi-receiver lowering uses pointer parameters

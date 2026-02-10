@@ -2,7 +2,7 @@
 // @desc: Evaluation is strict left-to-right for all expressions | Evaluation is strict left-to-right for all expressions
 // @expect-exit: 33
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-001: Evaluation is strict left-to-right for all expressions

@@ -2,7 +2,7 @@
 // @desc: Backend specifications define type mappings from Vexel types to target types | Backend type mappings - complex types compile correctly
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-020: Backend type mappings for complex types

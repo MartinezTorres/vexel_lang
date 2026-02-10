@@ -2,7 +2,7 @@
 // @desc: Backend optimizes unnecessary copies | Backend optimizes unnecessary copies
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-046: Backend optimizes unnecessary copies

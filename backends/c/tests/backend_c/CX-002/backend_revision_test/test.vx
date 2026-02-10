@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#scope--versioning
 // @desc: Backend revision v0.2.1 matches the language version; backend-only fixes should revise this document while keeping the major.minor pair aligned. | Backend revision v0.2.1 matches language version
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

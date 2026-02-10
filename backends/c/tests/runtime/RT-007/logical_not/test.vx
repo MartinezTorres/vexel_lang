@@ -2,7 +2,7 @@
 // @desc: Logical NOT operator (!) returns boolean value | Logical NOT operator (!) returns boolean value
 // @expect-exit: 3
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-007: Logical NOT operator (!) returns boolean value

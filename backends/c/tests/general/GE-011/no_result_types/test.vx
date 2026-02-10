@@ -2,7 +2,7 @@
 // @desc: There are no result types for error handling | No result types - functions return values directly
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-011: There are no result types for error handling

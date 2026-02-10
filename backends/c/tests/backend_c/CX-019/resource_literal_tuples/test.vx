@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: Backend only sees literal data (tuple arrays) from resource expressions and process imports. | Backend sees tuple arrays from resource expressions
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

@@ -2,7 +2,7 @@
 // @desc: The language defines no standard library | No standard library - no built-in print function
 // @expect-exit: 1
 // @expect-stderr: print
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-006: The language defines no standard library

@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#preamble
 // @desc: The compiler can generate executables as output | Executable with I/O operations works
 // @expect-exit: 0
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-023: Executable output with I/O

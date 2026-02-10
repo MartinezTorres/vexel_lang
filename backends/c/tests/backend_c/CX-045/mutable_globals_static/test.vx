@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
 // @desc: Mutable globals must become static variables in .c file
 // @expect-exit: 0
-// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); sys.exit(0 if re.search(r'\\bstatic\\s+VX_MUTABLE\\s+int32_t\\s+vx_global_counter\\s*=', src) else 1)" {VEXEL_C}
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); sys.exit(0 if re.search(r'\\bstatic\\s+VX_MUTABLE\\s+int32_t\\s+vx_global_counter\\s*=', src) else 1)" {VEXEL} -b c
 
 
 global_counter:#i32 = 0;

@@ -2,7 +2,7 @@
 // @desc: All syntax is expressed via sigils and operators rather than reserved words | Syntax via sigils and operators - @ for loop instead of '"'"'for'"'"' keyword
 // @expect-exit: 10
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-003: Demonstrate sigil-based syntax without keywords

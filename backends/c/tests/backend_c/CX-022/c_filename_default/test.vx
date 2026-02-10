@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
 // @desc: Filenames default to <module>.c for C source files. | Filenames default to <module>.c for C source
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

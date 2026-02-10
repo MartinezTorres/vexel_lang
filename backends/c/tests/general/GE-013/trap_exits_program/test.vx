@@ -2,7 +2,7 @@
 // @desc: Runtime errors trap and exit the program | Runtime errors trap - out of bounds access causes trap
 // @expect-exit: 0
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-013: Runtime errors trap and exit the program

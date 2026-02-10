@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: @@ loops must sort the temporary buffer via generated comparator helpers using lexicographic ordering for all types. | @@ loops sort via generated comparator helpers
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

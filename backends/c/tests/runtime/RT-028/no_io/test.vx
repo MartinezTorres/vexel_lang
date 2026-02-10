@@ -2,7 +2,7 @@
 // @desc: No I/O allowed during compile-time execution | No I/O allowed during compile-time execution
 // @expect-exit: 1
 // @expect-stderr: external
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-028: No I/O allowed during compile-time execution

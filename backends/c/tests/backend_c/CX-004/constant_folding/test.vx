@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: Constant folding must behave identically to the language specification. | Constant folding behaves per language spec
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

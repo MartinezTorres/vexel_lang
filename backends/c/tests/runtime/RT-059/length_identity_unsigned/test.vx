@@ -2,7 +2,7 @@
 // @desc: Length operator |x| on unsigned integers returns identity (|x| = x) | Length operator |x| on unsigned integers returns identity (|x| = x)
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-059: Length operator |x| on unsigned integers returns identity (|x| = x)

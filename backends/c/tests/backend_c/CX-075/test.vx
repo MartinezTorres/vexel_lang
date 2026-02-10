@@ -2,7 +2,7 @@
 // @desc: Array extents from immutable constexpr symbols must not degrade to zero-length arrays. | Constexpr symbol extents emit concrete C lengths
 // @expect-exit: 3
 // @run-generated: true
-// @command: {VEXEL_C} -b c test.vx && ! rg -n "\\[[[:space:]]*0\\][[:space:]]*=\\s*\\{" out.c
+// @command: {VEXEL} -b c test.vx && ! rg -n "\\[[[:space:]]*0\\][[:space:]]*=\\s*\\{" out.c
 
 
 &size() -> #i32 {

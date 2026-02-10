@@ -2,7 +2,7 @@
 // @desc: Unexported functions may be eliminated if unused during whole-program compilation | Unexported functions eliminated if unused
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-018: Unexported functions may be eliminated if unused

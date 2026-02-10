@@ -2,7 +2,7 @@
 // @desc: The language provides no explicit error handling mechanism | No error handling - program compiles without error handling
 // @expect-exit: 5
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-009: No explicit error handling mechanism

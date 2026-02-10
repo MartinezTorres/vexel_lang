@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
 // @desc: Header must declare every exported (&^) function. | Header must declare every exported (&^) function
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^exported_func() -> #i32 {

@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: No side effects allowed during compile-time execution | No side effects allowed during compile-time execution
 // @expect-exit: 1
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-029: No side effects allowed during compile-time execution

@@ -2,7 +2,7 @@
 // @desc: Compile-time execution cannot call external functions (&!) | Compile-time execution cannot call external functions (&!)
 // @expect-exit: 1
 // @expect-stderr: external
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-017: Compile-time execution cannot call external functions (&!)

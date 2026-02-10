@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Length operator |expr| rejects other operand types | Length operator |expr| rejects other operand types
 // @expect-exit: 1
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-052: Length operator |expr| rejects other operand types (except arrays, strings, signed/unsigned ints)

@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#preamble
 // @desc: Vexel is a strongly typed language | Strongly typed language - successful compilation with proper types
 // @expect-exit: 0
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-001: Strongly typed language with explicit typing

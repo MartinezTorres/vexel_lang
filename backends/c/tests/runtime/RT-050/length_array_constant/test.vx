@@ -2,7 +2,7 @@
 // @desc: Length operator |expr| on arrays must have compile-time constant length | Length operator |expr| on arrays must have compile-time constant length
 // @expect-exit: 10
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-050: Length operator |expr| on arrays must have compile-time constant length

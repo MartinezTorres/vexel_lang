@@ -2,7 +2,7 @@
 // @desc: Array indexing: arr[i] accesses element at index i | Array indexing: arr[i] accesses element at index i
 // @expect-exit: 90
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-042: Array indexing: arr[i] accesses element at index i

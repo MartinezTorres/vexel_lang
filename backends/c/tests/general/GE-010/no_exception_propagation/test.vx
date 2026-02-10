@@ -2,7 +2,7 @@
 // @desc: There are no exceptions in the language | No exceptions - normal execution without exception handling
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-010: No exceptions in the language

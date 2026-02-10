@@ -2,7 +2,7 @@
 // @desc: If condition is compile-time constant, branches can have different types (dead branch eliminated) | If condition is compile-time constant, branches can have different types (dead branch eliminated)
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-031: If condition is compile-time constant, branches can have different types

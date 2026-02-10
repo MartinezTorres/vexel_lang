@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: Purity analysis must behave identically to the language specification. | Purity analysis behaves per language spec
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &pure_fn(x:#i32) -> #i32 {

@@ -2,7 +2,7 @@
 // @desc: The language defines no standard library | No standard library - no built-in len function
 // @expect-exit: 1
 // @expect-stderr: len
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-006: No standard library

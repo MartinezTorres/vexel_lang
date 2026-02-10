@@ -2,7 +2,7 @@
 // @desc: Primitives are passed and stored by value | Primitives are passed and stored by value
 // @expect-exit: 10
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-034: Primitives are passed and stored by value

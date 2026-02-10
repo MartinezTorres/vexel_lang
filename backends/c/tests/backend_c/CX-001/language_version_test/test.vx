@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#scope--versioning
 // @desc: Backend targets the language semantics defined in vexel-rfc.md (v0.2.1). | Backend targets language semantics v0.2.1
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

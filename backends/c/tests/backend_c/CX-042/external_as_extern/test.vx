@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
 // @desc: Imported external declarations in Vexel must become extern prototypes in C. | Imported external declarations must become extern prototypes in C
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &!external_func() -> #i32;

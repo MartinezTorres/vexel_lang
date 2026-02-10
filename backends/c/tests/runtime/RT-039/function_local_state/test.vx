@@ -2,7 +2,7 @@
 // @desc: All mutable state is function-local (except through references) | All mutable state is function-local (except through references)
 // @expect-exit: 30
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-039: All mutable state is function-local (except through references)

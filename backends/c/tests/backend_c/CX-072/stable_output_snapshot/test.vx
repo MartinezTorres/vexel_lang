@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#backend-contract
 // @desc: Repeated compilations of the same input produce byte-identical C artifacts. | Backend output is deterministic
 // @expect-exit: 0
-// @command: mkdir -p run_a run_b && cp test.vx run_a/test.vx && cp test.vx run_b/test.vx && (cd run_a && {VEXEL_C} test.vx -o out) && (cd run_b && {VEXEL_C} test.vx -o out) && cmp -s run_a/out.c run_b/out.c && cmp -s run_a/out.h run_b/out.h
+// @command: mkdir -p run_a run_b && cp test.vx run_a/test.vx && cp test.vx run_b/test.vx && (cd run_a && {VEXEL} -b c test.vx -o out) && (cd run_b && {VEXEL} -b c test.vx -o out) && cmp -s run_a/out.c run_b/out.c && cmp -s run_a/out.h run_b/out.h
 
 
 &pair() -> (#i32, #i32) {

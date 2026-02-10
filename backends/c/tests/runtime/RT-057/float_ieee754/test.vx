@@ -2,7 +2,7 @@
 // @desc: Float behavior follows IEEE 754 standard | Float behavior follows IEEE 754 standard
 // @expect-exit: 4
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-057: Float behavior follows IEEE 754 standard

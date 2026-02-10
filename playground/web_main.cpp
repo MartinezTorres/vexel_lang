@@ -10,7 +10,7 @@ static void print_usage(const char* prog, const std::vector<vexel::BackendInfo>&
     std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
     std::cout << "Options:\n";
     std::cout << "  -o <path>    Output path (base name for generated files, default: out)\n";
-    std::cout << "  -b <name>    Backend: ";
+    std::cout << "  -b <name>    Backend (required): ";
     for (size_t i = 0; i < backends.size(); ++i) {
         std::cout << backends[i].name;
         if (i + 1 < backends.size()) std::cout << ", ";
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 
     vexel::Compiler::Options opts;
     opts.output_file = "out";
-    opts.backend = available_backends[0].name;
+    opts.backend.clear();
 
     for (int i = 1; i < argc; i++) {
         if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
@@ -72,6 +72,11 @@ int main(int argc, char** argv) {
 
     if (opts.input_file.empty()) {
         std::cerr << "Error: No input file specified\n";
+        print_usage(argv[0], available_backends);
+        return 1;
+    }
+    if (opts.backend.empty()) {
+        std::cerr << "Error: Backend must be specified with -b/--backend\n";
         print_usage(argv[0], available_backends);
         return 1;
     }

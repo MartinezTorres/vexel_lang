@@ -2,7 +2,7 @@
 // @desc: Composites have value semantics (assignment copies) | Composites have value semantics (assignment copies)
 // @expect-exit: 1
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-035: Composites have value semantics (assignment copies)

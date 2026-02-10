@@ -2,7 +2,7 @@
 // @desc: Array sizes must be compile-time constants | Array sizes must be compile-time constants
 // @expect-exit: 1
 // @expect-stderr: constant
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-010: Array sizes must be compile-time constants

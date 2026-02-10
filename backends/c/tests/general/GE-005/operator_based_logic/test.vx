@@ -2,7 +2,7 @@
 // @desc: Vexel is an operator-based language where all operations use operators rather than keywords | Operator-based language - logical operations via operators
 // @expect-exit: 1
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-005: Operator-based language

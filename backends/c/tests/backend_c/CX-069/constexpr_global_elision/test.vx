@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: Globals used only in compile-time evaluation are not emitted | Constexpr-only globals elided
 // @expect-exit: 0
-// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); sys.exit(1 if re.search(r'\\bvx_g\\b', src) else 0)" {VEXEL_C}
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); sys.exit(1 if re.search(r'\\bvx_g\\b', src) else 0)" {VEXEL} -b c
 
 g:#i32 = 3;
 

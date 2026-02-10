@@ -2,7 +2,7 @@
 // @desc: Integer overflow wraps using two'"'"'s complement arithmetic | Integer overflow wraps using two'"'"'s complement arithmetic
 // @expect-exit: 0
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-056: Integer overflow wraps using two's complement arithmetic

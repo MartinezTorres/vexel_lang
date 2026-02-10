@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#diagnostics-specific-to-this-backend
 // @desc: Backend must warn when integer widths exceed the host platform. | Backend warns when integer widths exceed host platform
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^main() -> #i32 {

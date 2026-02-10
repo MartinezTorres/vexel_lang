@@ -2,7 +2,7 @@
 // @desc: Compile-time iteration over compile-time arrays through function calls is fully folded. | Iteration + call chain folds fully
 // @expect-exit: 20
 // @run-generated: true
-// @command: {VEXEL_C} test.vx && rg -n "return 20;" out.c && ! rg -n "vx_sum_array|vx_build" out.c
+// @command: {VEXEL} -b c test.vx && rg -n "return 20;" out.c && ! rg -n "vx_sum_array|vx_build" out.c
 
 
 &sum_array(arr:#i32[4]) -> #i32 {

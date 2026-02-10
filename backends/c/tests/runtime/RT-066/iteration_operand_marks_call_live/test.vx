@@ -2,7 +2,7 @@
 // @desc: Calls used only as iterable operands in @ loops are reachable and must be emitted | Iteration operand calls remain reachable
 // @expect-exit: 9
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &make_values() -> #i32[3] {

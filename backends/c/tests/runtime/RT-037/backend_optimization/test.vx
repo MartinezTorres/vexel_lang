@@ -2,7 +2,7 @@
 // @desc: Backend may optimize to copy-on-write or move when safe | Backend may optimize to copy-on-write or move when safe
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-037: Backend may optimize to copy-on-write or move when safe

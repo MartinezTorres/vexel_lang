@@ -2,7 +2,7 @@
 // @desc: Logical AND operator (&&) short-circuits evaluation | Logical AND operator (&&) short-circuits evaluation
 // @expect-exit: 0
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-002: Logical AND operator (&&) short-circuits evaluation

@@ -2,7 +2,7 @@
 // @desc: Whole-program compilation enables dead code elimination | Dead code elimination - unused functions eliminated
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-016: Whole-program compilation enables dead code elimination

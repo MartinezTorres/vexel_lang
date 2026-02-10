@@ -2,7 +2,7 @@
 // @desc: No external calls allowed during compile-time execution | No external calls allowed during compile-time execution
 // @expect-exit: 1
 // @expect-stderr: external
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-027: No external calls allowed during compile-time execution

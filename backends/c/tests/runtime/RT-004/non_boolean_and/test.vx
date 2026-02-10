@@ -2,7 +2,7 @@
 // @desc: Logical AND and OR operators require boolean operands | Logical AND and OR operators require boolean operands
 // @expect-exit: 1
 // @expect-stderr: boolean
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-004: Logical AND and OR operators require boolean operands

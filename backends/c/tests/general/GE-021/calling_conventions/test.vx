@@ -2,7 +2,7 @@
 // @desc: Backend specifications define calling conventions for function calls | Backend calling conventions - function calls work correctly
 // @expect-exit: 72
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-021: Backend specifications define calling conventions for function calls

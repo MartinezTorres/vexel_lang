@@ -2,7 +2,7 @@
 // @desc: The compiler can generate libraries as output | Compiler generates libraries - multiple exported functions
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-024: The compiler can generate libraries as output

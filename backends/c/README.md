@@ -44,7 +44,13 @@ Source-of-truth integration points:
 - When both reentrant and non-reentrant call paths reach a function, the backend emits two variants (`__reent` and `__nonreent`) and call sites select the appropriate variant.
 - Exported (`&^`) functions are non-`static` and declared in the header; internal functions are `static`.
 - External (`&!`) declarations emit as `extern` prototypes only.
-- Function declarations/definitions are preceded by `// VEXEL: ...` line comments carrying backend-visible traits (`reentrant`, receiver ref-mask, export, inline/noinline, purity, no-global-write, ABI shape).
+- Function declarations/definitions are preceded by `// VEXEL: ...` line comments carrying backend-visible traits (`reentrant`, receiver ref-mask, export, purity, no-global-write, ABI shape).
+
+## Reentrancy Contract (Key Behavior)
+- This backend explicitly recognizes `[[nonreentrant]]` on ABI-boundary functions (`&^` exports and `&!` externals).
+- Default boundary mode is reentrant for both entry and exit boundaries (`R/R`).
+- Internal call variants are selected from frontend-provided reentrancy analysis; backend codegen does not recompute the graph.
+- Internal non-reentrant variants may use frame ABI; ABI boundaries remain native C ABI.
 
 ## Globals & Data
 - Immutable globals emit as `const` in the `.c` file; mutable globals emit as `static`.

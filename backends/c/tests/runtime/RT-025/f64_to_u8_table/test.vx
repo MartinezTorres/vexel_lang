@@ -2,7 +2,7 @@
 // @desc: Example: can use #f64 math at compile time to build #u8 lookup table | Example: can use #f64 math at compile time to build #u8 lookup table
 // @expect-exit: 100
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-025: Example: can use #f64 math at compile time to build #u8 lookup values

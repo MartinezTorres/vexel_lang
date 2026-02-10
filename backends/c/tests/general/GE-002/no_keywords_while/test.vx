@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#preamble
 // @desc: Vexel is a minimal language with no keywords | No keywords - while, for, class can be used as identifiers
 // @expect-exit: 0
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-002: Vexel is a minimal language with no keywords

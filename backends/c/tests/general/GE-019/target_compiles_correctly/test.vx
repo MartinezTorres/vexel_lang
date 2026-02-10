@@ -2,7 +2,7 @@
 // @desc: Backend specifications define the target language for compilation | Backend target language - runs correctly
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-019: Backend target language compilation

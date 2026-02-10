@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#calling--dispatch-rules
 // @desc: Direct Vexel calls must become direct C calls. | Direct Vexel calls must become direct C calls
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &helper(x:#i32) -> #i32 {

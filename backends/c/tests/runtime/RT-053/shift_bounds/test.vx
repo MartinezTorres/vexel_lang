@@ -2,7 +2,7 @@
 // @desc: Shift amount must be less than type bit width (undefined otherwise) | Shift amount must be less than type bit width (undefined otherwise)
 // @expect-exit: 128
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-053: Shift amount must be less than type bit width (undefined otherwise)

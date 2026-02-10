@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#backend-contract
 // @desc: Generated C artifacts must not contain debug marker comments in normal builds. | C output has no debug markers
 // @expect-exit: 0
-// @command: {VEXEL_C} test.vx && ! rg -n "DEBUG:" out.c out.h
+// @command: {VEXEL} -b c test.vx && ! rg -n "DEBUG:" out.c out.h
 
 
 &^main() -> #i32 {

@@ -2,7 +2,7 @@
 // @desc: Vexel is a strongly typed language | Strongly typed language - type mismatches caught at compile time
 // @expect-exit: 1
 // @expect-stderr: Type mismatch
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-001: Vexel is a strongly typed language

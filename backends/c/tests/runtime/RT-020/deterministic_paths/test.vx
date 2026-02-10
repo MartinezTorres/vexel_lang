@@ -2,7 +2,7 @@
 // @desc: All paths in compile-time execution must be deterministic (no runtime-dependent branches) | All paths in compile-time execution must be deterministic (no runtime-dependent branches)
 // @expect-exit: 14
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-020: All paths in compile-time execution must be deterministic

@@ -2,7 +2,7 @@
 // @desc: Within a module, constants initialize top-to-bottom in parse order | Within a module, constants initialize top-to-bottom in parse order
 // @expect-exit: 60
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-015: Within a module, constants initialize top-to-bottom in parse order

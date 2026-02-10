@@ -2,7 +2,7 @@
 // @desc: String indexing yields #u8 (read-only, cannot modify string contents) | String indexing yields #u8 (read-only, cannot modify string contents)
 // @expect-exit: 198
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-043: String indexing yields #u8 (read-only, cannot modify string contents)

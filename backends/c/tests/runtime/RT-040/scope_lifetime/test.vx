@@ -2,7 +2,7 @@
 // @desc: Variable lifetime ends at end of scope | Variable lifetime ends at end of scope
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-040: Variable lifetime ends at end of scope

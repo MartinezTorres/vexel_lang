@@ -2,7 +2,7 @@
 // @desc: All syntax is expressed via sigils and operators rather than reserved words | Syntax via sigils and operators - ternary instead of if/else
 // @expect-exit: 20
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-003: All syntax is expressed via sigils and operators rather than reserved words

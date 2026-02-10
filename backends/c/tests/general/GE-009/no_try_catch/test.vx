@@ -2,7 +2,7 @@
 // @desc: The language provides no explicit error handling mechanism | No error handling - try/catch can be used as identifiers
 // @expect-exit: 52
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-009: The language provides no explicit error handling mechanism

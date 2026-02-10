@@ -2,7 +2,7 @@
 // @desc: There are no result types for error handling | No result types - Result/Option can be used as identifiers
 // @expect-exit: 42
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // GE-011: No result or option types

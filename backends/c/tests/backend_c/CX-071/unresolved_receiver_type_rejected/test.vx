@@ -2,7 +2,7 @@
 // @desc: Exported receiver parameters must have concrete types before backend emission; no implicit i32 fallback. | Unresolved receiver types are rejected
 // @expect-exit: 1
 // @expect-stderr: requires a concrete type
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &^(x)foo() -> #i32 {

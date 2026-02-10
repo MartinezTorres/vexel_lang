@@ -100,13 +100,6 @@ int main(int argc, char** argv) {
             print_usage(argv[0], available_backends);
             return 1;
         }
-    } else if (native_mode) {
-        selected_backend_name = "c";
-        selected_backend = vexel::find_backend(selected_backend_name);
-        if (!selected_backend) {
-            std::cerr << "Error: Native mode requires backend 'c', but it is not registered\n";
-            return 1;
-        }
     } else if (!help_requested) {
         std::cerr << "Error: Backend must be specified with -b/--backend\n";
         print_usage(argv[0], available_backends);

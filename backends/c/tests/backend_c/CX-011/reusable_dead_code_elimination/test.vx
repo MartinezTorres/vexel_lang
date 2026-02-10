@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#shared-behavior
 // @desc: Internal helper passes (dead code elimination) must be reusable by other backends. | Dead code elimination passes are reusable by other backends
 // @expect-exit: 0
-// @command: {VEXEL_C} -b c test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 &unused_func() -> #i32 {

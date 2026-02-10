@@ -65,16 +65,16 @@ rm -f bad.out bad.err missing_b.out missing_b.err unknown.out unknown.err
 
 help_out=$("$ROOT/build/vexel" --help 2>/dev/null || true)
 if printf "%s" "$help_out" | rg -q -- "--run"; then
-  "$ROOT/build/vexel" --run -o out input.vx >/dev/null 2>/dev/null
+  "$ROOT/build/vexel" -b c --run -o out input.vx >/dev/null 2>/dev/null
 
-  "$ROOT/build/vexel" --emit-exe -o out input.vx >/dev/null 2>/dev/null
+  "$ROOT/build/vexel" -b c --emit-exe -o out input.vx >/dev/null 2>/dev/null
   if [[ ! -x out ]]; then
     echo "missing native executable output"
     exit 1
   fi
 else
   set +e
-  "$ROOT/build/vexel" --run -o out input.vx >run.out 2>run.err
+  "$ROOT/build/vexel" -b c --run -o out input.vx >run.out 2>run.err
   status=$?
   set -e
   if [[ $status -eq 0 ]]; then

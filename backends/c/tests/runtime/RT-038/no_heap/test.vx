@@ -2,7 +2,7 @@
 // @desc: No heap allocation: memory is stack or compile-time constant | No heap allocation: memory is stack or compile-time constant
 // @expect-exit: 55
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-038: No heap allocation: memory is stack or compile-time constant

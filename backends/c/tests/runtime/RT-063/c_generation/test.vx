@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: C generation mode: exports become C functions | C generation mode: exports become C functions
 // @expect-exit: 0
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-063: C generation mode: exports become C functions

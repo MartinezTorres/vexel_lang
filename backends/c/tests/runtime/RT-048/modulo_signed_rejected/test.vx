@@ -2,7 +2,7 @@
 // @desc: Modulo operator (%) is only defined for unsigned integers | Modulo operator (%) is only defined for unsigned integers - reject signed
 // @expect-exit: 1
 // @expect-stderr: unsigned
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-048: Modulo operator must reject signed integers (negative test)

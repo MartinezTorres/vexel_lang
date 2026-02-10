@@ -2,7 +2,7 @@
 // @desc: Assignment always creates independent copy (no aliasing) | Assignment always creates independent copy (no aliasing)
 // @expect-exit: 30
 // @run-generated: true
-// @command: {VEXEL_C} test.vx
+// @command: {VEXEL} -b c test.vx
 
 
 // RT-036: Assignment always creates independent copy (no aliasing)
