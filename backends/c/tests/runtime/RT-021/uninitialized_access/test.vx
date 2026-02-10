@@ -1,11 +1,10 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
-// @desc: Accessing uninitialized values during compile-time execution triggers compile-time error | Accessing uninitialized values during compile-time execution triggers compile-time error
-// @expect-exit: 1
-// @expect-stderr: uninitialized
+// @desc: Runtime-initialized globals remain mutable when compile-time evaluation fails
+// @expect-exit: 0
 // @command: {VEXEL_C} test.vx
 
 
-// RT-021: Accessing uninitialized values during compile-time execution triggers compile-time error
+// RT-021: Runtime-initialized globals are mutable when compile-time evaluation fails
 
 &bad_func() -> #i32 {
     x:#i32;
@@ -13,7 +12,7 @@
     x;
 }
 
-// Trying to use at compile time should fail
+// Compile-time evaluation fails, so this initializes at runtime and remains mutable
 value:#i32 = bad_func();
 
 &^main() -> #i32 {

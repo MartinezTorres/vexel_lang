@@ -4,6 +4,6 @@
 
 // EX-061: Range as syntactic sugar
 &^main() -> #i32 {
-    r = 0..3;
+    r = ( #i32 ) 0..3;
     -> r[0] + r[1] + r[2];  // 0 + 1 + 2 = 3
 }

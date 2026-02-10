@@ -5,8 +5,8 @@
     arr = [3, 1, 2];
     sum = 0;
     arr@@{
-        sum = sum + _
-    };
+            sum = sum + _
+        };
     sum
 }
 ```

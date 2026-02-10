@@ -5,11 +5,11 @@
 &^main() -> #i32 {
     outer = [10, 20];
     outer@{
-        inner = [1, 2];
-        inner@{
-            print(_)
+            inner = [1, 2];
+            inner@{
+                    print(_)
+                };
         };
-    };
     -> 0;
 }
 ```

@@ -8,7 +8,7 @@
     |arr|
 }
 &^main() -> #i32 {
-    count_one([1]) + count_many([1, 2, 3, 4])
+    count_one([( #i32 ) 1]) + count_many([( #i32 ) 1, 2, 3, 4])
 }
 ```
 

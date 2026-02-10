@@ -5,6 +5,6 @@
 // EX-065: Compile-time bounds required
 &^main() -> #i32 {
     // OK: compile-time constants
-    r = 0..5;
+    r = ( #i32 ) 0..5;
     -> r[0];
 }

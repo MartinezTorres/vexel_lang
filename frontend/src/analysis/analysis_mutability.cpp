@@ -136,7 +136,7 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
                         if (!mut) continue;
                         ExprPtr rec_expr = expr->receivers[i];
                         if (!rec_expr) continue;
-                        if (!is_addressable_lvalue(rec_expr) || !is_mutable_lvalue(rec_expr)) {
+                        if (!is_addressable_lvalue(rec_expr)) {
                             continue;
                         }
                         auto base = base_identifier_symbol(rec_expr);
@@ -154,29 +154,10 @@ void Analyzer::analyze_mutability(const Module& /*mod*/, AnalysisFacts& facts) {
         const Symbol* sym = entry.first;
         bool written = entry.second;
         if (!sym || !sym->declaration) continue;
-        bool effective_mutable = sym->is_mutable && written;
-        if (effective_mutable) {
+        if (!sym->declaration->var_init || written || global_initializer_runs_at_runtime(sym)) {
             facts.var_mutability[sym] = VarMutability::Mutable;
         } else {
-            bool constexpr_init = false;
-            if (sym->declaration->var_init) {
-                if (sym->declaration->var_type && sym->declaration->var_type->kind == Type::Kind::Array &&
-                    (sym->declaration->var_init->kind == Expr::Kind::ArrayLiteral ||
-                     sym->declaration->var_init->kind == Expr::Kind::Range)) {
-                    constexpr_init = true;
-                } else if (type_checker) {
-                    CompileTimeEvaluator evaluator(type_checker);
-                    CTValue result;
-                    if (evaluator.try_evaluate(sym->declaration->var_init, result)) {
-                        constexpr_init = true;
-                    }
-                }
-            }
-            if (constexpr_init) {
-                facts.var_mutability[sym] = VarMutability::Constexpr;
-            } else {
-                facts.var_mutability[sym] = VarMutability::NonMutableRuntime;
-            }
+            facts.var_mutability[sym] = VarMutability::Constexpr;
         }
     }
 }

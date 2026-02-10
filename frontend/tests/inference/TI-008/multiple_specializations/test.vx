@@ -7,5 +7,5 @@
 }
 
 &^main() -> #i32 {
-    combine(1, 2) + combine(10, 20) + combine(100, 200)
+    combine(2, 3) + combine(10, 20) + combine(100, 200)
 }

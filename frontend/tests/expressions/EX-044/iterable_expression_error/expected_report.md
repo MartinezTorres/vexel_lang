@@ -8,8 +8,8 @@
 }
 &^main() -> #i32 {
     get_array()@{
-        print(_);
-    };
+            print(_);
+        };
     -> 0;
 }
 ```

@@ -854,83 +854,8 @@ void CodeGenerator::gen_stmt(StmtPtr stmt) {
                 if (stmt->expr->kind == Expr::Kind::Assignment &&
                     stmt->expr->left->kind == Expr::Kind::Identifier &&
                     stmt->expr->creates_new_variable) {
-
-                    // Generate variable declaration with initialization
-                    std::string var_type_str;
-
-                    // Special handling for tuple-returning function calls
-                    if (stmt->expr->right && stmt->expr->right->kind == Expr::Kind::Call &&
-                        stmt->expr->right->operand && stmt->expr->right->operand->kind == Expr::Kind::Identifier) {
-
-                        std::string func_name = stmt->expr->right->operand->name;
-                        Symbol* sym = binding_for(stmt->expr->right->operand);
-
-                        if (sym && sym->kind == Symbol::Kind::Function && sym->declaration &&
-                            !sym->declaration->return_types.empty()) {
-                            // This is a tuple-returning function
-                            std::string tuple_name = std::string(TUPLE_TYPE_PREFIX) + std::to_string(sym->declaration->return_types.size());
-                            for (const auto& t : sym->declaration->return_types) {
-                                tuple_name += "_";
-                                if (t) {
-                                    tuple_name += t->to_string();
-                                } else {
-                                    tuple_name += "unknown";
-                                }
-                            }
-                            var_type_str = mangle_name(tuple_name);
-                        } else if (stmt->expr->right->type) {
-                            var_type_str = gen_type(stmt->expr->right->type);
-                        } else {
-                            throw CompileError("Missing type for assignment-generated variable '" +
-                                               stmt->expr->left->name + "'", stmt->expr->location);
-                        }
-                    } else if (stmt->expr->left && stmt->expr->left->type) {
-                        // Use explicit type annotation from left side
-                        var_type_str = gen_type(stmt->expr->left->type);
-                    } else if (stmt->expr->right && stmt->expr->right->type) {
-                        // Infer from right side
-                        var_type_str = gen_type(stmt->expr->right->type);
-                    } else {
-                        throw CompileError("Missing type for assignment-generated variable '" +
-                                           stmt->expr->left->name + "'", stmt->expr->location);
-                    }
-
-                    std::string var_name = mangle_name(stmt->expr->left->name);
-                    if (Symbol* sym = binding_for(stmt->expr->left)) {
-                        var_name += instance_suffix(sym);
-                    }
-
-                    // Special handling for array initialization
-                    TypePtr var_type = stmt->expr->left->type ? stmt->expr->left->type : stmt->expr->type;
-                    if (var_type && var_type->kind == Type::Kind::Array &&
-                        stmt->expr->right->kind == Expr::Kind::ArrayLiteral) {
-                        // Generate array declaration with inline initialization
-                        std::string elem_type = gen_type(var_type->element_type);
-                        std::string size_str = std::to_string(resolve_array_length(var_type, stmt->expr->location));
-                        emit(elem_type + " " + var_name + "[" + size_str + "] = {");
-                        {
-                            VoidCallGuard guard(*this, false);
-                            for (size_t i = 0; i < stmt->expr->right->elements.size(); i++) {
-                                if (i > 0) emit(", ");
-                                emit(gen_expr(stmt->expr->right->elements[i]));
-                            }
-                        }
-                        emit("};");
-                        break;
-                    }
-
-                    std::string rhs;
-                    {
-                        VoidCallGuard guard(*this, false);
-                        rhs = gen_expr(stmt->expr->right);
-                    }
-                    emit(var_type_str + " " + var_name + " = " + rhs + ";");
-                    // Release RHS temp if it's a temporary
-                    if (rhs.rfind("tmp", 0) == 0 &&
-                        (!stmt->expr->right || !stmt->expr->right->type ||
-                         stmt->expr->right->type->kind != Type::Kind::Array)) {
-                        release_temp(rhs);
-                    }
+                    // Keep declaration-assignment lowering in one place.
+                    (void)gen_assignment(stmt->expr);
                     break;
                 }
 
@@ -1582,6 +1507,8 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     init_val = std::to_string(val);
                 } else if (std::holds_alternative<double>(result)) {
                     init_val = std::to_string(std::get<double>(result));
+                } else if (std::holds_alternative<bool>(result)) {
+                    init_val = std::get<bool>(result) ? "1" : "0";
                 } else if (std::holds_alternative<std::string>(result)) {
                     init_val = "\"" + escape_c_string(std::get<std::string>(result)) + "\"";
                 }
@@ -1636,8 +1563,6 @@ std::string CodeGenerator::mutability_prefix(StmtPtr stmt) const {
     switch (kind) {
         case VarMutability::Mutable:
             return "VX_MUTABLE ";
-        case VarMutability::NonMutableRuntime:
-            return "VX_NON_MUTABLE ";
         case VarMutability::Constexpr:
             return "VX_CONSTEXPR ";
         default:

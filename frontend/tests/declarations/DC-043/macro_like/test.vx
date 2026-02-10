@@ -3,7 +3,7 @@
 
 
 // DC-043: Expression parameters enable macro-like behavior
-&unless($cond, $body) {
+&unless($cond:#b, $body) {
     !($cond) ? { $body; }
 }
 

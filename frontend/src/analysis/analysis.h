@@ -1,10 +1,12 @@
 #pragma once
 #include "ast.h"
 #include "symbols.h"
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace vexel {
@@ -13,7 +15,42 @@ struct Program;
 class TypeChecker;
 struct OptimizationFacts;
 
-enum class VarMutability { Mutable, NonMutableRuntime, Constexpr };
+enum class AnalysisPass : uint32_t {
+    Reachability = 1u << 0,
+    Reentrancy = 1u << 1,
+    Mutability = 1u << 2,
+    RefVariants = 1u << 3,
+    Effects = 1u << 4,
+    Usage = 1u << 5,
+};
+
+constexpr uint32_t kAllAnalysisPasses =
+    static_cast<uint32_t>(AnalysisPass::Reachability) |
+    static_cast<uint32_t>(AnalysisPass::Reentrancy) |
+    static_cast<uint32_t>(AnalysisPass::Mutability) |
+    static_cast<uint32_t>(AnalysisPass::RefVariants) |
+    static_cast<uint32_t>(AnalysisPass::Effects) |
+    static_cast<uint32_t>(AnalysisPass::Usage);
+
+enum class ReentrancyBoundaryKind {
+    EntryPoint,
+    ExitPoint,
+};
+
+enum class ReentrancyMode {
+    Default,
+    Reentrant,
+    NonReentrant,
+};
+
+struct AnalysisConfig {
+    uint32_t enabled_passes = kAllAnalysisPasses;
+    char default_entry_context = 'R';
+    char default_exit_context = 'R';
+    std::function<ReentrancyMode(const Symbol*, ReentrancyBoundaryKind)> reentrancy_mode_for_boundary;
+};
+
+enum class VarMutability { Mutable, Constexpr };
 
 struct AnalysisFacts {
     std::unordered_set<const Symbol*> reachable_functions;
@@ -38,8 +75,10 @@ struct AnalysisRunSummary {
 
 class Analyzer {
 public:
-    explicit Analyzer(TypeChecker* tc, const OptimizationFacts* opt = nullptr)
-        : type_checker(tc), optimization(opt) {}
+    explicit Analyzer(TypeChecker* tc,
+                      const OptimizationFacts* opt = nullptr,
+                      AnalysisConfig config = {})
+        : type_checker(tc), optimization(opt), analysis_config(std::move(config)) {}
     AnalysisFacts run(const Module& mod);
 
 private:
@@ -78,6 +117,7 @@ private:
 
     TypeChecker* type_checker;
     const OptimizationFacts* optimization;
+    AnalysisConfig analysis_config;
     int current_instance_id = -1;
     AnalysisRunSummary run_summary_;
 
@@ -85,6 +125,7 @@ private:
     const AnalysisRunSummary& run_summary() const { return run_summary_; }
     InstanceScope scoped_instance(int instance_id);
     bool is_foldable(const Symbol* func_sym) const;
+    bool pass_enabled(AnalysisPass pass) const;
     bool global_initializer_runs_at_runtime(const Symbol* sym) const;
     void build_run_summary(const AnalysisFacts& facts);
     std::optional<bool> constexpr_condition(ExprPtr expr) const;

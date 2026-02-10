@@ -216,6 +216,13 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     TypePtr left_type = check_expr(expr->left);
     TypePtr right_type = check_expr(expr->right);
+    auto coerce_bool_literal = [](ExprPtr node, TypePtr& type, PrimitiveType target_primitive) {
+        if (!node || !type) return;
+        if (node->kind != Expr::Kind::IntLiteral) return;
+        if (type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) return;
+        type = Type::make_primitive(target_primitive, node->location);
+        node->type = type;
+    };
     auto is_numeric_primitive = [](TypePtr t) {
         return t &&
                t->kind == Type::Kind::Primitive &&
@@ -242,6 +249,8 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     // Arithmetic operators
     if (expr->op == "+" || expr->op == "-" || expr->op == "*" || expr->op == "/") {
+        coerce_bool_literal(expr->left, left_type, PrimitiveType::I8);
+        coerce_bool_literal(expr->right, right_type, PrimitiveType::I8);
         if (!is_numeric_like(left_type) || !is_numeric_like(right_type)) {
             throw CompileError("Operator " + expr->op + " requires numeric operands", expr->location);
         }
@@ -253,6 +262,8 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
     // Modulo and bitwise: unsigned only
     if (expr->op == "%" || expr->op == "&" || expr->op == "|" || expr->op == "^" ||
         expr->op == "<<" || expr->op == ">>") {
+        coerce_bool_literal(expr->left, left_type, PrimitiveType::U8);
+        coerce_bool_literal(expr->right, right_type, PrimitiveType::U8);
         require_unsigned_integer(left_type, expr->left ? expr->left->location : expr->location,
                                  "Operator " + expr->op);
         require_unsigned_integer(right_type, expr->right ? expr->right->location : expr->location,
@@ -395,6 +406,13 @@ void TypeChecker::register_tuple_type(const std::string& name, const std::vector
 
 TypePtr TypeChecker::check_unary(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
+    auto coerce_bool_literal = [](ExprPtr node, TypePtr& type, PrimitiveType target_primitive) {
+        if (!node || !type) return;
+        if (node->kind != Expr::Kind::IntLiteral) return;
+        if (type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) return;
+        type = Type::make_primitive(target_primitive, node->location);
+        node->type = type;
+    };
     auto is_numeric_primitive = [](TypePtr t) {
         return t &&
                t->kind == Type::Kind::Primitive &&
@@ -405,6 +423,7 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     };
 
     if (expr->op == "-") {
+        coerce_bool_literal(expr->operand, operand_type, PrimitiveType::I8);
         if (!is_numeric_like(operand_type)) {
             throw CompileError("Unary - requires numeric operand", expr->location);
         }
@@ -421,6 +440,7 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     }
 
     if (expr->op == "~") {
+        coerce_bool_literal(expr->operand, operand_type, PrimitiveType::U8);
         if (operand_type && operand_type->kind == Type::Kind::Primitive &&
             !is_unsigned_int(operand_type->primitive)) {
             throw CompileError("Bitwise NOT requires unsigned integer", expr->location);
@@ -839,6 +859,16 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
 
     TypePtr true_type = check_expr(expr->true_expr);
     TypePtr false_type = check_expr(expr->false_expr);
+    auto coerce_bool_literal_branch = [](ExprPtr branch, TypePtr& branch_type) {
+        if (!branch || !branch_type) return;
+        if (branch->kind != Expr::Kind::IntLiteral) return;
+        if (branch_type->kind != Type::Kind::Primitive ||
+            branch_type->primitive != PrimitiveType::Bool) return;
+        branch_type = Type::make_primitive(PrimitiveType::I8, branch->location);
+        branch->type = branch_type;
+    };
+    coerce_bool_literal_branch(expr->true_expr, true_type);
+    coerce_bool_literal_branch(expr->false_expr, false_type);
 
     if (types_equal(true_type, false_type)) {
         expr->type = true_type;
@@ -1003,15 +1033,15 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Internal error: unresolved assignment target", expr->location);
         }
         if (!sym->is_mutable) {
-            bool can_promote_global =
+            bool infer_mutable_global =
                 !sym->is_local &&
-                sym->declaration &&
-                sym->declaration->kind == Stmt::Kind::VarDecl &&
-                sym->declaration->var_type;
-            if (can_promote_global) {
+                (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
+            if (infer_mutable_global) {
                 sym->kind = Symbol::Kind::Variable;
                 sym->is_mutable = true;
-                sym->declaration->is_mutable = true;
+                if (sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
+                    sym->declaration->is_mutable = true;
+                }
             }
         }
         if (!sym->is_mutable) {
@@ -1062,28 +1092,46 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
         throw CompileError("Range bounds must be integer expressions", expr->location);
     }
 
-    // Check if bounds are equal (would create empty array)
-    if (expr->left->kind == Expr::Kind::IntLiteral &&
-        expr->right->kind == Expr::Kind::IntLiteral) {
-        if (expr->left->uint_val == expr->right->uint_val) {
-            throw CompileError("Range with equal bounds (a..a) would produce empty array", expr->location);
-        }
-    }
-
-    auto fold_const = [&](ExprPtr e, uint64_t& out) -> bool {
+    auto fold_const = [&](ExprPtr e, int64_t& out) -> bool {
         if (e->kind == Expr::Kind::IntLiteral) {
-            out = e->uint_val;
+            if (e->literal_is_unsigned &&
+                e->uint_val > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+                return false;
+            }
+            out = static_cast<int64_t>(e->uint_val);
+            return true;
+        }
+        CompileTimeEvaluator evaluator(this);
+        CTValue value;
+        if (!evaluator.try_evaluate(e, value)) {
+            return false;
+        }
+        if (std::holds_alternative<int64_t>(value)) {
+            out = std::get<int64_t>(value);
+            return true;
+        }
+        if (std::holds_alternative<uint64_t>(value)) {
+            uint64_t v = std::get<uint64_t>(value);
+            if (v > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+                return false;
+            }
+            out = static_cast<int64_t>(v);
             return true;
         }
         return false;
     };
-    uint64_t start_val = 0, end_val = 0;
+    int64_t start_val = 0, end_val = 0;
     if (!fold_const(expr->left, start_val) || !fold_const(expr->right, end_val)) {
         throw CompileError("Range bounds must be compile-time constants", expr->location);
     }
+    if (start_val == end_val) {
+        throw CompileError("Range with equal bounds (a..a) would produce empty array", expr->location);
+    }
 
     TypePtr elem_type = unify_types(start_type, end_type);
-    uint64_t count = (start_val <= end_val) ? (end_val - start_val) : (start_val - end_val);
+    uint64_t count = (start_val < end_val)
+        ? static_cast<uint64_t>(end_val - start_val)
+        : static_cast<uint64_t>(start_val - end_val);
     ExprPtr size = Expr::make_int(count, expr->location);
     expr->type = Type::make_array(elem_type, size, expr->location);
     return expr->type;
@@ -1415,11 +1463,10 @@ TypePtr TypeChecker::infer_literal_type(ExprPtr expr) {
 bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
     if (!target || target->kind != Type::Kind::Primitive || !expr) return false;
 
-    // Do not implicitly widen boolean-typed literals to non-boolean targets
-    if (expr->type && expr->type->kind == Type::Kind::Primitive &&
-        expr->type->primitive == PrimitiveType::Bool &&
-        target->primitive != PrimitiveType::Bool) {
-        return false;
+    if (expr->kind == Expr::Kind::Conditional) {
+        if (!expr->true_expr || !expr->false_expr) return false;
+        return literal_assignable_to(target, expr->true_expr) &&
+               literal_assignable_to(target, expr->false_expr);
     }
 
     auto fits_signed = [&](int64_t minv, int64_t maxv) {

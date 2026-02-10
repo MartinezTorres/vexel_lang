@@ -1,7 +1,7 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/grammar/GR-032/primary_array/test.vx
-&arrays() -> #i8[2][2] {
+&arrays() -> #b[2][2] {
     empty = [];
     nums = [1, 2, 3, 4, 5];
     nested = [[1, 2], [3, 4]]

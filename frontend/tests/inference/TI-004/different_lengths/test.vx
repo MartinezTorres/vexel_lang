@@ -7,5 +7,5 @@
 }
 
 &^main() -> #i32 {
-    first_elem([1, 2, 3]) + first_elem([4, 5])
+    first_elem([2, 3, 4]) + first_elem([5, 6])
 }

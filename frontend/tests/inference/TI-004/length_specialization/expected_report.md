@@ -8,7 +8,7 @@
     values[0] + values[1] + values[2]
 }
 &^main() -> #i32 {
-    sum_pair([1, 2]) + sum_triple([3, 4, 5])
+    sum_pair([( #i32 ) 1, 2]) + sum_triple([( #i32 ) 3, 4, 5])
 }
 ```
 

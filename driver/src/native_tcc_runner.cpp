@@ -1,8 +1,8 @@
 #include "native_tcc_runner.h"
 
 #include "analysis_report.h"
-#include "backends/c/src/codegen.h"
 #include "analyzed_program_builder.h"
+#include "backend_registry.h"
 #include "frontend_pipeline.h"
 #include "io_utils.h"
 #include "module_loader.h"
@@ -24,9 +24,6 @@
 
 namespace vexel {
 
-using c_backend_codegen::CCodegenResult;
-using c_backend_codegen::CodeGenerator;
-
 namespace {
 
 #if VEXEL_HAS_NATIVE_TCC
@@ -44,15 +41,60 @@ Compiler::OutputPaths resolve_output_paths(const std::string& output_file) {
     return {dir, stem};
 }
 
-int compile_to_c(const Compiler::Options& opts, CCodegenResult& out, std::ostream& err) {
+int compile_to_translation_unit(const Compiler::Options& opts,
+                                std::string& out,
+                                std::ostream& err) {
     try {
+        const Backend* backend = find_backend(opts.backend);
+        if (!backend) {
+            err << "Error: Unknown backend '" << opts.backend << "'\n";
+            return 1;
+        }
+        if (!backend->emit_translation_unit) {
+            err << "Error: backend '" << backend->info.name
+                << "' does not support native translation-unit output\n";
+            return 1;
+        }
+
+        BackendAnalysisRequirements backend_reqs{};
+        if (backend->analysis_requirements) {
+            std::string req_error;
+            backend_reqs = backend->analysis_requirements(opts, req_error);
+            if (!req_error.empty()) {
+                err << "Error: " << req_error << "\n";
+                return 1;
+            }
+        }
+
+        AnalysisConfig analysis_config;
+        analysis_config.enabled_passes = backend_reqs.required_passes;
+        analysis_config.default_entry_context = backend_reqs.default_entry_reentrancy;
+        analysis_config.default_exit_context = backend_reqs.default_exit_reentrancy;
+        if (backend->boundary_reentrancy_mode) {
+            analysis_config.reentrancy_mode_for_boundary =
+                [&](const Symbol* sym, ReentrancyBoundaryKind boundary) -> ReentrancyMode {
+                    if (!sym) {
+                        return ReentrancyMode::Default;
+                    }
+                    std::string boundary_error;
+                    ReentrancyMode mode =
+                        backend->boundary_reentrancy_mode(*sym, boundary, opts, boundary_error);
+                    if (!boundary_error.empty()) {
+                        SourceLocation loc = sym->declaration ? sym->declaration->location : SourceLocation();
+                        throw CompileError(boundary_error, loc);
+                    }
+                    return mode;
+                };
+        }
+
         ModuleLoader loader(opts.project_root);
         Program program = loader.load(opts.input_file);
 
         Bindings bindings;
         Resolver resolver(program, bindings, opts.project_root);
         TypeChecker checker(opts.project_root, opts.allow_process, &resolver, &bindings, &program);
-        FrontendPipelineResult pipeline = run_frontend_pipeline(program, resolver, checker, opts.verbose);
+        FrontendPipelineResult pipeline =
+            run_frontend_pipeline(program, resolver, checker, opts.verbose, analysis_config);
 
         Compiler::OutputPaths paths = resolve_output_paths(opts.output_file);
         if (opts.emit_analysis) {
@@ -65,8 +107,17 @@ int compile_to_c(const Compiler::Options& opts, CCodegenResult& out, std::ostrea
 
         AnalyzedProgram analyzed =
             make_analyzed_program(pipeline.merged, checker, pipeline.analysis, pipeline.optimization);
-        CodeGenerator codegen;
-        out = codegen.generate(pipeline.merged, analyzed);
+        BackendInput input{analyzed, opts, paths};
+        std::string backend_error;
+        if (!backend->emit_translation_unit(input, out, backend_error)) {
+            if (!backend_error.empty()) {
+                err << "Error: " << backend_error << "\n";
+            } else {
+                err << "Error: backend '" << backend->info.name
+                    << "' failed to emit translation unit\n";
+            }
+            return 1;
+        }
         return 0;
     } catch (const CompileError& e) {
         err << "Error";
@@ -123,13 +174,11 @@ int run_native_with_tcc(const Compiler::Options& opts, NativeTccMode mode, std::
     err << "Error: this vexel build is missing tcc runtime support files (libtcc1.a)\n";
     return 1;
 #else
-    CCodegenResult c_result;
-    int compile_status = compile_to_c(opts, c_result, err);
+    std::string translation_unit;
+    int compile_status = compile_to_translation_unit(opts, translation_unit, err);
     if (compile_status != 0) {
         return compile_status;
     }
-
-    std::string full_c_unit = c_result.header + "\n" + c_result.source;
 
     TCCState* state = tcc_new();
     if (!state) {
@@ -148,7 +197,7 @@ int run_native_with_tcc(const Compiler::Options& opts, NativeTccMode mode, std::
         return 1;
     }
 
-    if (tcc_compile_string(state, full_c_unit.c_str()) < 0) {
+    if (tcc_compile_string(state, translation_unit.c_str()) < 0) {
         tcc_delete(state);
         return 1;
     }

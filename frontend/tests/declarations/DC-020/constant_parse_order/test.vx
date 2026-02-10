@@ -3,9 +3,9 @@
 
 
 // DC-020: Global constants initialize in parse order
-A = 1;
-B = A + 1;
-C = B + 1;
+A = 2;
+B = A + 2;
+C = B + 2;
 
 &^main() -> #i32 {
     C

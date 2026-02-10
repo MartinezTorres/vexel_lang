@@ -84,8 +84,7 @@ void Analyzer::analyze_effects(const Module& /*mod*/, AnalysisFacts& facts) {
                     }
                     auto base = base_identifier_symbol(expr->left);
                     if (base && !(*base)->is_local &&
-                        ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant) &&
-                        (*base)->is_mutable) {
+                        ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
                         direct_write = true;
                     }
                     return;
@@ -112,7 +111,7 @@ void Analyzer::analyze_effects(const Module& /*mod*/, AnalysisFacts& facts) {
                         }
                         if (!mut) continue;
                         ExprPtr rec = expr->receivers[i];
-                        if (!receiver_is_mutable_arg(rec)) {
+                        if (!is_addressable_lvalue(rec)) {
                             continue;
                         }
                         auto base = base_identifier_symbol(rec);

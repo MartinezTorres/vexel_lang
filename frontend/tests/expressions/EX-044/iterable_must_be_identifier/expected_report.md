@@ -9,8 +9,8 @@
 &^main() -> #i32 {
     arr = get_array();
     arr@{
-        print(_);
-    };
+            print(_);
+        };
     -> 0;
 }
 ```

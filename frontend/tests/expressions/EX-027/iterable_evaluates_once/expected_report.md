@@ -12,8 +12,8 @@ counter: #i32;
     counter = 0;
     arr = get_array();
     arr@{
-        print(_);
-    };
+            print(_);
+        };
     -> 0;
 }
 ```

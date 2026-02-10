@@ -12,6 +12,7 @@ SOURCES := $(sort $(call rwildcard,src/,*.cpp))
 OBJECTS := $(patsubst src/%.cpp,$(BUILD_DIR)/frontend/%.o,$(SOURCES))
 LIB_OBJECTS = $(filter-out $(BUILD_DIR)/frontend/cli/frontend_main.o,$(OBJECTS))
 CLI_OBJECT = $(BUILD_DIR)/frontend/cli/frontend_main.o
+DRIVER_BIN = $(BUILD_DIR)/vexel
 
 TEST_TARGETS := $(patsubst %/test.vx,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.vx))
 TEST_TARGETS += $(patsubst %/test.sh,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.sh))
@@ -29,6 +30,12 @@ $(BUILD_DIR)/lib/libvexelfrontend.a: $(LIB_OBJECTS)
 $(BUILD_DIR)/vexel-frontend: $(CLI_OBJECT) $(BUILD_DIR)/lib/libvexelfrontend.a
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(DRIVER_BIN): FORCE_DRIVER
+	+$(MAKE) -C .. driver
+
+.PHONY: FORCE_DRIVER
+FORCE_DRIVER:
 
 $(BUILD_DIR)/frontend/%.o: src/%.cpp
 	@mkdir -p $(@D)
@@ -54,12 +61,12 @@ update-test-reports: $(TEST_TARGETS)
 	done; \
 	echo "Updated $$updated test report(s). Use 'git diff' to review changes."
 
-$(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx all
+$(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx $(DRIVER_BIN)
 	@mkdir -p $(@D)
 	@{ \
 		stdout_file=$$(mktemp); \
 		stderr_file=$$(mktemp); \
-		if $(BUILD_DIR)/vexel-frontend tests/$*/test.vx > $$stdout_file 2> $$stderr_file; then \
+		if $(DRIVER_BIN) -b vexel -o $(@D)/out tests/$*/test.vx > $$stdout_file 2> $$stderr_file; then \
 			exit_code=0; \
 		else \
 			exit_code=$$?; \
@@ -79,7 +86,7 @@ $(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx all
 		rm -f $$stdout_file $$stderr_file; \
 	}
 
-$(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.sh all
+$(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.sh $(DRIVER_BIN)
 	@mkdir -p $(@D)
 	@{ \
 		stdout_file=$$(mktemp); \

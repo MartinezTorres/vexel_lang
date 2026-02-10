@@ -20,6 +20,23 @@ struct BackendInput {
 };
 
 using BackendEmitFn = void (*)(const BackendInput& input);
+using BackendNativeEmitTranslationUnitFn =
+    bool (*)(const BackendInput& input, std::string& out_translation_unit, std::string& error);
+
+struct BackendAnalysisRequirements {
+    uint32_t required_passes = kAllAnalysisPasses;
+    char default_entry_reentrancy = 'R';
+    char default_exit_reentrancy = 'R';
+};
+
+using BackendAnalysisRequirementsFn =
+    BackendAnalysisRequirements (*)(const Compiler::Options& options, std::string& error);
+using BackendBoundaryReentrancyModeFn =
+    ReentrancyMode (*)(const Symbol& sym,
+                       ReentrancyBoundaryKind boundary,
+                       const Compiler::Options& options,
+                       std::string& error);
+
 // Driver option delegation contract:
 // - Called only for options unknown to the frontend driver.
 // - `index` points at argv[index]; backends may advance it if they consume extra args.
@@ -34,6 +51,9 @@ using BackendPrintUsageFn = void (*)(std::ostream& os);
 struct Backend {
     BackendInfo info;
     BackendEmitFn emit = nullptr;
+    BackendNativeEmitTranslationUnitFn emit_translation_unit = nullptr;
+    BackendAnalysisRequirementsFn analysis_requirements = nullptr;
+    BackendBoundaryReentrancyModeFn boundary_reentrancy_mode = nullptr;
     BackendParseOptionFn parse_option = nullptr;
     BackendPrintUsageFn print_usage = nullptr;
 };

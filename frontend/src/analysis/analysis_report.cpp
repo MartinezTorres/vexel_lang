@@ -10,8 +10,6 @@ std::string mutability_label(VarMutability mut) {
     switch (mut) {
         case VarMutability::Mutable:
             return "mutable";
-        case VarMutability::NonMutableRuntime:
-            return "runtime-immutable";
         case VarMutability::Constexpr:
             return "constexpr";
     }

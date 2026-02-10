@@ -24,8 +24,18 @@ bool Analyzer::is_foldable(const Symbol* func_sym) const {
     return optimization->foldable_functions.count(func_sym) > 0;
 }
 
+bool Analyzer::pass_enabled(AnalysisPass pass) const {
+    return (analysis_config.enabled_passes & static_cast<uint32_t>(pass)) != 0;
+}
+
 bool Analyzer::global_initializer_runs_at_runtime(const Symbol* sym) const {
     if (!sym || !sym->declaration || !sym->declaration->var_init) {
+        return false;
+    }
+    if (sym->declaration->var_type &&
+        sym->declaration->var_type->kind == Type::Kind::Array &&
+        (sym->declaration->var_init->kind == Expr::Kind::ArrayLiteral ||
+         sym->declaration->var_init->kind == Expr::Kind::Range)) {
         return false;
     }
     if (!type_checker) {
@@ -195,13 +205,40 @@ std::optional<const Symbol*> Analyzer::base_identifier_symbol(ExprPtr expr) cons
 AnalysisFacts Analyzer::run(const Module& mod) {
     AnalysisFacts facts;
     run_summary_ = AnalysisRunSummary{};
-    analyze_reachability(mod, facts);
-    build_run_summary(facts);
-    analyze_reentrancy(mod, facts);
-    analyze_mutability(mod, facts);
-    analyze_ref_variants(mod, facts);
-    analyze_effects(mod, facts);
-    analyze_usage(mod, facts);
+
+    const bool needs_reachability =
+        pass_enabled(AnalysisPass::Reachability) ||
+        pass_enabled(AnalysisPass::Reentrancy) ||
+        pass_enabled(AnalysisPass::Mutability) ||
+        pass_enabled(AnalysisPass::RefVariants) ||
+        pass_enabled(AnalysisPass::Effects) ||
+        pass_enabled(AnalysisPass::Usage);
+    if (needs_reachability) {
+        analyze_reachability(mod, facts);
+        build_run_summary(facts);
+    }
+
+    if (pass_enabled(AnalysisPass::Reentrancy)) {
+        analyze_reentrancy(mod, facts);
+    }
+
+    const bool needs_mutability =
+        pass_enabled(AnalysisPass::Mutability) ||
+        pass_enabled(AnalysisPass::RefVariants) ||
+        pass_enabled(AnalysisPass::Effects);
+    if (needs_mutability) {
+        analyze_mutability(mod, facts);
+    }
+
+    if (pass_enabled(AnalysisPass::RefVariants)) {
+        analyze_ref_variants(mod, facts);
+    }
+    if (pass_enabled(AnalysisPass::Effects)) {
+        analyze_effects(mod, facts);
+    }
+    if (pass_enabled(AnalysisPass::Usage)) {
+        analyze_usage(mod, facts);
+    }
     return facts;
 }
 

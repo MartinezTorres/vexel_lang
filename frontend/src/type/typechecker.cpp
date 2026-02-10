@@ -293,9 +293,28 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     if (!sym) {
         throw CompileError("Internal error: unresolved variable '" + stmt->var_name + "'", stmt->location);
     }
-    sym->kind = stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;
+
+    bool inferred_mutable = stmt->is_mutable;
+    if (!sym->is_local && !inferred_mutable) {
+        bool constexpr_init = false;
+        if (stmt->var_init) {
+            if (type && type->kind == Type::Kind::Array &&
+                (stmt->var_init->kind == Expr::Kind::ArrayLiteral ||
+                 stmt->var_init->kind == Expr::Kind::Range)) {
+                constexpr_init = true;
+            } else {
+                CompileTimeEvaluator evaluator(this);
+                CTValue result;
+                constexpr_init = evaluator.try_evaluate(stmt->var_init, result);
+            }
+        }
+        inferred_mutable = !constexpr_init;
+        stmt->is_mutable = inferred_mutable;
+    }
+
+    sym->kind = inferred_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;
     sym->type = type;
-    sym->is_mutable = stmt->is_mutable;
+    sym->is_mutable = inferred_mutable;
     sym->declaration = stmt;
 }
 

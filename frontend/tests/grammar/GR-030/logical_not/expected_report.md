@@ -1,7 +1,7 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/grammar/GR-030/logical_not/test.vx
-&logicalNot(x: #i32) -> #b {
+&logicalNot(x: #b) -> #b {
     result = !x
 }
 ```

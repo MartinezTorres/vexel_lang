@@ -5,7 +5,7 @@
     a + b
 }
 &^main() -> #i32 {
-    combine_G_i8_i8(1, 2) + combine_G_i8_i8(10, 20) + combine_G_i8_i16(100, 200)
+    combine_G_i8_i8(2, 3) + combine_G_i8_i8(10, 20) + combine_G_i8_i16(100, 200)
 }
 &combine_G_i8_i8(a: #i8, b: #i8) -> #i8 {
     a + b

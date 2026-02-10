@@ -4,6 +4,6 @@
 
 // EX-066: Range type inference
 &^main() -> #i32 {
-    r = 0..10;
+    r = ( #i32 ) 0..10;
     -> (|r|);
 }

@@ -4,6 +4,6 @@
 
 &^main() -> #i32 {
     total:#i32 = 0
-    0..3@{ total = total + _; }
+    2..5@{ total = total + _; }
     total
 }

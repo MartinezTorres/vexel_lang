@@ -50,7 +50,8 @@ Module merge_program_instances(const Program& program) {
 FrontendPipelineResult run_frontend_pipeline(Program& program,
                                              Resolver& resolver,
                                              TypeChecker& checker,
-                                             bool verbose) {
+                                             bool verbose,
+                                             const AnalysisConfig& analysis_config) {
     validate_program_stage(program, "post-load");
 
     resolver.resolve();
@@ -77,7 +78,7 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
     OptimizationFacts optimization = optimizer.run(merged);
     validate_module_stage(merged, "post-optimize");
 
-    Analyzer analyzer(&checker, &optimization);
+    Analyzer analyzer(&checker, &optimization, analysis_config);
     AnalysisFacts analysis = analyzer.run(merged);
     validate_module_stage(merged, "post-analysis");
 

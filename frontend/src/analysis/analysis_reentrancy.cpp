@@ -11,31 +11,39 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
     Program* program = summary.program;
     if (!program) return;
 
-    auto has_ann = [](const std::vector<Annotation>& anns, const std::string& name) {
-        return std::any_of(anns.begin(), anns.end(), [&](const Annotation& a) { return a.name == name; });
+    auto normalize_ctx = [](char ctx, char fallback) {
+        if (ctx == 'R' || ctx == 'N') return ctx;
+        return (fallback == 'R' || fallback == 'N') ? fallback : 'N';
+    };
+
+    auto boundary_ctx = [&](const Symbol* sym, ReentrancyBoundaryKind kind) -> char {
+        ReentrancyMode mode = ReentrancyMode::Default;
+        if (analysis_config.reentrancy_mode_for_boundary) {
+            mode = analysis_config.reentrancy_mode_for_boundary(sym, kind);
+        }
+        char fallback = (kind == ReentrancyBoundaryKind::EntryPoint)
+                            ? analysis_config.default_entry_context
+                            : analysis_config.default_exit_context;
+        switch (mode) {
+            case ReentrancyMode::Reentrant:
+                return 'R';
+            case ReentrancyMode::NonReentrant:
+                return 'N';
+            case ReentrancyMode::Default:
+            default:
+                return normalize_ctx(fallback, 'N');
+        }
     };
 
     std::unordered_map<const Symbol*, StmtPtr> function_map = summary.reachable_function_decls;
-    std::unordered_set<const Symbol*> external_reentrant;
     std::unordered_set<const Symbol*> external_nonreentrant;
 
     for (const auto& instance : program->instances) {
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
-            if (!sym || sym->kind != Symbol::Kind::Function) continue;
-            if (sym->is_external) {
-                bool is_reentrant = has_ann(sym->declaration->annotations, "reentrant");
-                bool is_nonreentrant = has_ann(sym->declaration->annotations, "nonreentrant");
-                if (is_reentrant && is_nonreentrant) {
-                    throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on external function '" +
-                                       sym->name + "'", sym->declaration->location);
-                }
-                if (is_reentrant) {
-                    external_reentrant.insert(sym);
-                } else {
-                    external_nonreentrant.insert(sym);
-                }
-                continue;
+            if (!sym || sym->kind != Symbol::Kind::Function || !sym->is_external) continue;
+            if (boundary_ctx(sym, ReentrancyBoundaryKind::ExitPoint) == 'N') {
+                external_nonreentrant.insert(sym);
             }
         }
     }
@@ -49,14 +57,7 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
             if (!sym->is_exported) continue;
             if (!facts.reachable_functions.count(sym)) continue;
 
-            bool is_reentrant = has_ann(sym->declaration->annotations, "reentrant");
-            bool is_nonreentrant = has_ann(sym->declaration->annotations, "nonreentrant");
-            if (is_reentrant && is_nonreentrant) {
-                throw CompileError("Conflicting annotations: [[reentrant]] and [[nonreentrant]] on entry function '" +
-                                   sym->name + "'", sym->declaration->location);
-            }
-
-            char ctx = (is_reentrant ? 'R' : 'N');
+            char ctx = boundary_ctx(sym, ReentrancyBoundaryKind::EntryPoint);
             if (facts.reentrancy_variants[sym].insert(ctx).second) {
                 work.emplace_back(sym, ctx);
             }
@@ -103,10 +104,11 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     }
 
+    char fallback_ctx = normalize_ctx(analysis_config.default_entry_context, 'N');
     for (const auto& entry : function_map) {
         const Symbol* func_sym = entry.first;
         if (facts.reentrancy_variants[func_sym].empty()) {
-            facts.reentrancy_variants[func_sym].insert('N');
+            facts.reentrancy_variants[func_sym].insert(fallback_ctx);
         }
     }
 }

@@ -5,9 +5,9 @@
     [b, a]
 }
 &^main() -> #i32 {
-    swap_G_i8_i8(1, 2)[0]
+    swap_G_b_i8(1, 2)[0]
 }
-&swap_G_i8_i8(a: #i8, b: #i8) -> #i8[2] {
+&swap_G_b_i8(a: #b, b: #i8) -> #i8[2] {
     [b, a]
 }
 ```

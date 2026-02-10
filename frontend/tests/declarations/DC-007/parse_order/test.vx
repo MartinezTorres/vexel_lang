@@ -3,9 +3,9 @@
 
 
 // DC-007: Immutable globals initialized in parse order
-FIRST = 1;
-SECOND = 2;
-THIRD = 3;
+FIRST = 2;
+SECOND = 3;
+THIRD = 4;
 
 &^main() -> #i32 {
     FIRST + SECOND + THIRD

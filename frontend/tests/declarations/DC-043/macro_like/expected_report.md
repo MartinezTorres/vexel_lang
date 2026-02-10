@@ -1,7 +1,7 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-043/macro_like/test.vx
-&unless($cond: #T0, $body: #T1) {
+&unless($cond: #b, $body: #T0) {
     !cond ? 
         {
             body
