@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-101/multi_assign_desugar/test.vx
-&split(val: #i32) -> (#i32, #i32) {
-    (val / 2, val - val / 2)
-}
 &^main() -> #i32 {
     low: #i32;
     high: #i32;

@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-100/tuple_construction/test.vx
-&get_coords() -> (#i32, #i32) {
-    (42, 84)
-}
 &^main() -> #i32 {
     x: #i32;
     y: #i32;

@@ -1,7 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/grammar/GR-044/type_simple/test.vx
-#MyType(v: #i32);
 &^main() -> #i32 {
     x = 1;
     y = 2.0;

@@ -53,7 +53,8 @@ Canonical stage order in `frontend/src/cli/compiler.cpp`:
 6. Collect optimization facts (`Optimizer`)
 7. Analyze reachability/effects/reentrancy (`Analyzer`)
 8. Validate concrete type usage (`TypeChecker::validate_type_usage`)
-9. Emit backend output
+9. Prune merged top-level declarations to the live set (reachable functions, used globals/types)
+10. Emit backend output
 
 Lowered frontend contract lives in `frontend/src/transform/lowerer.h`.
 Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
@@ -123,7 +124,7 @@ Process expressions execute host commands. They are **disabled by default**; pas
 
 ## Web Playground
 
-The web playground runs the unified compiler in WebAssembly with backend `c` selected, and emits C for visualization. The built `docs/index.html` is self-contained (compiler embedded).
+The web playground runs the unified compiler in WebAssembly, lets you choose a backend, and shows emitted output files. The built `docs/index.html` is self-contained (compiler embedded).
 
 Live playground: https://martineztorres.github.io/vexel_lang/
 

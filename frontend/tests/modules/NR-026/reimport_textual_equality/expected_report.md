@@ -6,10 +6,6 @@
 &^main() -> #i32 {
     double(21)
 }
-&double(x: #i32) -> #i32 {
-    x * 2
-}
-#Pair(a: #i32, b: #i32);
 ```
 
 ## Stderr

@@ -71,9 +71,14 @@ $(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx $(DRIVE
 		else \
 			exit_code=$$?; \
 		fi; \
+		rendered_file=$(@D)/out.vx; \
 		echo "## Stdout" > $@; \
 		echo '```' >> $@; \
-		cat $$stdout_file >> $@; \
+		if [ -f $$rendered_file ]; then \
+			cat $$rendered_file >> $@; \
+		else \
+			cat $$stdout_file >> $@; \
+		fi; \
 		echo '```' >> $@; \
 		echo "" >> $@; \
 		echo "## Stderr" >> $@; \

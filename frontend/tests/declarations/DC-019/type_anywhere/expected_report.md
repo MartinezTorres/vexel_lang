@@ -5,7 +5,6 @@
     p = Point(10, 20);
     0
 }
-#Point(x: #i32, y: #i32);
 ```
 
 ## Stderr

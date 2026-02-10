@@ -22,15 +22,9 @@ value: #i32;
 &set(v: #i32) -> #i32 {
     value = v
 }
-&get() -> #i32 {
-    value
-}
 value: #i32;
 &reset() -> #i32 {
     value = 0
-}
-&set(v: #i32) -> #i32 {
-    value = v
 }
 &get() -> #i32 {
     value

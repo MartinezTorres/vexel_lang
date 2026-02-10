@@ -330,7 +330,7 @@
 
       <div class="pane" id="outputPane">
         <div class="pane-header">
-          <span class="pane-title">Generated C</span>
+          <span class="pane-title">Output Files</span>
           <button class="btn ghost" id="copyOutputBtn">Copy</button>
         </div>
         <div class="tabs" id="outputTabs"></div>
@@ -552,32 +552,42 @@
       return main || state.sources[state.activeSource];
     }
 
-    function readOutputs(FS, baseName, backend) {
-      const results = [];
-      const addIfExists = (path, name) => {
-        if (FS.analyzePath(path).exists) {
-          results.push({ name, content: FS.readFile(path, { encoding: "utf8" }) });
-        }
-      };
-
-      if (backend === "megalinker") {
-        addIfExists(`/project/${baseName}.h`, `${baseName}.h`);
-        addIfExists(`/project/${baseName}__runtime.c`, `${baseName}__runtime.c`);
-        const dir = "/project/megalinker";
-        if (FS.analyzePath(dir).exists) {
-          const files = FS.readdir(dir)
-            .filter((name) => name.endsWith(".c"))
-            .sort();
-          files.forEach((file) => {
-            addIfExists(`${dir}/${file}`, `megalinker/${file}`);
-          });
-        }
-      } else {
-        [".c", ".h"].forEach((suffix) => {
-          addIfExists(`/project/${baseName}${suffix}`, `${baseName}${suffix}`);
+    function listWorkspaceFiles(FS, root) {
+      const files = [];
+      const walk = (absDir, relDir) => {
+        if (!FS.analyzePath(absDir).exists) return;
+        const entries = FS.readdir(absDir).filter((name) => name !== "." && name !== "..");
+        entries.forEach((name) => {
+          const absPath = `${absDir}/${name}`.replace(/\/+/g, "/");
+          const relPath = relDir ? `${relDir}/${name}` : name;
+          const stat = FS.stat(absPath);
+          if (FS.isDir(stat.mode)) {
+            walk(absPath, relPath);
+            return;
+          }
+          files.push({ absPath, relPath });
         });
-      }
+      };
+      walk(root, "");
+      files.sort((a, b) => a.relPath.localeCompare(b.relPath));
+      return files;
+    }
 
+    function readOutputs(FS, sourceNames) {
+      const sourceSet = new Set(
+        sourceNames
+          .map((name) => sanitizeName(name))
+          .filter((name) => !!name)
+      );
+      const results = [];
+      const files = listWorkspaceFiles(FS, "/project");
+      files.forEach((file) => {
+        if (sourceSet.has(file.relPath)) return;
+        results.push({
+          name: file.relPath,
+          content: FS.readFile(file.absPath, { encoding: "utf8" })
+        });
+      });
       return results;
     }
 
@@ -604,8 +614,6 @@
         setStatus("Ready", "ready");
         return;
       }
-      const baseName = entryName.replace(/\.vx$/, "");
-
       log(`Compiling ${entryName} (${state.backend})...`);
       let exitCode = 0;
       let module;
@@ -629,7 +637,7 @@
       }
 
       try {
-        module.callMain(["-b", state.backend, "-o", `/project/${baseName}`, entryName]);
+        module.callMain(["-b", state.backend, "-o", `/project/${entryName.replace(/\.vx$/, "")}`, entryName]);
       } catch (err) {
         if (err && err.name === "ExitStatus") {
           exitCode = err.status;
@@ -641,7 +649,7 @@
         }
       }
 
-      const outputs = readOutputs(module.FS, baseName, state.backend);
+      const outputs = readOutputs(module.FS, state.sources.map((src) => src.name));
       state.outputs = outputs;
       state.activeOutput = 0;
       renderOutputTabs();

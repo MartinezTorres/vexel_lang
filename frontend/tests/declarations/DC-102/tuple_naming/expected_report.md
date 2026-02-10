@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-102/tuple_naming/test.vx
-&values() -> (#i32, #i32) {
-    (100, 200)
-}
 &^main() -> #i32 {
     a: #i32;
     b: #i32;

@@ -1,7 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/expressions/EX-016/dead_branch_elimination/test.vx
-ALWAYS_TRUE: #b = 1;
 &^main() -> #i32 {
     result = 10;
     -> result;

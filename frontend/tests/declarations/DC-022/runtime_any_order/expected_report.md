@@ -4,12 +4,6 @@
 &^main() -> #i32 {
     first() + second()
 }
-&first() -> #i32 {
-    1
-}
-&second() -> #i32 {
-    2
-}
 ```
 
 ## Stderr

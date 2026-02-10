@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-099/tuple_struct_sugar/test.vx
-&pair() -> (#i32, #i32) {
-    (10, 20)
-}
 &^main() -> #i32 {
     a: #i32;
     b: #i32;

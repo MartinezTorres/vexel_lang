@@ -1,7 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/modules/NR-005/file_immutable_string/test.vx
-data: #s = "test data with\x00null bytes\xFF";
 &^main() -> #i32 {
     0
 }

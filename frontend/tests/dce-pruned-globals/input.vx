@@ -1,0 +1,14 @@
+G_USED:#i32 = 3;
+G_UNUSED:#i32 = 9;
+
+&keep() -> #i32 {
+  G_USED
+}
+
+&dead() -> #i32 {
+  G_UNUSED
+}
+
+&^main() -> #i32 {
+  keep()
+}

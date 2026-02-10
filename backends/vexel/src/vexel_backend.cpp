@@ -395,7 +395,6 @@ static void emit_vexel_backend(const BackendInput& input) {
     if (input.options.verbose) {
         std::cout << "Writing lowered Vexel: " << output_path << std::endl;
     }
-    std::cout << text;
 }
 
 static BackendAnalysisRequirements vexel_analysis_requirements(const Compiler::Options&,

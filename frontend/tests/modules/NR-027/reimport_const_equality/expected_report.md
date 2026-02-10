@@ -6,7 +6,6 @@
 &^main() -> #i32 {
     ANSWER
 }
-PI: #i32 = 3;
 ANSWER: #i32 = 21 + 21;
 ```
 

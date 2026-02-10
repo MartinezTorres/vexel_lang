@@ -32,9 +32,6 @@ state: #i32;
 &reset() -> #i32 {
     state = 0
 }
-&increment() -> #i32 {
-    state = state + 1
-}
 &getState() -> #i32 {
     state
 }

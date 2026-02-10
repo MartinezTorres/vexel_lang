@@ -1,11 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-098/tuple_return_syntax/test.vx
-&divide(a: #i32, b: #i32) -> (#i32, #i32) {
-    q = a / b;
-    r = a - q * b;
-    (q, r)
-}
 &^main() -> #i32 {
     quotient: #i32;
     remainder: #i32;

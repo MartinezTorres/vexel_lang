@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-104/tuple_compile_time/test.vx
-&constants() -> (#i32, #i32) {
-    (1, 2)
-}
 &^main() -> #i32 {
     a: #i32;
     b: #i32;

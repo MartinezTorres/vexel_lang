@@ -22,7 +22,7 @@ cat >"$tmp/test.vx" <<'VX'
 }
 VX
 
-if ! "$CLI" -b vexel -o "$tmp/out" "$tmp/test.vx" >"$tmp/stdout" 2>"$tmp/stderr"; then
+if ! "$CLI" -b vexel -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>"$tmp/stderr"; then
   echo "backend vexel failed to compile valid input" >&2
   cat "$tmp/stderr" >&2
   exit 1
@@ -36,11 +36,6 @@ fi
 
 if [[ ! -f "$tmp/out.vx" ]]; then
   echo "missing lowered output file: $tmp/out.vx" >&2
-  exit 1
-fi
-
-if ! diff -q "$tmp/stdout" "$tmp/out.vx" >/dev/null 2>&1; then
-  echo "stdout and written output diverge" >&2
   exit 1
 fi
 

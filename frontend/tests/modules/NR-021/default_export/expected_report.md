@@ -10,7 +10,6 @@
     result = x == 42 && y == 100 && p.x == 1 && p.y == 2 ? ( #i32 ) 0 : ( #i32 ) 1;
     -> result;
 }
-#Point(x: #i32, y: #i32);
 &publicFunc() -> #i32 {
     42
 }

@@ -5,7 +5,6 @@
 &^main() -> #i32 {
     0
 }
-hello: #i32 = 0;
 ```
 
 ## Stderr

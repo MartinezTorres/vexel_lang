@@ -2,10 +2,6 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-002/receiver_evaluation_order/test.vx
 &!print(arg0: #i32);
-&get_func_id() -> #i32 {
-    print(1);
-    10
-}
 &get_arg() -> #i32 {
     print(2);
     20

@@ -28,6 +28,57 @@ void validate_program_stage(const Program&, const char*) {}
 void validate_module_stage(const Module&, const char*) {}
 #endif
 
+bool keep_top_level_stmt(StmtPtr stmt,
+                         Symbol* sym,
+                         const AnalysisFacts& analysis) {
+    if (!stmt) return false;
+
+    switch (stmt->kind) {
+        case Stmt::Kind::FuncDecl:
+            // Frontend DCE contract: only reachable functions reach backends.
+            return sym && analysis.reachable_functions.count(sym);
+        case Stmt::Kind::VarDecl:
+            if (stmt->is_exported) return true;
+            // Frontend DCE contract: only ABI-visible or referenced globals survive.
+            return sym && analysis.used_global_vars.count(sym);
+        case Stmt::Kind::TypeDecl:
+            return analysis.used_type_names.count(stmt->type_decl_name);
+        default:
+            return true;
+    }
+}
+
+Module merge_live_program_instances(const Program& program,
+                                    TypeChecker& checker,
+                                    const AnalysisFacts& analysis) {
+    Module merged;
+    if (program.modules.empty()) {
+        return merged;
+    }
+
+    merged.name = program.modules.front().module.name;
+    merged.path = program.modules.front().path;
+
+    for (const auto& instance : program.instances) {
+        const auto& mod_info = program.modules[static_cast<size_t>(instance.module_id)];
+        for (const auto& stmt : mod_info.module.top_level) {
+            Symbol* sym = nullptr;
+            if (stmt && (stmt->kind == Stmt::Kind::FuncDecl || stmt->kind == Stmt::Kind::VarDecl)) {
+                sym = checker.binding_for(instance.id, stmt.get());
+                if (!sym) {
+                    throw CompileError("Internal error: missing top-level binding during frontend DCE prune",
+                                       stmt->location);
+                }
+            }
+            if (keep_top_level_stmt(stmt, sym, analysis)) {
+                merged.top_level.push_back(stmt);
+            }
+        }
+    }
+
+    return merged;
+}
+
 } // namespace
 
 Module merge_program_instances(const Program& program) {
@@ -84,6 +135,9 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
 
     checker.validate_type_usage(merged, analysis);
     validate_module_stage(merged, "post-type-use");
+
+    merged = merge_live_program_instances(program, checker, analysis);
+    validate_module_stage(merged, "post-dce-prune");
 
     FrontendPipelineResult result;
     result.merged = std::move(merged);

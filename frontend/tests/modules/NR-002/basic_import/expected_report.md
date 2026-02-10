@@ -5,9 +5,6 @@
 &^main() -> #i32 {
     helper()
 }
-&helper() -> #i32 {
-    42
-}
 ```
 
 ## Stderr

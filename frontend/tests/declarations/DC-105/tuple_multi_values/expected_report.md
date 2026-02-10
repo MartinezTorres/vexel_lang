@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-105/tuple_multi_values/test.vx
-&triple() -> (#i32, #i32, #i32) {
-    (1, 2, 3)
-}
 &^main() -> #i32 {
     a: #i32;
     b: #i32;

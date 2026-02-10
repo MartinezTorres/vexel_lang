@@ -5,9 +5,6 @@
 &^main() -> #i32 {
     getValue()
 }
-&getValue() -> #i32 {
-    99
-}
 ```
 
 ## Stderr
