@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/declarations/DC-033/no_outlive/test.vx
 &test() -> #i32 {
-    x = 10;
+    x: #i32 = 10;
     &inner() -> #i32 {
         x
     }

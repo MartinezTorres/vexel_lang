@@ -66,6 +66,7 @@ struct Expr {
     std::string name;
     bool is_expr_param_ref = false;  // True if this is a $param reference
     bool creates_new_variable = false;  // True if this assignment creates a new variable
+    TypePtr declared_var_type;  // For declaration assignments, preserve declared/inferred variable type.
     int scope_instance_id = -1;  // For identifiers: which scope instance the symbol is from (-1 = not imported)
     bool is_mutable_binding = false;  // True if identifier refers to a mutable binding
     Symbol* resolved_symbol = nullptr;

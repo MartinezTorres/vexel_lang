@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/errors/ER-003/bool_to_int/test.vx
 &^main() -> #i32 {
-    x = 1;
+    x: #i32 = 1;
     x
 }
 ```

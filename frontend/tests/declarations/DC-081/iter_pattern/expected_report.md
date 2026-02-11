@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     coll = Collection([1, 2, 3, 4]);
-    product = 1;
+    product: #i32 = 1;
     Collection::@({
         product = product * _
     });

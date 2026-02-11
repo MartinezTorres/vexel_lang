@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     obj = Iterable(3);
-    sum = 0;
+    sum: #i32 = 0;
     Iterable::@({
         sum = sum + _
     });

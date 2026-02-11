@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/grammar/GR-030/length/test.vx
 &^main() -> #i32 {
-    arr = [1, 2, 3];
+    arr: #i32[3] = [1, 2, 3];
     len = |arr|;
     len
 }

@@ -156,6 +156,7 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     cloned->name = expr->name;
     cloned->is_expr_param_ref = expr->is_expr_param_ref;
     cloned->creates_new_variable = expr->creates_new_variable;
+    cloned->declared_var_type = expr->declared_var_type;
     cloned->is_mutable_binding = expr->is_mutable_binding;
 
     // Clone operator

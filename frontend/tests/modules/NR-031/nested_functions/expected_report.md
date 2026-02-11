@@ -5,7 +5,7 @@
     &inner() -> #i32 {
         99
     }
-    inner()
+    99
 }
 &^main() -> #i32 {
     outer()

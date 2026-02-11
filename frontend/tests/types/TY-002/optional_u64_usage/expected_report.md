@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/types/TY-002/optional_u64_usage/test.vx
 &^main() -> #i32 {
-    x = 1000;
+    x: #u64 = 1000;
     0
 }
 ```

@@ -4,7 +4,7 @@
 ::math;
 ::math;
 &^main() -> #i32 {
-    double(21)
+    42
 }
 ```
 

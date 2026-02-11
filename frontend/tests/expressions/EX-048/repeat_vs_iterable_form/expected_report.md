@@ -4,12 +4,12 @@
 &print(arg0: #i32) {
 }
 &^main() -> #i32 {
-    i = 0;
+    i: #i32 = 0;
     i < 3@{
             print(i);
             i = i + 1
         };
-    arr = [1, 2, 3];
+    arr: #i32[3] = [1, 2, 3];
     arr@{
             print(_);
         };

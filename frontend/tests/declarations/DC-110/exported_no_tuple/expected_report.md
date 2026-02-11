@@ -5,7 +5,7 @@
     x * 2
 }
 &^main() -> #i32 {
-    single_return(21)
+    42
 }
 ```
 

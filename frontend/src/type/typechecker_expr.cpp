@@ -955,11 +955,13 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_assignment(ExprPtr expr) {
+    expr->declared_var_type = nullptr;
     bool creates_new_variable = bindings && bindings->is_new_variable(current_instance_id, expr.get());
     if (creates_new_variable) {
         if (expr->left->kind != Expr::Kind::Identifier) {
             throw CompileError("Internal error: invalid declaration assignment", expr->location);
         }
+        const TypePtr explicit_decl_type = expr->left->type;
 
         // Check if RHS is a function reference (not allowed)
         if (expr->right->kind == Expr::Kind::Identifier) {
@@ -970,6 +972,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         }
 
         TypePtr rhs_type = check_expr(expr->right);
+        TypePtr rhs_inferred_type = rhs_type;
         TypePtr var_type = expr->left->type ? expr->left->type : rhs_type;
         if (expr->right->kind == Expr::Kind::Cast && expr->left->type) {
             rhs_type = var_type;
@@ -1010,6 +1013,9 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         lhs_sym->is_mutable = true;
 
         // Invariant: declaration-site LHS is not a typed value expression.
+        if (explicit_decl_type && !types_equal(rhs_inferred_type, explicit_decl_type)) {
+            expr->declared_var_type = explicit_decl_type;
+        }
         expr->left->type = nullptr;
         expr->creates_new_variable = true;
 

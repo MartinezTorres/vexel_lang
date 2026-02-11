@@ -7,7 +7,7 @@
             -> n;
         fib(n - 1) + fib(n - 2)
     }
-    fib(5)
+    5
 }
 &^main() -> #i32 {
     test()

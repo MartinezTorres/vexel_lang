@@ -2,9 +2,9 @@
 ```
 // Lowered Vexel module: tests/types/TY-060/comparison_op_neeq/test.vx
 &^main() -> #i32 {
-    a = 10;
-    b = 20;
-    1
+    a: #i32 = 10;
+    b: #i32 = 20;
+    a != b ? 1 : 0
 }
 ```
 

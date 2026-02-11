@@ -342,9 +342,19 @@ private:
                     << format_expr(expr->operand, my_prec, level);
                 break;
             case Expr::Kind::Assignment:
-                out << format_expr(expr->left, my_prec, level)
-                    << " = "
-                    << format_expr(expr->right, my_prec, level);
+                if (expr->creates_new_variable &&
+                    expr->left &&
+                    expr->left->kind == Expr::Kind::Identifier) {
+                    out << expr->left->name;
+                    if (expr->declared_var_type) {
+                        out << ": " << format_type(expr->declared_var_type);
+                    }
+                    out << " = " << format_expr(expr->right, my_prec, level);
+                } else {
+                    out << format_expr(expr->left, my_prec, level)
+                        << " = "
+                        << format_expr(expr->right, my_prec, level);
+                }
                 break;
             case Expr::Kind::Range:
                 out << format_expr(expr->left, my_prec, level)

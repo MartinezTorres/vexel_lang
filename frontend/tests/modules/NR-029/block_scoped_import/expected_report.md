@@ -4,12 +4,9 @@
 &^main() -> #i32 {
     {
         ::helper;
-        result = compute()
+        result = 777
     };
     0
-}
-&compute() -> #i32 {
-    777
 }
 ```
 

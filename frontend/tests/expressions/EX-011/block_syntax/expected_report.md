@@ -3,8 +3,8 @@
 // Lowered Vexel module: tests/expressions/EX-011/block_syntax/test.vx
 &^main() -> #i32 {
     x = {
-        a = 10;
-        b = 20;
+        a: #i32 = 10;
+        b: #i32 = 20;
         a + b
     };
     -> x;

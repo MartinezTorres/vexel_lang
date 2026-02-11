@@ -5,7 +5,7 @@
     &inner() -> #i32 {
         42
     }
-    inner()
+    42
 }
 &^main() -> #i32 {
     outer()

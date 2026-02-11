@@ -2,9 +2,9 @@
 ```
 // Lowered Vexel module: tests/inference/TI-009/consistent_semantics/test.vx
 &^main() -> #i32 {
-    a = increment_G_i8(10);
-    b = increment_G_i8(20);
-    c = increment_G_i8(30);
+    a: #i32 = 11;
+    b: #i32 = 21;
+    c: #i32 = 31;
     a + b + c
 }
 ```

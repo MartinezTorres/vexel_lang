@@ -4,7 +4,7 @@
 &^main() -> #i32 {
     next = NextNode(2);
     node = Node(1, next);
-    result = ( #i32 ) 0;
+    result = node.value == 1 && node.next.data == 2 ? ( #i32 ) 0 : ( #i32 ) 1;
     -> result;
 }
 ```

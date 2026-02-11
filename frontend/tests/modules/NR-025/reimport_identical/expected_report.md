@@ -4,7 +4,7 @@
 ::utils;
 ::utils;
 &^main() -> #i32 {
-    add(1, 2)
+    3
 }
 ```
 

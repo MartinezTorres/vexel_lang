@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/lexer/LX-001/valid_ascii/test.vx
 &^main() -> #i32 {
-    x = 42;
+    x: #i32 = 42;
     s = "ABC xyz 123 !@#$%^&*()-_=+[]{};:',.<>/?`~";
     0
 }

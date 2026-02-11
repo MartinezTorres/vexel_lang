@@ -22,6 +22,17 @@ cat >"$tmp/test.vx" <<'VX'
 }
 VX
 
+cat >"$tmp/typed_local.vx" <<'VX'
+&^main() -> #i32 {
+    limit:#i32 = 1000;
+    i:#i32 = 0;
+    (i < limit)@{
+        i = i + 1;
+    };
+    i
+}
+VX
+
 if ! "$CLI" -b vexel -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>"$tmp/stderr"; then
   echo "backend vexel failed to compile valid input" >&2
   cat "$tmp/stderr" >&2
@@ -46,6 +57,18 @@ fi
 
 if ! rg -q "&\^main\(\) -> #i32" "$tmp/out.vx"; then
   echo "missing lowered main signature" >&2
+  exit 1
+fi
+
+if ! "$CLI" -b vexel -o "$tmp/typed_local_out" "$tmp/typed_local.vx" >/dev/null 2>"$tmp/typed_local_stderr"; then
+  echo "backend vexel failed on typed local declaration input" >&2
+  cat "$tmp/typed_local_stderr" >&2
+  exit 1
+fi
+
+if ! rg -q "limit: #i32 = 1000;" "$tmp/typed_local_out.vx"; then
+  echo "lowered vexel lost typed local declaration annotation" >&2
+  cat "$tmp/typed_local_out.vx" >&2
   exit 1
 fi
 

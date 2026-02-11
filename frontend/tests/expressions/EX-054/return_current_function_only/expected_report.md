@@ -2,11 +2,8 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-054/return_current_function_only/test.vx
 &!print(arg0: #i32);
-&inner() -> #i32 {
-    -> 42;
-}
 &outer() -> #i32 {
-    result = inner();
+    result = 42;
     print(result);
     -> 0;
 }

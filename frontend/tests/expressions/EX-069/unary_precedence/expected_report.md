@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-069/unary_precedence/test.vx
 &^main() -> #i32 {
-    arr = [1, 2, 3];
+    arr: #i32[3] = [1, 2, 3];
     result = -arr[1];
     -> result;
 }

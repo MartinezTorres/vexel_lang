@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/types/TY-105/scope_lifetime/test.vx
 &^main() -> #i32 {
     {
-        x = 42
+        x: #i32 = 42
     };
     0
 }

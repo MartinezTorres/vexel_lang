@@ -1,9 +1,6 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/expressions/EX-092/multi_assignment_arity_match/test.vx
-&pair() -> (#i32, #i32) {
-    (1, 2)
-}
 &^main() -> #i32 {
     a: #i32;
     b: #i32;
