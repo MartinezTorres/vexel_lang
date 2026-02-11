@@ -311,6 +311,7 @@
           <option value="hello">Hello</option>
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
+          <option value="sieve">Prime Sieve (&lt;1000)</option>
           <option value="banked">Banked Calls + Globals</option>
           <option value="reentrant">Recursive (Reentrant)</option>
           <option value="globals">ROM + RAM Globals</option>
@@ -396,6 +397,13 @@
           name: "main.vx",
           content:
             "arr:#i32[4] = [1, 2, 3, 4];\n\n&^main() -> #i32 {\n  sum:#i32 = 0;\n  arr@{\n    sum = sum + _\n  };\n  sum\n}\n"
+        }
+      ],
+      sieve: [
+        {
+          name: "main.vx",
+          content:
+            "&^main() -> #i32 {\n  limit:#i32 = 1000;\n  prime:#b[1000];\n\n  i:#i32 = 0;\n  (i < limit)@{\n    prime[i] = 1;\n    i = i + 1;\n  };\n  prime[0] = 0;\n  prime[1] = 0;\n\n  p:#i32 = 2;\n  (p * p < limit)@{\n    prime[p] ? {\n      k:#i32 = p * p;\n      (k < limit)@{\n        prime[k] = 0;\n        k = k + p;\n      };\n    };\n    p = p + 1;\n  };\n\n  sum:#i32 = 0;\n  n:#i32 = 2;\n  (n < limit)@{\n    prime[n] ? { sum = sum + n; };\n    n = n + 1;\n  };\n\n  sum\n}\n"
         }
       ],
       banked: [
