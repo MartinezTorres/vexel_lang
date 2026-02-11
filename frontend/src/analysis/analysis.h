@@ -131,6 +131,8 @@ private:
     std::optional<bool> constexpr_condition(ExprPtr expr) const;
     void walk_pruned_expr(ExprPtr expr, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
     void walk_pruned_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
+    void walk_runtime_expr(ExprPtr expr, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
+    void walk_runtime_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const StmtVisitor& on_stmt);
     void analyze_reachability(const Module& mod, AnalysisFacts& facts);
     void analyze_reentrancy(const Module& mod, AnalysisFacts& facts);
     void analyze_mutability(const Module& mod, AnalysisFacts& facts);

@@ -1,0 +1,15 @@
+// @rfc: docs/vexel-rfc.md#whole-program-compilation
+// @desc: Globals referenced only by compile-time-known expressions are pruned before C emission.
+// @expect-exit: 42
+// @run-generated: true
+// @command: {VEXEL} -b c test.vx && ! rg -n "__res|__add" out.c out.h
+
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+res:#i32 = add(40, 2);
+
+&^main() -> #i32 {
+    42
+}

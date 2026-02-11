@@ -148,6 +148,14 @@ void Analyzer::walk_pruned_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const 
         [&](const StmtPtr& child) { walk_pruned_stmt(child, on_expr, on_stmt); });
 }
 
+void Analyzer::walk_runtime_expr(ExprPtr expr, const ExprVisitor& on_expr, const StmtVisitor& on_stmt) {
+    walk_pruned_expr(expr, on_expr, on_stmt);
+}
+
+void Analyzer::walk_runtime_stmt(StmtPtr stmt, const ExprVisitor& on_expr, const StmtVisitor& on_stmt) {
+    walk_pruned_stmt(stmt, on_expr, on_stmt);
+}
+
 Symbol* Analyzer::binding_for(ExprPtr expr) const {
     if (!type_checker) return nullptr;
     return type_checker->binding_for(current_instance_id, expr.get());

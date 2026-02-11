@@ -71,7 +71,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         if (!func_sym || !func_sym->declaration || !func_sym->declaration->body) continue;
         auto func_scope = scoped_instance(func_sym->instance_id);
         (void)func_scope;
-        walk_pruned_expr(
+        walk_runtime_expr(
             func_sym->declaration->body,
             [&](ExprPtr expr) {
                 if (!expr || expr->kind != Expr::Kind::Identifier) return;
@@ -103,7 +103,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         auto global_scope = scoped_instance(sym->instance_id);
         (void)global_scope;
         mark_type(sym->declaration->var_type);
-        walk_pruned_expr(
+        walk_runtime_expr(
             sym->declaration->var_init,
             [&](ExprPtr expr) {
                 if (!expr || expr->kind != Expr::Kind::Identifier) return;
