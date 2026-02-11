@@ -124,7 +124,6 @@ private:
     AnalysisContext context() const;
     const AnalysisRunSummary& run_summary() const { return run_summary_; }
     InstanceScope scoped_instance(int instance_id);
-    bool is_foldable(const Symbol* func_sym) const;
     bool pass_enabled(AnalysisPass pass) const;
     bool global_initializer_runs_at_runtime(const Symbol* sym) const;
     void build_run_summary(const AnalysisFacts& facts);

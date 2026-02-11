@@ -54,12 +54,6 @@ void Analyzer::analyze_effects(const Module& /*mod*/, AnalysisFacts& facts) {
     for (const auto& entry : function_map) {
         const Symbol* func_sym = entry.first;
         const StmtPtr& func = entry.second;
-        if (is_foldable(func_sym)) {
-            function_direct_writes_global[func_sym] = false;
-            function_direct_impure[func_sym] = false;
-            function_unknown_call[func_sym] = false;
-            continue;
-        }
         if (!func || !func->body) {
             function_direct_impure[func_sym] = true;
             function_unknown_call[func_sym] = true;

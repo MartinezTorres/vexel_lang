@@ -1,7 +1,6 @@
 #include "residualizer.h"
 
 #include "expr_access.h"
-#include "typechecker.h"
 
 namespace vexel {
 
@@ -377,24 +376,12 @@ bool Residualizer::can_fold_expr(const ExprPtr& expr) const {
             if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
                 return false;
             }
-            if (!expr->receivers.empty()) {
-                return false;
-            }
-            Symbol* sym = binding_for(expr->operand);
-            if (!sym || sym->kind != Symbol::Kind::Function) {
-                return false;
-            }
-            return facts_.foldable_functions.count(sym) > 0;
+            return true;
         }
 
         default:
             return false;
     }
-}
-
-Symbol* Residualizer::binding_for(const ExprPtr& expr) const {
-    if (!checker_ || !expr) return nullptr;
-    return checker_->binding_for(expr.get());
 }
 
 } // namespace vexel

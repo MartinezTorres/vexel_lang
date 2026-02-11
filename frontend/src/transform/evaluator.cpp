@@ -601,12 +601,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    // Check for mutable global access
-    std::string impurity_reason;
-    if (!is_pure_for_compile_time(func, impurity_reason)) {
-        error_msg = "Function is not pure for compile-time evaluation: " + impurity_reason;
-        return false;
-    }
+    // Do not reject calls with whole-function purity checks here.
+    // Evaluation is path-sensitive: if the concrete call instance reaches an impure
+    // operation (e.g., external call, mutable global write), try_evaluate fails.
 
     // Evaluate arguments
     std::unordered_map<std::string, CTValue> saved_constants = constants;
@@ -676,7 +673,11 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(expr->name);
     }
-    if (sym && sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
+    if (sym &&
+        !sym->is_local &&
+        sym->kind == Symbol::Kind::Constant &&
+        sym->declaration &&
+        sym->declaration->var_init) {
         return try_evaluate(sym->declaration->var_init, result);
     }
 

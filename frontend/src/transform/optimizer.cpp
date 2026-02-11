@@ -9,9 +9,6 @@ OptimizationFacts Optimizer::run(const Module& mod) {
         return facts;
     }
 
-    CompileTimeEvaluator eval(type_checker);
-    evaluator = &eval;
-
     Program* program = type_checker->get_program();
     int saved_instance = type_checker->current_instance();
     if (program) {
@@ -65,7 +62,6 @@ OptimizationFacts Optimizer::run(const Module& mod) {
     }
     type_checker->set_current_instance(saved_instance);
 
-    evaluator = nullptr;
     return facts;
 }
 
@@ -98,9 +94,10 @@ void Optimizer::mark_constexpr_init(StmtPtr stmt, OptimizationFacts& facts) {
         facts.constexpr_inits.insert(stmt.get());
         return;
     }
-    if (!evaluator) return;
+    if (!type_checker) return;
+    CompileTimeEvaluator evaluator(type_checker);
     CTValue result;
-    if (evaluator->try_evaluate(stmt->var_init, result)) {
+    if (evaluator.try_evaluate(stmt->var_init, result)) {
         facts.constexpr_inits.insert(stmt.get());
         facts.constexpr_values.emplace(stmt->var_init.get(), result);
     }
@@ -139,9 +136,10 @@ void Optimizer::visit_stmt(StmtPtr stmt, OptimizationFacts& facts) {
 void Optimizer::visit_expr(ExprPtr expr, OptimizationFacts& facts) {
     if (!expr) return;
 
-    if (evaluator && !facts.constexpr_values.count(expr.get())) {
+    if (type_checker && !facts.constexpr_values.count(expr.get())) {
+        CompileTimeEvaluator evaluator(type_checker);
         CTValue value;
-        if (evaluator->try_evaluate(expr, value)) {
+        if (evaluator.try_evaluate(expr, value)) {
             facts.constexpr_values.emplace(expr.get(), value);
         }
     }

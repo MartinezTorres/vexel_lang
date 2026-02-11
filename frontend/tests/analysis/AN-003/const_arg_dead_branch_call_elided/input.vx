@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Call-site constant arguments prune dead callee branches and can remove the callee entirely. | Const-call dead branches do not keep helper functions alive
+
+&!putchar(c:#u8);
+
+&print_newline(a:#b) {
+    a ? putchar(10);
+}
+
+&^main() -> #i32 {
+    putchar(72);
+    putchar(101);
+    putchar(108);
+    putchar(108);
+    putchar(111);
+    print_newline(0);
+    0
+}

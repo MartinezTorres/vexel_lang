@@ -6,8 +6,6 @@
 
 namespace vexel {
 
-class TypeChecker;
-
 // Rewrites expression/statement trees in place using optimizer facts.
 // This pass performs sub-expression residualization:
 // - replace compile-time-known expressions with literals
@@ -15,13 +13,11 @@ class TypeChecker;
 // - drop dead pure expression statements
 class Residualizer {
 public:
-    Residualizer(TypeChecker* checker, const OptimizationFacts& facts)
-        : checker_(checker), facts_(facts) {}
+    explicit Residualizer(const OptimizationFacts& facts) : facts_(facts) {}
 
     bool run(Module& mod);
 
 private:
-    TypeChecker* checker_ = nullptr;
     const OptimizationFacts& facts_;
     bool changed_ = false;
 
@@ -35,7 +31,6 @@ private:
 
     static void copy_expr_meta(const ExprPtr& from, const ExprPtr& to);
     bool can_fold_expr(const ExprPtr& expr) const;
-    Symbol* binding_for(const ExprPtr& expr) const;
     ExprPtr ctvalue_to_expr(const CTValue& value, const ExprPtr& origin) const;
     std::optional<bool> constexpr_condition(const ExprPtr& cond, const Expr* original) const;
 };

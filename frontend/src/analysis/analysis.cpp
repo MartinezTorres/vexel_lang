@@ -19,11 +19,6 @@ Analyzer::InstanceScope Analyzer::scoped_instance(int instance_id) {
     return InstanceScope(*this, instance_id);
 }
 
-bool Analyzer::is_foldable(const Symbol* func_sym) const {
-    if (!optimization) return false;
-    return optimization->foldable_functions.count(func_sym) > 0;
-}
-
 bool Analyzer::pass_enabled(AnalysisPass pass) const {
     return (analysis_config.enabled_passes & static_cast<uint32_t>(pass)) != 0;
 }
@@ -66,7 +61,7 @@ void Analyzer::build_run_summary(const AnalysisFacts& facts) {
             if (sym->kind == Symbol::Kind::Function) {
                 if (!sym->is_external && facts.reachable_functions.count(sym)) {
                     run_summary_.reachable_function_decls[sym] = sym->declaration;
-                    if (sym->declaration->body && !is_foldable(sym)) {
+                    if (sym->declaration->body) {
                         std::unordered_set<const Symbol*> calls;
                         collect_calls(sym->declaration->body, calls);
                         run_summary_.reachable_calls[sym] = std::move(calls);
@@ -296,10 +291,6 @@ void Analyzer::mark_reachable(const Symbol* func_sym,
         return;
     }
 
-    if (is_foldable(func_sym)) {
-        return;
-    }
-
     auto callee_scope = scoped_instance(func_sym->instance_id);
     (void)callee_scope;
 
@@ -318,6 +309,11 @@ void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& ca
             if (!node) return;
             if (node->kind != Expr::Kind::Call || !node->operand ||
                 node->operand->kind != Expr::Kind::Identifier) {
+                return;
+            }
+            // Call-graph edges are call-site specific: constexpr-folded call sites
+            // are compile-time-only instantiations and should not mark runtime reachability.
+            if (optimization && optimization->constexpr_values.count(node.get()) > 0) {
                 return;
             }
             Symbol* sym = binding_for(node->operand);

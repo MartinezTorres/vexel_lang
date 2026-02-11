@@ -23,7 +23,6 @@ public:
 
 private:
     TypeChecker* type_checker;
-    CompileTimeEvaluator* evaluator = nullptr;
 
     void visit_expr(ExprPtr expr, OptimizationFacts& facts);
     void visit_stmt(StmtPtr stmt, OptimizationFacts& facts);

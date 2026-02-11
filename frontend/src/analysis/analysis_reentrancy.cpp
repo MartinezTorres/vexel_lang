@@ -88,7 +88,6 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         }
         StmtPtr func = it->second;
         if (!func || !func->body) continue;
-        if (is_foldable(func_sym)) continue;
 
         auto calls_it = summary.reachable_calls.find(func_sym);
         if (calls_it == summary.reachable_calls.end()) continue;

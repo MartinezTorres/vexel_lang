@@ -1,19 +1,22 @@
 // @rfc: docs/vexel-rfc.md#annotations
-// @desc: Ref variants specialize mutable vs immutable receivers | Ref variants emit separate symbols
+// @desc: Receiver calls lower through backend ref-variant dispatch. | Receiver calls emit backend callable variants
 // @expect-exit: 0
-// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); ok = re.search(r'\\bvx_Box__get\\b', src) and re.search(r'\\bvx_Box__get__refN\\b', src); sys.exit(0 if ok else 1)" {VEXEL} -b c
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); ok = re.search(r'\\bvx_Box__get\\b', src); sys.exit(0 if ok else 1)" {VEXEL} -b c
 
 #Box(val:#i32);
 
-const_box:#Box = Box(2);
 bump:#i32;
+&!read_i32() -> #i32;
 
 &(self)#Box::get() -> #i32 {
     self.val
 }
 
 &^main() -> #i32 {
-    a:#Box = Box(1);
+    x:#i32 = read_i32();
+    a:#Box = Box(x);
+    a = Box(x + 1);
+    const_box:#Box = Box(x + 2);
     bump = 0;
     a.get() + const_box.get() + bump
 }

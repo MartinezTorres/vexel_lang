@@ -49,7 +49,6 @@ void Analyzer::analyze_ref_variants(const Module& /*mod*/, AnalysisFacts& facts)
         const Symbol* func_sym = entry.first;
         const StmtPtr& func_decl = entry.second;
         if (!func_sym || !func_decl) continue;
-        if (is_foldable(func_sym)) continue;
         auto func_scope = scoped_instance(func_sym->instance_id);
         (void)func_scope;
         if (func_decl->body) {
