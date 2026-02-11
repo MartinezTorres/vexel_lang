@@ -307,6 +307,7 @@
         <select id="backendSelect"></select>
         <select id="exampleSelect">
           <option value="">Load example</option>
+          <option value="quickadd">Quick Add</option>
           <option value="hello">Hello</option>
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
@@ -357,7 +358,8 @@
       sources: [
         {
           name: "main.vx",
-          content: "// Vexel example\n&add(a:#i32, b:#i32) -> #i32 { a + b }\n\nres:#i32 = add(40, 2)\n\n&^main() -> #i32 {\n  res\n}\n"
+          content:
+            "&!putchar(c:#u8);\n\n&print_newline() {\n  putchar(10);\n}\n\n&^main() -> #i32 {\n  putchar(72);\n  putchar(101);\n  putchar(108);\n  putchar(108);\n  putchar(111);\n  print_newline();\n  0\n}\n"
         }
       ],
       outputs: [],
@@ -368,6 +370,13 @@
     };
 
     const examples = {
+      quickadd: [
+        {
+          name: "main.vx",
+          content:
+            "// Vexel example\n&add(a:#i32, b:#i32) -> #i32 { a + b }\n\nres:#i32 = add(40, 2)\n\n&^main() -> #i32 {\n  res\n}\n"
+        }
+      ],
       hello: [
         {
           name: "main.vx",
@@ -637,7 +646,7 @@
       }
 
       try {
-        module.callMain(["-b", state.backend, "-o", `/project/${entryName.replace(/\.vx$/, "")}`, entryName]);
+        module.callMain(["-b", state.backend, "-o", `/project/__build/${entryName.replace(/\.vx$/, "")}`, entryName]);
       } catch (err) {
         if (err && err.name === "ExitStatus") {
           exitCode = err.status;
