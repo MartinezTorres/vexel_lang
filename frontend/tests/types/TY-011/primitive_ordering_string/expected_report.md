@@ -4,7 +4,7 @@
 &^main() -> #i32 {
     a = "apple";
     b = "banana";
-    a < b ? 1 : 0
+    1
 }
 ```
 

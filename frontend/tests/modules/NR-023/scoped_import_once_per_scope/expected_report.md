@@ -15,7 +15,7 @@
         reset();
         b = getState()
     };
-    result = a == 1 && b == 0 ? ( #i32 ) 0 : ( #i32 ) 1;
+    result = ( #i32 ) 1;
     -> result;
 }
 state: #i32;

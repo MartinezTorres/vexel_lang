@@ -6,6 +6,7 @@
 #include "optimizer.h"
 #include "pass_invariants.h"
 #include "program.h"
+#include "residualizer.h"
 #include "resolver.h"
 #include "typechecker.h"
 
@@ -126,7 +127,22 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
     validate_module_stage(merged, "post-lower");
 
     Optimizer optimizer(&checker);
-    OptimizationFacts optimization = optimizer.run(merged);
+    OptimizationFacts optimization;
+    static constexpr int kMaxResidualFixpointIterations = 64;
+    int residual_iters = 0;
+    while (true) {
+        optimization = optimizer.run(merged);
+        Residualizer residualizer(&checker, optimization);
+        if (!residualizer.run(merged)) {
+            break;
+        }
+        residual_iters++;
+        if (residual_iters >= kMaxResidualFixpointIterations) {
+            throw CompileError("Internal error: residualization did not converge",
+                               merged.location);
+        }
+    }
+    optimization = optimizer.run(merged);
     validate_module_stage(merged, "post-optimize");
 
     Analyzer analyzer(&checker, &optimization, analysis_config);

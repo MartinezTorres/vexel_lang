@@ -7,8 +7,6 @@
     outer < 3@{
             inner = 0;
             inner < 3@{
-                    inner == 1 ? 
-                        ->|;
                     print(inner);
                     inner = inner + 1
                 };

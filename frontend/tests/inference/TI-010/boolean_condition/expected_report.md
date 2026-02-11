@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/inference/TI-010/boolean_condition/test.vx
 &^main() -> #i32 {
     x = 0;
-    x ? 100 : 200
+    200
 }
 ```
 

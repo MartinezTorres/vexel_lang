@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/expressions/EX-080/logical_or_precedence/test.vx
 &^main() -> #i32 {
     result = 0 && 1 || 1;
-    result ? 1 : 0
+    1
 }
 ```
 

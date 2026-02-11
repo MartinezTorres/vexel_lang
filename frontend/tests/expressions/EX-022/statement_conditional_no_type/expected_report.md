@@ -4,8 +4,7 @@
 &!print(arg0: #i32);
 &^main() -> #i32 {
     x = 10;
-    x > 5 ? 
-        print(x);
+    print(x);
     0
 }
 ```

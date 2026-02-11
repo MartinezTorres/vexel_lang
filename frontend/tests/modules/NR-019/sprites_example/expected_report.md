@@ -4,7 +4,7 @@
 sprites: #__Tuple2_s_s[2] = [("sprite1.png", "PNG_DATA_1"), ("sprite2.png", "PNG_DATA_2")];
 &^main() -> #i32 {
     len = |sprites|;
-    result = len == 2 ? ( #i32 ) 0 : ( #i32 ) 1;
+    result = ( #i32 ) 0;
     -> result;
 }
 ```

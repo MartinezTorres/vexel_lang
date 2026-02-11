@@ -1,0 +1,15 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Unused pure call chains are eliminated at statement/sub-expression level. | Folded pure call statements do not keep callees reachable
+
+&leaf() -> #i32 {
+    21 + 21
+}
+
+&also_dead() -> #i32 {
+    leaf()
+}
+
+&^main() -> #i32 {
+    also_dead();
+    40 + 2
+}

@@ -4,7 +4,7 @@
 items: #__Tuple2_#s_#s[0] = [];
 &^main() -> #i32 {
     len = |items|;
-    result = len == 0 ? ( #i32 ) 0 : ( #i32 ) 1;
+    result = ( #i32 ) 0;
     -> result;
 }
 ```

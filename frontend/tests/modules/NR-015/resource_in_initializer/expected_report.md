@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/modules/NR-015/resource_in_initializer/test.vx
 &^main() -> #i32 {
-    result = CONFIG == "" ? ( #i32 ) 1 : ( #i32 ) 0;
+    result = ( #i32 ) 0;
     -> result;
 }
 ```

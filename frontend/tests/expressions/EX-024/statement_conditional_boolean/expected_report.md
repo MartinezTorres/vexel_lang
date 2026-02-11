@@ -4,8 +4,7 @@
 &!print(arg0: #i32);
 &^main() -> #i32 {
     flag = 1;
-    flag ? 
-        print(1);
+    print(1);
     0
 }
 ```

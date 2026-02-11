@@ -1,6 +1,6 @@
 ## Stdout
 ```
-missing live declarations in lowered output
+ok
 ```
 
 ## Stderr
@@ -8,4 +8,4 @@ missing live declarations in lowered output
 ```
 
 ## Exit Code
-1
+0
