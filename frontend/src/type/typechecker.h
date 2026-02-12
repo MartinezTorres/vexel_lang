@@ -179,7 +179,6 @@ private:
     void validate_type(TypePtr type, const SourceLocation& loc);
     void check_recursive_type(const std::string& type_name, StmtPtr type_decl, const SourceLocation& loc);
     bool is_primitive_type(TypePtr type);
-    std::optional<bool> evaluate_static_condition(ExprPtr expr);
 
     enum class TypeFamily { Signed, Unsigned, Float, Other };
     TypeFamily get_type_family(TypePtr type);

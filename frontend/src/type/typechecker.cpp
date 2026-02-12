@@ -418,7 +418,7 @@ void TypeChecker::validate_invariants(const Module& mod) {
                 break;
             case Expr::Kind::Conditional:
                 validate_expr(expr->condition);
-                if (auto static_value = evaluate_static_condition(expr->condition)) {
+                if (auto static_value = constexpr_condition(expr->condition)) {
                     if (static_value.value()) {
                         validate_expr(expr->true_expr);
                     } else {

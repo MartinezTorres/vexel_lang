@@ -1,11 +1,10 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-031/access_globals/test.vx
-IMMUTABLE: #i8 = 10;
 mutable: #i32;
 &test() -> #i32 {
     mutable = 20;
-    IMMUTABLE + mutable
+    10 + mutable
 }
 &^main() -> #i32 {
     test()

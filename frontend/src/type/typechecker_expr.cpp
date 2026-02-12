@@ -131,7 +131,7 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
                 }
             }
             if (!sym) {
-                throw CompileError("Internal error: unresolved identifier: " + expr->name, expr->location);
+                throw CompileError("Undefined identifier: " + expr->name, expr->location);
             }
             if (!sym->type && sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
                 if (sym->instance_id != current_instance_id) {
@@ -847,7 +847,7 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
     // Invariant: compile-time known condition short-circuits type requirements
     // for the dead branch. The type-use validator mirrors this by skipping
     // constexpr-dead branches.
-    auto static_value = evaluate_static_condition(expr->condition);
+    auto static_value = constexpr_condition(expr->condition);
     if (static_value.has_value()) {
         if (static_value.value()) {
             expr->type = check_expr(expr->true_expr);
@@ -891,41 +891,26 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
     throw CompileError("Conditional branches must have matching types at runtime (type mismatch: " + lhs + " vs " + rhs + ")",
                        expr->location);
 }
-std::optional<bool> TypeChecker::evaluate_static_condition(ExprPtr expr) {
-    std::unordered_set<const Stmt*> visiting;
-    auto helper = [&](auto&& self, ExprPtr node) -> std::optional<bool> {
-        if (!node) return std::nullopt;
-        switch (node->kind) {
-            case Expr::Kind::IntLiteral:
-                return node->uint_val != 0;
-            case Expr::Kind::Identifier: {
-                Symbol* sym = nullptr;
-                if (bindings) {
-                    sym = bindings->lookup(current_instance_id, node.get());
-                }
-                if (!sym) {
-                    sym = lookup_global(node->name);
-                }
-                if (!sym) return std::nullopt;
-                if (sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
-                    const Stmt* key = sym->declaration.get();
-                    if (visiting.count(key)) return std::nullopt;
-                    visiting.insert(key);
-                    auto res = self(self, sym->declaration->var_init);
-                    visiting.erase(key);
-                    return res;
-                }
-                return std::nullopt;
-            }
-            default:
-                return std::nullopt;
-        }
-    };
-    return helper(helper, expr);
-}
-
 std::optional<bool> TypeChecker::constexpr_condition(ExprPtr expr) {
-    return evaluate_static_condition(expr);
+    if (!expr) return std::nullopt;
+    CompileTimeEvaluator evaluator(this);
+    CTValue value;
+    if (!evaluator.try_evaluate(expr, value)) {
+        return std::nullopt;
+    }
+    if (std::holds_alternative<int64_t>(value)) {
+        return std::get<int64_t>(value) != 0;
+    }
+    if (std::holds_alternative<uint64_t>(value)) {
+        return std::get<uint64_t>(value) != 0;
+    }
+    if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value);
+    }
+    if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value) != 0.0;
+    }
+    return std::nullopt;
 }
 
 TypePtr TypeChecker::check_cast(ExprPtr expr) {
@@ -1471,6 +1456,9 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
 
     if (expr->kind == Expr::Kind::Conditional) {
         if (!expr->true_expr || !expr->false_expr) return false;
+        if (auto cond = constexpr_condition(expr->condition)) {
+            return literal_assignable_to(target, cond.value() ? expr->true_expr : expr->false_expr);
+        }
         return literal_assignable_to(target, expr->true_expr) &&
                literal_assignable_to(target, expr->false_expr);
     }

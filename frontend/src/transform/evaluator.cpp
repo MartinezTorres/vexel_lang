@@ -1214,14 +1214,9 @@ bool CompileTimeEvaluator::eval_type_constructor(ExprPtr expr, CTValue& result) 
     for (size_t i = 0; i < expr->args.size(); i++) {
         CTValue arg_val;
 
-        // Try to evaluate the argument
+        // Type constructors are only constexpr when every field argument is constexpr.
         if (!try_evaluate(expr->args[i], arg_val)) {
-            // If we can't evaluate it (e.g., it's an array or identifier pointing to array),
-            // store a placeholder value of 0 for pointer/array types
-            // This allows us to still track scalar fields like len, cap
-            std::string field_name = type_decl->fields[i].name;
-            composite->fields[field_name] = (int64_t)0;
-            continue;
+            return false;
         }
 
         // Store the field value

@@ -6,16 +6,14 @@
     b: #i32 = 0;
     {
         ::counter;
-        0;
         increment();
         a = getState()
     };
     {
         ::counter;
-        0;
         b = getState()
     };
-    result = a == 1 && b == 0 ? ( #i32 ) 0 : ( #i32 ) 1;
+    result = a == 1 && b == 0 ? 0 : 1;
     -> result;
 }
 state: #i32;

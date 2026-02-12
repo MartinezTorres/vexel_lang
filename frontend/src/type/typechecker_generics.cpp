@@ -5,6 +5,54 @@
 
 namespace vexel {
 
+namespace {
+
+bool array_sizes_equal(ExprPtr a, ExprPtr b) {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    if (a->kind == Expr::Kind::IntLiteral && b->kind == Expr::Kind::IntLiteral) {
+        return a->uint_val == b->uint_val;
+    }
+    return a.get() == b.get();
+}
+
+size_t array_size_hash(ExprPtr size) {
+    if (!size) {
+        return 0x9e3779b9ULL;
+    }
+    if (size->kind == Expr::Kind::IntLiteral) {
+        return std::hash<uint64_t>{}(size->uint_val);
+    }
+    return std::hash<const Expr*>{}(size.get());
+}
+
+std::string mangle_type_component(TypePtr type) {
+    if (!type) return "unknown";
+
+    switch (type->kind) {
+        case Type::Kind::Primitive:
+            return primitive_name(type->primitive);
+        case Type::Kind::Named:
+            return type->type_name;
+        case Type::Kind::Array: {
+            std::string component = "array_" + mangle_type_component(type->element_type);
+            if (type->array_size && type->array_size->kind == Expr::Kind::IntLiteral) {
+                component += "_n" + std::to_string(type->array_size->uint_val);
+            } else if (type->array_size) {
+                component += "_dyn";
+            } else {
+                component += "_unsized";
+            }
+            return component;
+        }
+        case Type::Kind::TypeVar:
+            return "tv_" + type->var_name;
+    }
+    return "unknown";
+}
+
+} // namespace
+
 bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
     if (!a && !b) return true;
     if (!a || !b) return false;
@@ -15,7 +63,8 @@ bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
         case Type::Kind::Primitive:
             return a->primitive == b->primitive;
         case Type::Kind::Array:
-            return types_equal_static(a->element_type, b->element_type);
+            return types_equal_static(a->element_type, b->element_type) &&
+                   array_sizes_equal(a->array_size, b->array_size);
         case Type::Kind::Named:
             return a->type_name == b->type_name;
         case Type::Kind::TypeVar:
@@ -34,6 +83,7 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
             break;
         case Type::Kind::Array:
             hash ^= type_hash(t->element_type) << 4;
+            hash ^= array_size_hash(t->array_size) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
             break;
         case Type::Kind::Named:
             hash ^= std::hash<std::string>{}(t->type_name);
@@ -99,13 +149,7 @@ std::string TypeChecker::mangle_generic_name(const std::string& base_name,
     std::string result = base_name + "_G";
 
     for (const auto& type : types) {
-        if (type->kind == Type::Kind::Primitive) {
-            result += "_" + primitive_name(type->primitive);
-        } else if (type->kind == Type::Kind::Named) {
-            result += "_" + type->type_name;
-        } else if (type->kind == Type::Kind::Array) {
-            result += "_array";
-        }
+        result += "_" + mangle_type_component(type);
     }
 
     return result;

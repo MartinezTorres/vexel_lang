@@ -82,6 +82,10 @@ StmtPtr Residualizer::rewrite_stmt(StmtPtr stmt, bool top_level) {
             if (stmt->expr) {
                 stmt->expr = rewrite_expr(stmt->expr);
             }
+            if (!top_level && should_drop_expr_stmt(stmt->expr)) {
+                changed_ = true;
+                return nullptr;
+            }
             return stmt;
 
         case Stmt::Kind::Return:
@@ -372,8 +376,11 @@ bool Residualizer::can_fold_expr(const ExprPtr& expr) const {
     if (!expr) return false;
 
     switch (expr->kind) {
-        case Expr::Kind::Block:
-            return true;
+        case Expr::Kind::Assignment:
+        case Expr::Kind::Iteration:
+        case Expr::Kind::Repeat:
+        case Expr::Kind::Process:
+            return false;
         case Expr::Kind::Call: {
             if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
                 return false;
@@ -382,7 +389,7 @@ bool Residualizer::can_fold_expr(const ExprPtr& expr) const {
         }
 
         default:
-            return false;
+            return true;
     }
 }
 

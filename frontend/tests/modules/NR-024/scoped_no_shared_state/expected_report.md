@@ -4,14 +4,12 @@
 &^main() -> #i32 {
     {
         ::stateful;
-        0;
         42
     };
     {
         ::stateful;
-        0;
         val = get();
-        result = val == 0 ? ( #i32 ) 0 : ( #i32 ) 1;
+        result = val == 0 ? 0 : 1;
         -> result;
     }
 }

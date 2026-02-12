@@ -46,6 +46,25 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
             case Type::Kind::TypeVar:
             default:
                 break;
+            }
+    };
+
+    auto mark_expr_types = [&](const ExprPtr& expr) {
+        if (!expr) return;
+        mark_type(expr->type);
+        mark_type(expr->declared_var_type);
+        mark_type(expr->target_type);
+        if (expr->kind == Expr::Kind::Identifier) {
+            if (Symbol* sym = binding_for(expr)) {
+                mark_type(sym->type);
+            }
+        }
+    };
+
+    auto mark_stmt_types = [&](const StmtPtr& stmt) {
+        if (!stmt) return;
+        if (stmt->kind == Stmt::Kind::VarDecl) {
+            mark_type(stmt->var_type);
         }
     };
 
@@ -74,6 +93,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         walk_runtime_expr(
             func_sym->declaration->body,
             [&](ExprPtr expr) {
+                mark_expr_types(expr);
                 if (!expr || expr->kind != Expr::Kind::Identifier) return;
                 Symbol* sym = binding_for(expr);
                 if (sym && !sym->is_local &&
@@ -81,7 +101,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
                     note_global(sym);
                 }
             },
-            [&](StmtPtr) {});
+            [&](StmtPtr stmt) { mark_stmt_types(stmt); });
         for (const auto& param : func_sym->declaration->params) {
             mark_type(param.type);
         }
@@ -106,6 +126,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
         walk_runtime_expr(
             sym->declaration->var_init,
             [&](ExprPtr expr) {
+                mark_expr_types(expr);
                 if (!expr || expr->kind != Expr::Kind::Identifier) return;
                 Symbol* used = binding_for(expr);
                 if (used && !used->is_local &&
@@ -113,7 +134,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
                     note_global(used);
                 }
             },
-            [&](StmtPtr) {});
+            [&](StmtPtr stmt) { mark_stmt_types(stmt); });
     }
 
     while (!type_worklist.empty()) {

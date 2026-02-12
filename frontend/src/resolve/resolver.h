@@ -27,7 +27,6 @@ private:
     // - Declarations are bound in Bindings; identifiers are bound when resolvable
     //   in the current scope (unresolved identifiers may be fixed by the typechecker).
     // - Assignment expressions that introduce new variables are flagged in Bindings.
-    // - Compile-time-known conditional branches are resolved on the taken side only.
     Program& program;
     Bindings& bindings;
     Scope* current_scope;
@@ -55,7 +54,6 @@ private:
     void resolve_stmt(StmtPtr stmt);
     void resolve_expr(ExprPtr expr);
     void resolve_type(TypePtr type);
-    std::optional<bool> evaluate_static_condition(ExprPtr expr);
 
     void resolve_func_decl(StmtPtr stmt, bool define_symbol);
     void resolve_type_decl(StmtPtr stmt);

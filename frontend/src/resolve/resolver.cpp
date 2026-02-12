@@ -418,7 +418,8 @@ void Resolver::resolve_expr(ExprPtr expr) {
         case Expr::Kind::Identifier: {
             Symbol* sym = current_scope ? current_scope->lookup(expr->name) : nullptr;
             if (!sym) {
-                throw CompileError("Undefined identifier: " + expr->name, expr->location);
+                // Binding-only resolver: unresolved identifiers are deferred to type checking.
+                break;
             }
             if (!sym->is_local &&
                 (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
@@ -488,12 +489,8 @@ void Resolver::resolve_expr(ExprPtr expr) {
             break;
         case Expr::Kind::Conditional:
             resolve_expr(expr->condition);
-            if (auto cond = evaluate_static_condition(expr->condition)) {
-                resolve_expr(cond.value() ? expr->true_expr : expr->false_expr);
-            } else {
-                resolve_expr(expr->true_expr);
-                resolve_expr(expr->false_expr);
-            }
+            resolve_expr(expr->true_expr);
+            resolve_expr(expr->false_expr);
             break;
         case Expr::Kind::Assignment: {
             if (expr->left && expr->left->kind == Expr::Kind::Identifier) {
@@ -551,36 +548,6 @@ void Resolver::resolve_expr(ExprPtr expr) {
         case Expr::Kind::CharLiteral:
             break;
     }
-}
-
-std::optional<bool> Resolver::evaluate_static_condition(ExprPtr expr) {
-    std::unordered_set<const Stmt*> visiting;
-    auto helper = [&](auto&& self, ExprPtr node) -> std::optional<bool> {
-        if (!node) return std::nullopt;
-        switch (node->kind) {
-            case Expr::Kind::IntLiteral:
-                return node->uint_val != 0;
-            case Expr::Kind::Identifier: {
-                Symbol* sym = bindings.lookup(current_instance_id, node.get());
-                if (!sym) {
-                    sym = current_scope ? current_scope->lookup(node->name) : nullptr;
-                }
-                if (!sym) return std::nullopt;
-                if (sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
-                    const Stmt* key = sym->declaration.get();
-                    if (visiting.count(key)) return std::nullopt;
-                    visiting.insert(key);
-                    auto res = self(self, sym->declaration->var_init);
-                    visiting.erase(key);
-                    return res;
-                }
-                return std::nullopt;
-            }
-            default:
-                return std::nullopt;
-        }
-    };
-    return helper(helper, expr);
 }
 
 void Resolver::resolve_type(TypePtr type) {
