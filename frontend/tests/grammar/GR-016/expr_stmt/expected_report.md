@@ -2,8 +2,6 @@
 ```
 // Lowered Vexel module: tests/grammar/GR-016/expr_stmt/test.vx
 &^main() -> #i32 {
-    x: #i32 = 10;
-    x + 1;
     0
 }
 ```

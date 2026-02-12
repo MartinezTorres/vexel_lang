@@ -2,8 +2,7 @@
 ```
 // Lowered Vexel module: tests/errors/ER-008/mixed_operators_fixed/test.vx
 &^main() -> #i32 {
-    total: #i32 = 1 + 2 * 3 + (4 * 5 + 6);
-    total
+    33
 }
 ```
 

@@ -1,14 +1,8 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-097/multiple_receivers/test.vx
-&(a, b, c)sum_three() -> #i32 {
-    a + b + c
-}
 &^main() -> #i32 {
-    x: #i32 = 1;
-    y: #i32 = 2;
-    z: #i32 = 3;
-    sum_three()
+    6
 }
 ```
 

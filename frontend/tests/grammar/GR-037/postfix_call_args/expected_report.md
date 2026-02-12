@@ -2,8 +2,7 @@
 ```
 // Lowered Vexel module: tests/grammar/GR-037/postfix_call_args/test.vx
 &^main() -> #i32 {
-    result = 6;
-    result
+    6
 }
 ```
 

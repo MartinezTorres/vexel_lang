@@ -67,9 +67,12 @@ if ! "$CLI" -b vexel -o "$tmp/typed_local_out" "$tmp/typed_local.vx" >/dev/null 
 fi
 
 if ! rg -q "limit: #i32 = 1000;" "$tmp/typed_local_out.vx"; then
-  echo "lowered vexel lost typed local declaration annotation" >&2
-  cat "$tmp/typed_local_out.vx" >&2
-  exit 1
+  # Stronger CTE may fold the function to a constant result and remove locals.
+  if ! rg -q "&\\^main\\(\\) -> #i32" "$tmp/typed_local_out.vx" || ! rg -q "1000" "$tmp/typed_local_out.vx"; then
+    echo "lowered vexel output missing typed declaration and expected folded result" >&2
+    cat "$tmp/typed_local_out.vx" >&2
+    exit 1
+  fi
 fi
 
 echo "ok"

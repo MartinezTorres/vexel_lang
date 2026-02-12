@@ -13,7 +13,22 @@ struct EvalReturn {
     CTValue value;
 };
 
+std::string ct_value_kind(const CTValue& value) {
+    if (std::holds_alternative<int64_t>(value)) return "int";
+    if (std::holds_alternative<uint64_t>(value)) return "uint";
+    if (std::holds_alternative<double>(value)) return "float";
+    if (std::holds_alternative<bool>(value)) return "bool";
+    if (std::holds_alternative<std::string>(value)) return "string";
+    if (std::holds_alternative<CTUninitialized>(value)) return "uninitialized";
+    if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) return "composite";
+    if (std::holds_alternative<std::shared_ptr<CTArray>>(value)) return "array";
+    return "unknown";
+}
+
 CTValue clone_value(const CTValue& value) {
+    if (std::holds_alternative<CTUninitialized>(value)) {
+        return CTUninitialized{};
+    }
     if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) {
         auto src = std::get<std::shared_ptr<CTComposite>>(value);
         if (!src) {
@@ -114,117 +129,11 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
             success = eval_length(expr, result);
             break;
         case Expr::Kind::Block:
-            // Evaluate block - process statements, then evaluate result
             {
-                // Save current constants
-                auto saved_constants = constants;
-                auto saved_uninitialized = uninitialized_locals;
-                std::unordered_set<std::string> locals_declared;
-
-                std::function<bool(StmtPtr)> eval_stmt;
-                eval_stmt = [&](StmtPtr stmt) -> bool {
-                    if (!stmt) return true;
-                    switch (stmt->kind) {
-                        case Stmt::Kind::Expr: {
-                            if (!stmt->expr) return true;
-                            if (stmt->expr->kind == Expr::Kind::Assignment &&
-                                stmt->expr->left && stmt->expr->left->kind == Expr::Kind::Identifier) {
-                                if (stmt->expr->creates_new_variable) {
-                                    locals_declared.insert(stmt->expr->left->name);
-                                }
-                                CTValue stmt_val;
-                                if (!eval_assignment(stmt->expr, stmt_val)) {
-                                    return false;
-                                }
-                                return true;
-                            }
-                            CTValue stmt_val;
-                            return try_evaluate(stmt->expr, stmt_val);
-                        }
-                        case Stmt::Kind::VarDecl: {
-                            if (stmt->var_init) {
-                                CTValue init_val;
-                                if (!try_evaluate(stmt->var_init, init_val)) {
-                                    return false;
-                                }
-                                constants[stmt->var_name] = clone_value(init_val);
-                                uninitialized_locals.erase(stmt->var_name);
-                                locals_declared.insert(stmt->var_name);
-                            } else {
-                                uninitialized_locals.insert(stmt->var_name);
-                                locals_declared.insert(stmt->var_name);
-                            }
-                            return true;
-                        }
-                        case Stmt::Kind::ConditionalStmt: {
-                            CTValue cond_val;
-                            if (!try_evaluate(stmt->condition, cond_val)) {
-                                return false;
-                            }
-                            bool is_true = false;
-                            if (std::holds_alternative<int64_t>(cond_val)) {
-                                is_true = std::get<int64_t>(cond_val) != 0;
-                            } else if (std::holds_alternative<uint64_t>(cond_val)) {
-                                is_true = std::get<uint64_t>(cond_val) != 0;
-                            } else if (std::holds_alternative<bool>(cond_val)) {
-                                is_true = std::get<bool>(cond_val);
-                            } else if (std::holds_alternative<double>(cond_val)) {
-                                is_true = std::get<double>(cond_val) != 0.0;
-                            } else {
-                                error_msg = "Conditional expression condition must be a scalar value";
-                                return false;
-                            }
-                            if (is_true && stmt->true_stmt) {
-                                return eval_stmt(stmt->true_stmt);
-                            }
-                            return true;
-                        }
-                        case Stmt::Kind::Return: {
-                            if (!stmt->return_expr) {
-                                error_msg = "Return statement requires an expression at compile time";
-                                return false;
-                            }
-                            CTValue ret_val;
-                            if (!try_evaluate(stmt->return_expr, ret_val)) {
-                                return false;
-                            }
-                            throw EvalReturn{clone_value(ret_val)};
-                        }
-                        case Stmt::Kind::Break:
-                            throw EvalBreak{};
-                        case Stmt::Kind::Continue:
-                            throw EvalContinue{};
-                        default:
-                            error_msg = "Statement type not supported at compile time";
-                            return false;
-                    }
-                };
-
-                for (const auto& stmt : expr->statements) {
-                    if (!eval_stmt(stmt)) {
-                        constants = saved_constants;
-                        uninitialized_locals = saved_uninitialized;
-                        return false;
-                    }
-                }
-
-                // Evaluate the result expression
-                if (expr->result_expr) {
-                    success = try_evaluate(expr->result_expr, result);
-                    if (!success) {
-                        constants = saved_constants;
-                        uninitialized_locals = saved_uninitialized;
-                        return false;
-                    }
-                } else {
-                    result = (int64_t)0;
-                    success = true;
-                }
-
-                // Remove locals declared in this block, keep updates to outer variables
-                for (const auto& name : locals_declared) {
-                    constants.erase(name);
-                    uninitialized_locals.erase(name);
+                bool handled = false;
+                success = eval_block_vm(expr, result, handled);
+                if (!handled) {
+                    success = eval_block_fallback(expr, result);
                 }
             }
             break;
@@ -257,6 +166,532 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
     }
 
     return success;
+}
+
+bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
+    if (!stmt || stmt->kind != Stmt::Kind::VarDecl) {
+        return false;
+    }
+
+    if (!stmt->var_type) {
+        uninitialized_locals.insert(stmt->var_name);
+        return true;
+    }
+
+    TypePtr var_type = stmt->var_type;
+    if (var_type->kind == Type::Kind::Array) {
+        if (!var_type->array_size) {
+            error_msg = "Array local requires compile-time size";
+            return false;
+        }
+        CTValue size_val;
+        if (!try_evaluate(var_type->array_size, size_val)) {
+            error_msg = "Array local requires compile-time size";
+            return false;
+        }
+        int64_t size = 0;
+        if (std::holds_alternative<int64_t>(size_val)) {
+            size = std::get<int64_t>(size_val);
+        } else if (std::holds_alternative<uint64_t>(size_val)) {
+            size = static_cast<int64_t>(std::get<uint64_t>(size_val));
+        } else {
+            error_msg = "Array local size must be an integer constant";
+            return false;
+        }
+        if (size < 0) {
+            error_msg = "Array local size cannot be negative";
+            return false;
+        }
+        auto array = std::make_shared<CTArray>();
+        array->elements.resize(static_cast<size_t>(size), CTUninitialized{});
+        constants[stmt->var_name] = array;
+        uninitialized_locals.erase(stmt->var_name);
+        return true;
+    }
+
+    if (var_type->kind == Type::Kind::Named &&
+        var_type->resolved_symbol &&
+        var_type->resolved_symbol->declaration &&
+        var_type->resolved_symbol->declaration->kind == Stmt::Kind::TypeDecl) {
+        auto composite = std::make_shared<CTComposite>();
+        composite->type_name = var_type->type_name;
+        for (const auto& field : var_type->resolved_symbol->declaration->fields) {
+            composite->fields[field.name] = CTUninitialized{};
+        }
+        constants[stmt->var_name] = composite;
+        uninitialized_locals.erase(stmt->var_name);
+        return true;
+    }
+
+    uninitialized_locals.insert(stmt->var_name);
+    return true;
+}
+
+bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& handled) {
+    handled = false;
+    if (!expr || expr->kind != Expr::Kind::Block) {
+        return false;
+    }
+
+    enum class VmOpKind {
+        EvalExpr,
+        EvalDeclAssignment,
+        DeclareVar,
+        JumpIfFalse,
+        Jump,
+        ExitScope,
+        ReturnExpr,
+    };
+
+    struct VmOp {
+        VmOpKind kind = VmOpKind::EvalExpr;
+        ExprPtr expr;
+        StmtPtr stmt;
+        int target = -1;
+        std::vector<std::string> scope_names;
+    };
+
+    struct VmLoopCtx {
+        int cond_pc = -1;
+        std::vector<int> break_jumps;
+        std::vector<int> continue_jumps;
+    };
+
+    std::vector<VmOp> code;
+    std::vector<std::vector<std::string>> scope_stack;
+    std::vector<VmLoopCtx> loop_stack;
+
+    auto begin_scope = [&]() {
+        scope_stack.emplace_back();
+    };
+
+    auto register_decl = [&](const std::string& name) {
+        if (!scope_stack.empty()) {
+            scope_stack.back().push_back(name);
+        }
+    };
+
+    auto end_scope = [&](std::vector<std::string>& names) {
+        if (scope_stack.empty()) {
+            names.clear();
+            return;
+        }
+        names = std::move(scope_stack.back());
+        scope_stack.pop_back();
+    };
+
+    auto add_op = [&](VmOp op) -> int {
+        code.push_back(std::move(op));
+        return static_cast<int>(code.size()) - 1;
+    };
+
+    std::function<bool(const ExprPtr&)> compile_expr_stmt;
+    std::function<bool(const StmtPtr&)> compile_stmt;
+
+    compile_expr_stmt = [&](const ExprPtr& e) -> bool {
+        if (!e) return true;
+        if (e->kind == Expr::Kind::Block) {
+            begin_scope();
+            for (const auto& st : e->statements) {
+                if (!compile_stmt(st)) {
+                    return false;
+                }
+            }
+            if (e->result_expr) {
+                VmOp result_op;
+                result_op.kind = VmOpKind::EvalExpr;
+                result_op.expr = e->result_expr;
+                add_op(std::move(result_op));
+            }
+            VmOp exit_op;
+            exit_op.kind = VmOpKind::ExitScope;
+            end_scope(exit_op.scope_names);
+            add_op(std::move(exit_op));
+            return true;
+        }
+
+        if (e->kind == Expr::Kind::Repeat) {
+            if (!e->condition || !e->right) {
+                return false;
+            }
+            VmOp cond_op;
+            cond_op.kind = VmOpKind::JumpIfFalse;
+            cond_op.expr = e->condition;
+            int cond_pc = add_op(std::move(cond_op));
+
+            loop_stack.push_back(VmLoopCtx{cond_pc, {}, {}});
+            if (!compile_expr_stmt(e->right)) {
+                return false;
+            }
+
+            for (int pc : loop_stack.back().continue_jumps) {
+                code[static_cast<size_t>(pc)].target = cond_pc;
+            }
+
+            VmOp back_op;
+            back_op.kind = VmOpKind::Jump;
+            back_op.target = cond_pc;
+            add_op(std::move(back_op));
+
+            int end_pc = static_cast<int>(code.size());
+            code[static_cast<size_t>(cond_pc)].target = end_pc;
+            for (int pc : loop_stack.back().break_jumps) {
+                code[static_cast<size_t>(pc)].target = end_pc;
+            }
+            loop_stack.pop_back();
+            return true;
+        }
+
+        if (e->kind == Expr::Kind::Assignment &&
+            e->creates_new_variable &&
+            e->left &&
+            e->left->kind == Expr::Kind::Identifier) {
+            register_decl(e->left->name);
+            VmOp op;
+            op.kind = VmOpKind::EvalDeclAssignment;
+            op.expr = e;
+            add_op(std::move(op));
+            return true;
+        }
+
+        VmOp op;
+        op.kind = VmOpKind::EvalExpr;
+        op.expr = e;
+        add_op(std::move(op));
+        return true;
+    };
+
+    compile_stmt = [&](const StmtPtr& stmt) -> bool {
+        if (!stmt) return true;
+        switch (stmt->kind) {
+            case Stmt::Kind::Expr:
+                return compile_expr_stmt(stmt->expr);
+            case Stmt::Kind::VarDecl: {
+                register_decl(stmt->var_name);
+                VmOp op;
+                op.kind = VmOpKind::DeclareVar;
+                op.stmt = stmt;
+                add_op(std::move(op));
+                return true;
+            }
+            case Stmt::Kind::ConditionalStmt: {
+                VmOp cond_op;
+                cond_op.kind = VmOpKind::JumpIfFalse;
+                cond_op.expr = stmt->condition;
+                int cond_pc = add_op(std::move(cond_op));
+                if (!compile_stmt(stmt->true_stmt)) {
+                    return false;
+                }
+                code[static_cast<size_t>(cond_pc)].target = static_cast<int>(code.size());
+                return true;
+            }
+            case Stmt::Kind::Return: {
+                if (!stmt->return_expr) {
+                    error_msg = "Return statement requires an expression at compile time";
+                    return false;
+                }
+                VmOp op;
+                op.kind = VmOpKind::ReturnExpr;
+                op.expr = stmt->return_expr;
+                add_op(std::move(op));
+                return true;
+            }
+            case Stmt::Kind::Break: {
+                if (loop_stack.empty()) {
+                    error_msg = "Break used outside of loop in compile-time evaluation";
+                    return false;
+                }
+                VmOp op;
+                op.kind = VmOpKind::Jump;
+                int pc = add_op(std::move(op));
+                loop_stack.back().break_jumps.push_back(pc);
+                return true;
+            }
+            case Stmt::Kind::Continue: {
+                if (loop_stack.empty()) {
+                    error_msg = "Continue used outside of loop in compile-time evaluation";
+                    return false;
+                }
+                VmOp op;
+                op.kind = VmOpKind::Jump;
+                int pc = add_op(std::move(op));
+                loop_stack.back().continue_jumps.push_back(pc);
+                return true;
+            }
+            default:
+                return false;
+        }
+    };
+
+    begin_scope();
+    for (const auto& stmt : expr->statements) {
+        if (!compile_stmt(stmt)) {
+            return false;
+        }
+    }
+    std::vector<std::string> top_scope_names;
+    end_scope(top_scope_names);
+    handled = true;
+
+    auto saved_constants = constants;
+    auto saved_uninitialized = uninitialized_locals;
+
+    auto scalar_to_bool = [&](const CTValue& v, bool& out) -> bool {
+        if (std::holds_alternative<int64_t>(v)) {
+            out = std::get<int64_t>(v) != 0;
+            return true;
+        }
+        if (std::holds_alternative<uint64_t>(v)) {
+            out = std::get<uint64_t>(v) != 0;
+            return true;
+        }
+        if (std::holds_alternative<bool>(v)) {
+            out = std::get<bool>(v);
+            return true;
+        }
+        if (std::holds_alternative<double>(v)) {
+            out = std::get<double>(v) != 0.0;
+            return true;
+        }
+        return false;
+    };
+
+    int pc = 0;
+    int64_t vm_steps = 0;
+    std::unordered_map<int, int> back_edge_counts;
+    while (pc >= 0 && static_cast<size_t>(pc) < code.size()) {
+        if (++vm_steps > static_cast<int64_t>(MAX_LOOP_ITERATIONS) * 64) {
+            error_msg = "VM step limit exceeded in compile-time evaluation";
+            constants = saved_constants;
+            uninitialized_locals = saved_uninitialized;
+            return false;
+        }
+        const VmOp& op = code[static_cast<size_t>(pc)];
+        switch (op.kind) {
+            case VmOpKind::EvalExpr: {
+                CTValue stmt_val;
+                if (!try_evaluate(op.expr, stmt_val)) {
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                pc++;
+                break;
+            }
+            case VmOpKind::EvalDeclAssignment: {
+                CTValue stmt_val;
+                if (!eval_assignment(op.expr, stmt_val)) {
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                pc++;
+                break;
+            }
+            case VmOpKind::DeclareVar: {
+                if (op.stmt && op.stmt->var_init) {
+                    CTValue init_val;
+                    if (!try_evaluate(op.stmt->var_init, init_val)) {
+                        constants = saved_constants;
+                        uninitialized_locals = saved_uninitialized;
+                        return false;
+                    }
+                    CTValue stored_val = clone_value(init_val);
+                    if (op.stmt->var_type &&
+                        !coerce_value_to_type(stored_val, op.stmt->var_type, stored_val)) {
+                        constants = saved_constants;
+                        uninitialized_locals = saved_uninitialized;
+                        return false;
+                    }
+                    constants[op.stmt->var_name] = clone_value(stored_val);
+                    uninitialized_locals.erase(op.stmt->var_name);
+                } else if (!declare_uninitialized_local(op.stmt)) {
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                pc++;
+                break;
+            }
+            case VmOpKind::JumpIfFalse: {
+                CTValue cond_val;
+                if (!try_evaluate(op.expr, cond_val)) {
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                bool is_true = false;
+                if (!scalar_to_bool(cond_val, is_true)) {
+                    error_msg = "Conditional expression condition must be a scalar value";
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                pc = is_true ? (pc + 1) : op.target;
+                break;
+            }
+            case VmOpKind::Jump:
+                if (op.target <= pc) {
+                    int& iter_count = back_edge_counts[op.target];
+                    iter_count++;
+                    if (iter_count > MAX_LOOP_ITERATIONS) {
+                        error_msg = "Loop iteration limit exceeded in compile-time evaluation";
+                        constants = saved_constants;
+                        uninitialized_locals = saved_uninitialized;
+                        return false;
+                    }
+                }
+                pc = op.target;
+                break;
+            case VmOpKind::ExitScope:
+                for (const auto& name : op.scope_names) {
+                    constants.erase(name);
+                    uninitialized_locals.erase(name);
+                }
+                pc++;
+                break;
+            case VmOpKind::ReturnExpr: {
+                CTValue ret_val;
+                if (!try_evaluate(op.expr, ret_val)) {
+                    constants = saved_constants;
+                    uninitialized_locals = saved_uninitialized;
+                    return false;
+                }
+                throw EvalReturn{clone_value(ret_val)};
+            }
+        }
+    }
+
+    if (expr->result_expr) {
+        if (!try_evaluate(expr->result_expr, result)) {
+            constants = saved_constants;
+            uninitialized_locals = saved_uninitialized;
+            return false;
+        }
+    } else {
+        result = static_cast<int64_t>(0);
+    }
+
+    for (const auto& name : top_scope_names) {
+        constants.erase(name);
+        uninitialized_locals.erase(name);
+    }
+    return true;
+}
+
+bool CompileTimeEvaluator::eval_block_fallback(ExprPtr expr, CTValue& result) {
+    if (!expr || expr->kind != Expr::Kind::Block) return false;
+
+    auto saved_constants = constants;
+    auto saved_uninitialized = uninitialized_locals;
+    std::unordered_set<std::string> locals_declared;
+
+    std::function<bool(StmtPtr)> eval_stmt;
+    eval_stmt = [&](StmtPtr stmt) -> bool {
+        if (!stmt) return true;
+        switch (stmt->kind) {
+            case Stmt::Kind::Expr: {
+                if (!stmt->expr) return true;
+                if (stmt->expr->kind == Expr::Kind::Assignment &&
+                    stmt->expr->left && stmt->expr->left->kind == Expr::Kind::Identifier) {
+                    if (stmt->expr->creates_new_variable) {
+                        locals_declared.insert(stmt->expr->left->name);
+                    }
+                    CTValue stmt_val;
+                    if (!eval_assignment(stmt->expr, stmt_val)) {
+                        return false;
+                    }
+                    return true;
+                }
+                CTValue stmt_val;
+                return try_evaluate(stmt->expr, stmt_val);
+            }
+            case Stmt::Kind::VarDecl: {
+                if (stmt->var_init) {
+                    CTValue init_val;
+                    if (!try_evaluate(stmt->var_init, init_val)) {
+                        return false;
+                    }
+                    CTValue stored_val = clone_value(init_val);
+                    if (stmt->var_type &&
+                        !coerce_value_to_type(stored_val, stmt->var_type, stored_val)) {
+                        return false;
+                    }
+                    constants[stmt->var_name] = clone_value(stored_val);
+                    uninitialized_locals.erase(stmt->var_name);
+                    locals_declared.insert(stmt->var_name);
+                    return true;
+                }
+                locals_declared.insert(stmt->var_name);
+                return declare_uninitialized_local(stmt);
+            }
+            case Stmt::Kind::ConditionalStmt: {
+                CTValue cond_val;
+                if (!try_evaluate(stmt->condition, cond_val)) {
+                    return false;
+                }
+                bool is_true = false;
+                if (std::holds_alternative<int64_t>(cond_val)) {
+                    is_true = std::get<int64_t>(cond_val) != 0;
+                } else if (std::holds_alternative<uint64_t>(cond_val)) {
+                    is_true = std::get<uint64_t>(cond_val) != 0;
+                } else if (std::holds_alternative<bool>(cond_val)) {
+                    is_true = std::get<bool>(cond_val);
+                } else if (std::holds_alternative<double>(cond_val)) {
+                    is_true = std::get<double>(cond_val) != 0.0;
+                } else {
+                    error_msg = "Conditional expression condition must be a scalar value";
+                    return false;
+                }
+                if (is_true && stmt->true_stmt) {
+                    return eval_stmt(stmt->true_stmt);
+                }
+                return true;
+            }
+            case Stmt::Kind::Return: {
+                if (!stmt->return_expr) {
+                    error_msg = "Return statement requires an expression at compile time";
+                    return false;
+                }
+                CTValue ret_val;
+                if (!try_evaluate(stmt->return_expr, ret_val)) {
+                    return false;
+                }
+                throw EvalReturn{clone_value(ret_val)};
+            }
+            case Stmt::Kind::Break:
+                throw EvalBreak{};
+            case Stmt::Kind::Continue:
+                throw EvalContinue{};
+            default:
+                error_msg = "Statement type not supported at compile time";
+                return false;
+        }
+    };
+
+    for (const auto& stmt : expr->statements) {
+        if (!eval_stmt(stmt)) {
+            constants = saved_constants;
+            uninitialized_locals = saved_uninitialized;
+            return false;
+        }
+    }
+
+    if (expr->result_expr) {
+        if (!try_evaluate(expr->result_expr, result)) {
+            constants = saved_constants;
+            uninitialized_locals = saved_uninitialized;
+            return false;
+        }
+    } else {
+        result = static_cast<int64_t>(0);
+    }
+
+    for (const auto& name : locals_declared) {
+        constants.erase(name);
+        uninitialized_locals.erase(name);
+    }
+    return true;
 }
 
 bool CompileTimeEvaluator::eval_literal(ExprPtr expr, CTValue& result) {
@@ -594,6 +1029,10 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     }
 
     StmtPtr func = sym->declaration;
+    if (expr->args.size() != func->params.size()) {
+        error_msg = "Argument count mismatch in compile-time evaluation";
+        return false;
+    }
 
     // Check if function is pure enough for compile-time evaluation
     if (func->is_external) {
@@ -618,7 +1057,16 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                 constants = saved_constants;
                 return false;
             }
-            constants[func->ref_params[i]] = clone_value(rec_val);
+            if (i < func->ref_param_types.size() && func->ref_param_types[i]) {
+                CTValue coerced;
+                if (!coerce_value_to_type(rec_val, func->ref_param_types[i], coerced)) {
+                    constants = saved_constants;
+                    return false;
+                }
+                constants[func->ref_params[i]] = clone_value(coerced);
+            } else {
+                constants[func->ref_params[i]] = clone_value(rec_val);
+            }
         }
     }
     for (size_t i = 0; i < expr->args.size(); i++) {
@@ -627,7 +1075,16 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
             constants = saved_constants;
             return false;
         }
-        constants[func->params[i].name] = clone_value(arg_val);
+        if (i < func->params.size() && func->params[i].type) {
+            CTValue coerced;
+            if (!coerce_value_to_type(arg_val, func->params[i].type, coerced)) {
+                constants = saved_constants;
+                return false;
+            }
+            constants[func->params[i].name] = clone_value(coerced);
+        } else {
+            constants[func->params[i].name] = clone_value(arg_val);
+        }
     }
 
     // Evaluate function body
@@ -659,6 +1116,10 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
 bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     auto it = constants.find(expr->name);
     if (it != constants.end()) {
+        if (std::holds_alternative<CTUninitialized>(it->second)) {
+            error_msg = "uninitialized variable accessed at compile time: " + expr->name;
+            return false;
+        }
         result = it->second;
         return true;
     }
@@ -678,7 +1139,17 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
         sym->kind == Symbol::Kind::Constant &&
         sym->declaration &&
         sym->declaration->var_init) {
-        return try_evaluate(sym->declaration->var_init, result);
+        if (!try_evaluate(sym->declaration->var_init, result)) {
+            return false;
+        }
+        if (sym->type) {
+            CTValue coerced;
+            if (!coerce_value_to_type(result, sym->type, coerced)) {
+                return false;
+            }
+            result = clone_value(coerced);
+        }
+        return true;
     }
 
     error_msg = "Identifier not found or not a compile-time constant: " + expr->name;
@@ -690,7 +1161,8 @@ int64_t CompileTimeEvaluator::to_int(const CTValue& v) {
     if (std::holds_alternative<uint64_t>(v)) return (int64_t)std::get<uint64_t>(v);
     if (std::holds_alternative<double>(v)) return (int64_t)std::get<double>(v);
     if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? 1 : 0;
-    throw CompileError("Cannot convert value to integer in compile-time evaluation", SourceLocation());
+    throw CompileError("Cannot convert value to integer in compile-time evaluation (" + ct_value_kind(v) + ")",
+                       SourceLocation());
 }
 
 double CompileTimeEvaluator::to_float(const CTValue& v) {
@@ -698,7 +1170,8 @@ double CompileTimeEvaluator::to_float(const CTValue& v) {
     if (std::holds_alternative<int64_t>(v)) return (double)std::get<int64_t>(v);
     if (std::holds_alternative<uint64_t>(v)) return (double)std::get<uint64_t>(v);
     if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? 1.0 : 0.0;
-    throw CompileError("Cannot convert value to float in compile-time evaluation", SourceLocation());
+    throw CompileError("Cannot convert value to float in compile-time evaluation (" + ct_value_kind(v) + ")",
+                       SourceLocation());
 }
 
 bool CompileTimeEvaluator::eval_type_constructor(ExprPtr expr, CTValue& result) {
@@ -785,6 +1258,10 @@ bool CompileTimeEvaluator::eval_member_access(ExprPtr expr, CTValue& result) {
     auto it = composite->fields.find(expr->name);
     if (it == composite->fields.end()) {
         error_msg = "Field not found: " + expr->name;
+        return false;
+    }
+    if (std::holds_alternative<CTUninitialized>(it->second)) {
+        error_msg = "uninitialized field accessed at compile time: " + expr->name;
         return false;
     }
 
@@ -1013,6 +1490,169 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
     return false;
 }
 
+bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
+                                                TypePtr target_type,
+                                                CTValue& output) {
+    if (std::holds_alternative<CTUninitialized>(input)) {
+        output = CTUninitialized{};
+        return true;
+    }
+    if (!target_type || target_type->kind == Type::Kind::TypeVar) {
+        output = clone_value(input);
+        return true;
+    }
+
+    if (target_type->kind == Type::Kind::Primitive) {
+        switch (target_type->primitive) {
+            case PrimitiveType::I8:
+            case PrimitiveType::I16:
+            case PrimitiveType::I32:
+            case PrimitiveType::I64:
+                output = to_int(input);
+                return true;
+            case PrimitiveType::U8:
+            case PrimitiveType::U16:
+            case PrimitiveType::U32:
+            case PrimitiveType::U64:
+                output = static_cast<uint64_t>(to_int(input));
+                return true;
+            case PrimitiveType::F32:
+            case PrimitiveType::F64:
+                output = to_float(input);
+                return true;
+            case PrimitiveType::Bool:
+                output = to_int(input) != 0;
+                return true;
+            case PrimitiveType::String:
+                if (!std::holds_alternative<std::string>(input)) {
+                    error_msg = "Type mismatch in compile-time coercion to string";
+                    return false;
+                }
+                output = std::get<std::string>(input);
+                return true;
+        }
+    }
+
+    if (target_type->kind == Type::Kind::Array) {
+        if (!std::holds_alternative<std::shared_ptr<CTArray>>(input)) {
+            error_msg = "Type mismatch in compile-time coercion to array";
+            return false;
+        }
+        auto in_array = std::get<std::shared_ptr<CTArray>>(input);
+        if (!in_array) {
+            error_msg = "Type mismatch in compile-time coercion to null array";
+            return false;
+        }
+        if (target_type->array_size) {
+            CTValue size_val;
+            if (!try_evaluate(target_type->array_size, size_val)) {
+                error_msg = "Array size must be compile-time constant in coercion";
+                return false;
+            }
+            int64_t expected_size = 0;
+            if (std::holds_alternative<int64_t>(size_val)) {
+                expected_size = std::get<int64_t>(size_val);
+            } else if (std::holds_alternative<uint64_t>(size_val)) {
+                expected_size = static_cast<int64_t>(std::get<uint64_t>(size_val));
+            } else {
+                error_msg = "Array size must be integer in compile-time coercion";
+                return false;
+            }
+            if (expected_size < 0 ||
+                static_cast<size_t>(expected_size) != in_array->elements.size()) {
+                error_msg = "Array size mismatch in compile-time coercion";
+                return false;
+            }
+        }
+        auto out_array = std::make_shared<CTArray>();
+        out_array->elements.reserve(in_array->elements.size());
+        for (const auto& elem : in_array->elements) {
+            CTValue coerced_elem;
+            if (target_type->element_type) {
+                if (!coerce_value_to_type(elem, target_type->element_type, coerced_elem)) {
+                    return false;
+                }
+            } else {
+                coerced_elem = clone_value(elem);
+            }
+            out_array->elements.push_back(clone_value(coerced_elem));
+        }
+        output = out_array;
+        return true;
+    }
+
+    if (target_type->kind == Type::Kind::Named) {
+        if (!std::holds_alternative<std::shared_ptr<CTComposite>>(input)) {
+            error_msg = "Type mismatch in compile-time coercion to named type";
+            return false;
+        }
+        auto in_comp = std::get<std::shared_ptr<CTComposite>>(input);
+        if (!in_comp) {
+            error_msg = "Type mismatch in compile-time coercion to null composite";
+            return false;
+        }
+        auto out_comp = std::make_shared<CTComposite>();
+        out_comp->type_name = target_type->type_name;
+
+        Symbol* type_sym = target_type->resolved_symbol;
+        if (!type_sym && type_checker && type_checker->get_scope()) {
+            type_sym = type_checker->get_scope()->lookup(target_type->type_name);
+        }
+        if (type_sym &&
+            type_sym->declaration &&
+            type_sym->declaration->kind == Stmt::Kind::TypeDecl) {
+            for (const auto& field : type_sym->declaration->fields) {
+                auto it = in_comp->fields.find(field.name);
+                if (it == in_comp->fields.end()) {
+                    error_msg = "Missing field in compile-time coercion: " + field.name;
+                    return false;
+                }
+                CTValue coerced_field;
+                if (!coerce_value_to_type(it->second, field.type, coerced_field)) {
+                    return false;
+                }
+                out_comp->fields[field.name] = clone_value(coerced_field);
+            }
+            output = out_comp;
+            return true;
+        }
+
+        // Fallback for unresolved named types: keep the known fields as-is.
+        out_comp->type_name = in_comp->type_name.empty() ? target_type->type_name : in_comp->type_name;
+        for (const auto& entry : in_comp->fields) {
+            out_comp->fields[entry.first] = clone_value(entry.second);
+        }
+        output = out_comp;
+        return true;
+    }
+
+    error_msg = "Unsupported target type in compile-time coercion";
+    return false;
+}
+
+bool CompileTimeEvaluator::coerce_value_to_lvalue_type(ExprPtr lvalue,
+                                                       const CTValue& input,
+                                                       CTValue& output) {
+    TypePtr target_type;
+    if (lvalue) {
+        target_type = lvalue->type;
+    }
+    if (!target_type && lvalue && lvalue->kind == Expr::Kind::Identifier) {
+        Symbol* sym = type_checker ? type_checker->binding_for(lvalue.get()) : nullptr;
+        if (!sym && type_checker && type_checker->get_scope()) {
+            sym = type_checker->get_scope()->lookup(lvalue->name);
+        }
+        if (sym) {
+            target_type = sym->type;
+        }
+    }
+    if (!target_type) {
+        output = clone_value(input);
+        return true;
+    }
+    return coerce_value_to_type(input, target_type, output);
+}
+
 bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     // Evaluate the right-hand side
     CTValue rhs_val;
@@ -1045,6 +1685,18 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         }
     }
 
+    CTValue assign_val = clone_value(rhs_val);
+    TypePtr assignment_type = expr->type;
+    if (expr->creates_new_variable && expr->declared_var_type) {
+        assignment_type = expr->declared_var_type;
+    } else if (!assignment_type && expr->left && expr->left->type) {
+        assignment_type = expr->left->type;
+    }
+    if (assignment_type &&
+        !coerce_value_to_type(assign_val, assignment_type, assign_val)) {
+        return false;
+    }
+
     std::function<bool(ExprPtr, const CTValue&)> assign_lvalue;
     std::function<bool(ExprPtr, CTValue&)> fetch_lvalue;
 
@@ -1055,6 +1707,10 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 auto it = constants.find(target->name);
                 if (it == constants.end()) {
                     error_msg = "Identifier not found or not a compile-time constant: " + target->name;
+                    return false;
+                }
+                if (std::holds_alternative<CTUninitialized>(it->second)) {
+                    error_msg = "uninitialized variable accessed at compile time: " + target->name;
                     return false;
                 }
                 out = it->second;
@@ -1086,13 +1742,19 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 CTValue index_val;
                 if (!try_evaluate(target->args[0], index_val)) return false;
                 if (!std::holds_alternative<int64_t>(index_val) &&
-                    !std::holds_alternative<uint64_t>(index_val)) {
-                    error_msg = "Index must be an integer constant";
+                    !std::holds_alternative<uint64_t>(index_val) &&
+                    !std::holds_alternative<bool>(index_val)) {
+                    error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
                     return false;
                 }
-                int64_t idx = std::holds_alternative<int64_t>(index_val)
-                    ? std::get<int64_t>(index_val)
-                    : static_cast<int64_t>(std::get<uint64_t>(index_val));
+                int64_t idx = 0;
+                if (std::holds_alternative<int64_t>(index_val)) {
+                    idx = std::get<int64_t>(index_val);
+                } else if (std::holds_alternative<uint64_t>(index_val)) {
+                    idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
+                } else {
+                    idx = std::get<bool>(index_val) ? 1 : 0;
+                }
                 if (idx < 0) {
                     error_msg = "Index cannot be negative";
                     return false;
@@ -1122,11 +1784,16 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     assign_lvalue = [&](ExprPtr target, const CTValue& value) -> bool {
         if (!target) return false;
         switch (target->kind) {
-            case Expr::Kind::Identifier:
-                constants[target->name] = clone_value(value);
+            case Expr::Kind::Identifier: {
+                CTValue stored_val;
+                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
+                    return false;
+                }
+                constants[target->name] = clone_value(stored_val);
                 uninitialized_locals.erase(target->name);
                 result = constants[target->name];
                 return true;
+            }
             case Expr::Kind::Member: {
                 CTValue base_val;
                 if (!fetch_lvalue(target->operand, base_val)) return false;
@@ -1144,11 +1811,15 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 for (const auto& entry : comp->fields) {
                     new_comp->fields[entry.first] = clone_value(entry.second);
                 }
-                new_comp->fields[target->name] = clone_value(value);
+                CTValue stored_val;
+                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
+                    return false;
+                }
+                new_comp->fields[target->name] = clone_value(stored_val);
                 if (!assign_lvalue(target->operand, new_comp)) {
                     return false;
                 }
-                result = clone_value(value);
+                result = clone_value(stored_val);
                 return true;
             }
             case Expr::Kind::Index: {
@@ -1157,13 +1828,19 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 CTValue index_val;
                 if (!try_evaluate(target->args[0], index_val)) return false;
                 if (!std::holds_alternative<int64_t>(index_val) &&
-                    !std::holds_alternative<uint64_t>(index_val)) {
-                    error_msg = "Index must be an integer constant";
+                    !std::holds_alternative<uint64_t>(index_val) &&
+                    !std::holds_alternative<bool>(index_val)) {
+                    error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
                     return false;
                 }
-                int64_t idx = std::holds_alternative<int64_t>(index_val)
-                    ? std::get<int64_t>(index_val)
-                    : static_cast<int64_t>(std::get<uint64_t>(index_val));
+                int64_t idx = 0;
+                if (std::holds_alternative<int64_t>(index_val)) {
+                    idx = std::get<int64_t>(index_val);
+                } else if (std::holds_alternative<uint64_t>(index_val)) {
+                    idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
+                } else {
+                    idx = std::get<bool>(index_val) ? 1 : 0;
+                }
                 if (idx < 0) {
                     error_msg = "Index cannot be negative";
                     return false;
@@ -1186,11 +1863,15 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 for (const auto& elem : array->elements) {
                     new_array->elements.push_back(clone_value(elem));
                 }
-                new_array->elements[static_cast<size_t>(idx)] = clone_value(value);
+                CTValue stored_val;
+                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
+                    return false;
+                }
+                new_array->elements[static_cast<size_t>(idx)] = clone_value(stored_val);
                 if (!assign_lvalue(target->operand, new_array)) {
                     return false;
                 }
-                result = clone_value(value);
+                result = clone_value(stored_val);
                 return true;
             }
             default:
@@ -1199,7 +1880,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         }
     };
 
-    return assign_lvalue(expr->left, rhs_val);
+    return assign_lvalue(expr->left, assign_val);
 }
 
 bool CompileTimeEvaluator::eval_array_literal(ExprPtr expr, CTValue& result) {
@@ -1294,13 +1975,19 @@ bool CompileTimeEvaluator::eval_index(ExprPtr expr, CTValue& result) {
     }
 
     if (!std::holds_alternative<int64_t>(index_val) &&
-        !std::holds_alternative<uint64_t>(index_val)) {
-        error_msg = "Index must be an integer constant";
+        !std::holds_alternative<uint64_t>(index_val) &&
+        !std::holds_alternative<bool>(index_val)) {
+        error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
         return false;
     }
-    int64_t idx = std::holds_alternative<int64_t>(index_val)
-        ? std::get<int64_t>(index_val)
-        : static_cast<int64_t>(std::get<uint64_t>(index_val));
+    int64_t idx = 0;
+    if (std::holds_alternative<int64_t>(index_val)) {
+        idx = std::get<int64_t>(index_val);
+    } else if (std::holds_alternative<uint64_t>(index_val)) {
+        idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
+    } else {
+        idx = std::get<bool>(index_val) ? 1 : 0;
+    }
     if (idx < 0) {
         error_msg = "Index cannot be negative";
         return false;
@@ -1314,6 +2001,10 @@ bool CompileTimeEvaluator::eval_index(ExprPtr expr, CTValue& result) {
         }
         if (static_cast<size_t>(idx) >= array->elements.size()) {
             error_msg = "Index out of bounds in compile-time evaluation";
+            return false;
+        }
+        if (std::holds_alternative<CTUninitialized>(array->elements[static_cast<size_t>(idx)])) {
+            error_msg = "uninitialized array element accessed at compile time";
             return false;
         }
         result = array->elements[static_cast<size_t>(idx)];

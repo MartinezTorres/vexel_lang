@@ -7,6 +7,7 @@
     loop
 }
 &print(arg0: #i32) {
+    0
 }
 &^main() -> #i32 {
     r = Range(0, 5);

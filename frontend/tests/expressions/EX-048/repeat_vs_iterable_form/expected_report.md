@@ -2,6 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-048/repeat_vs_iterable_form/test.vx
 &print(arg0: #i32) {
+    0
 }
 &^main() -> #i32 {
     i: #i32 = 0;

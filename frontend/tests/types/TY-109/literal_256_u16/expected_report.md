@@ -2,7 +2,6 @@
 ```
 // Lowered Vexel module: tests/types/TY-109/literal_256_u16/test.vx
 &^main() -> #i32 {
-    x = 256;
     0
 }
 ```

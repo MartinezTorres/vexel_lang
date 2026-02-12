@@ -2,8 +2,7 @@
 ```
 // Lowered Vexel module: tests/types/TY-044/type_constructor_syntax/test.vx
 &^main() -> #i32 {
-    p = Point(10, 20);
-    p.x
+    10
 }
 ```
 

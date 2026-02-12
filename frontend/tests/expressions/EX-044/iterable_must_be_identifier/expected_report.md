@@ -2,6 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-044/iterable_must_be_identifier/test.vx
 &print(arg0: #i32) {
+    0
 }
 &^main() -> #i32 {
     arr = [1, 2, 3];

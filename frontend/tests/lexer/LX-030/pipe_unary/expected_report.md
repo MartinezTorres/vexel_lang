@@ -2,8 +2,6 @@
 ```
 // Lowered Vexel module: tests/lexer/LX-030/pipe_unary/test.vx
 &^main() -> #i32 {
-    arr: #i32[3] = [1, 2, 3];
-    len = |arr|;
     0
 }
 ```

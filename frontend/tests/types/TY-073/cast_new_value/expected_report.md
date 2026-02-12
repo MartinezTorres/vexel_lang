@@ -2,9 +2,7 @@
 ```
 // Lowered Vexel module: tests/types/TY-073/cast_new_value/test.vx
 &^main() -> #i32 {
-    x: #u16 = 1000;
-    y = ( #i32 ) x;
-    y
+    1000
 }
 ```
 

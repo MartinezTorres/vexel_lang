@@ -2,7 +2,6 @@
 ```
 // Lowered Vexel module: tests/types/TY-107/literal_0_boolean/test.vx
 &^main() -> #i32 {
-    x = 0;
     0
 }
 ```

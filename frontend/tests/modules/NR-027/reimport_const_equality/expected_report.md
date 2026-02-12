@@ -4,9 +4,8 @@
 ::constants;
 ::constants;
 &^main() -> #i32 {
-    ANSWER
+    42
 }
-ANSWER: #i32 = 21 + 21;
 ```
 
 ## Stderr

@@ -11,9 +11,11 @@ namespace vexel {
 
 struct CTComposite;
 struct CTArray;
+struct CTUninitialized {};
 
 // Compile-time value - can be scalar, composite (struct), or array
 using CTValue = std::variant<int64_t, uint64_t, double, bool, std::string,
+                             CTUninitialized,
                              std::shared_ptr<CTComposite>, std::shared_ptr<CTArray>>;
 
 struct CTComposite {
@@ -72,6 +74,11 @@ private:
     bool eval_iteration(ExprPtr expr, CTValue& result);
     bool eval_repeat(ExprPtr expr, CTValue& result);
     bool eval_length(ExprPtr expr, CTValue& result);
+    bool eval_block_vm(ExprPtr expr, CTValue& result, bool& handled);
+    bool eval_block_fallback(ExprPtr expr, CTValue& result);
+    bool declare_uninitialized_local(const StmtPtr& stmt);
+    bool coerce_value_to_type(const CTValue& input, TypePtr target_type, CTValue& output);
+    bool coerce_value_to_lvalue_type(ExprPtr lvalue, const CTValue& input, CTValue& output);
 
     // Purity analysis
     bool is_pure_for_compile_time(StmtPtr func, std::string& reason);

@@ -1,7 +1,7 @@
 // @rfc: backends/c/README.md#code-generation-contract
-// @desc: Immutable globals stay in the C translation unit and are not declared in the public header. | Immutable globals are internal to generated C file
+// @desc: Non-exported immutable globals never appear in the public header; CTE/DCE may fold them away from the C unit entirely. | Immutable globals are not leaked through the header ABI
 // @expect-exit: 0
-// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); hdr = pathlib.Path('out.h').read_text(); ok = re.search(r'\\bVX_CONSTEXPR\\s+int32_t\\s+vx_table\\s*=\\s*7\\b', src) and not re.search(r'\\bvx_table\\b', hdr); sys.exit(0 if ok else 1)" {VEXEL} -b c
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); hdr = pathlib.Path('out.h').read_text(); folded = 'return 7;' in src; internal = re.search(r'\\bVX_CONSTEXPR\\s+int32_t\\s+vx_table\\s*=\\s*7\\b', src) is not None; ok = (folded or internal) and re.search(r'\\bvx_table\\b', hdr) is None; sys.exit(0 if ok else 1)" {VEXEL} -b c
 
 table:#i32 = 7;
 

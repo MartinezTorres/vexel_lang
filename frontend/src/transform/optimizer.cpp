@@ -36,7 +36,9 @@ OptimizationFacts Optimizer::run(const Module& mod) {
                 CompileTimeEvaluator func_eval(type_checker);
                 CTValue result;
                 if (!func_eval.try_evaluate(sym->declaration->body, result)) {
-                    facts.fold_skip_reasons[sym] = "evaluation-failed";
+                    std::string reason = func_eval.get_error();
+                    if (reason.empty()) reason = "unknown";
+                    facts.fold_skip_reasons[sym] = "evaluation-failed: " + reason;
                     continue;
                 }
                 bool scalar = std::holds_alternative<int64_t>(result) ||

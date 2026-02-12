@@ -372,6 +372,8 @@ bool Residualizer::can_fold_expr(const ExprPtr& expr) const {
     if (!expr) return false;
 
     switch (expr->kind) {
+        case Expr::Kind::Block:
+            return true;
         case Expr::Kind::Call: {
             if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
                 return false;
