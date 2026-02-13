@@ -179,6 +179,9 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
         success = false;
     }
 
+    if (success && expr && value_observer) {
+        value_observer(expr.get(), result);
+    }
     return success;
 }
 

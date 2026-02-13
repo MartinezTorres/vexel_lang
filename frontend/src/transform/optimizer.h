@@ -65,10 +65,6 @@ public:
 
 private:
     TypeChecker* type_checker;
-
-    void visit_expr(ExprPtr expr, int instance_id, OptimizationFacts& facts);
-    void visit_stmt(StmtPtr stmt, int instance_id, OptimizationFacts& facts);
-    void mark_constexpr_init(StmtPtr stmt, int instance_id, OptimizationFacts& facts);
 };
 
 } // namespace vexel

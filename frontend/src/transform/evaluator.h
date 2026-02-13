@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include <memory>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
@@ -42,6 +43,8 @@ struct CTEQueryResult {
 
 class CompileTimeEvaluator {
 public:
+    using ExprValueObserver = std::function<void(const Expr*, const CTValue&)>;
+
     CompileTimeEvaluator(TypeChecker* tc) : type_checker(tc) {}
 
     // Try to evaluate expression at compile time
@@ -63,6 +66,10 @@ public:
     void set_symbol_constant(const Symbol* sym, const CTValue& value) {
         if (!sym) return;
         symbol_constants[sym] = value;
+    }
+
+    void set_value_observer(ExprValueObserver observer) {
+        value_observer = std::move(observer);
     }
 
 private:
@@ -112,6 +119,7 @@ private:
     std::unordered_set<const Symbol*> constant_eval_stack;
     std::unordered_map<const Symbol*, CTValue> constant_value_cache;
     bool hard_error = false;
+    ExprValueObserver value_observer;
 };
 
 } // namespace vexel

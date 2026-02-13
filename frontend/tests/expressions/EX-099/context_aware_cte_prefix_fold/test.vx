@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Unknown-path evaluation must not leak context-sensitive constants | Runtime-dependent tails keep local expressions unresolved
+
+
+// EX-099: Runtime-dependent branch keeps local updates dynamic
+&^f(flag:#b) -> #i32 {
+    a:#i32 = 0
+    a = a + 1
+    flag ? { a = a + 1; }
+    a
+}
