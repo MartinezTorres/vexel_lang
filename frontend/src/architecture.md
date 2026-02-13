@@ -108,3 +108,9 @@ Every semantic change must add regression coverage for:
 - DCE correctness (symbol and statement/sub-expression levels)
 - Type-use correctness on reachable paths
 - Cross-module and generic-instantiation survival to backend emission
+
+Test-update policy:
+
+- Bulk expected-report refreshes are forbidden.
+- There must be no fixture/target/script that rewrites many `expected_report.md` files at once.
+- Expected outputs must be updated only per-test, with root-cause explanation in the commit.

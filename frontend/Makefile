@@ -18,7 +18,7 @@ TEST_TARGETS := $(patsubst %/test.vx,$(BUILD_DIR)/frontend-%/test_report.md,$(ca
 TEST_TARGETS += $(patsubst %/test.sh,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.sh))
 TEST_CHECK_TARGETS := $(patsubst %.md,%.checked,$(TEST_TARGETS))
 
-.PHONY: all clean test update-test-reports debug-invariants-test
+.PHONY: all clean test debug-invariants-test
 
 all: $(BUILD_DIR)/vexel-frontend $(BUILD_DIR)/lib/libvexelfrontend.a
 
@@ -47,19 +47,6 @@ test: $(TEST_CHECK_TARGETS)
 debug-invariants-test:
 	+$(MAKE) clean
 	+$(MAKE) CXXFLAGS="$(CXXFLAGS) -O0 -g -DVEXEL_DEBUG_PASS_INVARIANTS" test
-
-update-test-reports: $(TEST_TARGETS)
-	@echo "Updating test reports..."
-	@updated=0; \
-	for report in $(TEST_TARGETS); do \
-		expected=$$(echo $$report | sed 's|$(BUILD_DIR)/frontend-tests/|tests/|; s|test_report\.md|expected_report.md|'); \
-		if [ ! -f $$expected ] || ! diff -q $$report $$expected > /dev/null 2>&1; then \
-			mkdir -p $$(dirname $$expected); \
-			cp $$report $$expected; \
-			updated=$$((updated + 1)); \
-		fi; \
-	done; \
-	echo "Updated $$updated test report(s). Use 'git diff' to review changes."
 
 $(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx $(DRIVER_BIN)
 	@mkdir -p $(@D)
