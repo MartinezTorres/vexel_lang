@@ -27,12 +27,6 @@ bool Analyzer::global_initializer_runs_at_runtime(const Symbol* sym) const {
     if (!sym || !sym->declaration || !sym->declaration->var_init) {
         return false;
     }
-    if (sym->declaration->var_type &&
-        sym->declaration->var_type->kind == Type::Kind::Array &&
-        (sym->declaration->var_init->kind == Expr::Kind::ArrayLiteral ||
-         sym->declaration->var_init->kind == Expr::Kind::Range)) {
-        return false;
-    }
     if (!type_checker) {
         return true;
     }
@@ -309,11 +303,6 @@ void Analyzer::collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& ca
             if (!node) return;
             if (node->kind != Expr::Kind::Call || !node->operand ||
                 node->operand->kind != Expr::Kind::Identifier) {
-                return;
-            }
-            // Call-graph edges are call-site specific: constexpr-folded call sites
-            // are compile-time-only instantiations and should not mark runtime reachability.
-            if (optimization && optimization->constexpr_values.count(node.get()) > 0) {
                 return;
             }
             Symbol* sym = binding_for(node->operand);

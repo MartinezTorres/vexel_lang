@@ -11,9 +11,10 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
     Program* program = summary.program;
     if (!program) return;
 
-    auto normalize_ctx = [](char ctx, char fallback) {
+    auto normalize_ctx = [](char ctx) {
         if (ctx == 'R' || ctx == 'N') return ctx;
-        return (fallback == 'R' || fallback == 'N') ? fallback : 'N';
+        throw CompileError("Internal error: invalid reentrancy context key (expected 'R' or 'N')",
+                           SourceLocation());
     };
 
     auto boundary_ctx = [&](const Symbol* sym, ReentrancyBoundaryKind kind) -> char {
@@ -31,7 +32,7 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
                 return 'N';
             case ReentrancyMode::Default:
             default:
-                return normalize_ctx(fallback, 'N');
+                return normalize_ctx(fallback);
         }
     };
 
@@ -103,7 +104,7 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     }
 
-    char fallback_ctx = normalize_ctx(analysis_config.default_entry_context, 'N');
+    char fallback_ctx = normalize_ctx(analysis_config.default_entry_context);
     for (const auto& entry : function_map) {
         const Symbol* func_sym = entry.first;
         if (facts.reentrancy_variants[func_sym].empty()) {

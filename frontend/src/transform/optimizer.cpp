@@ -91,11 +91,6 @@ static std::optional<bool> evaluate_condition(ExprPtr expr, TypeChecker* type_ch
 
 void Optimizer::mark_constexpr_init(StmtPtr stmt, OptimizationFacts& facts) {
     if (!stmt || stmt->kind != Stmt::Kind::VarDecl || !stmt->var_init) return;
-    if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
-        (stmt->var_init->kind == Expr::Kind::ArrayLiteral || stmt->var_init->kind == Expr::Kind::Range)) {
-        facts.constexpr_inits.insert(stmt.get());
-        return;
-    }
     if (!type_checker) return;
     CompileTimeEvaluator evaluator(type_checker);
     CTValue result;

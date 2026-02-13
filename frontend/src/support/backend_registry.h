@@ -36,6 +36,7 @@ using BackendBoundaryReentrancyModeFn =
                        ReentrancyBoundaryKind boundary,
                        const Compiler::Options& options,
                        std::string& error);
+using BackendValidateOptionsFn = void (*)(const Compiler::Options& options, std::string& error);
 
 // Driver option delegation contract:
 // - Called only for options unknown to the frontend driver.
@@ -54,6 +55,7 @@ struct Backend {
     BackendNativeEmitTranslationUnitFn emit_translation_unit = nullptr;
     BackendAnalysisRequirementsFn analysis_requirements = nullptr;
     BackendBoundaryReentrancyModeFn boundary_reentrancy_mode = nullptr;
+    BackendValidateOptionsFn validate_options = nullptr;
     BackendParseOptionFn parse_option = nullptr;
     BackendPrintUsageFn print_usage = nullptr;
 };

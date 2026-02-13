@@ -129,13 +129,7 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
             success = eval_length(expr, result);
             break;
         case Expr::Kind::Block:
-            {
-                bool handled = false;
-                success = eval_block_vm(expr, result, handled);
-                if (!handled) {
-                    success = eval_block_fallback(expr, result);
-                }
-            }
+            success = eval_block_vm(expr, result);
             break;
         default:
             error_msg = "Expression kind not supported at compile time";
@@ -227,8 +221,7 @@ bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
     return true;
 }
 
-bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& handled) {
-    handled = false;
+bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result) {
     if (!expr || expr->kind != Expr::Kind::Block) {
         return false;
     }
@@ -241,6 +234,8 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
         Jump,
         ExitScope,
         ReturnExpr,
+        BreakSignal,
+        ContinueSignal,
     };
 
     struct VmOp {
@@ -398,6 +393,12 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
             }
             case Stmt::Kind::Break: {
                 if (loop_stack.empty()) {
+                    if (loop_depth > 0) {
+                        VmOp op;
+                        op.kind = VmOpKind::BreakSignal;
+                        add_op(std::move(op));
+                        return true;
+                    }
                     error_msg = "Break used outside of loop in compile-time evaluation";
                     return false;
                 }
@@ -409,6 +410,12 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
             }
             case Stmt::Kind::Continue: {
                 if (loop_stack.empty()) {
+                    if (loop_depth > 0) {
+                        VmOp op;
+                        op.kind = VmOpKind::ContinueSignal;
+                        add_op(std::move(op));
+                        return true;
+                    }
                     error_msg = "Continue used outside of loop in compile-time evaluation";
                     return false;
                 }
@@ -431,8 +438,6 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
     }
     std::vector<std::string> top_scope_names;
     end_scope(top_scope_names);
-    handled = true;
-
     auto saved_constants = constants;
     auto saved_uninitialized = uninitialized_locals;
 
@@ -559,6 +564,10 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
                 }
                 throw EvalReturn{clone_value(ret_val)};
             }
+            case VmOpKind::BreakSignal:
+                throw EvalBreak{};
+            case VmOpKind::ContinueSignal:
+                throw EvalContinue{};
         }
     }
 
@@ -573,121 +582,6 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result, bool& ha
     }
 
     for (const auto& name : top_scope_names) {
-        constants.erase(name);
-        uninitialized_locals.erase(name);
-    }
-    return true;
-}
-
-bool CompileTimeEvaluator::eval_block_fallback(ExprPtr expr, CTValue& result) {
-    if (!expr || expr->kind != Expr::Kind::Block) return false;
-
-    auto saved_constants = constants;
-    auto saved_uninitialized = uninitialized_locals;
-    std::unordered_set<std::string> locals_declared;
-
-    std::function<bool(StmtPtr)> eval_stmt;
-    eval_stmt = [&](StmtPtr stmt) -> bool {
-        if (!stmt) return true;
-        switch (stmt->kind) {
-            case Stmt::Kind::Expr: {
-                if (!stmt->expr) return true;
-                if (stmt->expr->kind == Expr::Kind::Assignment &&
-                    stmt->expr->left && stmt->expr->left->kind == Expr::Kind::Identifier) {
-                    if (stmt->expr->creates_new_variable) {
-                        locals_declared.insert(stmt->expr->left->name);
-                    }
-                    CTValue stmt_val;
-                    if (!eval_assignment(stmt->expr, stmt_val)) {
-                        return false;
-                    }
-                    return true;
-                }
-                CTValue stmt_val;
-                return try_evaluate(stmt->expr, stmt_val);
-            }
-            case Stmt::Kind::VarDecl: {
-                if (stmt->var_init) {
-                    CTValue init_val;
-                    if (!try_evaluate(stmt->var_init, init_val)) {
-                        return false;
-                    }
-                    CTValue stored_val = clone_value(init_val);
-                    if (stmt->var_type &&
-                        !coerce_value_to_type(stored_val, stmt->var_type, stored_val)) {
-                        return false;
-                    }
-                    constants[stmt->var_name] = clone_value(stored_val);
-                    uninitialized_locals.erase(stmt->var_name);
-                    locals_declared.insert(stmt->var_name);
-                    return true;
-                }
-                locals_declared.insert(stmt->var_name);
-                return declare_uninitialized_local(stmt);
-            }
-            case Stmt::Kind::ConditionalStmt: {
-                CTValue cond_val;
-                if (!try_evaluate(stmt->condition, cond_val)) {
-                    return false;
-                }
-                bool is_true = false;
-                if (std::holds_alternative<int64_t>(cond_val)) {
-                    is_true = std::get<int64_t>(cond_val) != 0;
-                } else if (std::holds_alternative<uint64_t>(cond_val)) {
-                    is_true = std::get<uint64_t>(cond_val) != 0;
-                } else if (std::holds_alternative<bool>(cond_val)) {
-                    is_true = std::get<bool>(cond_val);
-                } else if (std::holds_alternative<double>(cond_val)) {
-                    is_true = std::get<double>(cond_val) != 0.0;
-                } else {
-                    error_msg = "Conditional expression condition must be a scalar value";
-                    return false;
-                }
-                if (is_true && stmt->true_stmt) {
-                    return eval_stmt(stmt->true_stmt);
-                }
-                return true;
-            }
-            case Stmt::Kind::Return: {
-                if (!stmt->return_expr) {
-                    error_msg = "Return statement requires an expression at compile time";
-                    return false;
-                }
-                CTValue ret_val;
-                if (!try_evaluate(stmt->return_expr, ret_val)) {
-                    return false;
-                }
-                throw EvalReturn{clone_value(ret_val)};
-            }
-            case Stmt::Kind::Break:
-                throw EvalBreak{};
-            case Stmt::Kind::Continue:
-                throw EvalContinue{};
-            default:
-                error_msg = "Statement type not supported at compile time";
-                return false;
-        }
-    };
-
-    for (const auto& stmt : expr->statements) {
-        if (!eval_stmt(stmt)) {
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
-            return false;
-        }
-    }
-
-    if (expr->result_expr) {
-        if (!try_evaluate(expr->result_expr, result)) {
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
-            return false;
-        }
-    } else {
-        result = static_cast<int64_t>(0);
-    }
-
-    for (const auto& name : locals_declared) {
         constants.erase(name);
         uninitialized_locals.erase(name);
     }
@@ -1107,6 +1001,53 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     } catch (const EvalReturn& ret) {
         result = clone_value(ret.value);
         success = true;
+    }
+    if (success) {
+        if (!func->return_types.empty()) {
+            if (!std::holds_alternative<std::shared_ptr<CTComposite>>(result)) {
+                error_msg = "Tuple return value expected for compile-time call";
+                success = false;
+            } else {
+                auto in_comp = std::get<std::shared_ptr<CTComposite>>(result);
+                if (!in_comp) {
+                    error_msg = "Tuple return value is null in compile-time call";
+                    success = false;
+                } else {
+                    auto out_comp = std::make_shared<CTComposite>();
+                    if (expr->type && expr->type->kind == Type::Kind::Named) {
+                        out_comp->type_name = expr->type->type_name;
+                    } else {
+                        out_comp->type_name = in_comp->type_name;
+                    }
+                    for (size_t i = 0; i < func->return_types.size(); ++i) {
+                        const std::string field_name = std::string(MANGLED_PREFIX) + std::to_string(i);
+                        auto it = in_comp->fields.find(field_name);
+                        if (it == in_comp->fields.end()) {
+                            error_msg = "Missing tuple return field in compile-time call: " + field_name;
+                            success = false;
+                            break;
+                        }
+                        CTValue coerced_field = clone_value(it->second);
+                        if (func->return_types[i] &&
+                            !coerce_value_to_type(it->second, func->return_types[i], coerced_field)) {
+                            success = false;
+                            break;
+                        }
+                        out_comp->fields[field_name] = clone_value(coerced_field);
+                    }
+                    if (success) {
+                        result = out_comp;
+                    }
+                }
+            }
+        } else if (func->return_type) {
+            CTValue coerced_result;
+            if (!coerce_value_to_type(result, func->return_type, coerced_result)) {
+                success = false;
+            } else {
+                result = clone_value(coerced_result);
+            }
+        }
     }
     pop_ref_params();
     constants = saved_constants;
@@ -1612,13 +1553,17 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
             return true;
         }
 
-        // Fallback for unresolved named types: keep the known fields as-is.
-        out_comp->type_name = in_comp->type_name.empty() ? target_type->type_name : in_comp->type_name;
-        for (const auto& entry : in_comp->fields) {
-            out_comp->fields[entry.first] = clone_value(entry.second);
+        const bool is_internal_tuple_type =
+            target_type->type_name.rfind("__Tuple", 0) == 0;
+        if (is_internal_tuple_type && in_comp->type_name == target_type->type_name) {
+            // Lowered tuple temporaries are compiler-internal named composites.
+            // Keep strict behavior for user named types, but allow exact tuple passthrough.
+            output = clone_value(input);
+            return true;
         }
-        output = out_comp;
-        return true;
+
+        error_msg = "Named type must be resolved for compile-time coercion: " + target_type->type_name;
+        return false;
     }
 
     error_msg = "Unsupported target type in compile-time coercion";
@@ -2247,152 +2192,6 @@ bool CompileTimeEvaluator::eval_length(ExprPtr expr, CTValue& result) {
     }
     error_msg = "Length requires array or string at compile time";
     return false;
-}
-
-bool CompileTimeEvaluator::is_pure_for_compile_time(StmtPtr func, std::string& reason) {
-    if (!func || !func->body) {
-        return true;
-    }
-
-    // Prevent infinite recursion when analysing recursive functions
-    if (purity_stack.count(func.get())) {
-        return true;
-    }
-
-    purity_stack.insert(func.get());
-    push_ref_params(func);
-    bool pure = is_expr_pure(func->body, reason);
-    pop_ref_params();
-    purity_stack.erase(func.get());
-    return pure;
-}
-
-bool CompileTimeEvaluator::is_expr_pure(ExprPtr expr, std::string& reason) {
-    if (!expr) return true;
-
-    switch (expr->kind) {
-        case Expr::Kind::Assignment:
-            if (expr->left) {
-                std::string base = base_identifier(expr->left);
-                if (!base.empty() && is_ref_param(base)) {
-                    reason = "mutates receiver '" + base + "'";
-                    return false;
-                }
-            }
-            // Check if assigning to a global mutable variable
-            if (expr->left) {
-                std::string base = base_identifier(expr->left);
-                if (!base.empty()) {
-                    Symbol* sym = type_checker->get_scope()->lookup(base);
-                    if (sym && sym->kind == Symbol::Kind::Variable && sym->is_mutable) {
-                        reason = "modifies mutable global variable '" + base + "'";
-                        return false;
-                    }
-                }
-            }
-            return is_expr_pure(expr->right, reason);
-
-        case Expr::Kind::Call:
-            // Check if calling an external function
-            if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                Symbol* sym = type_checker->get_scope()->lookup(expr->operand->name);
-                if (sym && sym->kind == Symbol::Kind::Function) {
-                    if (sym->declaration && sym->declaration->is_external) {
-                        reason = "calls external function '" + expr->operand->name + "'";
-                        return false;
-                    }
-                    // Recursively check called function
-                    if (sym->declaration && !is_pure_for_compile_time(sym->declaration, reason)) {
-                        return false;
-                    }
-                }
-            }
-            for (const auto& rec : expr->receivers) {
-                if (!is_expr_pure(rec, reason)) return false;
-            }
-            // Check arguments
-            for (const auto& arg : expr->args) {
-                if (!is_expr_pure(arg, reason)) return false;
-            }
-            return true;
-
-        case Expr::Kind::Binary:
-            return is_expr_pure(expr->left, reason) && is_expr_pure(expr->right, reason);
-
-        case Expr::Kind::Unary:
-            return is_expr_pure(expr->operand, reason);
-
-        case Expr::Kind::Conditional:
-            return is_expr_pure(expr->condition, reason) &&
-                   is_expr_pure(expr->true_expr, reason) &&
-                   is_expr_pure(expr->false_expr, reason);
-
-        case Expr::Kind::Block:
-            for (const auto& stmt : expr->statements) {
-                if (!is_stmt_pure(stmt, reason)) return false;
-            }
-            return is_expr_pure(expr->result_expr, reason);
-
-        case Expr::Kind::Index:
-            return is_expr_pure(expr->operand, reason) &&
-                   (expr->args.empty() ? true : is_expr_pure(expr->args[0], reason));
-
-        case Expr::Kind::Member:
-            return is_expr_pure(expr->operand, reason);
-
-        case Expr::Kind::ArrayLiteral:
-        case Expr::Kind::TupleLiteral:
-            for (const auto& elem : expr->elements) {
-                if (!is_expr_pure(elem, reason)) return false;
-            }
-            return true;
-
-        case Expr::Kind::Cast:
-            return is_expr_pure(expr->operand, reason);
-
-        case Expr::Kind::Range:
-            return is_expr_pure(expr->left, reason) && is_expr_pure(expr->right, reason);
-
-        case Expr::Kind::Length:
-            return is_expr_pure(expr->operand, reason);
-
-        case Expr::Kind::Iteration:
-            return is_expr_pure(loop_subject(expr), reason) && is_expr_pure(loop_body(expr), reason);
-
-        case Expr::Kind::Repeat:
-            return is_expr_pure(loop_subject(expr), reason) && is_expr_pure(loop_body(expr), reason);
-
-        default:
-            // Literals and identifiers are pure
-            return true;
-    }
-}
-
-bool CompileTimeEvaluator::is_stmt_pure(StmtPtr stmt, std::string& reason) {
-    if (!stmt) return true;
-
-    switch (stmt->kind) {
-        case Stmt::Kind::Expr:
-            return is_expr_pure(stmt->expr, reason);
-
-        case Stmt::Kind::Return:
-            return is_expr_pure(stmt->return_expr, reason);
-
-        case Stmt::Kind::VarDecl:
-            return is_expr_pure(stmt->var_init, reason);
-
-        case Stmt::Kind::ConditionalStmt:
-            return is_expr_pure(stmt->condition, reason) &&
-                   is_stmt_pure(stmt->true_stmt, reason);
-
-        case Stmt::Kind::Break:
-        case Stmt::Kind::Continue:
-            // These are pure (they just control flow)
-            return true;
-
-        default:
-            return true;
-    }
 }
 
 void CompileTimeEvaluator::push_ref_params(StmtPtr func) {

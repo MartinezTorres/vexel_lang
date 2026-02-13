@@ -13,9 +13,16 @@ if ! make -s -C "$ROOT" driver >/tmp/driver_build.out 2>/tmp/driver_build.err; t
   exit 1
 fi
 
-"$ROOT/build/vexel" --backend-opt foo=bar -b c -o out input.vx >/dev/null 2>/dev/null
-if [[ ! -f out.c ]]; then
-  echo "missing out.c"
+set +e
+"$ROOT/build/vexel" --backend-opt foo=bar -b c -o out input.vx >valid_opt.out 2>valid_opt.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected unknown backend option failure for c backend"
+  exit 1
+fi
+if ! rg -q "does not accept backend options" valid_opt.err; then
+  echo "missing c-backend option rejection message"
   exit 1
 fi
 
@@ -120,6 +127,7 @@ if ! rg -q "Backend-specific options \\(c\\):" unknown.out; then
   exit 1
 fi
 rm -f \
+  valid_opt.out valid_opt.err \
   bad.out bad.err \
   missing_b.out missing_b.err \
   missing_b_run.out missing_b_run.err \

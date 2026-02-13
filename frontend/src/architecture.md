@@ -166,3 +166,20 @@ Reject a change if any item below is true:
 - Keeps or adds a placeholder semantic path without hard failure.
 - Converts a defect test into a characterization test without explicit approval.
 - Updates expected outputs broadly instead of per-test root-cause updates.
+
+## Wall-of-Shame Escalation Protocol
+
+When working on an existing issue, if a newly discovered problem is meaningful
+enough to be logged in `WallOfShame.md`, interrupt the current task and apply
+this protocol immediately:
+
+1. Log the new issue in `WallOfShame.md` with evidence and `UNRESOLVED` status.
+2. Add a red-first regression test that captures the current wrong behavior.
+3. Commit current repository state immediately, even if the original task is partial.
+4. Resume the original task only after the new issue and failing test are recorded.
+
+Rationale:
+
+- Prevents hidden architectural debt from being silently carried forward.
+- Preserves root-cause visibility at discovery time.
+- Avoids long sessions that mix fixes with undocumented new regressions.

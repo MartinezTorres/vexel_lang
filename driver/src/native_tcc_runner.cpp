@@ -1,15 +1,5 @@
 #include "native_tcc_runner.h"
 
-#include "analysis_report.h"
-#include "analyzed_program_builder.h"
-#include "backend_registry.h"
-#include "frontend_pipeline.h"
-#include "io_utils.h"
-#include "module_loader.h"
-#include "resolver.h"
-#include "typechecker.h"
-
-#include <filesystem>
 #include <string>
 
 #if VEXEL_HAS_LIBTCC
@@ -27,111 +17,16 @@ namespace vexel {
 namespace {
 
 #if VEXEL_HAS_NATIVE_TCC
-Compiler::OutputPaths resolve_output_paths(const std::string& output_file) {
-    std::filesystem::path base_path(output_file);
-    std::filesystem::path dir = base_path.parent_path();
-    if (dir.empty()) dir = ".";
-    std::string stem = base_path.has_extension()
-        ? base_path.stem().string()
-        : base_path.filename().string();
-    if (stem.empty()) stem = "out";
-    if (!std::filesystem::exists(dir)) {
-        std::filesystem::create_directories(dir);
-    }
-    return {dir, stem};
-}
-
 int compile_to_translation_unit(const Compiler::Options& opts,
                                 std::string& out,
                                 std::ostream& err) {
-    try {
-        const Backend* backend = find_backend(opts.backend);
-        if (!backend) {
-            err << "Error: Unknown backend '" << opts.backend << "'\n";
-            return 1;
-        }
-        if (!backend->emit_translation_unit) {
-            err << "Error: backend '" << backend->info.name
-                << "' does not support native translation-unit output\n";
-            return 1;
-        }
-
-        BackendAnalysisRequirements backend_reqs{};
-        if (backend->analysis_requirements) {
-            std::string req_error;
-            backend_reqs = backend->analysis_requirements(opts, req_error);
-            if (!req_error.empty()) {
-                err << "Error: " << req_error << "\n";
-                return 1;
-            }
-        }
-
-        AnalysisConfig analysis_config;
-        analysis_config.enabled_passes = backend_reqs.required_passes;
-        analysis_config.default_entry_context = backend_reqs.default_entry_reentrancy;
-        analysis_config.default_exit_context = backend_reqs.default_exit_reentrancy;
-        if (backend->boundary_reentrancy_mode) {
-            analysis_config.reentrancy_mode_for_boundary =
-                [&](const Symbol* sym, ReentrancyBoundaryKind boundary) -> ReentrancyMode {
-                    if (!sym) {
-                        return ReentrancyMode::Default;
-                    }
-                    std::string boundary_error;
-                    ReentrancyMode mode =
-                        backend->boundary_reentrancy_mode(*sym, boundary, opts, boundary_error);
-                    if (!boundary_error.empty()) {
-                        SourceLocation loc = sym->declaration ? sym->declaration->location : SourceLocation();
-                        throw CompileError(boundary_error, loc);
-                    }
-                    return mode;
-                };
-        }
-
-        ModuleLoader loader(opts.project_root);
-        Program program = loader.load(opts.input_file);
-
-        Bindings bindings;
-        Resolver resolver(program, bindings, opts.project_root);
-        TypeChecker checker(opts.project_root, opts.allow_process, &resolver, &bindings, &program);
-        FrontendPipelineResult pipeline =
-            run_frontend_pipeline(program, resolver, checker, opts.verbose, analysis_config);
-
-        Compiler::OutputPaths paths = resolve_output_paths(opts.output_file);
-        if (opts.emit_analysis) {
-            std::filesystem::path analysis_path = paths.dir / (paths.stem + ".analysis.txt");
-            write_text_file_or_throw(analysis_path.string(),
-                                     format_analysis_report(pipeline.merged,
-                                                            pipeline.analysis,
-                                                            &pipeline.optimization));
-        }
-
-        AnalyzedProgram analyzed =
-            make_analyzed_program(pipeline.merged, checker, pipeline.analysis, pipeline.optimization);
-        BackendInput input{analyzed, opts, paths};
-        std::string backend_error;
-        if (!backend->emit_translation_unit(input, out, backend_error)) {
-            if (!backend_error.empty()) {
-                err << "Error: " << backend_error << "\n";
-            } else {
-                err << "Error: backend '" << backend->info.name
-                    << "' failed to emit translation unit\n";
-            }
-            return 1;
-        }
-        return 0;
-    } catch (const CompileError& e) {
-        err << "Error";
-        if (!e.location.filename.empty()) {
-            err << " at " << e.location.filename
-                << ":" << e.location.line
-                << ":" << e.location.column;
-        }
-        err << ": " << e.what() << "\n";
-        return 1;
-    } catch (const std::exception& e) {
-        err << "Error: " << e.what() << "\n";
+    Compiler compiler(opts);
+    std::string compile_error;
+    if (!compiler.emit_translation_unit(out, compile_error)) {
+        err << "Error: " << compile_error << "\n";
         return 1;
     }
+    return 0;
 }
 #endif
 

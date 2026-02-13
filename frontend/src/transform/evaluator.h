@@ -46,8 +46,6 @@ public:
 private:
     TypeChecker* type_checker;
     std::unordered_map<std::string, CTValue> constants;
-    // Tracks call stack during purity analysis; raw pointers are fine while AST nodes stay alive for one evaluator run.
-    std::unordered_set<const Stmt*> purity_stack;
     std::unordered_set<std::string> uninitialized_locals;
     std::vector<std::unordered_set<std::string>> ref_param_stack;
     std::string error_msg;
@@ -74,16 +72,10 @@ private:
     bool eval_iteration(ExprPtr expr, CTValue& result);
     bool eval_repeat(ExprPtr expr, CTValue& result);
     bool eval_length(ExprPtr expr, CTValue& result);
-    bool eval_block_vm(ExprPtr expr, CTValue& result, bool& handled);
-    bool eval_block_fallback(ExprPtr expr, CTValue& result);
+    bool eval_block_vm(ExprPtr expr, CTValue& result);
     bool declare_uninitialized_local(const StmtPtr& stmt);
     bool coerce_value_to_type(const CTValue& input, TypePtr target_type, CTValue& output);
     bool coerce_value_to_lvalue_type(ExprPtr lvalue, const CTValue& input, CTValue& output);
-
-    // Purity analysis
-    bool is_pure_for_compile_time(StmtPtr func, std::string& reason);
-    bool is_expr_pure(ExprPtr expr, std::string& reason);
-    bool is_stmt_pure(StmtPtr stmt, std::string& reason);
 
     int64_t to_int(const CTValue& v);
     double to_float(const CTValue& v);

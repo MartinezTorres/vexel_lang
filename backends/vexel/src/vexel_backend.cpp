@@ -391,6 +391,12 @@ static bool parse_vexel_backend_option(int, char**, int&, Compiler::Options&, st
     return false;
 }
 
+static void validate_vexel_backend_options(const Compiler::Options& options, std::string& error) {
+    if (options.backend_options.empty()) return;
+    const auto& entry = *options.backend_options.begin();
+    error = "Vexel backend does not accept backend options (unknown key: " + entry.first + ")";
+}
+
 static void print_vexel_backend_usage(std::ostream& os) {
     os << "  (none)\n";
 }
@@ -425,6 +431,7 @@ void register_backend_vexel() {
     backend.info.version = "v0.1.0";
     backend.emit = emit_vexel_backend;
     backend.analysis_requirements = vexel_analysis_requirements;
+    backend.validate_options = validate_vexel_backend_options;
     backend.parse_option = parse_vexel_backend_option;
     backend.print_usage = print_vexel_backend_usage;
     (void)register_backend(backend);

@@ -280,25 +280,121 @@ StmtPtr TypeChecker::clone_stmt(StmtPtr stmt) {
 
     return cloned;
 }
-void TypeChecker::substitute_types(StmtPtr func, const std::vector<TypePtr>& concrete_types) {
-    // Build type substitution map
-    std::unordered_map<std::string, TypePtr> type_map;
 
-    for (size_t i = 0; i < func->params.size() && i < concrete_types.size(); i++) {
-        func->params[i].type = concrete_types[i];
-        // If there was a type variable, map it
-        // This is simplified - full implementation would track type variable names
+namespace {
+
+void collect_typevar_bindings(TypePtr pattern,
+                              TypePtr concrete,
+                              std::unordered_map<std::string, TypePtr>& type_map) {
+    if (!pattern || !concrete) return;
+    if (pattern->kind == Type::Kind::TypeVar) {
+        type_map[pattern->var_name] = concrete;
+        return;
     }
-
-    // Substitute types in body
-    if (func->body) {
-        substitute_types_in_expr(func->body, type_map);
+    if (pattern->kind == Type::Kind::Array && concrete->kind == Type::Kind::Array) {
+        collect_typevar_bindings(pattern->element_type, concrete->element_type, type_map);
     }
 }
+
+} // namespace
+
+TypePtr TypeChecker::substitute_type_with_map(TypePtr type,
+                                              const std::unordered_map<std::string, TypePtr>& type_map) {
+    if (!type) return nullptr;
+
+    if (type->kind == Type::Kind::TypeVar) {
+        auto it = type_map.find(type->var_name);
+        if (it != type_map.end()) {
+            return it->second;
+        }
+        return type;
+    }
+
+    if (type->kind == Type::Kind::Array) {
+        TypePtr elem = substitute_type_with_map(type->element_type, type_map);
+        if (elem == type->element_type) {
+            return type;
+        }
+        TypePtr cloned = std::make_shared<Type>(*type);
+        cloned->element_type = elem;
+        return cloned;
+    }
+
+    return type;
+}
+
+void TypeChecker::substitute_types(StmtPtr func, const std::vector<TypePtr>& concrete_types) {
+    if (!func) return;
+
+    std::unordered_map<std::string, TypePtr> substitutions;
+
+    for (size_t i = 0; i < func->params.size() && i < concrete_types.size(); i++) {
+        TypePtr concrete = concrete_types[i];
+        if (!concrete) continue;
+        collect_typevar_bindings(func->params[i].type, concrete, substitutions);
+        func->params[i].type = concrete;
+    }
+
+    for (auto& param : func->params) {
+        param.type = substitute_type_with_map(param.type, substitutions);
+    }
+    for (auto& ref_type : func->ref_param_types) {
+        ref_type = substitute_type_with_map(ref_type, substitutions);
+    }
+    func->return_type = substitute_type_with_map(func->return_type, substitutions);
+    for (auto& ret_type : func->return_types) {
+        ret_type = substitute_type_with_map(ret_type, substitutions);
+    }
+
+    if (func->body) {
+        substitute_types_in_expr(func->body, substitutions);
+    }
+}
+
+void TypeChecker::substitute_types_in_stmt(StmtPtr stmt,
+                                           const std::unordered_map<std::string, TypePtr>& type_map) {
+    if (!stmt) return;
+
+    switch (stmt->kind) {
+        case Stmt::Kind::Expr:
+            substitute_types_in_expr(stmt->expr, type_map);
+            break;
+        case Stmt::Kind::Return:
+            substitute_types_in_expr(stmt->return_expr, type_map);
+            break;
+        case Stmt::Kind::VarDecl:
+            stmt->var_type = substitute_type_with_map(stmt->var_type, type_map);
+            substitute_types_in_expr(stmt->var_init, type_map);
+            break;
+        case Stmt::Kind::ConditionalStmt:
+            substitute_types_in_expr(stmt->condition, type_map);
+            substitute_types_in_stmt(stmt->true_stmt, type_map);
+            break;
+        case Stmt::Kind::FuncDecl:
+            for (auto& param : stmt->params) {
+                param.type = substitute_type_with_map(param.type, type_map);
+            }
+            for (auto& ref_type : stmt->ref_param_types) {
+                ref_type = substitute_type_with_map(ref_type, type_map);
+            }
+            stmt->return_type = substitute_type_with_map(stmt->return_type, type_map);
+            for (auto& ret_type : stmt->return_types) {
+                ret_type = substitute_type_with_map(ret_type, type_map);
+            }
+            substitute_types_in_expr(stmt->body, type_map);
+            break;
+        default:
+            break;
+    }
+}
+
 void TypeChecker::substitute_types_in_expr(ExprPtr expr, const std::unordered_map<std::string, TypePtr>& type_map) {
     if (!expr) return;
 
-    // Recursively substitute in sub-expressions
+    expr->type = substitute_type_with_map(expr->type, type_map);
+    expr->declared_var_type = substitute_type_with_map(expr->declared_var_type, type_map);
+    expr->target_type = substitute_type_with_map(expr->target_type, type_map);
+
     substitute_types_in_expr(expr->left, type_map);
     substitute_types_in_expr(expr->right, type_map);
     substitute_types_in_expr(expr->operand, type_map);
@@ -313,6 +409,14 @@ void TypeChecker::substitute_types_in_expr(ExprPtr expr, const std::unordered_ma
 
     for (auto& elem : expr->elements) {
         substitute_types_in_expr(elem, type_map);
+    }
+
+    for (auto& receiver : expr->receivers) {
+        substitute_types_in_expr(receiver, type_map);
+    }
+
+    for (auto& stmt : expr->statements) {
+        substitute_types_in_stmt(stmt, type_map);
     }
 }
 

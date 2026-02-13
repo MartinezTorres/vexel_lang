@@ -38,6 +38,7 @@ public:
 
     Compiler(const Options& opts);
     OutputPaths compile();
+    bool emit_translation_unit(std::string& out_translation_unit, std::string& error);
 
 private:
     Options options;
