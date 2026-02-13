@@ -37,3 +37,4 @@ Assistant.md
 # Web build artifacts (embedded into playground.html)
 playground/vexel.js
 playground/vexel.wasm
+docs/playground.html

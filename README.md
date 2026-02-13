@@ -19,7 +19,7 @@ gcc out.c -o simple -lm
 - `backends/c/` - portable C backend (`libvexel-c.a`, tests).
 - `backends/ext/megalinker/` - banked megalinker backend (WIP).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
-- `docs/` - language RFC (`docs/vexel-rfc.md`) and generated playground page (`docs/index.html`).
+- `docs/` - language RFC (`docs/vexel-rfc.md`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
 - `examples/` - sample programs plus `examples/lib/` helper modules.
 
@@ -125,7 +125,7 @@ Process expressions execute host commands. They are **disabled by default**; pas
 
 ## Web Playground
 
-The web playground runs the unified compiler in WebAssembly, lets you choose a backend, and shows emitted output files. The built `docs/index.html` is self-contained (compiler embedded).
+The web playground runs the unified compiler in WebAssembly, lets you choose a backend, and shows emitted output files. The generated `docs/playground.html` is self-contained (compiler embedded).
 
 Live playground: https://martineztorres.github.io/vexel_lang/
 
@@ -135,8 +135,12 @@ make web
 python3 -m http.server
 ```
 
-Open `http://localhost:8000/docs/` in a browser. You can copy `docs/index.html` to another machine and it will still work.
+Open `http://localhost:8000/docs/` in a browser. You can copy `docs/playground.html` to another machine and it will still work.
+Open `http://localhost:8000/docs/playground.html` for the playground directly.
 Playground build and embed logic live in `playground/Makefile`, `playground/embed.py`, and `playground/web_main.cpp`.
+
+GitHub Pages deployment uses a workflow that runs `make web` and publishes `docs/`. The landing page (`docs/index.html`) is source-controlled; `docs/playground.html` is generated.
+In repository settings, configure Pages to use **GitHub Actions** as the source.
 
 ## Supported Platforms & Toolchains
 

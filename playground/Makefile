@@ -40,7 +40,7 @@ EMFLAGS := \
 TARGET := $(OUT_DIR)/vexel.js
 WASM := $(OUT_DIR)/vexel.wasm
 PLAYGROUND_TEMPLATE := $(OUT_DIR)/playground.template.html
-PLAYGROUND := $(DOCS_DIR)/index.html
+PLAYGROUND := $(DOCS_DIR)/playground.html
 
 .PHONY: all clean
 
