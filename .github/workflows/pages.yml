@@ -29,6 +29,9 @@ jobs:
       - name: Build web playground
         run: make web
 
+      - name: Verify docs landing separation
+        run: bash tools/check_docs_landing.sh
+
       - name: Validate docs payload
         run: |
           test -f docs/index.html
