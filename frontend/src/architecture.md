@@ -114,3 +114,55 @@ Test-update policy:
 - Bulk expected-report refreshes are forbidden.
 - There must be no fixture/target/script that rewrites many `expected_report.md` files at once.
 - Expected outputs must be updated only per-test, with root-cause explanation in the commit.
+
+## Failure Patterns (Wall-of-Shame Driven)
+
+Recurring failure modes seen in this codebase:
+
+- Ownership drift:
+  - Same semantic decision implemented in multiple subsystems.
+  - Result: divergence and hidden behavior differences.
+- Fail-open contracts:
+  - Unknown/invalid input is normalized or silently accepted.
+  - Result: configuration/user errors become runtime surprises.
+- Placeholder bridges:
+  - Temporary fallback paths remain in production semantics.
+  - Result: architecture complexity and unsound edge behavior.
+- Incomplete migrations:
+  - Stub paths are left active while new path is partially rolled out.
+  - Result: correctness relies on incidental downstream behavior.
+- Test objective inversion:
+  - Characterization tests are used where desired-behavior regression tests are required.
+  - Result: green test suite while known defects remain unresolved.
+
+## Change Strategy (Contract-Closed Slices)
+
+"Small, self-consistent steps" is not sufficient by itself.  
+Correct rule: use contract-closed slices.
+
+A change slice is acceptable only when all of the following hold:
+
+- Ownership closure:
+  - The changed semantic concern has one active owner after the change.
+  - No duplicated semantic engines remain for the same concern.
+- Contract closure:
+  - Unknown/invalid cases fail explicitly (diagnostic/error), not normalize/silently pass.
+  - No semantic fallback/bridge is introduced to preserve temporary behavior.
+- Migration closure:
+  - If migration is incomplete, the unfinished path is gated by hard failure, not by permissive fallback.
+- Test closure:
+  - Tests assert desired behavior.
+  - For unresolved defects, tests are red-first and stay red until fixed.
+- Context closure:
+  - Do not edit partially-understood ownership paths.
+  - Read touched owner files end-to-end before modifying them.
+
+## Review Gate
+
+Reject a change if any item below is true:
+
+- Introduces a second semantic owner for existing behavior.
+- Adds normalization/defaulting where an error should be emitted.
+- Keeps or adds a placeholder semantic path without hard failure.
+- Converts a defect test into a characterization test without explicit approval.
+- Updates expected outputs broadly instead of per-test root-cause updates.

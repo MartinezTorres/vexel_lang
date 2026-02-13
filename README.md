@@ -32,6 +32,7 @@ gcc out.c -o simple -lm
 Implementation index:
 
 - Frontend pipeline and pass order: `frontend/src/cli/compiler.cpp`
+- Frontend architecture contract and change strategy: `frontend/src/architecture.md`
 - Frontend invariant checks: `frontend/src/pipeline/pass_invariants.h`, `frontend/src/pipeline/pass_invariants.cpp`
 - Lowered frontend contract: `frontend/src/transform/lowerer.h`
 - C backend code generator core: `backends/c/src/codegen.h`
