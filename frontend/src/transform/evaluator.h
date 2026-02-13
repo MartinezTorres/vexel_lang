@@ -44,6 +44,7 @@ struct CTEQueryResult {
 class CompileTimeEvaluator {
 public:
     using ExprValueObserver = std::function<void(const Expr*, const CTValue&)>;
+    using SymbolReadObserver = std::function<void(const Symbol*)>;
 
     CompileTimeEvaluator(TypeChecker* tc) : type_checker(tc) {}
 
@@ -70,6 +71,10 @@ public:
 
     void set_value_observer(ExprValueObserver observer) {
         value_observer = std::move(observer);
+    }
+
+    void set_symbol_read_observer(SymbolReadObserver observer) {
+        symbol_read_observer = std::move(observer);
     }
 
 private:
@@ -120,6 +125,7 @@ private:
     std::unordered_map<const Symbol*, CTValue> constant_value_cache;
     bool hard_error = false;
     ExprValueObserver value_observer;
+    SymbolReadObserver symbol_read_observer;
 };
 
 } // namespace vexel

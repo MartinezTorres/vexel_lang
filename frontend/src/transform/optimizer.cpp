@@ -3,6 +3,7 @@
 #include "expr_access.h"
 #include "typechecker.h"
 
+#include <queue>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -120,6 +121,7 @@ bool is_scalar_ctvalue(const CTValue& value) {
 struct CollectedExpr {
     ExprPtr expr;
     int instance_id = -1;
+    ExprFactKey key;
 };
 
 class ExprCollector {
@@ -173,7 +175,7 @@ private:
             condition_keys_.insert(key);
         }
         if (seen_expr_keys_.insert(key).second) {
-            all_exprs_.push_back(CollectedExpr{expr, instance_id});
+            all_exprs_.push_back(CollectedExpr{expr, instance_id, key});
         }
     }
 
@@ -181,7 +183,7 @@ private:
         if (!expr) return;
         ExprFactKey key = expr_fact_key(instance_id, expr.get());
         if (seen_context_roots_.insert(key).second) {
-            context_roots_.push_back(CollectedExpr{expr, instance_id});
+            context_roots_.push_back(CollectedExpr{expr, instance_id, key});
         }
     }
 
@@ -397,6 +399,19 @@ public:
     CTEFixpointScheduler(TypeChecker* checker, const Module& mod)
         : type_checker_(checker), collector_(checker) {
         collector_.collect_module(mod);
+        expr_enqueued_.assign(collector_.all_exprs().size(), false);
+        root_enqueued_.assign(collector_.context_roots().size(), false);
+
+        for (size_t i = 0; i < collector_.all_exprs().size(); ++i) {
+            expr_index_by_key_[collector_.all_exprs()[i].key] = i;
+            enqueue_expr(i);
+        }
+        for (size_t i = 0; i < collector_.context_roots().size(); ++i) {
+            enqueue_root(i);
+        }
+        for (const auto& candidate : collector_.global_constant_candidates()) {
+            tracked_symbols_.insert(candidate.first);
+        }
     }
 
     OptimizationFacts run() {
@@ -407,21 +422,25 @@ public:
 
         static constexpr int kMaxCteFixpointIterations = 64;
         int iter = 0;
-        while (true) {
-            bool changed = false;
+        while (iter < kMaxCteFixpointIterations) {
+            bool progressed = false;
 
-            run_context_roots(changed);
-            run_per_expr_queries(changed);
-            promote_global_constants(changed);
+            progressed |= drain_root_queue();
+            progressed |= drain_expr_queue();
 
-            if (!changed) {
-                break;
+            std::vector<const Symbol*> changed_symbols;
+            progressed |= promote_global_constants(changed_symbols);
+            if (!changed_symbols.empty()) {
+                enqueue_dependents(changed_symbols);
+                progressed = true;
             }
+
+            if (!progressed) break;
             iter++;
-            if (iter >= kMaxCteFixpointIterations) {
-                throw CompileError("Internal error: compile-time fact scheduler did not converge",
-                                   SourceLocation());
-            }
+        }
+        if (iter >= kMaxCteFixpointIterations) {
+            throw CompileError("Internal error: compile-time fact scheduler did not converge",
+                               SourceLocation());
         }
 
         facts.constexpr_values = stable_values_;
@@ -454,11 +473,91 @@ private:
     std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> stable_values_;
     std::unordered_set<ExprFactKey, ExprFactKeyHash> unstable_values_;
     std::unordered_map<const Symbol*, CTValue> known_symbol_values_;
+    std::unordered_set<const Symbol*> tracked_symbols_;
+
+    std::unordered_map<ExprFactKey, size_t, ExprFactKeyHash> expr_index_by_key_;
+    std::vector<bool> expr_enqueued_;
+    std::vector<bool> root_enqueued_;
+    std::queue<size_t> expr_queue_;
+    std::queue<size_t> root_queue_;
+
+    std::unordered_map<const Symbol*, std::unordered_set<size_t>> symbol_to_roots_;
+    std::unordered_map<size_t, std::unordered_set<const Symbol*>> root_to_symbols_;
+    std::unordered_map<const Symbol*, std::unordered_set<ExprFactKey, ExprFactKeyHash>> symbol_to_exprs_;
+    std::unordered_map<ExprFactKey, std::unordered_set<const Symbol*>, ExprFactKeyHash> expr_to_symbols_;
 
     void seed_evaluator(CompileTimeEvaluator& evaluator) const {
         for (const auto& entry : known_symbol_values_) {
             evaluator.set_symbol_constant(entry.first, entry.second);
         }
+    }
+
+    static std::unordered_set<const Symbol*> normalize_symbol_set(
+        const std::unordered_set<const Symbol*>& in,
+        const std::unordered_set<const Symbol*>& allowed) {
+        std::unordered_set<const Symbol*> out;
+        for (const Symbol* sym : in) {
+            if (sym && allowed.count(sym)) {
+                out.insert(sym);
+            }
+        }
+        return out;
+    }
+
+    void enqueue_expr(size_t idx) {
+        if (idx >= expr_enqueued_.size()) return;
+        if (expr_enqueued_[idx]) return;
+        expr_enqueued_[idx] = true;
+        expr_queue_.push(idx);
+    }
+
+    void enqueue_root(size_t idx) {
+        if (idx >= root_enqueued_.size()) return;
+        if (root_enqueued_[idx]) return;
+        root_enqueued_[idx] = true;
+        root_queue_.push(idx);
+    }
+
+    void update_root_dependencies(size_t root_idx,
+                                  const std::unordered_set<const Symbol*>& symbols) {
+        const auto normalized = normalize_symbol_set(symbols, tracked_symbols_);
+        auto& old = root_to_symbols_[root_idx];
+        for (const Symbol* sym : old) {
+            if (!normalized.count(sym)) {
+                auto sit = symbol_to_roots_.find(sym);
+                if (sit != symbol_to_roots_.end()) {
+                    sit->second.erase(root_idx);
+                    if (sit->second.empty()) {
+                        symbol_to_roots_.erase(sit);
+                    }
+                }
+            }
+        }
+        for (const Symbol* sym : normalized) {
+            symbol_to_roots_[sym].insert(root_idx);
+        }
+        old = normalized;
+    }
+
+    void update_expr_dependencies(const ExprFactKey& key,
+                                  const std::unordered_set<const Symbol*>& symbols) {
+        const auto normalized = normalize_symbol_set(symbols, tracked_symbols_);
+        auto& old = expr_to_symbols_[key];
+        for (const Symbol* sym : old) {
+            if (!normalized.count(sym)) {
+                auto sit = symbol_to_exprs_.find(sym);
+                if (sit != symbol_to_exprs_.end()) {
+                    sit->second.erase(key);
+                    if (sit->second.empty()) {
+                        symbol_to_exprs_.erase(sit);
+                    }
+                }
+            }
+        }
+        for (const Symbol* sym : normalized) {
+            symbol_to_exprs_[sym].insert(key);
+        }
+        old = normalized;
     }
 
     bool observe_expr_value(const ExprFactKey& key, const CTValue& value) {
@@ -483,19 +582,30 @@ private:
         return true;
     }
 
-    void run_context_roots(bool& changed) {
-        for (const auto& root : collector_.context_roots()) {
+    bool drain_root_queue() {
+        bool changed = false;
+        while (!root_queue_.empty()) {
+            size_t root_idx = root_queue_.front();
+            root_queue_.pop();
+            if (root_idx < root_enqueued_.size()) {
+                root_enqueued_[root_idx] = false;
+            }
+            if (root_idx >= collector_.context_roots().size()) continue;
+
+            const CollectedExpr& root = collector_.context_roots()[root_idx];
             auto scope = type_checker_->scoped_instance(root.instance_id);
             (void)scope;
+
             ExprPtrSet root_expr_nodes = collect_root_expr_nodes(root.expr);
             CompileTimeEvaluator evaluator(type_checker_);
             seed_evaluator(evaluator);
+
             std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> local_stable;
             std::unordered_set<ExprFactKey, ExprFactKeyHash> local_unstable;
+            std::unordered_set<const Symbol*> local_symbols;
+
             auto observe_local = [&](const ExprFactKey& key, const CTValue& value) {
-                if (!key.expr || local_unstable.count(key)) {
-                    return;
-                }
+                if (!key.expr || local_unstable.count(key)) return;
                 auto it = local_stable.find(key);
                 if (it == local_stable.end()) {
                     local_stable.emplace(key, clone_value(value));
@@ -506,15 +616,22 @@ private:
                     local_unstable.insert(key);
                 }
             };
+            evaluator.set_symbol_read_observer([&](const Symbol* sym) {
+                if (!sym) return;
+                local_symbols.insert(sym);
+            });
             evaluator.set_value_observer([&](const Expr* expr, const CTValue& value) {
                 if (!expr) return;
                 if (!root_expr_nodes.count(expr)) return;
                 observe_local(expr_fact_key(root.instance_id, expr), value);
             });
+
             CTEQueryResult query = evaluator.query(root.expr);
+            update_root_dependencies(root_idx, local_symbols);
             if (query.status != CTEQueryStatus::Known) {
                 continue;
             }
+
             for (const auto& key : local_unstable) {
                 if (stable_values_.count(key)) {
                     stable_values_.erase(key);
@@ -531,29 +648,45 @@ private:
                 }
             }
         }
+        return changed;
     }
 
-    void run_per_expr_queries(bool& changed) {
-        for (const auto& item : collector_.all_exprs()) {
-            ExprFactKey key = expr_fact_key(item.instance_id, item.expr.get());
-            if (stable_values_.count(key) || unstable_values_.count(key)) {
-                continue;
+    bool drain_expr_queue() {
+        bool changed = false;
+        while (!expr_queue_.empty()) {
+            size_t expr_idx = expr_queue_.front();
+            expr_queue_.pop();
+            if (expr_idx < expr_enqueued_.size()) {
+                expr_enqueued_[expr_idx] = false;
             }
+            if (expr_idx >= collector_.all_exprs().size()) continue;
 
+            const CollectedExpr& item = collector_.all_exprs()[expr_idx];
+            ExprFactKey key = item.key;
             auto scope = type_checker_->scoped_instance(item.instance_id);
             (void)scope;
             CompileTimeEvaluator evaluator(type_checker_);
             seed_evaluator(evaluator);
+
+            std::unordered_set<const Symbol*> local_symbols;
+            evaluator.set_symbol_read_observer([&](const Symbol* sym) {
+                if (!sym) return;
+                local_symbols.insert(sym);
+            });
+
             CTEQueryResult query = evaluator.query(item.expr);
+            update_expr_dependencies(key, local_symbols);
             if (query.status == CTEQueryStatus::Known) {
                 if (observe_expr_value(key, query.value)) {
                     changed = true;
                 }
             }
         }
+        return changed;
     }
 
-    void promote_global_constants(bool& changed) {
+    bool promote_global_constants(std::vector<const Symbol*>& changed_symbols) {
+        bool changed = false;
         for (const auto& candidate : collector_.global_constant_candidates()) {
             const Symbol* sym = candidate.first;
             const ExprFactKey& key = candidate.second;
@@ -565,6 +698,7 @@ private:
             auto known_it = known_symbol_values_.find(sym);
             if (known_it == known_symbol_values_.end()) {
                 known_symbol_values_[sym] = clone_value(value_it->second);
+                changed_symbols.push_back(sym);
                 changed = true;
                 continue;
             }
@@ -572,6 +706,28 @@ private:
             if (!ctvalue_equal(known_it->second, value_it->second)) {
                 throw CompileError("Internal error: non-monotonic compile-time value for symbol '" + sym->name + "'",
                                    sym->declaration ? sym->declaration->location : SourceLocation());
+            }
+        }
+        return changed;
+    }
+
+    void enqueue_dependents(const std::vector<const Symbol*>& changed_symbols) {
+        for (const Symbol* sym : changed_symbols) {
+            auto root_it = symbol_to_roots_.find(sym);
+            if (root_it != symbol_to_roots_.end()) {
+                for (size_t root_idx : root_it->second) {
+                    enqueue_root(root_idx);
+                }
+            }
+
+            auto expr_it = symbol_to_exprs_.find(sym);
+            if (expr_it != symbol_to_exprs_.end()) {
+                for (const auto& key : expr_it->second) {
+                    auto idx_it = expr_index_by_key_.find(key);
+                    if (idx_it != expr_index_by_key_.end()) {
+                        enqueue_expr(idx_it->second);
+                    }
+                }
             }
         }
     }

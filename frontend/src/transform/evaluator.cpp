@@ -1134,6 +1134,9 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(expr->name);
     }
+    if (sym && symbol_read_observer) {
+        symbol_read_observer(sym);
+    }
     if (sym) {
         auto known = symbol_constants.find(sym);
         if (known != symbol_constants.end()) {

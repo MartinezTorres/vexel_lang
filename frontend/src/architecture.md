@@ -93,6 +93,10 @@ Any pass that mutates AST must keep bindings/facts coherent for downstream passe
 ### Fixpoint and Unknown-State Monotonicity
 
 - Frontend semantic solving is iterative/fixpoint-based, not a single-pass assumption.
+- Compile-time fact solving is dependency-driven:
+  - `optimizer` owns worklists for context roots and expression nodes.
+  - `evaluator` trace hooks (`value` and `symbol-read`) feed dependency edges.
+  - When known compile-time symbol values change, only dependent work is re-queued.
 - Each iteration must be monotonic for knowledge:
   - `Unknown` may become `Known` or `Error`.
   - `Known` must never become `Unknown`.
