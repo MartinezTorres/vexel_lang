@@ -18,9 +18,8 @@ cat >"$SRC" <<'VXEOF'
 }
 VXEOF
 
-if ! "$DRIVER" -b c --backend-opt nonsense=1 -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
-  cat "$STDERR_FILE" >&2
-  echo "expected unresolved behavior: unknown backend-opt key is currently accepted" >&2
+if "$DRIVER" -b c --backend-opt nonsense=1 -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
+  echo "backend must reject unknown --backend-opt key for selected backend" >&2
   exit 1
 fi
 

@@ -19,9 +19,8 @@ cat >"$SRC" <<'VXEOF'
 }
 VXEOF
 
-if ! "$DRIVER" -b vexel -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
-  cat "$STDERR_FILE" >&2
-  echo "expected unresolved behavior: unknown annotation is currently accepted by frontend" >&2
+if "$DRIVER" -b vexel -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
+  echo "frontend must reject unknown annotations" >&2
   exit 1
 fi
 
