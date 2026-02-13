@@ -168,6 +168,14 @@ private:
     std::unordered_set<const Symbol*> function_symbols_;
     std::unordered_map<const Symbol*, ExprFactKey> function_body_keys_;
 
+    void collect_type(const TypePtr& type, int instance_id) {
+        if (!type) return;
+        if (type->kind == Type::Kind::Array) {
+            collect_type(type->element_type, instance_id);
+            collect_expr(type->array_size, instance_id, false);
+        }
+    }
+
     void add_expr(const ExprPtr& expr, int instance_id, bool is_condition_expr) {
         if (!expr) return;
         ExprFactKey key = expr_fact_key(instance_id, expr.get());
@@ -192,6 +200,16 @@ private:
 
         switch (stmt->kind) {
             case Stmt::Kind::FuncDecl: {
+                for (const auto& param : stmt->params) {
+                    collect_type(param.type, instance_id);
+                }
+                for (const auto& ref_type : stmt->ref_param_types) {
+                    collect_type(ref_type, instance_id);
+                }
+                collect_type(stmt->return_type, instance_id);
+                for (const auto& ret_type : stmt->return_types) {
+                    collect_type(ret_type, instance_id);
+                }
                 Symbol* sym = type_checker_ ? type_checker_->binding_for(instance_id, stmt.get()) : nullptr;
                 if (sym) {
                     function_symbols_.insert(sym);
@@ -206,6 +224,7 @@ private:
                 break;
             }
             case Stmt::Kind::VarDecl:
+                collect_type(stmt->var_type, instance_id);
                 if (stmt->var_init) {
                     ExprFactKey init_key = expr_fact_key(instance_id, stmt->var_init.get());
                     var_init_candidates_.push_back({stmt_fact_key(instance_id, stmt.get()), init_key});
@@ -218,6 +237,11 @@ private:
                             global_constant_candidates_.push_back({sym, init_key});
                         }
                     }
+                }
+                break;
+            case Stmt::Kind::TypeDecl:
+                for (const auto& field : stmt->fields) {
+                    collect_type(field.type, instance_id);
                 }
                 break;
             case Stmt::Kind::Expr:
@@ -246,6 +270,9 @@ private:
             case Expr::Kind::Binary:
             case Expr::Kind::Assignment:
             case Expr::Kind::Range:
+                if (expr->kind == Expr::Kind::Assignment) {
+                    collect_type(expr->declared_var_type, instance_id);
+                }
                 collect_expr(expr->left, instance_id, false);
                 collect_expr(expr->right, instance_id, false);
                 break;
@@ -253,6 +280,9 @@ private:
             case Expr::Kind::Cast:
             case Expr::Kind::Length:
             case Expr::Kind::Member:
+                if (expr->kind == Expr::Kind::Cast) {
+                    collect_type(expr->target_type, instance_id);
+                }
                 collect_expr(expr->operand, instance_id, false);
                 break;
             case Expr::Kind::Call:

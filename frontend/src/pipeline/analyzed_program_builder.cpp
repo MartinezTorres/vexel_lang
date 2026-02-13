@@ -1,6 +1,5 @@
 #include "analyzed_program_builder.h"
 
-#include "evaluator.h"
 #include "typechecker.h"
 
 namespace vexel {
@@ -35,13 +34,6 @@ AnalyzedProgram make_analyzed_program(const Module& merged,
         auto scope = checker.scoped_instance(instance_id);
         (void)scope;
         return checker.constexpr_condition(expr);
-    };
-
-    out.try_evaluate = [&checker](int instance_id, ExprPtr expr, CTValue& out_value) -> bool {
-        auto scope = checker.scoped_instance(instance_id);
-        (void)scope;
-        CompileTimeEvaluator evaluator(&checker);
-        return evaluator.try_evaluate(expr, out_value);
     };
 
     out.lookup_type_symbol = [&checker](int instance_id, const std::string& type_name) -> Symbol* {

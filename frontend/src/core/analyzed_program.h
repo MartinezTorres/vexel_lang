@@ -25,7 +25,6 @@ struct AnalyzedProgram {
     std::function<Symbol*(int instance_id, const void* node)> binding_for;
     std::function<TypePtr(TypePtr)> resolve_type;
     std::function<std::optional<bool>(int instance_id, ExprPtr)> constexpr_condition;
-    std::function<bool(int instance_id, ExprPtr, CTValue&)> try_evaluate;
     std::function<Symbol*(int instance_id, const std::string& type_name)> lookup_type_symbol;
 };
 

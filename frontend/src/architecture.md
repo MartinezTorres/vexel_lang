@@ -63,6 +63,10 @@ Exactly one subsystem owns each concern:
 - Backends must not be responsible for language-level liveness decisions.
 - Reachability/usage pruning must be complete before backend emission.
 
+5. Frontend-owned CTE semantics
+- Backends consume frontend `constexpr` facts and residualized AST only.
+- Backends must not instantiate compile-time evaluators or semantic fallback evaluators.
+
 5. Whole-program semantics
 - Analysis assumes all source is available.
 - Cross-module graph decisions are frontend responsibilities.
