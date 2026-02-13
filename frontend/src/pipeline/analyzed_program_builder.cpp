@@ -30,8 +30,10 @@ AnalyzedProgram make_analyzed_program(const Module& merged,
         return checker.resolve_type(type);
     };
 
-    out.constexpr_condition = [&checker](ExprPtr expr) -> std::optional<bool> {
+    out.constexpr_condition = [&checker](int instance_id, ExprPtr expr) -> std::optional<bool> {
         if (!expr) return std::nullopt;
+        auto scope = checker.scoped_instance(instance_id);
+        (void)scope;
         return checker.constexpr_condition(expr);
     };
 

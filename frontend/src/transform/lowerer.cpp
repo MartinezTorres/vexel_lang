@@ -98,12 +98,6 @@ ExprPtr Lowerer::lower_expr(ExprPtr expr) {
             expr->result_expr = lower_expr(expr->result_expr);
             break;
         case Expr::Kind::Conditional: {
-            if (checker) {
-                auto cond = checker->constexpr_condition(expr->condition);
-                if (cond.has_value()) {
-                    return lower_expr(cond.value() ? expr->true_expr : expr->false_expr);
-                }
-            }
             expr->condition = lower_expr(expr->condition);
             expr->true_expr = lower_expr(expr->true_expr);
             expr->false_expr = lower_expr(expr->false_expr);

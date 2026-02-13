@@ -6,7 +6,7 @@ ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 ANALYZED_HEADER="$ROOT/frontend/src/core/analyzed_program.h"
 ANALYZED_BUILDER="$ROOT/frontend/src/pipeline/analyzed_program_builder.cpp"
 
-if ! rg -q "constexpr_condition[[:space:]]*=.*std::function<std::optional<bool>\(int instance_id, ExprPtr\)>" "$ANALYZED_HEADER"; then
+if ! rg -q "std::function<std::optional<bool>\(int instance_id, ExprPtr\)>[[:space:]]+constexpr_condition;" "$ANALYZED_HEADER"; then
   echo "AnalyzedProgram constexpr_condition contract must include instance_id" >&2
   exit 1
 fi

@@ -226,7 +226,7 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
     while (true) {
         optimization = optimizer.run(merged);
         Residualizer residualizer(optimization);
-        if (!residualizer.run(merged)) {
+        if (!residualizer.run(merged, checker.get_program())) {
             break;
         }
         residual_iters++;

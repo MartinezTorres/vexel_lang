@@ -1,6 +1,7 @@
 #include "residualizer.h"
 
 #include "expr_access.h"
+#include "program.h"
 
 namespace vexel {
 
@@ -56,9 +57,50 @@ bool is_literal_expr_kind(Expr::Kind kind) {
 
 } // namespace
 
-bool Residualizer::run(Module& mod) {
+bool Residualizer::run(Module& mod, const Program* program) {
     changed_ = false;
-    rewrite_stmt_list(mod.top_level, true);
+    if (!program || program->instances.empty()) {
+        current_instance_id_ = -1;
+        rewrite_stmt_list(mod.top_level, true);
+        return changed_;
+    }
+
+    std::vector<StmtPtr> rewritten;
+    rewritten.reserve(mod.top_level.size());
+    size_t cursor = 0;
+
+    for (const auto& instance : program->instances) {
+        const Module& src = program->modules[static_cast<size_t>(instance.module_id)].module;
+        for (size_t i = 0; i < src.top_level.size(); ++i) {
+            if (cursor >= mod.top_level.size()) {
+                break;
+            }
+            current_instance_id_ = instance.id;
+            StmtPtr next = rewrite_stmt(mod.top_level[cursor], true);
+            ++cursor;
+            if (!next) {
+                changed_ = true;
+                continue;
+            }
+            rewritten.push_back(next);
+        }
+    }
+
+    // Safety fallback for mismatched merge metadata: keep residualizer total.
+    for (; cursor < mod.top_level.size(); ++cursor) {
+        current_instance_id_ = -1;
+        StmtPtr next = rewrite_stmt(mod.top_level[cursor], true);
+        if (!next) {
+            changed_ = true;
+            continue;
+        }
+        rewritten.push_back(next);
+    }
+
+    if (rewritten.size() != mod.top_level.size()) {
+        changed_ = true;
+    }
+    mod.top_level.swap(rewritten);
     return changed_;
 }
 
@@ -120,7 +162,7 @@ ExprPtr Residualizer::rewrite_expr(ExprPtr expr, bool allow_fold) {
     if (!expr) return nullptr;
 
     if (allow_fold && can_fold_expr(expr) && !is_literal_expr_kind(expr->kind)) {
-        auto value_it = facts_.constexpr_values.find(expr.get());
+        auto value_it = facts_.constexpr_values.find(expr_fact_key(current_instance_id_, expr.get()));
         if (value_it != facts_.constexpr_values.end()) {
             ExprPtr folded = ctvalue_to_expr(value_it->second, expr);
             if (folded) {
@@ -342,21 +384,21 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
 
 std::optional<bool> Residualizer::constexpr_condition(const ExprPtr& cond, const Expr* original) const {
     if (original) {
-        auto it = facts_.constexpr_conditions.find(original);
+        auto it = facts_.constexpr_conditions.find(expr_fact_key(current_instance_id_, original));
         if (it != facts_.constexpr_conditions.end()) {
             return it->second;
         }
     }
 
     if (cond) {
-        auto it = facts_.constexpr_conditions.find(cond.get());
+        auto it = facts_.constexpr_conditions.find(expr_fact_key(current_instance_id_, cond.get()));
         if (it != facts_.constexpr_conditions.end()) {
             return it->second;
         }
     }
 
     if (cond) {
-        auto value_it = facts_.constexpr_values.find(cond.get());
+        auto value_it = facts_.constexpr_values.find(expr_fact_key(current_instance_id_, cond.get()));
         if (value_it != facts_.constexpr_values.end()) {
             bool out = false;
             if (scalar_to_bool(value_it->second, out)) {

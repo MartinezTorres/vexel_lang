@@ -81,7 +81,7 @@ void Analyzer::build_run_summary(const AnalysisFacts& facts) {
 
 std::optional<bool> Analyzer::constexpr_condition(ExprPtr expr) const {
     if (!expr || !optimization) return std::nullopt;
-    auto it = optimization->constexpr_conditions.find(expr.get());
+    auto it = optimization->constexpr_conditions.find(expr_fact_key(current_instance_id, expr.get()));
     if (it != optimization->constexpr_conditions.end()) {
         return it->second;
     }

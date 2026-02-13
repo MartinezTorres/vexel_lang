@@ -57,12 +57,13 @@ OptimizationFacts Optimizer::run(const Module& mod) {
             }
 
             for (const auto& stmt : module.top_level) {
-                visit_stmt(stmt, facts);
+                visit_stmt(stmt, instance.id, facts);
             }
         }
     } else {
+        int instance_id = saved_instance;
         for (const auto& stmt : mod.top_level) {
-            visit_stmt(stmt, facts);
+            visit_stmt(stmt, instance_id, facts);
         }
     }
     type_checker->set_current_instance(saved_instance);
@@ -92,100 +93,101 @@ static std::optional<bool> evaluate_condition(ExprPtr expr, TypeChecker* type_ch
     return std::nullopt;
 }
 
-void Optimizer::mark_constexpr_init(StmtPtr stmt, OptimizationFacts& facts) {
+void Optimizer::mark_constexpr_init(StmtPtr stmt, int instance_id, OptimizationFacts& facts) {
     if (!stmt || stmt->kind != Stmt::Kind::VarDecl || !stmt->var_init) return;
     if (!type_checker) return;
     CompileTimeEvaluator evaluator(type_checker);
     CTValue result;
     if (evaluator.try_evaluate(stmt->var_init, result)) {
-        facts.constexpr_inits.insert(stmt.get());
-        facts.constexpr_values.emplace(stmt->var_init.get(), result);
+        facts.constexpr_inits.insert(stmt_fact_key(instance_id, stmt.get()));
+        facts.constexpr_values.emplace(expr_fact_key(instance_id, stmt->var_init.get()), result);
     }
 }
 
-void Optimizer::visit_stmt(StmtPtr stmt, OptimizationFacts& facts) {
+void Optimizer::visit_stmt(StmtPtr stmt, int instance_id, OptimizationFacts& facts) {
     if (!stmt) return;
     switch (stmt->kind) {
         case Stmt::Kind::FuncDecl:
             if (!stmt->is_external) {
-                visit_expr(stmt->body, facts);
+                visit_expr(stmt->body, instance_id, facts);
             }
             break;
         case Stmt::Kind::VarDecl:
-            mark_constexpr_init(stmt, facts);
-            visit_expr(stmt->var_init, facts);
+            mark_constexpr_init(stmt, instance_id, facts);
+            visit_expr(stmt->var_init, instance_id, facts);
             break;
         case Stmt::Kind::Expr:
-            visit_expr(stmt->expr, facts);
+            visit_expr(stmt->expr, instance_id, facts);
             break;
         case Stmt::Kind::Return:
-            visit_expr(stmt->return_expr, facts);
+            visit_expr(stmt->return_expr, instance_id, facts);
             break;
         case Stmt::Kind::ConditionalStmt:
             if (auto cond = evaluate_condition(stmt->condition, type_checker)) {
-                facts.constexpr_conditions[stmt->condition.get()] = cond.value();
+                facts.constexpr_conditions[expr_fact_key(instance_id, stmt->condition.get())] = cond.value();
             }
-            visit_expr(stmt->condition, facts);
-            visit_stmt(stmt->true_stmt, facts);
+            visit_expr(stmt->condition, instance_id, facts);
+            visit_stmt(stmt->true_stmt, instance_id, facts);
             break;
         default:
             break;
     }
 }
 
-void Optimizer::visit_expr(ExprPtr expr, OptimizationFacts& facts) {
+void Optimizer::visit_expr(ExprPtr expr, int instance_id, OptimizationFacts& facts) {
     if (!expr) return;
 
-    if (type_checker && !facts.constexpr_values.count(expr.get())) {
+    ExprFactKey expr_key = expr_fact_key(instance_id, expr.get());
+    if (type_checker && !facts.constexpr_values.count(expr_key)) {
         CompileTimeEvaluator evaluator(type_checker);
         CTValue value;
         if (evaluator.try_evaluate(expr, value)) {
-            facts.constexpr_values.emplace(expr.get(), value);
+            facts.constexpr_values.emplace(expr_key, value);
         }
     }
 
     switch (expr->kind) {
         case Expr::Kind::Conditional:
             if (auto cond = evaluate_condition(expr->condition, type_checker)) {
-                facts.constexpr_conditions[expr->condition.get()] = cond.value();
+                facts.constexpr_conditions[expr_fact_key(instance_id, expr->condition.get())] = cond.value();
             }
-            visit_expr(expr->condition, facts);
-            visit_expr(expr->true_expr, facts);
-            visit_expr(expr->false_expr, facts);
+            visit_expr(expr->condition, instance_id, facts);
+            visit_expr(expr->true_expr, instance_id, facts);
+            visit_expr(expr->false_expr, instance_id, facts);
             break;
         case Expr::Kind::Call:
-            visit_expr(expr->operand, facts);
-            for (const auto& rec : expr->receivers) visit_expr(rec, facts);
-            for (const auto& arg : expr->args) visit_expr(arg, facts);
+            visit_expr(expr->operand, instance_id, facts);
+            for (const auto& rec : expr->receivers) visit_expr(rec, instance_id, facts);
+            for (const auto& arg : expr->args) visit_expr(arg, instance_id, facts);
             break;
         case Expr::Kind::Binary:
         case Expr::Kind::Assignment:
         case Expr::Kind::Range:
-            visit_expr(expr->left, facts);
-            visit_expr(expr->right, facts);
+            visit_expr(expr->left, instance_id, facts);
+            visit_expr(expr->right, instance_id, facts);
             break;
         case Expr::Kind::Unary:
         case Expr::Kind::Cast:
         case Expr::Kind::Length:
         case Expr::Kind::Member:
-            visit_expr(expr->operand, facts);
+            visit_expr(expr->operand, instance_id, facts);
             break;
         case Expr::Kind::Index:
-            visit_expr(expr->operand, facts);
-            if (!expr->args.empty()) visit_expr(expr->args[0], facts);
+            visit_expr(expr->operand, instance_id, facts);
+            if (!expr->args.empty()) visit_expr(expr->args[0], instance_id, facts);
             break;
         case Expr::Kind::ArrayLiteral:
         case Expr::Kind::TupleLiteral:
-            for (const auto& elem : expr->elements) visit_expr(elem, facts);
+            for (const auto& elem : expr->elements) visit_expr(elem, instance_id, facts);
             break;
         case Expr::Kind::Block:
-            for (const auto& st : expr->statements) visit_stmt(st, facts);
-            visit_expr(expr->result_expr, facts);
+            for (const auto& st : expr->statements) visit_stmt(st, instance_id, facts);
+            visit_expr(expr->result_expr, instance_id, facts);
             break;
         case Expr::Kind::Iteration:
         case Expr::Kind::Repeat:
-            visit_expr(loop_subject(expr), facts);
-            visit_expr(loop_body(expr), facts);
+            visit_expr(loop_subject(expr), instance_id, facts);
+            visit_expr(loop_body(expr), instance_id, facts);
             break;
         default:
             break;
