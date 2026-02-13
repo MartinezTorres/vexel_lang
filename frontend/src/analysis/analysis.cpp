@@ -1,6 +1,5 @@
 #include "analysis.h"
 #include "ast_walk.h"
-#include "evaluator.h"
 #include "optimizer.h"
 #include "program.h"
 #include "typechecker.h"
@@ -27,12 +26,11 @@ bool Analyzer::global_initializer_runs_at_runtime(const Symbol* sym) const {
     if (!sym || !sym->declaration || !sym->declaration->var_init) {
         return false;
     }
-    if (!type_checker) {
+    if (!optimization) {
         return true;
     }
-    CompileTimeEvaluator evaluator(type_checker);
-    CTValue result;
-    return !evaluator.try_evaluate(sym->declaration->var_init, result);
+    const ExprFactKey key = expr_fact_key(sym->instance_id, sym->declaration->var_init.get());
+    return optimization->constexpr_values.count(key) == 0;
 }
 
 void Analyzer::build_run_summary(const AnalysisFacts& facts) {

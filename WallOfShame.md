@@ -258,6 +258,11 @@ Resolution entry:
 - `Resolved`: `7664739`
 - `Notes`: Replaced raw-pointer optimization fact keys with `(instance_id,node)` keys and updated frontend/backends to query facts with instance context.
 
+- `ID`: `WS-014`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Status reconciliation (append-only): issue entry keeps historical `Status: UNRESOLVED`, but effective state is RESOLVED by this and prior resolution entries.
+
 - `ID`: `WS-015`
 - `Type`: `Resolution`
 - `Resolved`: `7664739`
@@ -272,3 +277,18 @@ Resolution entry:
 - `Type`: `Resolution`
 - `Resolved`: `7664739`
 - `Notes`: Extended `AnalyzedProgram::constexpr_condition` to include `instance_id` and updated backend call sites.
+
+- `ID`: `WS-015`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Status reconciliation (append-only): issue entry keeps historical `Status: UNRESOLVED`, but effective state is RESOLVED by this and prior resolution entries.
+
+- `ID`: `WS-016`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Status reconciliation (append-only): issue entry keeps historical `Status: UNRESOLVED`, but effective state is RESOLVED by this and prior resolution entries.
+
+- `ID`: `WS-017`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Status reconciliation (append-only): issue entry keeps historical `Status: UNRESOLVED`, but effective state is RESOLVED by this and prior resolution entries.

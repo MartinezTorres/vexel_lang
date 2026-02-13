@@ -1,4 +1,5 @@
 #include "cli_utils.h"
+#include "common.h"
 
 #include <cstring>
 

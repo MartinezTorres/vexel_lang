@@ -1,10 +1,7 @@
 #pragma once
-#include "ast.h"
-#include "typechecker.h"
-#include <string>
-#include <unordered_set>
-#include <unordered_map>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
 
 namespace vexel {
 

@@ -30,6 +30,9 @@ Exactly one subsystem owns each concern:
 - Compile-time execution engine:
   - Owner: `transform/evaluator.*`
   - Single implementation for static value evaluation.
+- Compile-time value data model (`CTValue`, `CTEQueryResult`):
+  - Owner: `core/cte_value.h`
+  - Public headers may depend on this model, but must not leak evaluator engine ownership.
 - Compile-time facts collection:
   - Owner: `transform/optimizer.*`
   - Records constexpr values/conditions using the single evaluator.
@@ -113,6 +116,7 @@ Any pass that mutates AST must keep bindings/facts coherent for downstream passe
 Changes should be rejected if they introduce any of these:
 
 - New static evaluators outside `transform/evaluator.*`.
+- Public headers that expose evaluator engine headers instead of `core/cte_value.h`.
 - Silent placeholder values or hidden default semantic behavior.
 - Backend-side fixes for frontend liveness/type-analysis bugs.
 - Pass-local hacks that bypass pipeline contracts instead of fixing ownership.

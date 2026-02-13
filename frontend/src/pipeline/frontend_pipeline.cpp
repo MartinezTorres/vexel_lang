@@ -174,8 +174,6 @@ void validate_prune_linkage(const Program& program,
     }
 }
 
-} // namespace
-
 Module merge_program_instances(const Program& program) {
     Module merged;
     if (program.modules.empty()) {
@@ -193,6 +191,8 @@ Module merge_program_instances(const Program& program) {
     }
     return merged;
 }
+
+} // namespace
 
 FrontendPipelineResult run_frontend_pipeline(Program& program,
                                              Resolver& resolver,

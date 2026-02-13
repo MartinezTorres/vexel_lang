@@ -16,8 +16,6 @@ struct FrontendPipelineResult {
     AnalysisFacts analysis;
 };
 
-Module merge_program_instances(const Program& program);
-
 FrontendPipelineResult run_frontend_pipeline(Program& program,
                                              Resolver& resolver,
                                              TypeChecker& checker,

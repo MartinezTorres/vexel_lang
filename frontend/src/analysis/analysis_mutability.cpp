@@ -1,6 +1,5 @@
 #include "analysis.h"
 
-#include "evaluator.h"
 #include "typechecker.h"
 
 #include <algorithm>
