@@ -156,3 +156,63 @@ Resolution entry:
 - `Type`: `Resolution`
 - `Resolved`: `ddc8f8d`
 - `Notes`: Flipped `AR-010..AR-016` from characterization checks to desired-behavior assertions so they fail until architectural issues are fixed.
+
+- `ID`: `WS-001`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Removed hardcoded runtime-classification shortcuts for global initializers and delegated to evaluator truth.
+
+- `ID`: `WS-002`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Added prune-linkage validation and stabilized frontend DCE pruning so kept roots cannot reference dropped top-level functions.
+
+- `ID`: `WS-003`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Removed block-evaluator fallback path and kept one VM-based block execution engine.
+
+- `ID`: `WS-004`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Implemented real generic substitution map collection/application across function signatures and bodies.
+
+- `ID`: `WS-005`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Removed dead purity-analyzer helper path from evaluator to reduce ownership ambiguity in CTE.
+
+- `ID`: `WS-006`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Added per-backend option validation hook and enforced unknown-option rejection for backends without option support.
+
+- `ID`: `WS-007`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Removed silent reentrancy normalization fallback and now fail-fast on invalid default context keys.
+
+- `ID`: `WS-008`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Consolidated block compile-time execution to the VM path and removed duplicated semantics engine.
+
+- `ID`: `WS-009`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Replaced unresolved named-type coercion fallback with strict behavior plus explicit internal tuple coercion handling.
+
+- `ID`: `WS-010`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Completed generic substitution implementation and removed empty-map/stub behavior from monomorphization path.
+
+- `ID`: `WS-011`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Moved translation-unit emission orchestration into compiler path and removed duplicate native-TCC pipeline logic.
+
+- `ID`: `WS-012`
+- `Type`: `Resolution`
+- `Resolved`: `891eea1`
+- `Notes`: Implemented frontend annotation validation and hard errors for unknown annotations.
