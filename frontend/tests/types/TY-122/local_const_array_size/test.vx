@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Array size expressions can use compile-time-known local immutable values | Local compile-time constants are valid array sizes
+
+&^main() -> #i32 {
+    limit:#i32 = 1000;
+    prime:#b[limit];
+    (#i32)|prime|
+}

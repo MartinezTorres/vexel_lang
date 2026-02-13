@@ -1,5 +1,5 @@
-// @rfc: docs/vexel-rfc.md#errors--diagnostics
-// @desc: Array size not being a compile-time constant is a compile-time error | Array size not compile-time constant: non-pure function call
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Compile-time execution propagates through local assignment chains | Local array size after pure call and arithmetic folds at compile time
 
 
 &^compute() -> #i32 {

@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
+// @desc: Compile-time dependency cycles in array-size evaluation are rejected with deterministic diagnostics | Compile-time dependency cycle in array-size evaluation is an error
+
+&f() -> #i32 { g() }
+&g() -> #i32 { f() }
+
+&^main() -> #i32 {
+    n:#i32 = f();
+    arr:#i32[n];
+    0
+}

@@ -1,11 +1,11 @@
 // @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: When condition is a runtime value, both branches must have the same type | Runtime conditional with different branch types is an error
 
+&!runtime_flag() -> #b;
 
 // EX-017: Runtime conditional type mismatch error
 &^main() -> #i32 {
-    x:#i32 = 10;
     // ERROR: runtime condition but branches have different types
-    result = x > 5 ? 100 : "error";
+    result = runtime_flag() ? 100 : "error";
     -> 0;
 }

@@ -90,6 +90,16 @@ Any pass that mutates AST must keep bindings/facts coherent for downstream passe
 - Used named types must be retained even if only referenced by local declarations.
 - Monomorphized instantiations required by reachable runtime calls must survive to backend input.
 
+### Fixpoint and Unknown-State Monotonicity
+
+- Frontend semantic solving is iterative/fixpoint-based, not a single-pass assumption.
+- Each iteration must be monotonic for knowledge:
+  - `Unknown` may become `Known` or `Error`.
+  - `Known` must never become `Unknown`.
+- Dependency loops must be detected explicitly (for example SCCs in dependency graphs).
+- An SCC with no external seed knowledge remains unresolved and must produce a deterministic diagnostic.
+- Unknown states must not be converted into implicit defaults/bridges just to pass a later stage.
+
 ## Review Rejects
 
 Changes should be rejected if they introduce any of these:

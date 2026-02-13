@@ -1,6 +1,7 @@
 #include "evaluator.h"
 #include "constants.h"
 #include "expr_access.h"
+#include "typechecker.h"
 #include <algorithm>
 #include <functional>
 
@@ -57,6 +58,23 @@ CTValue clone_value(const CTValue& value) {
 }
 } // namespace
 
+CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
+    error_msg.clear();
+    hard_error = false;
+
+    CTEQueryResult out;
+    CTValue value;
+    if (try_evaluate(expr, value)) {
+        out.status = CTEQueryStatus::Known;
+        out.value = clone_value(value);
+        return out;
+    }
+
+    out.status = hard_error ? CTEQueryStatus::Error : CTEQueryStatus::Unknown;
+    out.message = error_msg;
+    return out;
+}
+
 bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
     if (!expr) {
         error_msg = "Null expression";
@@ -65,6 +83,7 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
 
     if (recursion_depth >= MAX_RECURSION_DEPTH) {
         error_msg = "Recursion depth limit exceeded in compile-time evaluation";
+        hard_error = true;
         return false;
     }
 
@@ -156,10 +175,47 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
         success = false;
     } catch (const CompileError& e) {
         error_msg = e.what();
+        hard_error = true;
         success = false;
     }
 
     return success;
+}
+
+bool CompileTimeEvaluator::evaluate_constant_symbol(Symbol* sym, CTValue& result) {
+    if (!sym || sym->kind != Symbol::Kind::Constant || !sym->declaration || !sym->declaration->var_init) {
+        return false;
+    }
+
+    auto cached = constant_value_cache.find(sym);
+    if (cached != constant_value_cache.end()) {
+        result = clone_value(cached->second);
+        return true;
+    }
+
+    if (constant_eval_stack.count(sym) > 0) {
+        error_msg = "Compile-time dependency cycle detected at symbol: " + sym->name;
+        hard_error = true;
+        return false;
+    }
+
+    constant_eval_stack.insert(sym);
+    const bool ok = try_evaluate(sym->declaration->var_init, result);
+    constant_eval_stack.erase(sym);
+    if (!ok) {
+        return false;
+    }
+
+    if (sym->type) {
+        CTValue coerced;
+        if (!coerce_value_to_type(result, sym->type, coerced)) {
+            return false;
+        }
+        result = clone_value(coerced);
+    }
+
+    constant_value_cache[sym] = clone_value(result);
+    return true;
 }
 
 bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
@@ -1075,20 +1131,20 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(expr->name);
     }
-    if (sym &&
-        !sym->is_local &&
-        sym->kind == Symbol::Kind::Constant &&
-        sym->declaration &&
-        sym->declaration->var_init) {
-        if (!try_evaluate(sym->declaration->var_init, result)) {
-            return false;
-        }
-        if (sym->type) {
-            CTValue coerced;
-            if (!coerce_value_to_type(result, sym->type, coerced)) {
+    if (sym) {
+        auto known = symbol_constants.find(sym);
+        if (known != symbol_constants.end()) {
+            if (std::holds_alternative<CTUninitialized>(known->second)) {
+                error_msg = "uninitialized variable accessed at compile time: " + expr->name;
                 return false;
             }
-            result = clone_value(coerced);
+            result = clone_value(known->second);
+            return true;
+        }
+    }
+    if (sym && sym->kind == Symbol::Kind::Constant && sym->declaration && sym->declaration->var_init) {
+        if (!evaluate_constant_symbol(sym, result)) {
+            return false;
         }
         return true;
     }

@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "bindings.h"
+#include "evaluator.h"
 #include "program.h"
 #include "symbols.h"
 #include <optional>
@@ -72,6 +73,8 @@ class TypeChecker {
     bool allow_process;
     std::unordered_map<std::string, std::vector<TypePtr>> forced_tuple_types;
     int current_instance_id = -1;
+    std::unordered_map<const Symbol*, CTValue> known_constexpr_values;
+    std::unordered_map<unsigned long long, bool> constexpr_condition_cache;
 
 public:
     class InstanceScope {
@@ -137,6 +140,8 @@ private:
     Symbol* lookup_global(const std::string& name) const;
     Symbol* lookup_binding(const void* node) const;
     unsigned long long stmt_key(const Stmt* stmt) const;
+    unsigned long long expr_key(int instance_id, const Expr* expr) const;
+    unsigned long long expr_key(const Expr* expr) const;
     void validate_invariants(const Module& mod);
 
     void check_stmt(StmtPtr stmt);
@@ -199,6 +204,11 @@ private:
     void require_boolean(TypePtr type, const SourceLocation& loc, const std::string& context);
     void require_boolean_expr(ExprPtr expr, TypePtr type, const SourceLocation& loc, const std::string& context);
     void require_unsigned_integer(TypePtr type, const SourceLocation& loc, const std::string& context);
+    bool try_evaluate_constexpr(ExprPtr expr, CTValue& out);
+    CTEQueryResult query_constexpr(ExprPtr expr);
+    void remember_constexpr_value(Symbol* sym, const CTValue& value);
+    void forget_constexpr_value(Symbol* sym);
+    void forget_all_constexpr_values();
 };
 
 }

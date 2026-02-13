@@ -53,12 +53,13 @@ $(BUILD_DIR)/frontend-tests/%/test_report.md: $(abspath tests)/%/test.vx $(DRIVE
 	@{ \
 		stdout_file=$$(mktemp); \
 		stderr_file=$$(mktemp); \
+		rendered_file=$(@D)/out.vx; \
+		rm -f $$rendered_file; \
 		if $(DRIVER_BIN) -b vexel -o $(@D)/out tests/$*/test.vx > $$stdout_file 2> $$stderr_file; then \
 			exit_code=0; \
 		else \
 			exit_code=$$?; \
 		fi; \
-		rendered_file=$(@D)/out.vx; \
 		echo "## Stdout" > $@; \
 		echo '```' >> $@; \
 		if [ -f $$rendered_file ]; then \

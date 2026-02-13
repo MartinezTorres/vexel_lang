@@ -75,10 +75,28 @@ void TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
             // Recursively validate element type
             validate_type(type->element_type, loc);
             if (type->array_size) {
-                CompileTimeEvaluator evaluator(this);
-                CTValue size_val;
-                if (!evaluator.try_evaluate(type->array_size, size_val)) {
+                CTEQueryResult size_query = query_constexpr(type->array_size);
+                if (size_query.status == CTEQueryStatus::Error) {
+                    throw CompileError(size_query.message.empty()
+                                           ? "Array size evaluation failed"
+                                           : size_query.message,
+                                       loc);
+                }
+                if (size_query.status != CTEQueryStatus::Known) {
                     throw CompileError("Array size must be a compile-time constant", loc);
+                }
+
+                const CTValue& size_val = size_query.value;
+                if (std::holds_alternative<int64_t>(size_val)) {
+                    if (std::get<int64_t>(size_val) < 0) {
+                        throw CompileError("Array size must be non-negative", loc);
+                    }
+                } else if (std::holds_alternative<uint64_t>(size_val)) {
+                    // Already non-negative.
+                } else if (std::holds_alternative<bool>(size_val)) {
+                    // Allow #b values as 0/1 in size position.
+                } else {
+                    throw CompileError("Array size must be an integer compile-time constant", loc);
                 }
             }
             break;

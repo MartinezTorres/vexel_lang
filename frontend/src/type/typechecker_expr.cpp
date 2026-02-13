@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <iostream>
 #include "lexer.h"
@@ -514,6 +515,36 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         return expr->type;
     }
 
+    auto invalidate_receiver_constexpr = [&]() {
+        auto lookup_identifier_symbol = [&](ExprPtr node) -> Symbol* {
+            if (!node || node->kind != Expr::Kind::Identifier) return nullptr;
+            Symbol* target = lookup_binding(node.get());
+            if (!target) {
+                target = lookup_global(node->name);
+                if (target && bindings) {
+                    bindings->bind(current_instance_id, node.get(), target);
+                }
+            }
+            return target;
+        };
+        std::function<Symbol*(ExprPtr)> base_symbol = [&](ExprPtr node) -> Symbol* {
+            if (!node) return nullptr;
+            if (node->kind == Expr::Kind::Identifier) {
+                return lookup_identifier_symbol(node);
+            }
+            if (node->kind == Expr::Kind::Member || node->kind == Expr::Kind::Index) {
+                return base_symbol(node->operand);
+            }
+            return nullptr;
+        };
+        for (const auto& rec : expr->receivers) {
+            Symbol* target = base_symbol(rec);
+            if (target) {
+                forget_constexpr_value(target);
+            }
+        }
+    };
+
     if (sym->kind == Symbol::Kind::Type && sym->declaration) {
         for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
             if (!sym->declaration->fields[i].type ||
@@ -613,11 +644,13 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                 auto inst_it = func_it->second.find(sig);
                 if (inst_it != func_it->second.end()) {
                     expr->type = inst_it->second.declaration->return_type;
+                    invalidate_receiver_constexpr();
                     return expr->type;
                 }
             }
 
             expr->type = make_fresh_typevar();
+            invalidate_receiver_constexpr();
             return expr->type;
         }
 
@@ -664,16 +697,19 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
             register_tuple_type(tuple_type_name, sym->declaration->return_types);
             expr->type = Type::make_named(tuple_type_name, expr->location);
+            invalidate_receiver_constexpr();
             return expr->type;
         }
 
         if (sym->declaration->return_type) {
             expr->type = sym->declaration->return_type;
+            invalidate_receiver_constexpr();
             return expr->type;
         }
 
         // No declared return type: treat as void (no value)
         expr->type = nullptr;
+        invalidate_receiver_constexpr();
         return expr->type;
     }
 
@@ -848,6 +884,11 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
     // for the dead branch. The type-use validator mirrors this by skipping
     // constexpr-dead branches.
     auto static_value = constexpr_condition(expr->condition);
+    if (expr->condition && static_value.has_value()) {
+        constexpr_condition_cache[expr_key(expr->condition.get())] = static_value.value();
+    } else if (expr->condition) {
+        constexpr_condition_cache.erase(expr_key(expr->condition.get()));
+    }
     if (static_value.has_value()) {
         if (static_value.value()) {
             expr->type = check_expr(expr->true_expr);
@@ -893,9 +934,8 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
 }
 std::optional<bool> TypeChecker::constexpr_condition(ExprPtr expr) {
     if (!expr) return std::nullopt;
-    CompileTimeEvaluator evaluator(this);
     CTValue value;
-    if (!evaluator.try_evaluate(expr, value)) {
+    if (!try_evaluate_constexpr(expr, value)) {
         return std::nullopt;
     }
     if (std::holds_alternative<int64_t>(value)) {
@@ -1004,6 +1044,13 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         expr->left->type = nullptr;
         expr->creates_new_variable = true;
 
+        CTValue value;
+        if (try_evaluate_constexpr(expr->right, value)) {
+            remember_constexpr_value(lhs_sym, value);
+        } else {
+            forget_constexpr_value(lhs_sym);
+        }
+
         expr->type = var_type;
         return var_type;
     }
@@ -1023,11 +1070,17 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         if (!sym) {
             throw CompileError("Internal error: unresolved assignment target", expr->location);
         }
+        if (expr->left->name == "_") {
+            throw CompileError("Cannot assign to read-only loop variable '_'", expr->location);
+        }
         if (!sym->is_mutable) {
             bool infer_mutable_global =
                 !sym->is_local &&
                 (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
-            if (infer_mutable_global) {
+            bool infer_mutable_local =
+                sym->is_local &&
+                (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
+            if (infer_mutable_global || infer_mutable_local) {
                 sym->kind = Symbol::Kind::Variable;
                 sym->is_mutable = true;
                 if (sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
@@ -1036,11 +1089,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             }
         }
         if (!sym->is_mutable) {
-            std::string name = expr->left->name;
-            if (name == "_") {
-                throw CompileError("Cannot assign to read-only loop variable '_'", expr->location);
-            }
-            throw CompileError("Cannot assign to immutable constant: " + name, expr->location);
+            throw CompileError("Cannot assign to immutable constant: " + expr->left->name, expr->location);
         }
     }
 
@@ -1068,6 +1117,43 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
 
     expr->creates_new_variable = false;
     expr->type = lhs_type;
+
+    auto lookup_identifier_symbol = [&](ExprPtr node) -> Symbol* {
+        if (!node || node->kind != Expr::Kind::Identifier) return nullptr;
+        Symbol* sym = lookup_binding(node.get());
+        if (!sym) {
+            sym = lookup_global(node->name);
+            if (sym && bindings) {
+                bindings->bind(current_instance_id, node.get(), sym);
+            }
+        }
+        return sym;
+    };
+    std::function<Symbol*(ExprPtr)> base_symbol = [&](ExprPtr node) -> Symbol* {
+        if (!node) return nullptr;
+        if (node->kind == Expr::Kind::Identifier) {
+            return lookup_identifier_symbol(node);
+        }
+        if (node->kind == Expr::Kind::Member || node->kind == Expr::Kind::Index) {
+            return base_symbol(node->operand);
+        }
+        return nullptr;
+    };
+
+    Symbol* assigned_sym = base_symbol(expr->left);
+    if (assigned_sym) {
+        if (expr->left->kind == Expr::Kind::Identifier) {
+            CTValue value;
+            if (try_evaluate_constexpr(expr->right, value)) {
+                remember_constexpr_value(assigned_sym, value);
+            } else {
+                forget_constexpr_value(assigned_sym);
+            }
+        } else {
+            forget_constexpr_value(assigned_sym);
+        }
+    }
+
     return lhs_type;
 }
 
@@ -1092,9 +1178,8 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
             out = static_cast<int64_t>(e->uint_val);
             return true;
         }
-        CompileTimeEvaluator evaluator(this);
         CTValue value;
-        if (!evaluator.try_evaluate(e, value)) {
+        if (!try_evaluate_constexpr(e, value)) {
             return false;
         }
         if (std::holds_alternative<int64_t>(value)) {
@@ -1164,9 +1249,11 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
         ? iterable_type->element_type
         : make_fresh_typevar();
     assign_loop_symbol_expr(expr->right, loop_type, bindings, current_instance_id);
+    auto saved_constexpr_values = known_constexpr_values;
     loop_depth++;
     check_expr(expr->right);
     loop_depth--;
+    known_constexpr_values = std::move(saved_constexpr_values);
 
     expr->type = nullptr;
     return nullptr;
@@ -1177,9 +1264,11 @@ TypePtr TypeChecker::check_repeat(ExprPtr expr) {
     require_boolean_expr(expr->condition, cond_type,
                          expr->condition ? expr->condition->location : expr->location,
                          "Repeat loop");
+    auto saved_constexpr_values = known_constexpr_values;
     loop_depth++;
     check_expr(expr->right);
     loop_depth--;
+    known_constexpr_values = std::move(saved_constexpr_values);
     expr->type = nullptr;
     return nullptr;
 }

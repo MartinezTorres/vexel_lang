@@ -43,6 +43,7 @@ Symbol* TypeChecker::binding_for(int instance_id, const void* node) const {
 void TypeChecker::set_current_instance(int instance_id) {
     current_instance_id = instance_id;
     global_scope = resolver ? resolver->instance_scope(current_instance_id) : nullptr;
+    forget_all_constexpr_values();
 }
 
 Symbol* TypeChecker::lookup_global(const std::string& name) const {
@@ -58,13 +59,55 @@ Symbol* TypeChecker::lookup_binding(const void* node) const {
     return bindings->lookup(current_instance_id, node);
 }
 
+bool TypeChecker::try_evaluate_constexpr(ExprPtr expr, CTValue& out) {
+    CompileTimeEvaluator evaluator(this);
+    for (const auto& entry : known_constexpr_values) {
+        evaluator.set_symbol_constant(entry.first, entry.second);
+    }
+    return evaluator.try_evaluate(expr, out);
+}
+
+CTEQueryResult TypeChecker::query_constexpr(ExprPtr expr) {
+    CompileTimeEvaluator evaluator(this);
+    for (const auto& entry : known_constexpr_values) {
+        evaluator.set_symbol_constant(entry.first, entry.second);
+    }
+    return evaluator.query(expr);
+}
+
+void TypeChecker::remember_constexpr_value(Symbol* sym, const CTValue& value) {
+    if (!sym || !sym->is_local) return;
+    known_constexpr_values[sym] = value;
+}
+
+void TypeChecker::forget_constexpr_value(Symbol* sym) {
+    if (!sym || !sym->is_local) return;
+    known_constexpr_values.erase(sym);
+}
+
+void TypeChecker::forget_all_constexpr_values() {
+    known_constexpr_values.clear();
+}
+
 unsigned long long TypeChecker::stmt_key(const Stmt* stmt) const {
     return (static_cast<unsigned long long>(static_cast<uint32_t>(current_instance_id)) << 32) ^
            static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(stmt));
 }
 
+unsigned long long TypeChecker::expr_key(int instance_id, const Expr* expr) const {
+    return (static_cast<unsigned long long>(static_cast<uint32_t>(instance_id)) << 32) ^
+           static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(expr));
+}
+
+unsigned long long TypeChecker::expr_key(const Expr* expr) const {
+    return expr_key(current_instance_id, expr);
+}
+
 void TypeChecker::check_program(Program& program_in) {
     set_program(&program_in);
+    checked_statements.clear();
+    constexpr_condition_cache.clear();
+    forget_all_constexpr_values();
     for (const auto& instance : program_in.instances) {
         set_current_instance(instance.id);
         check_module(program_in.modules[static_cast<size_t>(instance.module_id)].module);
@@ -122,7 +165,21 @@ void TypeChecker::check_stmt(StmtPtr stmt) {
             require_boolean_expr(stmt->condition, cond_type,
                                  stmt->condition ? stmt->condition->location : stmt->location,
                                  "Conditional statement");
-            check_stmt(stmt->true_stmt);
+            auto cond = constexpr_condition(stmt->condition);
+            if (stmt->condition && cond.has_value()) {
+                constexpr_condition_cache[expr_key(stmt->condition.get())] = cond.value();
+            } else if (stmt->condition) {
+                constexpr_condition_cache.erase(expr_key(stmt->condition.get()));
+            }
+            if (cond.has_value()) {
+                if (cond.value()) {
+                    check_stmt(stmt->true_stmt);
+                }
+            } else {
+                auto saved_constexpr_values = known_constexpr_values;
+                check_stmt(stmt->true_stmt);
+                known_constexpr_values = std::move(saved_constexpr_values);
+            }
             break;
         }
         default:
@@ -173,6 +230,17 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
     }
 
     if (!stmt->is_external && stmt->body) {
+        struct ConstexprScopeGuard {
+            TypeChecker& tc;
+            std::unordered_map<const Symbol*, CTValue> saved;
+            explicit ConstexprScopeGuard(TypeChecker& checker)
+                : tc(checker), saved(checker.known_constexpr_values) {
+                tc.known_constexpr_values.clear();
+            }
+            ~ConstexprScopeGuard() {
+                tc.known_constexpr_values = std::move(saved);
+            }
+        } constexpr_guard(*this);
         if (stmt->ref_param_types.size() < stmt->ref_params.size()) {
             stmt->ref_param_types.resize(stmt->ref_params.size(), nullptr);
         }
@@ -303,9 +371,8 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
                  stmt->var_init->kind == Expr::Kind::Range)) {
                 constexpr_init = true;
             } else {
-                CompileTimeEvaluator evaluator(this);
                 CTValue result;
-                constexpr_init = evaluator.try_evaluate(stmt->var_init, result);
+                constexpr_init = try_evaluate_constexpr(stmt->var_init, result);
             }
         }
         inferred_mutable = !constexpr_init;
@@ -329,6 +396,19 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     sym->type = type;
     sym->is_mutable = inferred_mutable;
     sym->declaration = stmt;
+
+    if (sym->is_local) {
+        if (!stmt->var_init) {
+            forget_constexpr_value(sym);
+        } else {
+            CTValue value;
+            if (try_evaluate_constexpr(stmt->var_init, value)) {
+                remember_constexpr_value(sym, value);
+            } else {
+                forget_constexpr_value(sym);
+            }
+        }
+    }
 }
 
 void TypeChecker::validate_invariants(const Module& mod) {
@@ -418,15 +498,29 @@ void TypeChecker::validate_invariants(const Module& mod) {
                 break;
             case Expr::Kind::Conditional:
                 validate_expr(expr->condition);
-                if (auto static_value = constexpr_condition(expr->condition)) {
-                    if (static_value.value()) {
-                        validate_expr(expr->true_expr);
+                if (expr->condition) {
+                    auto it = constexpr_condition_cache.find(expr_key(expr->condition.get()));
+                    if (it != constexpr_condition_cache.end()) {
+                        if (it->second) {
+                            validate_expr(expr->true_expr);
+                        } else {
+                            validate_expr(expr->false_expr);
+                        }
+                        break;
+                    }
+                }
+                {
+                    auto static_value = constexpr_condition(expr->condition);
+                    if (static_value.has_value()) {
+                        if (static_value.value()) {
+                            validate_expr(expr->true_expr);
+                        } else {
+                            validate_expr(expr->false_expr);
+                        }
                     } else {
+                        validate_expr(expr->true_expr);
                         validate_expr(expr->false_expr);
                     }
-                } else {
-                    validate_expr(expr->true_expr);
-                    validate_expr(expr->false_expr);
                 }
                 break;
             case Expr::Kind::Assignment:
@@ -541,6 +635,15 @@ void TypeChecker::validate_invariants(const Module& mod) {
                 break;
             case Stmt::Kind::ConditionalStmt:
                 validate_expr(stmt->condition);
+                if (stmt->condition) {
+                    auto it = constexpr_condition_cache.find(expr_key(stmt->condition.get()));
+                    if (it != constexpr_condition_cache.end()) {
+                        if (it->second) {
+                            validate_stmt(stmt->true_stmt);
+                        }
+                        break;
+                    }
+                }
                 validate_stmt(stmt->true_stmt);
                 break;
             case Stmt::Kind::Import:
@@ -559,6 +662,12 @@ void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& fa
     TypeUseContext ctx;
     ctx.resolve_type = [this](TypePtr type) { return resolve_type(type); };
     ctx.constexpr_condition = [this](int instance_id, ExprPtr expr) {
+        if (expr) {
+            auto it = constexpr_condition_cache.find(expr_key(instance_id, expr.get()));
+            if (it != constexpr_condition_cache.end()) {
+                return std::optional<bool>(it->second);
+            }
+        }
         auto scope = scoped_instance(instance_id);
         (void)scope;
         auto result = constexpr_condition(expr);

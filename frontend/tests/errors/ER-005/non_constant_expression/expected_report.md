@@ -1,11 +1,17 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/errors/ER-005/non_constant_expression/test.vx
+&^compute() -> #i32 {
+    5
+}
+&^main() -> #i32 {
+    0
+}
 ```
 
 ## Stderr
 ```
-Error at tests/errors/ER-005/non_constant_expression/test.vx:12:5: Array size must be a compile-time constant
 ```
 
 ## Exit Code
-1
+0

@@ -1,5 +1,8 @@
 #include "optimizer.h"
 #include "expr_access.h"
+#include "typechecker.h"
+
+#include <optional>
 
 namespace vexel {
 
