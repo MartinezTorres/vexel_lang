@@ -151,3 +151,8 @@ Resolution entry:
 - `Summary`: New architecture tests (`AR-010..AR-016`) were written as characterization checks of broken behavior instead of failing tests for desired behavior.
 - `Impact`: Provides false confidence and blocks TDD flow because unresolved architectural defects still produce green tests.
 - `Evidence`: `frontend/tests/architecture/AR-010` through `frontend/tests/architecture/AR-016` pass while corresponding issues remain unresolved.
+
+- `ID`: `WS-013`
+- `Type`: `Resolution`
+- `Resolved`: `ddc8f8d`
+- `Notes`: Flipped `AR-010..AR-016` from characterization checks to desired-behavior assertions so they fail until architectural issues are fixed.
