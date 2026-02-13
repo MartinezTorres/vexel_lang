@@ -252,3 +252,23 @@ Resolution entry:
 - `Summary`: Frontend->backend `constexpr_condition` contract omits module-instance identity.
 - `Impact`: Backends cannot safely query branch facts for multi-instance programs and may validate/emit against the wrong instance context.
 - `Evidence`: `frontend/tests/architecture/AR-020/analyzed_program_constexpr_condition_must_be_instance_aware`.
+
+- `ID`: `WS-014`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Replaced raw-pointer optimization fact keys with `(instance_id,node)` keys and updated frontend/backends to query facts with instance context.
+
+- `ID`: `WS-015`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Removed constexpr branch pruning from `transform/lowerer.*`; branch folding ownership is now only optimizer/residualizer.
+
+- `ID`: `WS-016`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Consolidated frontend orchestration into one canonical preparation path reused by both `compile()` and `emit_translation_unit()`.
+
+- `ID`: `WS-017`
+- `Type`: `Resolution`
+- `Resolved`: `7664739`
+- `Notes`: Extended `AnalyzedProgram::constexpr_condition` to include `instance_id` and updated backend call sites.
