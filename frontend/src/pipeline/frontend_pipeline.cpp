@@ -76,6 +76,7 @@ Module merge_live_program_instances(const Program& program,
             }
             if (keep_top_level_stmt(stmt, sym, analysis)) {
                 merged.top_level.push_back(stmt);
+                merged.top_level_instance_ids.push_back(instance.id);
             }
         }
     }
@@ -187,6 +188,7 @@ Module merge_program_instances(const Program& program) {
         const auto& mod_info = program.modules[static_cast<size_t>(instance.module_id)];
         for (const auto& stmt : mod_info.module.top_level) {
             merged.top_level.push_back(stmt);
+            merged.top_level_instance_ids.push_back(instance.id);
         }
     }
     return merged;
@@ -226,7 +228,7 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
     while (true) {
         optimization = optimizer.run(merged);
         Residualizer residualizer(optimization);
-        if (!residualizer.run(merged, checker.get_program())) {
+        if (!residualizer.run(merged)) {
             break;
         }
         residual_iters++;

@@ -223,6 +223,9 @@ struct Module {
     std::string name;
     std::string path;
     std::vector<StmtPtr> top_level;
+    // Optional per-top-level source instance IDs used by instance-aware passes.
+    // When present, size must match top_level.size().
+    std::vector<int> top_level_instance_ids;
     SourceLocation location;
 };
 

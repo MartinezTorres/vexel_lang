@@ -119,6 +119,10 @@ void validate_stmt(const StmtPtr& stmt, const std::string& stage) {
 }
 
 void validate_module(const Module& mod, const std::string& stage) {
+    if (!mod.top_level_instance_ids.empty() &&
+        mod.top_level_instance_ids.size() != mod.top_level.size()) {
+        invariant_fail(stage, mod.location, "top-level instance IDs are not aligned with top-level declarations");
+    }
     for (const auto& stmt : mod.top_level) {
         if (!stmt) {
             invariant_fail(stage, mod.location, "top-level statement is null");
@@ -141,4 +145,3 @@ void validate_program_invariants(const Program& program, const char* stage) {
 }
 
 } // namespace vexel
-

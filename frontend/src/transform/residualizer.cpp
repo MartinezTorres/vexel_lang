@@ -1,7 +1,6 @@
 #include "residualizer.h"
 
 #include "expr_access.h"
-#include "program.h"
 
 namespace vexel {
 
@@ -57,50 +56,35 @@ bool is_literal_expr_kind(Expr::Kind kind) {
 
 } // namespace
 
-bool Residualizer::run(Module& mod, const Program* program) {
+bool Residualizer::run(Module& mod) {
     changed_ = false;
-    if (!program || program->instances.empty()) {
-        current_instance_id_ = -1;
-        rewrite_stmt_list(mod.top_level, true);
-        return changed_;
+    if (mod.top_level_instance_ids.size() != mod.top_level.size()) {
+        throw CompileError("Internal error: residualizer requires top-level instance IDs aligned with merged module",
+                           mod.location);
     }
 
     std::vector<StmtPtr> rewritten;
+    std::vector<int> rewritten_instance_ids;
     rewritten.reserve(mod.top_level.size());
-    size_t cursor = 0;
+    rewritten_instance_ids.reserve(mod.top_level_instance_ids.size());
 
-    for (const auto& instance : program->instances) {
-        const Module& src = program->modules[static_cast<size_t>(instance.module_id)].module;
-        for (size_t i = 0; i < src.top_level.size(); ++i) {
-            if (cursor >= mod.top_level.size()) {
-                break;
-            }
-            current_instance_id_ = instance.id;
-            StmtPtr next = rewrite_stmt(mod.top_level[cursor], true);
-            ++cursor;
-            if (!next) {
-                changed_ = true;
-                continue;
-            }
-            rewritten.push_back(next);
-        }
-    }
-
-    // Safety fallback for mismatched merge metadata: keep residualizer total.
-    for (; cursor < mod.top_level.size(); ++cursor) {
-        current_instance_id_ = -1;
-        StmtPtr next = rewrite_stmt(mod.top_level[cursor], true);
+    for (size_t i = 0; i < mod.top_level.size(); ++i) {
+        current_instance_id_ = mod.top_level_instance_ids[i];
+        StmtPtr next = rewrite_stmt(mod.top_level[i], true);
         if (!next) {
             changed_ = true;
             continue;
         }
         rewritten.push_back(next);
+        rewritten_instance_ids.push_back(current_instance_id_);
     }
 
     if (rewritten.size() != mod.top_level.size()) {
         changed_ = true;
     }
     mod.top_level.swap(rewritten);
+    mod.top_level_instance_ids.swap(rewritten_instance_ids);
+    current_instance_id_ = -1;
     return changed_;
 }
 
