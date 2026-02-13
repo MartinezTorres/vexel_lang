@@ -142,3 +142,12 @@ Resolution entry:
 - `Summary`: Frontend annotation validator is a no-op, so unknown/typo annotations are silently accepted.
 - `Impact`: Annotation spelling mistakes reach backends unchecked and can silently alter intended behavior.
 - `Evidence`: `frontend/tests/architecture/AR-016/unknown_annotation_is_silently_accepted`.
+
+- `ID`: `WS-013`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `cc10b71`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: New architecture tests (`AR-010..AR-016`) were written as characterization checks of broken behavior instead of failing tests for desired behavior.
+- `Impact`: Provides false confidence and blocks TDD flow because unresolved architectural defects still produce green tests.
+- `Evidence`: `frontend/tests/architecture/AR-010` through `frontend/tests/architecture/AR-016` pass while corresponding issues remain unresolved.
