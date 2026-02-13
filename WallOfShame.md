@@ -216,3 +216,39 @@ Resolution entry:
 - `Type`: `Resolution`
 - `Resolved`: `891eea1`
 - `Notes`: Implemented frontend annotation validation and hard errors for unknown annotations.
+
+- `ID`: `WS-014`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Frontend optimization facts are keyed by raw AST pointers without module-instance identity.
+- `Impact`: Compile-time facts can bleed across module instances that share AST nodes, causing unsound CTE/branch pruning/DCE decisions.
+- `Evidence`: `frontend/tests/architecture/AR-017/optimizer_facts_must_be_instance_aware`.
+
+- `ID`: `WS-015`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Lowerer performs constexpr branch pruning instead of staying shape-only.
+- `Impact`: Semantic ownership drifts from optimizer/residualizer, and branch decisions can use wrong instance context.
+- `Evidence`: `frontend/tests/architecture/AR-018/lowerer_must_not_perform_constexpr_pruning`.
+
+- `ID`: `WS-016`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Compiler frontend orchestration is duplicated across `compile()` and `emit_translation_unit()`.
+- `Impact`: Pipeline drift risk between normal emission and translation-unit code paths.
+- `Evidence`: `frontend/tests/architecture/AR-019/compiler_pipeline_single_owner`.
+
+- `ID`: `WS-017`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Frontend->backend `constexpr_condition` contract omits module-instance identity.
+- `Impact`: Backends cannot safely query branch facts for multi-instance programs and may validate/emit against the wrong instance context.
+- `Evidence`: `frontend/tests/architecture/AR-020/analyzed_program_constexpr_condition_must_be_instance_aware`.
