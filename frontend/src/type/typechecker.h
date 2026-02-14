@@ -5,6 +5,7 @@
 #include "program.h"
 #include "symbols.h"
 #include <optional>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -13,6 +14,7 @@ namespace vexel {
 
 struct AnalysisFacts;
 class Resolver;
+class CTEEngine;
 
 // Type signature for generic instantiations
 struct TypeSignature {
@@ -75,6 +77,7 @@ class TypeChecker {
     int current_instance_id = -1;
     std::unordered_map<const Symbol*, CTValue> known_constexpr_values;
     std::unordered_map<unsigned long long, bool> constexpr_condition_cache;
+    std::unique_ptr<CTEEngine> cte_engine;
 
 public:
     class InstanceScope {
@@ -105,6 +108,7 @@ public:
 
     TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false,
                 Resolver* resolver = nullptr, Bindings* bindings = nullptr, Program* program = nullptr);
+    ~TypeChecker();
     void check_program(Program& program);
     void check_module(Module& mod);
     void validate_type_usage(const Module& mod, const AnalysisFacts& facts);

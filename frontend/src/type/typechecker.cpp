@@ -1,5 +1,5 @@
 #include "typechecker.h"
-#include "evaluator.h"
+#include "cte_engine.h"
 #include "expr_access.h"
 #include "resolver.h"
 #include "type_use_validator.h"
@@ -20,7 +20,10 @@ TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs,
       type_var_counter(0),
       loop_depth(0),
       project_root(proj_root),
-      allow_process(allow_process_exprs) {}
+      allow_process(allow_process_exprs),
+      cte_engine(std::make_unique<CTEEngine>(this)) {}
+
+TypeChecker::~TypeChecker() = default;
 
 void TypeChecker::set_resolver(Resolver* resolver_in) {
     resolver = resolver_in;
@@ -60,19 +63,19 @@ Symbol* TypeChecker::lookup_binding(const void* node) const {
 }
 
 bool TypeChecker::try_evaluate_constexpr(ExprPtr expr, CTValue& out) {
-    CompileTimeEvaluator evaluator(this);
-    for (const auto& entry : known_constexpr_values) {
-        evaluator.set_symbol_constant(entry.first, entry.second);
+    if (!cte_engine) {
+        cte_engine = std::make_unique<CTEEngine>(this);
     }
-    return evaluator.try_evaluate(expr, out);
+    const auto seed_values = known_constexpr_values;
+    return cte_engine->try_evaluate(current_instance_id, expr, out, seed_values);
 }
 
 CTEQueryResult TypeChecker::query_constexpr(ExprPtr expr) {
-    CompileTimeEvaluator evaluator(this);
-    for (const auto& entry : known_constexpr_values) {
-        evaluator.set_symbol_constant(entry.first, entry.second);
+    if (!cte_engine) {
+        cte_engine = std::make_unique<CTEEngine>(this);
     }
-    return evaluator.query(expr);
+    const auto seed_values = known_constexpr_values;
+    return cte_engine->query(current_instance_id, expr, seed_values);
 }
 
 void TypeChecker::remember_constexpr_value(Symbol* sym, const CTValue& value) {

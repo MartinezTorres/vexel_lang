@@ -47,6 +47,9 @@ public:
         symbol_read_observer = std::move(observer);
     }
 
+    // Reset all transient evaluation state so one evaluator instance can be safely reused.
+    void reset_state();
+
 private:
     TypeChecker* type_checker;
     std::unordered_map<std::string, CTValue> constants;

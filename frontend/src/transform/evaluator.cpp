@@ -75,6 +75,22 @@ CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
     return out;
 }
 
+void CompileTimeEvaluator::reset_state() {
+    constants.clear();
+    symbol_constants.clear();
+    uninitialized_locals.clear();
+    ref_param_stack.clear();
+    error_msg.clear();
+    recursion_depth = 0;
+    loop_depth = 0;
+    return_depth = 0;
+    constant_eval_stack.clear();
+    constant_value_cache.clear();
+    hard_error = false;
+    value_observer = nullptr;
+    symbol_read_observer = nullptr;
+}
+
 bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
     if (!expr) {
         error_msg = "Null expression";

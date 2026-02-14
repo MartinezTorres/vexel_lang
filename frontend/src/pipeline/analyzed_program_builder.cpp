@@ -4,6 +4,26 @@
 
 namespace vexel {
 
+namespace {
+
+std::optional<bool> scalar_to_bool(const CTValue& value) {
+    if (std::holds_alternative<int64_t>(value)) {
+        return std::get<int64_t>(value) != 0;
+    }
+    if (std::holds_alternative<uint64_t>(value)) {
+        return std::get<uint64_t>(value) != 0;
+    }
+    if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value);
+    }
+    if (std::holds_alternative<double>(value)) {
+        return std::get<double>(value) != 0.0;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 AnalyzedProgram make_analyzed_program(const Module& merged,
                                       TypeChecker& checker,
                                       const AnalysisFacts& analysis,
@@ -29,11 +49,17 @@ AnalyzedProgram make_analyzed_program(const Module& merged,
         return checker.resolve_type(type);
     };
 
-    out.constexpr_condition = [&checker](int instance_id, ExprPtr expr) -> std::optional<bool> {
+    out.constexpr_condition = [&optimization](int instance_id, ExprPtr expr) -> std::optional<bool> {
         if (!expr) return std::nullopt;
-        auto scope = checker.scoped_instance(instance_id);
-        (void)scope;
-        return checker.constexpr_condition(expr);
+        auto cond_it = optimization.constexpr_conditions.find(expr_fact_key(instance_id, expr.get()));
+        if (cond_it != optimization.constexpr_conditions.end()) {
+            return cond_it->second;
+        }
+        auto value_it = optimization.constexpr_values.find(expr_fact_key(instance_id, expr.get()));
+        if (value_it == optimization.constexpr_values.end()) {
+            return std::nullopt;
+        }
+        return scalar_to_bool(value_it->second);
     };
 
     out.lookup_type_symbol = [&checker](int instance_id, const std::string& type_name) -> Symbol* {

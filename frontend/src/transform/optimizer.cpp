@@ -1,6 +1,6 @@
 #include "optimizer.h"
 
-#include "evaluator.h"
+#include "cte_engine.h"
 #include "expr_access.h"
 #include "typechecker.h"
 
@@ -428,7 +428,7 @@ ExprPtrSet collect_root_expr_nodes(const ExprPtr& root) {
 class CTEFixpointScheduler {
 public:
     CTEFixpointScheduler(TypeChecker* checker, const Module& mod)
-        : type_checker_(checker), collector_(checker) {
+        : type_checker_(checker), collector_(checker), cte_engine_(checker) {
         collector_.collect_module(mod);
         expr_enqueued_.assign(collector_.all_exprs().size(), false);
         root_enqueued_.assign(collector_.context_roots().size(), false);
@@ -501,6 +501,7 @@ public:
 private:
     TypeChecker* type_checker_ = nullptr;
     ExprCollector collector_;
+    CTEEngine cte_engine_;
 
     std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> stable_values_;
     std::unordered_set<ExprFactKey, ExprFactKeyHash> unstable_values_;
@@ -518,12 +519,6 @@ private:
     std::unordered_map<size_t, std::unordered_set<const Symbol*>> root_to_symbols_;
     std::unordered_map<const Symbol*, std::unordered_set<ExprFactKey, ExprFactKeyHash>> symbol_to_exprs_;
     std::unordered_map<ExprFactKey, std::unordered_set<const Symbol*>, ExprFactKeyHash> expr_to_symbols_;
-
-    void seed_evaluator(CompileTimeEvaluator& evaluator) const {
-        for (const auto& entry : known_symbol_values_) {
-            evaluator.set_symbol_constant(entry.first, entry.second);
-        }
-    }
 
     static std::unordered_set<const Symbol*> normalize_symbol_set(
         const std::unordered_set<const Symbol*>& in,
@@ -630,8 +625,6 @@ private:
             (void)scope;
 
             ExprPtrSet root_expr_nodes = collect_root_expr_nodes(root.expr);
-            CompileTimeEvaluator evaluator(type_checker_);
-            seed_evaluator(evaluator);
 
             std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> local_stable;
             std::unordered_set<ExprFactKey, ExprFactKeyHash> local_unstable;
@@ -649,17 +642,20 @@ private:
                     local_unstable.insert(key);
                 }
             };
-            evaluator.set_symbol_read_observer([&](const Symbol* sym) {
-                if (!sym) return;
-                local_symbols.insert(sym);
-            });
-            evaluator.set_value_observer([&](const Expr* expr, const CTValue& value) {
-                if (!expr) return;
-                if (!root_expr_nodes.count(expr)) return;
-                observe_local(expr_fact_key(root.instance_id, expr), value);
-            });
-
-            CTEQueryResult query = evaluator.query(root.expr);
+            CTEQueryResult query =
+                cte_engine_.query(
+                    root.instance_id,
+                    root.expr,
+                    known_symbol_values_,
+                    [&](const Expr* expr, const CTValue& value) {
+                        if (!expr) return;
+                        if (!root_expr_nodes.count(expr)) return;
+                        observe_local(expr_fact_key(root.instance_id, expr), value);
+                    },
+                    [&](const Symbol* sym) {
+                        if (!sym) return;
+                        local_symbols.insert(sym);
+                    });
             update_root_dependencies(root_idx, local_symbols);
             if (query.status != CTEQueryStatus::Known) {
                 continue;
@@ -704,16 +700,18 @@ private:
             }
             auto scope = type_checker_->scoped_instance(item.instance_id);
             (void)scope;
-            CompileTimeEvaluator evaluator(type_checker_);
-            seed_evaluator(evaluator);
 
             std::unordered_set<const Symbol*> local_symbols;
-            evaluator.set_symbol_read_observer([&](const Symbol* sym) {
-                if (!sym) return;
-                local_symbols.insert(sym);
-            });
-
-            CTEQueryResult query = evaluator.query(item.expr);
+            CTEQueryResult query =
+                cte_engine_.query(
+                    item.instance_id,
+                    item.expr,
+                    known_symbol_values_,
+                    {},
+                    [&](const Symbol* sym) {
+                        if (!sym) return;
+                        local_symbols.insert(sym);
+                    });
             update_expr_dependencies(key, local_symbols);
             if (query.status == CTEQueryStatus::Known) {
                 if (observe_expr_value(key, query.value)) {
