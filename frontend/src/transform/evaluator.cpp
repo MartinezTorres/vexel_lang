@@ -544,7 +544,7 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result) {
             }
             case VmOpKind::EvalDeclAssignment: {
                 CTValue stmt_val;
-                if (!eval_assignment(op.expr, stmt_val)) {
+                if (!try_evaluate(op.expr, stmt_val)) {
                     constants = saved_constants;
                     uninitialized_locals = saved_uninitialized;
                     return false;
@@ -1666,6 +1666,11 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         return constants.count(name) > 0 || uninitialized_locals.count(name) > 0;
     };
 
+    const bool creates_local_identifier =
+        expr->creates_new_variable &&
+        expr->left &&
+        expr->left->kind == Expr::Kind::Identifier;
+
     std::string base = base_identifier(expr->left);
     if (!base.empty()) {
         if (base == "_") {
@@ -1676,18 +1681,24 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             error_msg = "Cannot mutate receiver at compile time: " + base;
             return false;
         }
-        Symbol* sym = type_checker ? type_checker->get_scope()->lookup(base) : nullptr;
-        if (sym && !sym->is_mutable && !is_local(base)) {
+        Symbol* sym = type_checker && type_checker->get_scope()
+            ? type_checker->get_scope()->lookup(base)
+            : nullptr;
+        if (!creates_local_identifier && sym && !sym->is_mutable && !is_local(base)) {
             error_msg = "Cannot assign to immutable constant: " + base;
             return false;
         }
-        if (sym && sym->kind == Symbol::Kind::Variable && sym->is_mutable && !is_local(base)) {
+        if (!creates_local_identifier &&
+            sym &&
+            sym->kind == Symbol::Kind::Variable &&
+            sym->is_mutable &&
+            !is_local(base)) {
             error_msg = "Cannot modify mutable globals at compile time: " + base;
             return false;
         }
     }
 
-    CTValue assign_val = clone_value(rhs_val);
+    CTValue assign_val = rhs_val;
     TypePtr assignment_type = expr->type;
     if (expr->creates_new_variable && expr->declared_var_type) {
         assignment_type = expr->declared_var_type;
@@ -1698,83 +1709,117 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         !coerce_value_to_type(assign_val, assignment_type, assign_val)) {
         return false;
     }
+    auto clone_composite = [&](const std::shared_ptr<CTComposite>& src) {
+        if (!src) return std::shared_ptr<CTComposite>();
+        auto dst = std::make_shared<CTComposite>();
+        dst->type_name = src->type_name;
+        for (const auto& entry : src->fields) {
+            dst->fields[entry.first] = clone_value(entry.second);
+        }
+        return dst;
+    };
+    auto clone_array = [&](const std::shared_ptr<CTArray>& src) {
+        if (!src) return std::shared_ptr<CTArray>();
+        auto dst = std::make_shared<CTArray>();
+        dst->elements.reserve(src->elements.size());
+        for (const auto& entry : src->elements) {
+            dst->elements.push_back(clone_value(entry));
+        }
+        return dst;
+    };
+    auto parse_index = [&](ExprPtr index_expr, int64_t& idx) -> bool {
+        CTValue index_val;
+        if (!try_evaluate(index_expr, index_val)) return false;
+        if (!std::holds_alternative<int64_t>(index_val) &&
+            !std::holds_alternative<uint64_t>(index_val) &&
+            !std::holds_alternative<bool>(index_val)) {
+            error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
+            return false;
+        }
+        if (std::holds_alternative<int64_t>(index_val)) {
+            idx = std::get<int64_t>(index_val);
+        } else if (std::holds_alternative<uint64_t>(index_val)) {
+            idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
+        } else {
+            idx = std::get<bool>(index_val) ? 1 : 0;
+        }
+        if (idx < 0) {
+            error_msg = "Index cannot be negative";
+            return false;
+        }
+        return true;
+    };
 
-    std::function<bool(ExprPtr, const CTValue&)> assign_lvalue;
-    std::function<bool(ExprPtr, CTValue&)> fetch_lvalue;
-
-    fetch_lvalue = [&](ExprPtr target, CTValue& out) -> bool {
-        if (!target) return false;
+    std::function<bool(ExprPtr, CTValue*&)> resolve_lvalue_slot;
+    resolve_lvalue_slot = [&](ExprPtr target, CTValue*& out) -> bool {
+        if (!target) {
+            error_msg = "Assignment target is not addressable at compile time";
+            return false;
+        }
         switch (target->kind) {
             case Expr::Kind::Identifier: {
                 auto it = constants.find(target->name);
                 if (it == constants.end()) {
-                    error_msg = "Identifier not found or not a compile-time constant: " + target->name;
-                    return false;
+                    // Assignment writes can materialize an lvalue slot without reading prior value.
+                    constants[target->name] = CTUninitialized{};
+                    it = constants.find(target->name);
                 }
-                if (std::holds_alternative<CTUninitialized>(it->second)) {
-                    error_msg = "uninitialized variable accessed at compile time: " + target->name;
-                    return false;
-                }
-                out = it->second;
+                out = &it->second;
                 return true;
             }
             case Expr::Kind::Member: {
-                CTValue base_val;
-                if (!fetch_lvalue(target->operand, base_val)) return false;
-                if (!std::holds_alternative<std::shared_ptr<CTComposite>>(base_val)) {
+                CTValue* base_slot = nullptr;
+                if (!resolve_lvalue_slot(target->operand, base_slot)) return false;
+                if (!base_slot || !std::holds_alternative<std::shared_ptr<CTComposite>>(*base_slot)) {
                     error_msg = "Member access on non-composite value";
                     return false;
                 }
-                auto comp = std::get<std::shared_ptr<CTComposite>>(base_val);
+                auto comp = std::get<std::shared_ptr<CTComposite>>(*base_slot);
                 if (!comp) {
                     error_msg = "Member access on null composite value";
                     return false;
+                }
+                if (comp.use_count() > 1) {
+                    auto unique_comp = clone_composite(comp);
+                    *base_slot = unique_comp;
+                    comp = unique_comp;
                 }
                 auto it = comp->fields.find(target->name);
                 if (it == comp->fields.end()) {
                     error_msg = "Field not found: " + target->name;
                     return false;
                 }
-                out = it->second;
+                out = &it->second;
                 return true;
             }
             case Expr::Kind::Index: {
-                CTValue base_val;
-                if (!fetch_lvalue(target->operand, base_val)) return false;
-                CTValue index_val;
-                if (!try_evaluate(target->args[0], index_val)) return false;
-                if (!std::holds_alternative<int64_t>(index_val) &&
-                    !std::holds_alternative<uint64_t>(index_val) &&
-                    !std::holds_alternative<bool>(index_val)) {
-                    error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
+                if (target->args.empty()) {
+                    error_msg = "Index expression missing index";
                     return false;
                 }
-                int64_t idx = 0;
-                if (std::holds_alternative<int64_t>(index_val)) {
-                    idx = std::get<int64_t>(index_val);
-                } else if (std::holds_alternative<uint64_t>(index_val)) {
-                    idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
-                } else {
-                    idx = std::get<bool>(index_val) ? 1 : 0;
-                }
-                if (idx < 0) {
-                    error_msg = "Index cannot be negative";
-                    return false;
-                }
-                if (!std::holds_alternative<std::shared_ptr<CTArray>>(base_val)) {
+                CTValue* base_slot = nullptr;
+                if (!resolve_lvalue_slot(target->operand, base_slot)) return false;
+                if (!base_slot || !std::holds_alternative<std::shared_ptr<CTArray>>(*base_slot)) {
                     error_msg = "Indexing non-array value at compile time";
                     return false;
                 }
-                auto array = std::get<std::shared_ptr<CTArray>>(base_val);
+                auto array = std::get<std::shared_ptr<CTArray>>(*base_slot);
                 if (!array) {
                     error_msg = "Indexing null array";
                     return false;
                 }
+                if (array.use_count() > 1) {
+                    auto unique_array = clone_array(array);
+                    *base_slot = unique_array;
+                    array = unique_array;
+                }
+                int64_t idx = 0;
+                if (!parse_index(target->args[0], idx)) return false;
                 if (static_cast<size_t>(idx) >= array->elements.size()) {
                     error_msg = "Index out of bounds in compile-time evaluation";
                     return false;
                 }
-                out = array->elements[static_cast<size_t>(idx)];
+                out = &array->elements[static_cast<size_t>(idx)];
                 return true;
             }
             default:
@@ -1783,106 +1828,31 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         }
     };
 
-    assign_lvalue = [&](ExprPtr target, const CTValue& value) -> bool {
-        if (!target) return false;
-        switch (target->kind) {
-            case Expr::Kind::Identifier: {
-                CTValue stored_val;
-                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
-                    return false;
-                }
-                constants[target->name] = clone_value(stored_val);
-                uninitialized_locals.erase(target->name);
-                result = constants[target->name];
-                return true;
-            }
-            case Expr::Kind::Member: {
-                CTValue base_val;
-                if (!fetch_lvalue(target->operand, base_val)) return false;
-                if (!std::holds_alternative<std::shared_ptr<CTComposite>>(base_val)) {
-                    error_msg = "Member access on non-composite value";
-                    return false;
-                }
-                auto comp = std::get<std::shared_ptr<CTComposite>>(base_val);
-                if (!comp) {
-                    error_msg = "Member access on null composite value";
-                    return false;
-                }
-                auto new_comp = std::make_shared<CTComposite>();
-                new_comp->type_name = comp->type_name;
-                for (const auto& entry : comp->fields) {
-                    new_comp->fields[entry.first] = clone_value(entry.second);
-                }
-                CTValue stored_val;
-                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
-                    return false;
-                }
-                new_comp->fields[target->name] = clone_value(stored_val);
-                if (!assign_lvalue(target->operand, new_comp)) {
-                    return false;
-                }
-                result = clone_value(stored_val);
-                return true;
-            }
-            case Expr::Kind::Index: {
-                CTValue base_val;
-                if (!fetch_lvalue(target->operand, base_val)) return false;
-                CTValue index_val;
-                if (!try_evaluate(target->args[0], index_val)) return false;
-                if (!std::holds_alternative<int64_t>(index_val) &&
-                    !std::holds_alternative<uint64_t>(index_val) &&
-                    !std::holds_alternative<bool>(index_val)) {
-                    error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
-                    return false;
-                }
-                int64_t idx = 0;
-                if (std::holds_alternative<int64_t>(index_val)) {
-                    idx = std::get<int64_t>(index_val);
-                } else if (std::holds_alternative<uint64_t>(index_val)) {
-                    idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
-                } else {
-                    idx = std::get<bool>(index_val) ? 1 : 0;
-                }
-                if (idx < 0) {
-                    error_msg = "Index cannot be negative";
-                    return false;
-                }
-                if (!std::holds_alternative<std::shared_ptr<CTArray>>(base_val)) {
-                    error_msg = "Indexing non-array value at compile time";
-                    return false;
-                }
-                auto array = std::get<std::shared_ptr<CTArray>>(base_val);
-                if (!array) {
-                    error_msg = "Indexing null array";
-                    return false;
-                }
-                if (static_cast<size_t>(idx) >= array->elements.size()) {
-                    error_msg = "Index out of bounds in compile-time evaluation";
-                    return false;
-                }
-                auto new_array = std::make_shared<CTArray>();
-                new_array->elements.reserve(array->elements.size());
-                for (const auto& elem : array->elements) {
-                    new_array->elements.push_back(clone_value(elem));
-                }
-                CTValue stored_val;
-                if (!coerce_value_to_lvalue_type(target, value, stored_val)) {
-                    return false;
-                }
-                new_array->elements[static_cast<size_t>(idx)] = clone_value(stored_val);
-                if (!assign_lvalue(target->operand, new_array)) {
-                    return false;
-                }
-                result = clone_value(stored_val);
-                return true;
-            }
-            default:
-                error_msg = "Assignment target is not addressable at compile time";
-                return false;
-        }
-    };
+    if (creates_local_identifier &&
+        constants.count(expr->left->name) == 0 &&
+        uninitialized_locals.count(expr->left->name) == 0) {
+        constants[expr->left->name] = CTUninitialized{};
+    }
 
-    return assign_lvalue(expr->left, assign_val);
+    CTValue* slot = nullptr;
+    if (!resolve_lvalue_slot(expr->left, slot)) {
+        return false;
+    }
+    if (!slot) {
+        error_msg = "Assignment target is not addressable at compile time";
+        return false;
+    }
+
+    CTValue stored_val;
+    if (!coerce_value_to_lvalue_type(expr->left, assign_val, stored_val)) {
+        return false;
+    }
+    *slot = clone_value(stored_val);
+    if (expr->left && expr->left->kind == Expr::Kind::Identifier) {
+        uninitialized_locals.erase(expr->left->name);
+    }
+    result = clone_value(stored_val);
+    return true;
 }
 
 bool CompileTimeEvaluator::eval_array_literal(ExprPtr expr, CTValue& result) {

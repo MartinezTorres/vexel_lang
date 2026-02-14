@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Nested constant-call chains must prune dead callees transitively. | Nested const-call dead branches do not keep transitively dead helpers
+
+&rare_path() -> #i32 {
+    91
+}
+
+&level2(b:#b) -> #i32 {
+    b ? rare_path() : 41
+}
+
+&level1(a:#b) -> #i32 {
+    level2(a)
+}
+
+&^main() -> #i32 {
+    level1(0) + 1
+}

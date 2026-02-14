@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Runtime-unknown branches must keep potentially-called helpers reachable. | Unknown runtime path does not over-prune helper code
+
+&!read_flag() -> #b;
+
+&rare_path() -> #i32 {
+    99
+}
+
+&choose(flag:#b) -> #i32 {
+    flag ? rare_path() : 1
+}
+
+&^main() -> #i32 {
+    a:#i32 = choose(0);
+    b:#i32 = choose(read_flag());
+    a + b
+}

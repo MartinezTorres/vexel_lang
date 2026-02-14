@@ -1,0 +1,4 @@
+BASE:#i32 = 9;
+WIDTH:#i32 = BASE + 7;
+HEIGHT:#i32 = WIDTH + 4;
+TABLE:#i32 = WIDTH * HEIGHT;

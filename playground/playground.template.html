@@ -170,6 +170,9 @@
       border-bottom: 1px solid var(--outline);
       background: var(--tab);
       overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+      scroll-snap-type: x proximity;
     }
 
     .tab {
@@ -182,6 +185,7 @@
       cursor: pointer;
       white-space: nowrap;
       transition: 0.15s ease;
+      scroll-snap-align: start;
     }
 
     .tab.active {
@@ -288,8 +292,57 @@
     }
 
     @media (max-width: 900px) {
+      .app {
+        width: 100vw;
+        min-height: 100vh;
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .controls .status {
+        grid-column: 1 / -1;
+      }
+
+      #compileBtn {
+        grid-column: 1 / -1;
+      }
+
+      .controls .btn,
+      .controls select {
+        width: 100%;
+      }
+
+      .pane-header {
+        padding: 9px 11px;
+      }
+
+      .tabs {
+        padding: 7px 10px;
+      }
+
       .editor, .output {
         min-height: calc(var(--mobile-code-lines) * var(--code-line-height) * 1em + 32px);
+      }
+
+      .debug {
+        min-height: 170px;
+      }
+
+      .debug-log {
+        min-height: 140px;
+        max-height: 240px;
       }
     }
   </style>
@@ -304,6 +357,7 @@
       <div class="controls">
         <button class="btn primary" id="compileBtn" disabled>Compile</button>
         <button class="btn" id="addFileBtn">Add File</button>
+        <button class="btn" id="shareBtn">Copy Share URL</button>
         <select id="backendSelect"></select>
         <select id="exampleSelect">
           <option value="">Load example</option>
@@ -441,6 +495,7 @@
     const backendSelect = document.getElementById("backendSelect");
     const exampleSelect = document.getElementById("exampleSelect");
     const copyOutputBtn = document.getElementById("copyOutputBtn");
+    const shareBtn = document.getElementById("shareBtn");
     const statusText = document.getElementById("statusText");
     const statusDot = document.getElementById("statusDot");
 
@@ -693,6 +748,84 @@
       log(`Loaded example: ${key}`);
     }
 
+    function encodeShareState() {
+      const payload = {
+        backend: state.backend,
+        sources: state.sources.map((src) => ({
+          name: src.name,
+          content: src.content
+        }))
+      };
+      const json = JSON.stringify(payload);
+      if (typeof TextEncoder !== "undefined") {
+        const bytes = new TextEncoder().encode(json);
+        let binary = "";
+        bytes.forEach((b) => {
+          binary += String.fromCharCode(b);
+        });
+        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      }
+      return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    }
+
+    function decodeShareState(token) {
+      try {
+        const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "===".slice((b64.length + 3) % 4);
+        const binary = atob(padded);
+        if (typeof TextDecoder !== "undefined") {
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          return JSON.parse(new TextDecoder().decode(bytes));
+        }
+        return JSON.parse(decodeURIComponent(escape(binary)));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function buildShareUrl() {
+      const token = encodeShareState();
+      if (!token || token.length > 8000) {
+        return null;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.set("state", token);
+      url.hash = "";
+      return url.toString();
+    }
+
+    function applyShareStateFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("state");
+      if (!token) return false;
+
+      const parsed = decodeShareState(token);
+      if (!parsed || !Array.isArray(parsed.sources)) return false;
+
+      const restored = [];
+      parsed.sources.forEach((src) => {
+        if (!src || typeof src !== "object") return;
+        const name = sanitizeName(String(src.name || ""));
+        if (!name) return;
+        restored.push({
+          name,
+          content: typeof src.content === "string" ? src.content : ""
+        });
+      });
+      if (restored.length === 0) return false;
+
+      state.sources = restored.slice(0, 64);
+      state.activeSource = 0;
+      if (typeof parsed.backend === "string" && parsed.backend.trim().length > 0) {
+        state.backend = parsed.backend.trim();
+      }
+      clearOutputs();
+      return true;
+    }
+
     function decodeWasmBase64() {
       if (!VEXEL_WASM_BASE64 || VEXEL_WASM_BASE64.startsWith("_")) return null;
       const binary = atob(VEXEL_WASM_BASE64);
@@ -776,11 +909,34 @@
       );
     });
 
+    shareBtn.addEventListener("click", () => {
+      const url = buildShareUrl();
+      if (!url) {
+        log("Source set is too large to encode into a share URL", "error");
+        return;
+      }
+      navigator.clipboard.writeText(url).then(
+        () => log("Copied share URL to clipboard"),
+        () => log("Share URL copy failed", "error")
+      );
+    });
+
     renderSourceTabs();
     renderEditors();
     clearOutputs();
     window.addEventListener("DOMContentLoaded", () => {
       populateBackends();
+      if (applyShareStateFromUrl()) {
+        const available = Array.from(backendSelect.options).map((opt) => opt.value);
+        if (!available.includes(state.backend)) {
+          state.backend = available[0] || "c";
+        }
+        backendSelect.value = state.backend;
+        renderSourceTabs();
+        renderEditors();
+        clearOutputs();
+        log("Loaded shared state from URL");
+      }
       initCompiler();
     });
   </script>

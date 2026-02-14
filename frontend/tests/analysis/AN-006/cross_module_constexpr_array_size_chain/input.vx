@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Cross-module constexpr chains must resolve into type-level array sizes. | Imported constexpr chains are usable in array-size expressions
+
+::dims;
+
+&^main() -> #i32 {
+    arr:#i32[dims::WIDTH + dims::HEIGHT];
+    (#i32)|arr|
+}

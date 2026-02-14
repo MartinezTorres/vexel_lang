@@ -1,0 +1,13 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Pure loops in parameterless entrypoints should fully fold in lowered output. | Pure loop bodies do not survive as runtime iteration in lowered code
+
+&^main() -> #i32 {
+    n:#i32 = 150;
+    acc:#i32 = 0;
+    i:#i32 = 0;
+    (i < n)@{
+        acc = acc + i;
+        i = i + 1;
+    };
+    acc
+}

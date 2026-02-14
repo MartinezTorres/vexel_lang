@@ -438,6 +438,7 @@ public:
             enqueue_expr(i);
         }
         for (size_t i = 0; i < collector_.context_roots().size(); ++i) {
+            root_keys_.insert(collector_.context_roots()[i].key);
             enqueue_root(i);
         }
         for (const auto& candidate : collector_.global_constant_candidates()) {
@@ -507,6 +508,7 @@ private:
     std::unordered_set<const Symbol*> tracked_symbols_;
 
     std::unordered_map<ExprFactKey, size_t, ExprFactKeyHash> expr_index_by_key_;
+    std::unordered_set<ExprFactKey, ExprFactKeyHash> root_keys_;
     std::vector<bool> expr_enqueued_;
     std::vector<bool> root_enqueued_;
     std::queue<size_t> expr_queue_;
@@ -694,6 +696,12 @@ private:
 
             const CollectedExpr& item = collector_.all_exprs()[expr_idx];
             ExprFactKey key = item.key;
+            if (root_keys_.count(key)) {
+                continue;
+            }
+            if (stable_values_.count(key) || unstable_values_.count(key)) {
+                continue;
+            }
             auto scope = type_checker_->scoped_instance(item.instance_id);
             (void)scope;
             CompileTimeEvaluator evaluator(type_checker_);
