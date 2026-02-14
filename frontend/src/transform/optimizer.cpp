@@ -437,7 +437,17 @@ public:
         for (size_t i = 0; i < collector_.all_exprs().size(); ++i) {
             expr_index_by_key_[collector_.all_exprs()[i].key] = i;
         }
+        root_expr_node_sets_.reserve(collector_.context_roots().size());
+        root_expr_node_lists_.reserve(collector_.context_roots().size());
         for (size_t i = 0; i < collector_.context_roots().size(); ++i) {
+            ExprPtrSet nodes = collect_root_expr_nodes(collector_.context_roots()[i].expr);
+            std::vector<const Expr*> node_list;
+            node_list.reserve(nodes.size());
+            for (const Expr* expr : nodes) {
+                node_list.push_back(expr);
+            }
+            root_expr_node_lists_.push_back(std::move(node_list));
+            root_expr_node_sets_.push_back(std::move(nodes));
             enqueue_root(i);
         }
         for (const auto& candidate : collector_.global_constant_candidates()) {
@@ -512,6 +522,8 @@ private:
     std::vector<bool> root_enqueued_;
     std::queue<size_t> expr_queue_;
     std::queue<size_t> root_queue_;
+    std::vector<ExprPtrSet> root_expr_node_sets_;
+    std::vector<std::vector<const Expr*>> root_expr_node_lists_;
 
     std::unordered_map<const Symbol*, std::unordered_set<size_t>> symbol_to_roots_;
     std::unordered_map<size_t, std::unordered_set<const Symbol*>> root_to_symbols_;
@@ -587,7 +599,7 @@ private:
         old = normalized;
     }
 
-    bool observe_expr_value(const ExprFactKey& key, const CTValue& value) {
+    bool observe_expr_value(const ExprFactKey& key, CTValue value) {
         if (!key.expr) return false;
 
         if (unstable_values_.count(key)) {
@@ -596,7 +608,7 @@ private:
 
         auto it = stable_values_.find(key);
         if (it == stable_values_.end()) {
-            stable_values_[key] = clone_value(value);
+            stable_values_[key] = std::move(value);
             return true;
         }
 
@@ -623,7 +635,8 @@ private:
             auto scope = type_checker_->scoped_instance(root.instance_id);
             (void)scope;
 
-            ExprPtrSet root_expr_nodes = collect_root_expr_nodes(root.expr);
+            const ExprPtrSet& root_expr_nodes = root_expr_node_sets_[root_idx];
+            const std::vector<const Expr*>& root_expr_list = root_expr_node_lists_[root_idx];
 
             std::unordered_map<const Expr*, CTValue> local_stable;
             std::unordered_set<const Expr*> local_unstable;
@@ -671,9 +684,9 @@ private:
                         changed = true;
                     }
                 }
-                for (const auto& entry : local_stable) {
+                for (auto& entry : local_stable) {
                     ExprFactKey key = expr_fact_key(root.instance_id, entry.first);
-                    if (observe_expr_value(key, entry.second)) {
+                    if (observe_expr_value(key, std::move(entry.second))) {
                         changed = true;
                     }
                 }
@@ -682,7 +695,7 @@ private:
             // Root execution can short-circuit on runtime-dependent paths.
             // Queue only unresolved nodes from this root for targeted fallback
             // queries instead of maintaining a full eager per-expression pass.
-            for (const Expr* expr_node : root_expr_nodes) {
+            for (const Expr* expr_node : root_expr_list) {
                 if (!expr_node) continue;
                 ExprFactKey key = expr_fact_key(root.instance_id, expr_node);
                 if (root_known && local_observed.count(expr_node)) continue;
@@ -729,7 +742,7 @@ private:
                     });
             update_expr_dependencies(key, local_symbols);
             if (query.status == CTEQueryStatus::Known) {
-                if (observe_expr_value(key, query.value)) {
+                if (observe_expr_value(key, std::move(query.value))) {
                     changed = true;
                 }
             }
