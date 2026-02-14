@@ -56,6 +56,7 @@ CTValue clone_value(const CTValue& value) {
     }
     return value;
 }
+
 } // namespace
 
 CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
@@ -88,6 +89,7 @@ void CompileTimeEvaluator::reset_state() {
     constant_value_cache.clear();
     expr_param_stack.clear();
     expanding_expr_params.clear();
+    expr_param_expansion_depth = 0;
     hard_error = false;
     value_observer = nullptr;
     symbol_read_observer = nullptr;
@@ -783,8 +785,14 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
 
     std::string func_name = expr->operand->name;
     Symbol* sym = nullptr;
-    if (type_checker) {
+    if (expr->operand) {
+        sym = expr->operand->resolved_symbol;
+    }
+    if (!sym && type_checker) {
         sym = type_checker->binding_for(expr->operand.get());
+        if (expr->operand) {
+            expr->operand->resolved_symbol = sym;
+        }
     }
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(func_name);
@@ -1031,10 +1039,21 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
                 continue;
             }
             expanding_expr_params.insert(expr->name);
+            struct ExprParamExpansionGuard {
+                int& depth;
+                explicit ExprParamExpansionGuard(int& d) : depth(d) { depth++; }
+                ~ExprParamExpansionGuard() { depth--; }
+            } expansion_guard(expr_param_expansion_depth);
             const bool ok = try_evaluate(found->second, result);
             expanding_expr_params.erase(expr->name);
             return ok;
         }
+    }
+
+    Symbol* sym = expr->resolved_symbol;
+    if (expr_param_expansion_depth == 0 && !sym && type_checker) {
+        sym = type_checker->binding_for(expr.get());
+        expr->resolved_symbol = sym;
     }
 
     auto it = constants.find(expr->name);
@@ -1053,7 +1072,10 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
     }
 
     // Try to look up global constant
-    Symbol* sym = type_checker ? type_checker->binding_for(expr.get()) : nullptr;
+    if (!sym && type_checker) {
+        sym = type_checker->binding_for(expr.get());
+        expr->resolved_symbol = sym;
+    }
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(expr->name);
     }
@@ -1108,9 +1130,10 @@ bool CompileTimeEvaluator::eval_type_constructor(ExprPtr expr, CTValue& result) 
     }
 
     std::string type_name = expr->operand->name;
-    Symbol* sym = nullptr;
-    if (type_checker) {
+    Symbol* sym = expr->operand->resolved_symbol;
+    if (!sym && type_checker) {
         sym = type_checker->binding_for(expr->operand.get());
+        expr->operand->resolved_symbol = sym;
     }
     if (!sym && type_checker && type_checker->get_scope()) {
         sym = type_checker->get_scope()->lookup(type_name);
@@ -1563,7 +1586,11 @@ bool CompileTimeEvaluator::coerce_value_to_lvalue_type(ExprPtr lvalue,
         target_type = lvalue->type;
     }
     if (!target_type && lvalue && lvalue->kind == Expr::Kind::Identifier) {
-        Symbol* sym = type_checker ? type_checker->binding_for(lvalue.get()) : nullptr;
+        Symbol* sym = lvalue->resolved_symbol;
+        if (!sym && type_checker) {
+            sym = type_checker->binding_for(lvalue.get());
+            lvalue->resolved_symbol = sym;
+        }
         if (!sym && type_checker && type_checker->get_scope()) {
             sym = type_checker->get_scope()->lookup(lvalue->name);
         }
@@ -1767,8 +1794,13 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         return false;
     }
     *slot = clone_value(stored_val);
-    if (expr->left && expr->left->kind == Expr::Kind::Identifier) {
-        uninitialized_locals.erase(expr->left->name);
+    ExprPtr root_ident = expr->left;
+    while (root_ident &&
+           (root_ident->kind == Expr::Kind::Member || root_ident->kind == Expr::Kind::Index)) {
+        root_ident = root_ident->operand;
+    }
+    if (root_ident && root_ident->kind == Expr::Kind::Identifier) {
+        uninitialized_locals.erase(root_ident->name);
     }
     result = clone_value(stored_val);
     return true;

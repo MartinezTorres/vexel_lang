@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Expression parameter assignment targets callee-local shadow when names collide | Expression parameter assignment respects local shadowing
+
+
+// DC-127: Assignment inside expression parameter writes callee-local shadowed name
+&apply($expr) -> #i32 {
+    x:#i32 = 40;
+    $expr;
+    x
+}
+
+&^main() -> #i32 {
+    x:#i32 = 10;
+    y:#i32 = apply(x = x + 1);
+    x * 100 + y
+}

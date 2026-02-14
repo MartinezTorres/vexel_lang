@@ -98,6 +98,7 @@ private:
     std::unordered_map<const Symbol*, CTValue> constant_value_cache;
     std::vector<std::unordered_map<std::string, ExprPtr>> expr_param_stack;
     std::unordered_set<std::string> expanding_expr_params;
+    int expr_param_expansion_depth = 0;
     bool hard_error = false;
     ExprValueObserver value_observer;
     SymbolReadObserver symbol_read_observer;

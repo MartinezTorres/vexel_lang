@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Expression parameter assignment updates caller variable when no callee shadow exists | Expression parameter assignment updates caller when unshadowed
+
+
+// DC-128: Assignment inside expression parameter updates caller when name is unshadowed
+&apply($expr) -> #i32 {
+    y:#i32 = 3;
+    $expr;
+    y
+}
+
+&^main() -> #i32 {
+    x:#i32 = 10;
+    apply(x = x + 5);
+    x
+}
