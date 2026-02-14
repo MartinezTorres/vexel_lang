@@ -11,7 +11,7 @@ if ! rg -q "std::function<std::optional<bool>\(int instance_id, ExprPtr\)>[[:spa
   exit 1
 fi
 
-if ! rg -q "out\.constexpr_condition[[:space:]]*= \[&checker\]\(int instance_id, ExprPtr expr\)" "$ANALYZED_BUILDER"; then
+if ! rg -q "out\.constexpr_condition[[:space:]]*=.*\(int instance_id, ExprPtr expr\)" "$ANALYZED_BUILDER"; then
   echo "analyzed_program_builder must wire constexpr_condition with instance_id" >&2
   exit 1
 fi

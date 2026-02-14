@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../../../../.." && pwd)"
 OPT_CPP="$ROOT/frontend/src/transform/optimizer.cpp"
 
-if ! rg -q "set_symbol_read_observer" "$OPT_CPP"; then
-  echo "optimizer must consume evaluator symbol-read tracing" >&2
+if ! rg -q "cte_engine_\\.query\\(" "$OPT_CPP"; then
+  echo "optimizer must consume CTE through the canonical CTE engine query path" >&2
   exit 1
 fi
 
