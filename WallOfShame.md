@@ -328,3 +328,13 @@ Resolution entry:
 - `Summary`: Optimizer CTE scheduler repeatedly constructs fresh evaluators per root/expression instead of reusing compiled execution state.
 - `Impact`: Compile-time execution scales poorly on large constexpr workloads due to repeated evaluator setup, AST traversal, and value cloning.
 - `Evidence`: Audit finding in `frontend/src/transform/optimizer.cpp` (`CompileTimeEvaluator evaluator(...)` inside root/expr queue drains).
+
+- `ID`: `WS-019`
+- `Type`: `Resolution`
+- `Resolved`: `925c441`
+- `Notes`: Introduced canonical `CTEEngine` service and removed direct typechecker-side `CompileTimeEvaluator` ownership/instantiation.
+
+- `ID`: `WS-020`
+- `Type`: `Resolution`
+- `Resolved`: `925c441`
+- `Notes`: `AnalyzedProgram::constexpr_condition` now reads optimizer `constexpr_conditions/constexpr_values` facts instead of recomputing through typechecker.
