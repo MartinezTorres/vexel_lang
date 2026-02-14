@@ -80,7 +80,7 @@ private:
     bool eval_iteration(ExprPtr expr, CTValue& result);
     bool eval_repeat(ExprPtr expr, CTValue& result);
     bool eval_length(ExprPtr expr, CTValue& result);
-    bool eval_block_vm(ExprPtr expr, CTValue& result);
+    bool eval_block(ExprPtr expr, CTValue& result);
     bool declare_uninitialized_local(const StmtPtr& stmt);
     bool coerce_value_to_type(const CTValue& input, TypePtr target_type, CTValue& output);
     bool coerce_value_to_lvalue_type(ExprPtr lvalue, const CTValue& input, CTValue& output);
@@ -96,6 +96,8 @@ private:
 
     std::unordered_set<const Symbol*> constant_eval_stack;
     std::unordered_map<const Symbol*, CTValue> constant_value_cache;
+    std::vector<std::unordered_map<std::string, ExprPtr>> expr_param_stack;
+    std::unordered_set<std::string> expanding_expr_params;
     bool hard_error = false;
     ExprValueObserver value_observer;
     SymbolReadObserver symbol_read_observer;

@@ -2,15 +2,7 @@
 ```
 // Lowered Vexel module: tests/inference/TI-014/nested_modify/test.vx
 &^main() -> #i32 {
-    counter: #i32 = 0;
-    &increment() -> #i32 {
-        counter = counter + 1;
-        counter
-    }
-    increment();
-    increment();
-    increment();
-    counter
+    3
 }
 ```
 

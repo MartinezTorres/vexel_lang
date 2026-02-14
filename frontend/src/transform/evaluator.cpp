@@ -86,6 +86,8 @@ void CompileTimeEvaluator::reset_state() {
     return_depth = 0;
     constant_eval_stack.clear();
     constant_value_cache.clear();
+    expr_param_stack.clear();
+    expanding_expr_params.clear();
     hard_error = false;
     value_observer = nullptr;
     symbol_read_observer = nullptr;
@@ -164,7 +166,7 @@ bool CompileTimeEvaluator::try_evaluate(ExprPtr expr, CTValue& result) {
             success = eval_length(expr, result);
             break;
         case Expr::Kind::Block:
-            success = eval_block_vm(expr, result);
+            success = eval_block(expr, result);
             break;
         default:
             error_msg = "Expression kind not supported at compile time";
@@ -296,225 +298,57 @@ bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
     return true;
 }
 
-bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result) {
+bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
     if (!expr || expr->kind != Expr::Kind::Block) {
         return false;
     }
 
-    enum class VmOpKind {
-        EvalExpr,
-        EvalDeclAssignment,
-        DeclareVar,
-        JumpIfFalse,
-        Jump,
-        ExitScope,
-        ReturnExpr,
-        BreakSignal,
-        ContinueSignal,
-    };
-
-    struct VmOp {
-        VmOpKind kind = VmOpKind::EvalExpr;
-        ExprPtr expr;
-        StmtPtr stmt;
-        int target = -1;
-        std::vector<std::string> scope_names;
-    };
-
-    struct VmLoopCtx {
-        int cond_pc = -1;
-        std::vector<int> break_jumps;
-        std::vector<int> continue_jumps;
-    };
-
-    std::vector<VmOp> code;
-    std::vector<std::vector<std::string>> scope_stack;
-    std::vector<VmLoopCtx> loop_stack;
-
-    auto begin_scope = [&]() {
-        scope_stack.emplace_back();
-    };
-
-    auto register_decl = [&](const std::string& name) {
-        if (!scope_stack.empty()) {
-            scope_stack.back().push_back(name);
-        }
-    };
-
-    auto end_scope = [&](std::vector<std::string>& names) {
-        if (scope_stack.empty()) {
-            names.clear();
-            return;
-        }
-        names = std::move(scope_stack.back());
-        scope_stack.pop_back();
-    };
-
-    auto add_op = [&](VmOp op) -> int {
-        code.push_back(std::move(op));
-        return static_cast<int>(code.size()) - 1;
-    };
-
-    std::function<bool(const ExprPtr&)> compile_expr_stmt;
-    std::function<bool(const StmtPtr&)> compile_stmt;
-
-    compile_expr_stmt = [&](const ExprPtr& e) -> bool {
-        if (!e) return true;
-        if (e->kind == Expr::Kind::Block) {
-            begin_scope();
-            for (const auto& st : e->statements) {
-                if (!compile_stmt(st)) {
-                    return false;
-                }
-            }
-            if (e->result_expr) {
-                VmOp result_op;
-                result_op.kind = VmOpKind::EvalExpr;
-                result_op.expr = e->result_expr;
-                add_op(std::move(result_op));
-            }
-            VmOp exit_op;
-            exit_op.kind = VmOpKind::ExitScope;
-            end_scope(exit_op.scope_names);
-            add_op(std::move(exit_op));
-            return true;
-        }
-
-        if (e->kind == Expr::Kind::Repeat) {
-            if (!e->condition || !e->right) {
-                return false;
-            }
-            VmOp cond_op;
-            cond_op.kind = VmOpKind::JumpIfFalse;
-            cond_op.expr = e->condition;
-            int cond_pc = add_op(std::move(cond_op));
-
-            loop_stack.push_back(VmLoopCtx{cond_pc, {}, {}});
-            if (!compile_expr_stmt(e->right)) {
-                return false;
-            }
-
-            for (int pc : loop_stack.back().continue_jumps) {
-                code[static_cast<size_t>(pc)].target = cond_pc;
-            }
-
-            VmOp back_op;
-            back_op.kind = VmOpKind::Jump;
-            back_op.target = cond_pc;
-            add_op(std::move(back_op));
-
-            int end_pc = static_cast<int>(code.size());
-            code[static_cast<size_t>(cond_pc)].target = end_pc;
-            for (int pc : loop_stack.back().break_jumps) {
-                code[static_cast<size_t>(pc)].target = end_pc;
-            }
-            loop_stack.pop_back();
-            return true;
-        }
-
-        if (e->kind == Expr::Kind::Assignment &&
-            e->creates_new_variable &&
-            e->left &&
-            e->left->kind == Expr::Kind::Identifier) {
-            register_decl(e->left->name);
-            VmOp op;
-            op.kind = VmOpKind::EvalDeclAssignment;
-            op.expr = e;
-            add_op(std::move(op));
-            return true;
-        }
-
-        VmOp op;
-        op.kind = VmOpKind::EvalExpr;
-        op.expr = e;
-        add_op(std::move(op));
-        return true;
-    };
-
-    compile_stmt = [&](const StmtPtr& stmt) -> bool {
-        if (!stmt) return true;
-        switch (stmt->kind) {
-            case Stmt::Kind::Expr:
-                return compile_expr_stmt(stmt->expr);
-            case Stmt::Kind::VarDecl: {
-                register_decl(stmt->var_name);
-                VmOp op;
-                op.kind = VmOpKind::DeclareVar;
-                op.stmt = stmt;
-                add_op(std::move(op));
-                return true;
-            }
-            case Stmt::Kind::ConditionalStmt: {
-                VmOp cond_op;
-                cond_op.kind = VmOpKind::JumpIfFalse;
-                cond_op.expr = stmt->condition;
-                int cond_pc = add_op(std::move(cond_op));
-                if (!compile_stmt(stmt->true_stmt)) {
-                    return false;
-                }
-                code[static_cast<size_t>(cond_pc)].target = static_cast<int>(code.size());
-                return true;
-            }
-            case Stmt::Kind::Return: {
-                if (!stmt->return_expr) {
-                    error_msg = "Return statement requires an expression at compile time";
-                    return false;
-                }
-                VmOp op;
-                op.kind = VmOpKind::ReturnExpr;
-                op.expr = stmt->return_expr;
-                add_op(std::move(op));
-                return true;
-            }
-            case Stmt::Kind::Break: {
-                if (loop_stack.empty()) {
-                    if (loop_depth > 0) {
-                        VmOp op;
-                        op.kind = VmOpKind::BreakSignal;
-                        add_op(std::move(op));
-                        return true;
-                    }
-                    error_msg = "Break used outside of loop in compile-time evaluation";
-                    return false;
-                }
-                VmOp op;
-                op.kind = VmOpKind::Jump;
-                int pc = add_op(std::move(op));
-                loop_stack.back().break_jumps.push_back(pc);
-                return true;
-            }
-            case Stmt::Kind::Continue: {
-                if (loop_stack.empty()) {
-                    if (loop_depth > 0) {
-                        VmOp op;
-                        op.kind = VmOpKind::ContinueSignal;
-                        add_op(std::move(op));
-                        return true;
-                    }
-                    error_msg = "Continue used outside of loop in compile-time evaluation";
-                    return false;
-                }
-                VmOp op;
-                op.kind = VmOpKind::Jump;
-                int pc = add_op(std::move(op));
-                loop_stack.back().continue_jumps.push_back(pc);
-                return true;
-            }
-            default:
-                return false;
-        }
-    };
-
-    begin_scope();
-    for (const auto& stmt : expr->statements) {
-        if (!compile_stmt(stmt)) {
-            return false;
-        }
-    }
-    std::vector<std::string> top_scope_names;
-    end_scope(top_scope_names);
     auto saved_constants = constants;
     auto saved_uninitialized = uninitialized_locals;
+
+    struct LocalShadow {
+        bool had_const = false;
+        CTValue old_const = static_cast<int64_t>(0);
+        bool had_uninitialized = false;
+    };
+
+    std::unordered_map<std::string, LocalShadow> shadows;
+    std::vector<std::string> local_names;
+
+    auto restore_on_failure = [&]() {
+        constants = saved_constants;
+        uninitialized_locals = saved_uninitialized;
+    };
+
+    auto remember_local = [&](const std::string& name) {
+        if (name.empty() || shadows.count(name) > 0) {
+            return;
+        }
+
+        LocalShadow shadow;
+        auto const_it = constants.find(name);
+        if (const_it != constants.end()) {
+            shadow.had_const = true;
+            shadow.old_const = clone_value(const_it->second);
+        }
+        shadow.had_uninitialized = uninitialized_locals.count(name) > 0;
+        shadows[name] = std::move(shadow);
+        local_names.push_back(name);
+    };
+
+    auto cleanup_locals = [&]() {
+        for (const auto& name : local_names) {
+            constants.erase(name);
+            uninitialized_locals.erase(name);
+            const LocalShadow& shadow = shadows[name];
+            if (shadow.had_const) {
+                constants[name] = clone_value(shadow.old_const);
+            }
+            if (shadow.had_uninitialized) {
+                uninitialized_locals.insert(name);
+            }
+        }
+    };
 
     auto scalar_to_bool = [&](const CTValue& v, bool& out) -> bool {
         if (std::holds_alternative<int64_t>(v)) {
@@ -536,130 +370,112 @@ bool CompileTimeEvaluator::eval_block_vm(ExprPtr expr, CTValue& result) {
         return false;
     };
 
-    int pc = 0;
-    int64_t vm_steps = 0;
-    std::unordered_map<int, int> back_edge_counts;
-    while (pc >= 0 && static_cast<size_t>(pc) < code.size()) {
-        if (++vm_steps > static_cast<int64_t>(MAX_LOOP_ITERATIONS) * 64) {
-            error_msg = "VM step limit exceeded in compile-time evaluation";
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
-            return false;
-        }
-        const VmOp& op = code[static_cast<size_t>(pc)];
-        switch (op.kind) {
-            case VmOpKind::EvalExpr: {
-                CTValue stmt_val;
-                if (!try_evaluate(op.expr, stmt_val)) {
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
+    std::function<bool(const StmtPtr&)> eval_stmt = [&](const StmtPtr& stmt) -> bool {
+        if (!stmt) return true;
+
+        switch (stmt->kind) {
+            case Stmt::Kind::Expr: {
+                if (!stmt->expr) return true;
+                if (stmt->expr->kind == Expr::Kind::Assignment &&
+                    stmt->expr->creates_new_variable &&
+                    stmt->expr->left &&
+                    stmt->expr->left->kind == Expr::Kind::Identifier) {
+                    remember_local(stmt->expr->left->name);
+                }
+                CTValue ignored;
+                if (!try_evaluate(stmt->expr, ignored)) {
+                    restore_on_failure();
                     return false;
                 }
-                pc++;
-                break;
+                return true;
             }
-            case VmOpKind::EvalDeclAssignment: {
-                CTValue stmt_val;
-                if (!try_evaluate(op.expr, stmt_val)) {
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
-                    return false;
-                }
-                pc++;
-                break;
-            }
-            case VmOpKind::DeclareVar: {
-                if (op.stmt && op.stmt->var_init) {
+            case Stmt::Kind::VarDecl: {
+                remember_local(stmt->var_name);
+                if (stmt->var_init) {
                     CTValue init_val;
-                    if (!try_evaluate(op.stmt->var_init, init_val)) {
-                        constants = saved_constants;
-                        uninitialized_locals = saved_uninitialized;
+                    if (!try_evaluate(stmt->var_init, init_val)) {
+                        restore_on_failure();
                         return false;
                     }
                     CTValue stored_val = clone_value(init_val);
-                    if (op.stmt->var_type &&
-                        !coerce_value_to_type(stored_val, op.stmt->var_type, stored_val)) {
-                        constants = saved_constants;
-                        uninitialized_locals = saved_uninitialized;
+                    if (stmt->var_type &&
+                        !coerce_value_to_type(stored_val, stmt->var_type, stored_val)) {
+                        restore_on_failure();
                         return false;
                     }
-                    constants[op.stmt->var_name] = clone_value(stored_val);
-                    uninitialized_locals.erase(op.stmt->var_name);
-                } else if (!declare_uninitialized_local(op.stmt)) {
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
+                    constants[stmt->var_name] = clone_value(stored_val);
+                    uninitialized_locals.erase(stmt->var_name);
+                } else if (!declare_uninitialized_local(stmt)) {
+                    restore_on_failure();
                     return false;
                 }
-                pc++;
-                break;
+                return true;
             }
-            case VmOpKind::JumpIfFalse: {
+            case Stmt::Kind::ConditionalStmt: {
                 CTValue cond_val;
-                if (!try_evaluate(op.expr, cond_val)) {
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
+                if (!try_evaluate(stmt->condition, cond_val)) {
+                    restore_on_failure();
                     return false;
                 }
                 bool is_true = false;
                 if (!scalar_to_bool(cond_val, is_true)) {
                     error_msg = "Conditional expression condition must be a scalar value";
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
+                    restore_on_failure();
                     return false;
                 }
-                pc = is_true ? (pc + 1) : op.target;
-                break;
+                if (is_true && !eval_stmt(stmt->true_stmt)) {
+                    return false;
+                }
+                return true;
             }
-            case VmOpKind::Jump:
-                if (op.target <= pc) {
-                    int& iter_count = back_edge_counts[op.target];
-                    iter_count++;
-                    if (iter_count > MAX_LOOP_ITERATIONS) {
-                        error_msg = "Loop iteration limit exceeded in compile-time evaluation";
-                        constants = saved_constants;
-                        uninitialized_locals = saved_uninitialized;
-                        return false;
-                    }
+            case Stmt::Kind::Return: {
+                if (!stmt->return_expr) {
+                    error_msg = "Return statement requires an expression at compile time";
+                    restore_on_failure();
+                    return false;
                 }
-                pc = op.target;
-                break;
-            case VmOpKind::ExitScope:
-                for (const auto& name : op.scope_names) {
-                    constants.erase(name);
-                    uninitialized_locals.erase(name);
-                }
-                pc++;
-                break;
-            case VmOpKind::ReturnExpr: {
                 CTValue ret_val;
-                if (!try_evaluate(op.expr, ret_val)) {
-                    constants = saved_constants;
-                    uninitialized_locals = saved_uninitialized;
+                if (!try_evaluate(stmt->return_expr, ret_val)) {
+                    restore_on_failure();
                     return false;
                 }
                 throw EvalReturn{clone_value(ret_val)};
             }
-            case VmOpKind::BreakSignal:
-                throw EvalBreak{};
-            case VmOpKind::ContinueSignal:
-                throw EvalContinue{};
+            case Stmt::Kind::Break:
+                if (loop_depth > 0) {
+                    throw EvalBreak{};
+                }
+                error_msg = "Break used outside of loop in compile-time evaluation";
+                restore_on_failure();
+                return false;
+            case Stmt::Kind::Continue:
+                if (loop_depth > 0) {
+                    throw EvalContinue{};
+                }
+                error_msg = "Continue used outside of loop in compile-time evaluation";
+                restore_on_failure();
+                return false;
+            default:
+                return true;
+        }
+    };
+
+    for (const auto& stmt : expr->statements) {
+        if (!eval_stmt(stmt)) {
+            return false;
         }
     }
 
     if (expr->result_expr) {
         if (!try_evaluate(expr->result_expr, result)) {
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
+            restore_on_failure();
             return false;
         }
     } else {
         result = static_cast<int64_t>(0);
     }
 
-    for (const auto& name : top_scope_names) {
-        constants.erase(name);
-        uninitialized_locals.erase(name);
-    }
+    cleanup_locals();
     return true;
 }
 
@@ -1015,55 +831,137 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
 
     // Evaluate arguments
     std::unordered_map<std::string, CTValue> saved_constants = constants;
+    std::unordered_set<std::string> saved_uninitialized = uninitialized_locals;
+    std::unordered_set<std::string> call_bindings;
+    std::unordered_map<std::string, ExprPtr> expr_param_bindings;
+
+    auto restore_all_state = [&]() {
+        constants = saved_constants;
+        uninitialized_locals = saved_uninitialized;
+    };
+
+    auto restore_binding = [&](const std::string& name) {
+        auto it = saved_constants.find(name);
+        if (it != saved_constants.end()) {
+            constants[name] = clone_value(it->second);
+        } else {
+            constants.erase(name);
+        }
+        if (saved_uninitialized.count(name) > 0) {
+            uninitialized_locals.insert(name);
+        } else {
+            uninitialized_locals.erase(name);
+        }
+    };
+
+    auto cleanup_call_frame = [&]() {
+        std::vector<std::string> introduced_constants;
+        introduced_constants.reserve(constants.size());
+        for (const auto& entry : constants) {
+            if (saved_constants.count(entry.first) == 0) {
+                introduced_constants.push_back(entry.first);
+            }
+        }
+        for (const auto& name : introduced_constants) {
+            constants.erase(name);
+        }
+
+        std::vector<std::string> introduced_uninitialized;
+        introduced_uninitialized.reserve(uninitialized_locals.size());
+        for (const auto& name : uninitialized_locals) {
+            if (saved_uninitialized.count(name) == 0) {
+                introduced_uninitialized.push_back(name);
+            }
+        }
+        for (const auto& name : introduced_uninitialized) {
+            uninitialized_locals.erase(name);
+        }
+
+        for (const auto& name : call_bindings) {
+            restore_binding(name);
+        }
+    };
+
     if (!func->ref_params.empty()) {
         if (expr->receivers.size() != func->ref_params.size()) {
             error_msg = "Receiver count mismatch in compile-time evaluation";
             return false;
         }
         for (size_t i = 0; i < func->ref_params.size(); i++) {
+            call_bindings.insert(func->ref_params[i]);
             CTValue rec_val;
             if (!try_evaluate(expr->receivers[i], rec_val)) {
-                constants = saved_constants;
+                restore_all_state();
                 return false;
             }
             if (i < func->ref_param_types.size() && func->ref_param_types[i]) {
                 CTValue coerced;
                 if (!coerce_value_to_type(rec_val, func->ref_param_types[i], coerced)) {
-                    constants = saved_constants;
+                    restore_all_state();
                     return false;
                 }
                 constants[func->ref_params[i]] = clone_value(coerced);
             } else {
                 constants[func->ref_params[i]] = clone_value(rec_val);
             }
+            uninitialized_locals.erase(func->ref_params[i]);
         }
     }
     for (size_t i = 0; i < expr->args.size(); i++) {
+        const Parameter& param = func->params[i];
+        call_bindings.insert(param.name);
+        if (param.is_expression_param) {
+            expr_param_bindings[param.name] = expr->args[i];
+            continue;
+        }
         CTValue arg_val;
         if (!try_evaluate(expr->args[i], arg_val)) {
-            constants = saved_constants;
+            restore_all_state();
             return false;
         }
-        if (i < func->params.size() && func->params[i].type) {
+        if (param.type) {
             CTValue coerced;
-            if (!coerce_value_to_type(arg_val, func->params[i].type, coerced)) {
-                constants = saved_constants;
+            if (!coerce_value_to_type(arg_val, param.type, coerced)) {
+                restore_all_state();
                 return false;
             }
-            constants[func->params[i].name] = clone_value(coerced);
+            constants[param.name] = clone_value(coerced);
         } else {
-            constants[func->params[i].name] = clone_value(arg_val);
+            constants[param.name] = clone_value(arg_val);
         }
+        uninitialized_locals.erase(param.name);
     }
 
     // Evaluate function body
     if (!func->body) {
         error_msg = "Function has no body";
-        constants = saved_constants;
+        restore_all_state();
         return false;
     }
 
     push_ref_params(func);
+    struct RefParamGuard {
+        CompileTimeEvaluator* self;
+        ~RefParamGuard() {
+            if (self) self->pop_ref_params();
+        }
+    } ref_guard{this};
+
+    bool pushed_expr_params = false;
+    if (!expr_param_bindings.empty()) {
+        expr_param_stack.push_back(std::move(expr_param_bindings));
+        pushed_expr_params = true;
+    }
+    struct ExprParamGuard {
+        CompileTimeEvaluator* self;
+        bool active = false;
+        ~ExprParamGuard() {
+            if (active && self && !self->expr_param_stack.empty()) {
+                self->expr_param_stack.pop_back();
+            }
+        }
+    } expr_param_guard{this, pushed_expr_params};
+
     struct ReturnGuard {
         int& depth;
         explicit ReturnGuard(int& d) : depth(d) { depth++; }
@@ -1124,12 +1022,29 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
             }
         }
     }
-    pop_ref_params();
-    constants = saved_constants;
-    return success;
+    if (!success) {
+        restore_all_state();
+        return false;
+    }
+
+    cleanup_call_frame();
+    return true;
 }
 
 bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
+    if (expanding_expr_params.count(expr->name) == 0) {
+        for (auto it = expr_param_stack.rbegin(); it != expr_param_stack.rend(); ++it) {
+            auto found = it->find(expr->name);
+            if (found == it->end() || !found->second) {
+                continue;
+            }
+            expanding_expr_params.insert(expr->name);
+            const bool ok = try_evaluate(found->second, result);
+            expanding_expr_params.erase(expr->name);
+            return ok;
+        }
+    }
+
     auto it = constants.find(expr->name);
     if (it != constants.end()) {
         if (std::holds_alternative<CTUninitialized>(it->second)) {

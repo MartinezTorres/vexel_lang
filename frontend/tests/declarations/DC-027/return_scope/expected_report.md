@@ -1,14 +1,8 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-027/return_scope/test.vx
-&outer() -> #i32 {
-    &inner() -> #i32 {
-        -> 10;
-    }
-    30
-}
 &^main() -> #i32 {
-    outer()
+    30
 }
 ```
 

@@ -1,15 +1,8 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/declarations/DC-033/no_outlive/test.vx
-&test() -> #i32 {
-    x: #i32 = 10;
-    &inner() -> #i32 {
-        x
-    }
-    inner()
-}
 &^main() -> #i32 {
-    test()
+    10
 }
 ```
 

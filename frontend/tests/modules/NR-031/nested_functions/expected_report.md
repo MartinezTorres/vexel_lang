@@ -1,14 +1,8 @@
 ## Stdout
 ```
 // Lowered Vexel module: tests/modules/NR-031/nested_functions/test.vx
-&outer() -> #i32 {
-    &inner() -> #i32 {
-        99
-    }
-    99
-}
 &^main() -> #i32 {
-    outer()
+    99
 }
 ```
 
