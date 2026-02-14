@@ -292,3 +292,39 @@ Resolution entry:
 - `Type`: `Resolution`
 - `Resolved`: `7664739`
 - `Notes`: Status reconciliation (append-only): issue entry keeps historical `Status: UNRESOLVED`, but effective state is RESOLVED by this and prior resolution entries.
+
+- `ID`: `WS-018`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Compile-time execution uses a hybrid semantic engine (`eval_block_vm` for control flow, `try_evaluate` AST dispatch for expression semantics) instead of one canonical execution model.
+- `Impact`: Semantic drift risk remains high and performance work is fragmented because CTE behavior is split across two interpreters with different responsibilities.
+- `Evidence`: Audit finding in `frontend/src/transform/evaluator.cpp` (`eval_block_vm` still repeatedly delegates expression semantics to `try_evaluate`).
+
+- `ID`: `WS-019`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Type checker owns direct compile-time evaluation entry points (`try_evaluate_constexpr`, `query_constexpr`) and instantiates evaluators ad hoc.
+- `Impact`: CTE ownership is split across optimizer and typechecker, increasing semantic drift risk and preventing one canonical execution service.
+- `Evidence`: Audit finding in `frontend/src/type/typechecker.cpp` (direct `CompileTimeEvaluator` construction in constexpr query helpers).
+
+- `ID`: `WS-020`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Backend handoff exposes `constexpr_condition` through `TypeChecker` recomputation instead of using optimizer facts as the single truth.
+- `Impact`: Backend-visible constexpr decisions can diverge from optimizer/residualizer facts and bypass canonical CTE fact ownership.
+- `Evidence`: Audit finding in `frontend/src/pipeline/analyzed_program_builder.cpp` (`constexpr_condition` callback calls `checker.constexpr_condition`).
+
+- `ID`: `WS-021`
+- `Type`: `Issue`
+- `Status`: `UNRESOLVED`
+- `Introduced`: `UNKNOWN`
+- `Resolved`: `UNRESOLVED`
+- `Summary`: Optimizer CTE scheduler repeatedly constructs fresh evaluators per root/expression instead of reusing compiled execution state.
+- `Impact`: Compile-time execution scales poorly on large constexpr workloads due to repeated evaluator setup, AST traversal, and value cloning.
+- `Evidence`: Audit finding in `frontend/src/transform/optimizer.cpp` (`CompileTimeEvaluator evaluator(...)` inside root/expr queue drains).
