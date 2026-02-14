@@ -173,6 +173,7 @@ private:
         if (!type) return;
         if (type->kind == Type::Kind::Array) {
             collect_type(type->element_type, instance_id);
+            add_context_root(type->array_size, instance_id);
             collect_expr(type->array_size, instance_id, false);
         }
     }
@@ -435,10 +436,8 @@ public:
 
         for (size_t i = 0; i < collector_.all_exprs().size(); ++i) {
             expr_index_by_key_[collector_.all_exprs()[i].key] = i;
-            enqueue_expr(i);
         }
         for (size_t i = 0; i < collector_.context_roots().size(); ++i) {
-            root_keys_.insert(collector_.context_roots()[i].key);
             enqueue_root(i);
         }
         for (const auto& candidate : collector_.global_constant_candidates()) {
@@ -509,7 +508,6 @@ private:
     std::unordered_set<const Symbol*> tracked_symbols_;
 
     std::unordered_map<ExprFactKey, size_t, ExprFactKeyHash> expr_index_by_key_;
-    std::unordered_set<ExprFactKey, ExprFactKeyHash> root_keys_;
     std::vector<bool> expr_enqueued_;
     std::vector<bool> root_enqueued_;
     std::queue<size_t> expr_queue_;
@@ -532,11 +530,12 @@ private:
         return out;
     }
 
-    void enqueue_expr(size_t idx) {
-        if (idx >= expr_enqueued_.size()) return;
-        if (expr_enqueued_[idx]) return;
+    bool enqueue_expr(size_t idx) {
+        if (idx >= expr_enqueued_.size()) return false;
+        if (expr_enqueued_[idx]) return false;
         expr_enqueued_[idx] = true;
         expr_queue_.push(idx);
+        return true;
     }
 
     void enqueue_root(size_t idx) {
@@ -628,10 +627,12 @@ private:
 
             std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> local_stable;
             std::unordered_set<ExprFactKey, ExprFactKeyHash> local_unstable;
+            std::unordered_set<ExprFactKey, ExprFactKeyHash> local_observed;
             std::unordered_set<const Symbol*> local_symbols;
 
             auto observe_local = [&](const ExprFactKey& key, const CTValue& value) {
                 if (!key.expr || local_unstable.count(key)) return;
+                local_observed.insert(key);
                 auto it = local_stable.find(key);
                 if (it == local_stable.end()) {
                     local_stable.emplace(key, clone_value(value));
@@ -657,22 +658,36 @@ private:
                         local_symbols.insert(sym);
                     });
             update_root_dependencies(root_idx, local_symbols);
-            if (query.status != CTEQueryStatus::Known) {
-                continue;
-            }
-
-            for (const auto& key : local_unstable) {
-                if (stable_values_.count(key)) {
-                    stable_values_.erase(key);
-                    unstable_values_.insert(key);
-                    changed = true;
-                } else if (!unstable_values_.count(key)) {
-                    unstable_values_.insert(key);
-                    changed = true;
+            const bool root_known = query.status == CTEQueryStatus::Known;
+            if (root_known) {
+                for (const auto& key : local_unstable) {
+                    if (stable_values_.count(key)) {
+                        stable_values_.erase(key);
+                        unstable_values_.insert(key);
+                        changed = true;
+                    } else if (!unstable_values_.count(key)) {
+                        unstable_values_.insert(key);
+                        changed = true;
+                    }
+                }
+                for (const auto& entry : local_stable) {
+                    if (observe_expr_value(entry.first, entry.second)) {
+                        changed = true;
+                    }
                 }
             }
-            for (const auto& entry : local_stable) {
-                if (observe_expr_value(entry.first, entry.second)) {
+
+            // Root execution can short-circuit on runtime-dependent paths.
+            // Queue only unresolved nodes from this root for targeted fallback
+            // queries instead of maintaining a full eager per-expression pass.
+            for (const Expr* expr_node : root_expr_nodes) {
+                if (!expr_node) continue;
+                ExprFactKey key = expr_fact_key(root.instance_id, expr_node);
+                if (root_known && local_observed.count(key)) continue;
+                if (stable_values_.count(key) || unstable_values_.count(key)) continue;
+                auto idx_it = expr_index_by_key_.find(key);
+                if (idx_it == expr_index_by_key_.end()) continue;
+                if (enqueue_expr(idx_it->second)) {
                     changed = true;
                 }
             }
@@ -692,12 +707,10 @@ private:
 
             const CollectedExpr& item = collector_.all_exprs()[expr_idx];
             ExprFactKey key = item.key;
-            if (root_keys_.count(key)) {
-                continue;
-            }
             if (stable_values_.count(key) || unstable_values_.count(key)) {
                 continue;
             }
+
             auto scope = type_checker_->scoped_instance(item.instance_id);
             (void)scope;
 

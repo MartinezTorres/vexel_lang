@@ -101,7 +101,9 @@ Any pass that mutates AST must keep bindings/facts coherent for downstream passe
 
 - Frontend semantic solving is iterative/fixpoint-based, not a single-pass assumption.
 - Compile-time fact solving is dependency-driven:
-  - `optimizer` owns worklists for context roots and expression nodes.
+  - `optimizer` owns a worklist of context roots.
+  - Root evaluation emits sub-expression facts observed during root execution.
+  - Unresolved nodes may use a targeted fallback query queue; eager full-expression rescans are forbidden.
   - `evaluator` trace hooks (`value` and `symbol-read`) feed dependency edges.
   - When known compile-time symbol values change, only dependent work is re-queued.
 - Each iteration must be monotonic for knowledge:
