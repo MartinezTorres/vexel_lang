@@ -338,3 +338,13 @@ Resolution entry:
 - `Type`: `Resolution`
 - `Resolved`: `925c441`
 - `Notes`: `AnalyzedProgram::constexpr_condition` now reads optimizer `constexpr_conditions/constexpr_values` facts instead of recomputing through typechecker.
+
+- `ID`: `WS-018`
+- `Type`: `Resolution`
+- `Resolved`: `319e568`
+- `Notes`: Removed hybrid block-VM ownership path from evaluator; compile-time block execution now uses one canonical evaluator flow (`eval_block`) with architecture guard coverage in `AR-030`.
+
+- `ID`: `WS-021`
+- `Type`: `Resolution`
+- `Resolved`: `925c441`
+- `Notes`: Replaced ad-hoc evaluator construction in optimizer with a persistent `CTEEngine`-backed fixpoint scheduler (`expr_queue_`/`root_queue_` + dependency requeue), making CTE fact collection single-owner and stateful.
