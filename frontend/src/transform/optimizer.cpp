@@ -625,22 +625,22 @@ private:
 
             ExprPtrSet root_expr_nodes = collect_root_expr_nodes(root.expr);
 
-            std::unordered_map<ExprFactKey, CTValue, ExprFactKeyHash> local_stable;
-            std::unordered_set<ExprFactKey, ExprFactKeyHash> local_unstable;
-            std::unordered_set<ExprFactKey, ExprFactKeyHash> local_observed;
+            std::unordered_map<const Expr*, CTValue> local_stable;
+            std::unordered_set<const Expr*> local_unstable;
+            std::unordered_set<const Expr*> local_observed;
             std::unordered_set<const Symbol*> local_symbols;
 
-            auto observe_local = [&](const ExprFactKey& key, const CTValue& value) {
-                if (!key.expr || local_unstable.count(key)) return;
-                local_observed.insert(key);
-                auto it = local_stable.find(key);
+            auto observe_local = [&](const Expr* expr_node, const CTValue& value) {
+                if (!expr_node || local_unstable.count(expr_node)) return;
+                local_observed.insert(expr_node);
+                auto it = local_stable.find(expr_node);
                 if (it == local_stable.end()) {
-                    local_stable.emplace(key, clone_value(value));
+                    local_stable.emplace(expr_node, clone_value(value));
                     return;
                 }
                 if (!ctvalue_equal(it->second, value)) {
                     local_stable.erase(it);
-                    local_unstable.insert(key);
+                    local_unstable.insert(expr_node);
                 }
             };
             CTEQueryResult query =
@@ -651,7 +651,7 @@ private:
                     [&](const Expr* expr, const CTValue& value) {
                         if (!expr) return;
                         if (!root_expr_nodes.count(expr)) return;
-                        observe_local(expr_fact_key(root.instance_id, expr), value);
+                        observe_local(expr, value);
                     },
                     [&](const Symbol* sym) {
                         if (!sym) return;
@@ -660,7 +660,8 @@ private:
             update_root_dependencies(root_idx, local_symbols);
             const bool root_known = query.status == CTEQueryStatus::Known;
             if (root_known) {
-                for (const auto& key : local_unstable) {
+                for (const Expr* expr_node : local_unstable) {
+                    ExprFactKey key = expr_fact_key(root.instance_id, expr_node);
                     if (stable_values_.count(key)) {
                         stable_values_.erase(key);
                         unstable_values_.insert(key);
@@ -671,7 +672,8 @@ private:
                     }
                 }
                 for (const auto& entry : local_stable) {
-                    if (observe_expr_value(entry.first, entry.second)) {
+                    ExprFactKey key = expr_fact_key(root.instance_id, entry.first);
+                    if (observe_expr_value(key, entry.second)) {
                         changed = true;
                     }
                 }
@@ -683,7 +685,7 @@ private:
             for (const Expr* expr_node : root_expr_nodes) {
                 if (!expr_node) continue;
                 ExprFactKey key = expr_fact_key(root.instance_id, expr_node);
-                if (root_known && local_observed.count(key)) continue;
+                if (root_known && local_observed.count(expr_node)) continue;
                 if (stable_values_.count(key) || unstable_values_.count(key)) continue;
                 auto idx_it = expr_index_by_key_.find(key);
                 if (idx_it == expr_index_by_key_.end()) continue;
