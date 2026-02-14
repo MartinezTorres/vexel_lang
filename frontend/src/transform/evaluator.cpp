@@ -303,9 +303,6 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    auto saved_constants = constants;
-    auto saved_uninitialized = uninitialized_locals;
-
     struct LocalShadow {
         bool had_const = false;
         CTValue old_const = static_cast<int64_t>(0);
@@ -314,11 +311,6 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
 
     std::unordered_map<std::string, LocalShadow> shadows;
     std::vector<std::string> local_names;
-
-    auto restore_on_failure = [&]() {
-        constants = saved_constants;
-        uninitialized_locals = saved_uninitialized;
-    };
 
     auto remember_local = [&](const std::string& name) {
         if (name.empty() || shadows.count(name) > 0) {
@@ -384,7 +376,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                 }
                 CTValue ignored;
                 if (!try_evaluate(stmt->expr, ignored)) {
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 return true;
@@ -394,19 +386,19 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                 if (stmt->var_init) {
                     CTValue init_val;
                     if (!try_evaluate(stmt->var_init, init_val)) {
-                        restore_on_failure();
+                        cleanup_locals();
                         return false;
                     }
                     CTValue stored_val = clone_value(init_val);
                     if (stmt->var_type &&
                         !coerce_value_to_type(stored_val, stmt->var_type, stored_val)) {
-                        restore_on_failure();
+                        cleanup_locals();
                         return false;
                     }
                     constants[stmt->var_name] = clone_value(stored_val);
                     uninitialized_locals.erase(stmt->var_name);
                 } else if (!declare_uninitialized_local(stmt)) {
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 return true;
@@ -414,13 +406,13 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
             case Stmt::Kind::ConditionalStmt: {
                 CTValue cond_val;
                 if (!try_evaluate(stmt->condition, cond_val)) {
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 bool is_true = false;
                 if (!scalar_to_bool(cond_val, is_true)) {
                     error_msg = "Conditional expression condition must be a scalar value";
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 if (is_true && !eval_stmt(stmt->true_stmt)) {
@@ -431,12 +423,12 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
             case Stmt::Kind::Return: {
                 if (!stmt->return_expr) {
                     error_msg = "Return statement requires an expression at compile time";
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 CTValue ret_val;
                 if (!try_evaluate(stmt->return_expr, ret_val)) {
-                    restore_on_failure();
+                    cleanup_locals();
                     return false;
                 }
                 throw EvalReturn{clone_value(ret_val)};
@@ -446,14 +438,14 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                     throw EvalBreak{};
                 }
                 error_msg = "Break used outside of loop in compile-time evaluation";
-                restore_on_failure();
+                cleanup_locals();
                 return false;
             case Stmt::Kind::Continue:
                 if (loop_depth > 0) {
                     throw EvalContinue{};
                 }
                 error_msg = "Continue used outside of loop in compile-time evaluation";
-                restore_on_failure();
+                cleanup_locals();
                 return false;
             default:
                 return true;
@@ -468,7 +460,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
 
     if (expr->result_expr) {
         if (!try_evaluate(expr->result_expr, result)) {
-            restore_on_failure();
+            cleanup_locals();
             return false;
         }
     } else {
@@ -1705,18 +1697,16 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                     error_msg = "Member access on non-composite value";
                     return false;
                 }
-                auto comp = std::get<std::shared_ptr<CTComposite>>(*base_slot);
-                if (!comp) {
+                auto& comp_ref = std::get<std::shared_ptr<CTComposite>>(*base_slot);
+                if (!comp_ref) {
                     error_msg = "Member access on null composite value";
                     return false;
                 }
-                if (comp.use_count() > 1) {
-                    auto unique_comp = clone_composite(comp);
-                    *base_slot = unique_comp;
-                    comp = unique_comp;
+                if (!comp_ref.unique()) {
+                    comp_ref = clone_composite(comp_ref);
                 }
-                auto it = comp->fields.find(target->name);
-                if (it == comp->fields.end()) {
+                auto it = comp_ref->fields.find(target->name);
+                if (it == comp_ref->fields.end()) {
                     error_msg = "Field not found: " + target->name;
                     return false;
                 }
@@ -1734,23 +1724,21 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                     error_msg = "Indexing non-array value at compile time";
                     return false;
                 }
-                auto array = std::get<std::shared_ptr<CTArray>>(*base_slot);
-                if (!array) {
+                auto& array_ref = std::get<std::shared_ptr<CTArray>>(*base_slot);
+                if (!array_ref) {
                     error_msg = "Indexing null array";
                     return false;
                 }
-                if (array.use_count() > 1) {
-                    auto unique_array = clone_array(array);
-                    *base_slot = unique_array;
-                    array = unique_array;
+                if (!array_ref.unique()) {
+                    array_ref = clone_array(array_ref);
                 }
                 int64_t idx = 0;
                 if (!parse_index(target->args[0], idx)) return false;
-                if (static_cast<size_t>(idx) >= array->elements.size()) {
+                if (static_cast<size_t>(idx) >= array_ref->elements.size()) {
                     error_msg = "Index out of bounds in compile-time evaluation";
                     return false;
                 }
-                out = &array->elements[static_cast<size_t>(idx)];
+                out = &array_ref->elements[static_cast<size_t>(idx)];
                 return true;
             }
             default:
@@ -1947,40 +1935,43 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    std::vector<CTValue> elements = array->elements;
-    if (expr->is_sorted_iteration && elements.size() > 1) {
+    const std::vector<CTValue>* elements = &array->elements;
+    std::vector<CTValue> sorted_elements;
+    if (expr->is_sorted_iteration && elements->size() > 1) {
+        sorted_elements = *elements;
+        elements = &sorted_elements;
         auto same_kind = [&](const CTValue& a, const CTValue& b) -> bool {
             return a.index() == b.index();
         };
-        for (size_t i = 1; i < elements.size(); ++i) {
-            if (!same_kind(elements[0], elements[i])) {
+        for (size_t i = 1; i < elements->size(); ++i) {
+            if (!same_kind((*elements)[0], (*elements)[i])) {
                 error_msg = "Sorted iteration requires uniform scalar element types";
                 return false;
             }
         }
 
-        if (std::holds_alternative<int64_t>(elements[0])) {
-            std::sort(elements.begin(), elements.end(),
+        if (std::holds_alternative<int64_t>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<int64_t>(a) < std::get<int64_t>(b);
                       });
-        } else if (std::holds_alternative<uint64_t>(elements[0])) {
-            std::sort(elements.begin(), elements.end(),
+        } else if (std::holds_alternative<uint64_t>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<uint64_t>(a) < std::get<uint64_t>(b);
                       });
-        } else if (std::holds_alternative<double>(elements[0])) {
-            std::sort(elements.begin(), elements.end(),
+        } else if (std::holds_alternative<double>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<double>(a) < std::get<double>(b);
                       });
-        } else if (std::holds_alternative<bool>(elements[0])) {
-            std::sort(elements.begin(), elements.end(),
+        } else if (std::holds_alternative<bool>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<bool>(a) < std::get<bool>(b);
                       });
-        } else if (std::holds_alternative<std::string>(elements[0])) {
-            std::sort(elements.begin(), elements.end(),
+        } else if (std::holds_alternative<std::string>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<std::string>(a) < std::get<std::string>(b);
                       });
@@ -1989,9 +1980,6 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
             return false;
         }
     }
-
-    auto saved_constants = constants;
-    auto saved_uninitialized = uninitialized_locals;
 
     bool had_underscore = constants.count("_") > 0;
     CTValue saved_underscore;
@@ -2006,15 +1994,13 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
         ~LoopGuard() { depth--; }
     } loop_guard(loop_depth);
 
-    for (const auto& elem : elements) {
+    for (const auto& elem : *elements) {
         constants["_"] = clone_value(elem);
         uninitialized_locals.erase("_");
 
         CTValue body_val;
         try {
             if (!try_evaluate(expr->right, body_val)) {
-                constants = saved_constants;
-                uninitialized_locals = saved_uninitialized;
                 return false;
             }
         } catch (const EvalContinue&) {
@@ -2043,9 +2029,6 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
 
 bool CompileTimeEvaluator::eval_repeat(ExprPtr expr, CTValue& result) {
     if (!expr || !expr->condition || !expr->right) return false;
-
-    auto saved_constants = constants;
-    auto saved_uninitialized = uninitialized_locals;
 
     struct LoopGuard {
         int& depth;
@@ -2077,15 +2060,11 @@ bool CompileTimeEvaluator::eval_repeat(ExprPtr expr, CTValue& result) {
     while (true) {
         CTValue cond_val;
         if (!try_evaluate(expr->condition, cond_val)) {
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
             return false;
         }
         bool is_true = false;
         if (!to_bool(cond_val, is_true)) {
             error_msg = "Repeat condition must be a scalar value";
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
             return false;
         }
         if (!is_true) {
@@ -2094,16 +2073,12 @@ bool CompileTimeEvaluator::eval_repeat(ExprPtr expr, CTValue& result) {
 
         if (iterations++ >= MAX_LOOP_ITERATIONS) {
             error_msg = "Repeat loop exceeded compile-time iteration limit";
-            constants = saved_constants;
-            uninitialized_locals = saved_uninitialized;
             return false;
         }
 
         CTValue body_val;
         try {
             if (!try_evaluate(expr->right, body_val)) {
-                constants = saved_constants;
-                uninitialized_locals = saved_uninitialized;
                 return false;
             }
         } catch (const EvalContinue&) {
