@@ -26,37 +26,6 @@ std::string ct_value_kind(const CTValue& value) {
     return "unknown";
 }
 
-CTValue clone_value(const CTValue& value) {
-    if (std::holds_alternative<CTUninitialized>(value)) {
-        return CTUninitialized{};
-    }
-    if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) {
-        auto src = std::get<std::shared_ptr<CTComposite>>(value);
-        if (!src) {
-            return std::shared_ptr<CTComposite>();
-        }
-        auto dst = std::make_shared<CTComposite>();
-        dst->type_name = src->type_name;
-        for (const auto& entry : src->fields) {
-            dst->fields[entry.first] = clone_value(entry.second);
-        }
-        return dst;
-    }
-    if (std::holds_alternative<std::shared_ptr<CTArray>>(value)) {
-        auto src = std::get<std::shared_ptr<CTArray>>(value);
-        if (!src) {
-            return std::shared_ptr<CTArray>();
-        }
-        auto dst = std::make_shared<CTArray>();
-        dst->elements.reserve(src->elements.size());
-        for (const auto& elem : src->elements) {
-            dst->elements.push_back(clone_value(elem));
-        }
-        return dst;
-    }
-    return value;
-}
-
 } // namespace
 
 CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
@@ -67,7 +36,7 @@ CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
     CTValue value;
     if (try_evaluate(expr, value)) {
         out.status = CTEQueryStatus::Known;
-        out.value = clone_value(value);
+        out.value = copy_ct_value(value);
         return out;
     }
 
@@ -212,7 +181,7 @@ bool CompileTimeEvaluator::evaluate_constant_symbol(Symbol* sym, CTValue& result
 
     auto cached = constant_value_cache.find(sym);
     if (cached != constant_value_cache.end()) {
-        result = clone_value(cached->second);
+        result = copy_ct_value(cached->second);
         return true;
     }
 
@@ -234,10 +203,10 @@ bool CompileTimeEvaluator::evaluate_constant_symbol(Symbol* sym, CTValue& result
         if (!coerce_value_to_type(result, sym->type, coerced)) {
             return false;
         }
-        result = clone_value(coerced);
+        result = copy_ct_value(coerced);
     }
 
-    constant_value_cache[sym] = clone_value(result);
+    constant_value_cache[sym] = copy_ct_value(result);
     return true;
 }
 
@@ -323,7 +292,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
         auto const_it = constants.find(name);
         if (const_it != constants.end()) {
             shadow.had_const = true;
-            shadow.old_const = clone_value(const_it->second);
+            shadow.old_const = copy_ct_value(const_it->second);
         }
         shadow.had_uninitialized = uninitialized_locals.count(name) > 0;
         shadows[name] = std::move(shadow);
@@ -336,7 +305,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
             uninitialized_locals.erase(name);
             const LocalShadow& shadow = shadows[name];
             if (shadow.had_const) {
-                constants[name] = clone_value(shadow.old_const);
+                constants[name] = copy_ct_value(shadow.old_const);
             }
             if (shadow.had_uninitialized) {
                 uninitialized_locals.insert(name);
@@ -391,13 +360,13 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                         cleanup_locals();
                         return false;
                     }
-                    CTValue stored_val = clone_value(init_val);
+                    CTValue stored_val = copy_ct_value(init_val);
                     if (stmt->var_type &&
                         !coerce_value_to_type(stored_val, stmt->var_type, stored_val)) {
                         cleanup_locals();
                         return false;
                     }
-                    constants[stmt->var_name] = clone_value(stored_val);
+                    constants[stmt->var_name] = copy_ct_value(stored_val);
                     uninitialized_locals.erase(stmt->var_name);
                 } else if (!declare_uninitialized_local(stmt)) {
                     cleanup_locals();
@@ -433,7 +402,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                     cleanup_locals();
                     return false;
                 }
-                throw EvalReturn{clone_value(ret_val)};
+                throw EvalReturn{copy_ct_value(ret_val)};
             }
             case Stmt::Kind::Break:
                 if (loop_depth > 0) {
@@ -843,7 +812,7 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     auto restore_binding = [&](const std::string& name) {
         auto it = saved_constants.find(name);
         if (it != saved_constants.end()) {
-            constants[name] = clone_value(it->second);
+            constants[name] = copy_ct_value(it->second);
         } else {
             constants.erase(name);
         }
@@ -855,28 +824,6 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     };
 
     auto cleanup_call_frame = [&]() {
-        std::vector<std::string> introduced_constants;
-        introduced_constants.reserve(constants.size());
-        for (const auto& entry : constants) {
-            if (saved_constants.count(entry.first) == 0) {
-                introduced_constants.push_back(entry.first);
-            }
-        }
-        for (const auto& name : introduced_constants) {
-            constants.erase(name);
-        }
-
-        std::vector<std::string> introduced_uninitialized;
-        introduced_uninitialized.reserve(uninitialized_locals.size());
-        for (const auto& name : uninitialized_locals) {
-            if (saved_uninitialized.count(name) == 0) {
-                introduced_uninitialized.push_back(name);
-            }
-        }
-        for (const auto& name : introduced_uninitialized) {
-            uninitialized_locals.erase(name);
-        }
-
         for (const auto& name : call_bindings) {
             restore_binding(name);
         }
@@ -900,9 +847,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                     restore_all_state();
                     return false;
                 }
-                constants[func->ref_params[i]] = clone_value(coerced);
+                constants[func->ref_params[i]] = copy_ct_value(coerced);
             } else {
-                constants[func->ref_params[i]] = clone_value(rec_val);
+                constants[func->ref_params[i]] = copy_ct_value(rec_val);
             }
             uninitialized_locals.erase(func->ref_params[i]);
         }
@@ -925,9 +872,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                 restore_all_state();
                 return false;
             }
-            constants[param.name] = clone_value(coerced);
+            constants[param.name] = copy_ct_value(coerced);
         } else {
-            constants[param.name] = clone_value(arg_val);
+            constants[param.name] = copy_ct_value(arg_val);
         }
         uninitialized_locals.erase(param.name);
     }
@@ -972,7 +919,7 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     try {
         success = try_evaluate(func->body, result);
     } catch (const EvalReturn& ret) {
-        result = clone_value(ret.value);
+        result = copy_ct_value(ret.value);
         success = true;
     }
     if (success) {
@@ -1000,13 +947,13 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                             success = false;
                             break;
                         }
-                        CTValue coerced_field = clone_value(it->second);
+                        CTValue coerced_field = copy_ct_value(it->second);
                         if (func->return_types[i] &&
                             !coerce_value_to_type(it->second, func->return_types[i], coerced_field)) {
                             success = false;
                             break;
                         }
-                        out_comp->fields[field_name] = clone_value(coerced_field);
+                        out_comp->fields[field_name] = copy_ct_value(coerced_field);
                     }
                     if (success) {
                         result = out_comp;
@@ -1018,7 +965,7 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
             if (!coerce_value_to_type(result, func->return_type, coerced_result)) {
                 success = false;
             } else {
-                result = clone_value(coerced_result);
+                result = copy_ct_value(coerced_result);
             }
         }
     }
@@ -1089,7 +1036,7 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
                 error_msg = "uninitialized variable accessed at compile time: " + expr->name;
                 return false;
             }
-            result = clone_value(known->second);
+            result = copy_ct_value(known->second);
             return true;
         }
     }
@@ -1172,7 +1119,7 @@ bool CompileTimeEvaluator::eval_type_constructor(ExprPtr expr, CTValue& result) 
         std::string field_name = type_decl->fields[i].name;
 
         // Convert CTValue to the field storage type
-        composite->fields[field_name] = clone_value(arg_val);
+        composite->fields[field_name] = copy_ct_value(arg_val);
     }
 
     result = composite;
@@ -1442,7 +1389,7 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
         return true;
     }
     if (!target_type || target_type->kind == Type::Kind::TypeVar) {
-        output = clone_value(input);
+        output = copy_ct_value(input);
         return true;
     }
 
@@ -1517,9 +1464,9 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                     return false;
                 }
             } else {
-                coerced_elem = clone_value(elem);
+                coerced_elem = copy_ct_value(elem);
             }
-            out_array->elements.push_back(clone_value(coerced_elem));
+            out_array->elements.push_back(copy_ct_value(coerced_elem));
         }
         output = out_array;
         return true;
@@ -1555,7 +1502,7 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 if (!coerce_value_to_type(it->second, field.type, coerced_field)) {
                     return false;
                 }
-                out_comp->fields[field.name] = clone_value(coerced_field);
+                out_comp->fields[field.name] = copy_ct_value(coerced_field);
             }
             output = out_comp;
             return true;
@@ -1566,7 +1513,7 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
         if (is_internal_tuple_type && in_comp->type_name == target_type->type_name) {
             // Lowered tuple temporaries are compiler-internal named composites.
             // Keep strict behavior for user named types, but allow exact tuple passthrough.
-            output = clone_value(input);
+            output = copy_ct_value(input);
             return true;
         }
 
@@ -1599,7 +1546,7 @@ bool CompileTimeEvaluator::coerce_value_to_lvalue_type(ExprPtr lvalue,
         }
     }
     if (!target_type) {
-        output = clone_value(input);
+        output = copy_ct_value(input);
         return true;
     }
     return coerce_value_to_type(input, target_type, output);
@@ -1664,7 +1611,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         auto dst = std::make_shared<CTComposite>();
         dst->type_name = src->type_name;
         for (const auto& entry : src->fields) {
-            dst->fields[entry.first] = clone_value(entry.second);
+            dst->fields[entry.first] = clone_ct_value(entry.second);
         }
         return dst;
     };
@@ -1673,7 +1620,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         auto dst = std::make_shared<CTArray>();
         dst->elements.reserve(src->elements.size());
         for (const auto& entry : src->elements) {
-            dst->elements.push_back(clone_value(entry));
+            dst->elements.push_back(clone_ct_value(entry));
         }
         return dst;
     };
@@ -1793,7 +1740,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     if (!coerce_value_to_lvalue_type(expr->left, assign_val, stored_val)) {
         return false;
     }
-    *slot = clone_value(stored_val);
+    *slot = copy_ct_value(stored_val);
     ExprPtr root_ident = expr->left;
     while (root_ident &&
            (root_ident->kind == Expr::Kind::Member || root_ident->kind == Expr::Kind::Index)) {
@@ -1802,7 +1749,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     if (root_ident && root_ident->kind == Expr::Kind::Identifier) {
         uninitialized_locals.erase(root_ident->name);
     }
-    result = clone_value(stored_val);
+    result = copy_ct_value(stored_val);
     return true;
 }
 
@@ -1815,7 +1762,7 @@ bool CompileTimeEvaluator::eval_array_literal(ExprPtr expr, CTValue& result) {
         if (!try_evaluate(elem, elem_val)) {
             return false;
         }
-        array->elements.push_back(clone_value(elem_val));
+        array->elements.push_back(copy_ct_value(elem_val));
     }
     result = array;
     return true;
@@ -1833,7 +1780,7 @@ bool CompileTimeEvaluator::eval_tuple_literal(ExprPtr expr, CTValue& result) {
             return false;
         }
         std::string field_name = std::string(MANGLED_PREFIX) + std::to_string(i);
-        tuple->fields[field_name] = clone_value(elem_val);
+        tuple->fields[field_name] = copy_ct_value(elem_val);
     }
     result = tuple;
     return true;
@@ -2027,7 +1974,7 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
     } loop_guard(loop_depth);
 
     for (const auto& elem : *elements) {
-        constants["_"] = clone_value(elem);
+        constants["_"] = copy_ct_value(elem);
         uninitialized_locals.erase("_");
 
         CTValue body_val;

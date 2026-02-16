@@ -13,37 +13,6 @@ namespace vexel {
 
 namespace {
 
-CTValue clone_value(const CTValue& value) {
-    if (std::holds_alternative<CTUninitialized>(value)) {
-        return CTUninitialized{};
-    }
-    if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) {
-        auto src = std::get<std::shared_ptr<CTComposite>>(value);
-        if (!src) {
-            return std::shared_ptr<CTComposite>();
-        }
-        auto dst = std::make_shared<CTComposite>();
-        dst->type_name = src->type_name;
-        for (const auto& entry : src->fields) {
-            dst->fields[entry.first] = clone_value(entry.second);
-        }
-        return dst;
-    }
-    if (std::holds_alternative<std::shared_ptr<CTArray>>(value)) {
-        auto src = std::get<std::shared_ptr<CTArray>>(value);
-        if (!src) {
-            return std::shared_ptr<CTArray>();
-        }
-        auto dst = std::make_shared<CTArray>();
-        dst->elements.reserve(src->elements.size());
-        for (const auto& elem : src->elements) {
-            dst->elements.push_back(clone_value(elem));
-        }
-        return dst;
-    }
-    return value;
-}
-
 bool ctvalue_equal(const CTValue& a, const CTValue& b) {
     if (a.index() != b.index()) return false;
 
@@ -648,7 +617,7 @@ private:
                 local_observed.insert(expr_node);
                 auto it = local_stable.find(expr_node);
                 if (it == local_stable.end()) {
-                    local_stable.emplace(expr_node, clone_value(value));
+                    local_stable.emplace(expr_node, copy_ct_value(value));
                     return;
                 }
                 if (!ctvalue_equal(it->second, value)) {
@@ -762,7 +731,7 @@ private:
 
             auto known_it = known_symbol_values_.find(sym);
             if (known_it == known_symbol_values_.end()) {
-                known_symbol_values_[sym] = clone_value(value_it->second);
+                known_symbol_values_[sym] = copy_ct_value(value_it->second);
                 changed_symbols.push_back(sym);
                 changed = true;
                 continue;

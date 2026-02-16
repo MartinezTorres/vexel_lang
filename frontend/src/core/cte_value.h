@@ -43,4 +43,10 @@ struct CTEQueryResult {
     std::string message;
 };
 
+inline CTValue copy_ct_value(const CTValue& value) {
+    return value;
+}
+
+CTValue clone_ct_value(const CTValue& value);
+
 } // namespace vexel
