@@ -41,8 +41,7 @@ void Analyzer::build_run_summary(const AnalysisFacts& facts) {
     }
 
     for (const auto& instance : run_summary_.program->instances) {
-        auto instance_scope = scoped_instance(instance.id);
-        (void)instance_scope;
+        [[maybe_unused]] auto instance_scope = scoped_instance(instance.id);
 
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
@@ -237,24 +236,22 @@ AnalysisFacts Analyzer::run(const Module& mod) {
     return facts;
 }
 
-void Analyzer::analyze_reachability(const Module& mod, AnalysisFacts& facts) {
+void Analyzer::analyze_reachability(const Module& /*mod*/, AnalysisFacts& facts) {
     Program* program = context().program;
     if (!program) return;
 
     for (const auto& instance : program->instances) {
-        auto instance_scope = scoped_instance(instance.id);
-        (void)instance_scope;
+        [[maybe_unused]] auto instance_scope = scoped_instance(instance.id);
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || sym->kind != Symbol::Kind::Function) continue;
             if (!sym->is_exported) continue;
-            mark_reachable(sym, mod, facts);
+            mark_reachable(sym, facts);
         }
     }
 
     for (const auto& instance : program->instances) {
-        auto instance_scope = scoped_instance(instance.id);
-        (void)instance_scope;
+        [[maybe_unused]] auto instance_scope = scoped_instance(instance.id);
         for (const auto& pair : instance.symbols) {
             const Symbol* sym = pair.second;
             if (!sym || (sym->kind != Symbol::Kind::Variable && sym->kind != Symbol::Kind::Constant)) continue;
@@ -264,14 +261,13 @@ void Analyzer::analyze_reachability(const Module& mod, AnalysisFacts& facts) {
             std::unordered_set<const Symbol*> calls;
             collect_calls(sym->declaration->var_init, calls);
             for (const Symbol* callee : calls) {
-                mark_reachable(callee, mod, facts);
+                mark_reachable(callee, facts);
             }
         }
     }
 }
 
-void Analyzer::mark_reachable(const Symbol* func_sym,
-                              const Module& mod, AnalysisFacts& facts) {
+void Analyzer::mark_reachable(const Symbol* func_sym, AnalysisFacts& facts) {
     if (!func_sym) return;
     if (facts.reachable_functions.count(func_sym)) {
         return;
@@ -283,13 +279,12 @@ void Analyzer::mark_reachable(const Symbol* func_sym,
         return;
     }
 
-    auto callee_scope = scoped_instance(func_sym->instance_id);
-    (void)callee_scope;
+    [[maybe_unused]] auto callee_scope = scoped_instance(func_sym->instance_id);
 
     std::unordered_set<const Symbol*> calls;
     collect_calls(func_sym->declaration->body, calls);
     for (const auto& called_sym : calls) {
-        mark_reachable(called_sym, mod, facts);
+        mark_reachable(called_sym, facts);
     }
 
 }

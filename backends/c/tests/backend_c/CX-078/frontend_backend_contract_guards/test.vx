@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#whole-program-compilation
+// @desc: Backend consumes analyzed facts and must not own compile-time evaluator semantics. | C backend contract guards
+// @expect-exit: 0
+// @command: python3 -c "import pathlib, subprocess, sys; vexel = pathlib.Path(sys.argv[1]).resolve(); root = vexel.parents[1]; src = root / 'backends' / 'c' / 'src'; codegen = (src / 'codegen.cpp').read_text(); assert 'backend received module without analysis facts' in codegen; assert 'backend single-function emit missing analysis facts' in codegen; joined = '\\n'.join(p.read_text() for p in src.glob('*.cpp')); assert 'CompileTimeEvaluator' not in joined; subprocess.run([str(vexel), '-b', 'c', 'test.vx'], check=True)" {VEXEL}
+
+&^main() -> #i32 {
+    0
+}

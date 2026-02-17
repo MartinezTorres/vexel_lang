@@ -79,7 +79,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 5. Split evaluator monolith while keeping single-owner semantics
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - `frontend/src/transform/evaluator.cpp` is still a large complexity hotspot.
   - Large functions (`eval_call`, `eval_binary`, `eval_cast`, `eval_assignment`) are hard to audit and evolve.
@@ -94,7 +94,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 6. Remove intra-megalinker duplication first
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Megalinker duplicates helper logic both in backend orchestration and codegen units.
   - Same lvalue/mutability/ref-variant helpers appear in more than one place.
@@ -108,7 +108,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 7. Add backend contract guards (not output-parity guards)
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Backend semantic contracts must stay correct while C and megalinker evolve independently.
   - Output drift between backends is intentional and should not be treated as a regression by itself.
@@ -122,7 +122,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 8. Frontend hygiene cleanup (naming and dead parameters)
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Residual naming still uses "fallback" for strict/default behavior in reentrancy analysis.
   - Some signatures carry unused parameters.

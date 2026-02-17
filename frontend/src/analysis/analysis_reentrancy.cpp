@@ -22,9 +22,9 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         if (analysis_config.reentrancy_mode_for_boundary) {
             mode = analysis_config.reentrancy_mode_for_boundary(sym, kind);
         }
-        char fallback = (kind == ReentrancyBoundaryKind::EntryPoint)
-                            ? analysis_config.default_entry_context
-                            : analysis_config.default_exit_context;
+        char default_ctx = (kind == ReentrancyBoundaryKind::EntryPoint)
+                               ? analysis_config.default_entry_context
+                               : analysis_config.default_exit_context;
         switch (mode) {
             case ReentrancyMode::Reentrant:
                 return 'R';
@@ -32,7 +32,7 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
                 return 'N';
             case ReentrancyMode::Default:
             default:
-                return normalize_ctx(fallback);
+                return normalize_ctx(default_ctx);
         }
     };
 
@@ -104,11 +104,11 @@ void Analyzer::analyze_reentrancy(const Module& /*mod*/, AnalysisFacts& facts) {
         }
     }
 
-    char fallback_ctx = normalize_ctx(analysis_config.default_entry_context);
+    char default_entry_ctx = normalize_ctx(analysis_config.default_entry_context);
     for (const auto& entry : function_map) {
         const Symbol* func_sym = entry.first;
         if (facts.reentrancy_variants[func_sym].empty()) {
-            facts.reentrancy_variants[func_sym].insert(fallback_ctx);
+            facts.reentrancy_variants[func_sym].insert(default_entry_ctx);
         }
     }
 }

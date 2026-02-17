@@ -139,8 +139,7 @@ private:
     void analyze_effects(const Module& mod, AnalysisFacts& facts);
     void analyze_usage(const Module& mod, AnalysisFacts& facts);
 
-    void mark_reachable(const Symbol* func_sym,
-                        const Module& mod, AnalysisFacts& facts);
+    void mark_reachable(const Symbol* func_sym, AnalysisFacts& facts);
     void collect_calls(ExprPtr expr, std::unordered_set<const Symbol*>& calls);
 
     Symbol* binding_for(ExprPtr expr) const;
