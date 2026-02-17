@@ -237,7 +237,6 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
                                merged.location);
         }
     }
-    optimization = optimizer.run(merged);
     validate_module_stage(merged, "post-optimize");
 
     Analyzer analyzer(&checker, &optimization, analysis_config);
