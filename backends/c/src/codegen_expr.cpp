@@ -327,12 +327,17 @@ std::string CodeGenerator::gen_unary(ExprPtr expr) {
 
 std::string CodeGenerator::gen_call(ExprPtr expr) {
     // Check if this is a type constructor call
-    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier &&
-        expr->type && expr->type->kind == Type::Kind::Named) {
-
+    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
         Symbol* sym = binding_for(expr->operand);
+        StmtPtr type_decl;
+        auto type_it = type_decl_map.find(expr->operand->name);
+        if (type_it != type_decl_map.end()) {
+            type_decl = type_it->second;
+        } else if (sym && sym->kind == Symbol::Kind::Type && sym->declaration) {
+            type_decl = sym->declaration;
+        }
 
-        if (sym && sym->kind == Symbol::Kind::Type && sym->declaration) {
+        if (type_decl) {
             // Generate C struct initialization
             std::string type_name = mangle_name(expr->operand->name);
             std::string result = "((" + type_name + "){";
@@ -340,10 +345,22 @@ std::string CodeGenerator::gen_call(ExprPtr expr) {
             // Match arguments to fields by position
             {
                 VoidCallGuard guard(*this, false);
-                for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
+                for (size_t i = 0; i < expr->args.size() && i < type_decl->fields.size(); i++) {
+                    const auto& field = type_decl->fields[i];
+                    TypePtr field_type = resolve_type(field.type);
                     if (i > 0) result += ", ";
-                    result += "." + mangle_name(sym->declaration->fields[i].name) + " = ";
-                    result += gen_expr(expr->args[i]);
+                    result += "." + mangle_name(field.name) + " = ";
+                    if (field_type && field_type->kind == Type::Kind::Array) {
+                        ExprPtr arg = expr->args[i];
+                        if (!arg || arg->kind != Expr::Kind::ArrayLiteral) {
+                            throw CompileError(
+                                "C backend requires array constructor arguments to be residualized as array literals",
+                                arg ? arg->location : expr->location);
+                        }
+                        result += gen_array_initializer(arg);
+                    } else {
+                        result += gen_expr(expr->args[i]);
+                    }
                 }
             }
 

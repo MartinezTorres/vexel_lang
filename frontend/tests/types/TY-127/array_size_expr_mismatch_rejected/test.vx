@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Array size expressions are part of type identity after constexpr normalization. | #u8[2+1] and #u8[4] are incompatible.
+
+&use_three(a:#u8[2 + 1]) -> #i32 {
+    (#i32)a[0]
+}
+
+&^main() -> #i32 {
+    four:#u8[4];
+    use_three(four)
+}

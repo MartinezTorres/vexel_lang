@@ -1,0 +1,27 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Compile-time construction of nested array globals is fully folded. | Pure nested writes in local arrays fold into exported constants.
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL} -b c test.vx && ! rg -n "\\bvx_build\\b" out.c
+
+&build() -> #u8[2][3] {
+    out:#u8[2][3];
+
+    y:#i32 = 0;
+    (y < 2)@{
+        x:#i32 = 0;
+        (x < 3)@{
+            out[y][x] = (#u8)(y * 3 + x);
+            x = x + 1;
+        };
+        y = y + 1;
+    };
+
+    out
+}
+
+^table:#u8[2][3] = build();
+
+&^main() -> #i32 {
+    (#i32)table[1][2] - 5
+}

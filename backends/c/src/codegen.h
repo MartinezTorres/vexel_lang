@@ -117,6 +117,7 @@ public:
 private:
     std::unordered_set<std::string> current_ref_params;  // Track reference parameters in current function
     std::unordered_map<std::string, std::vector<TypePtr>> tuple_types;  // Track tuple types: name -> element types
+    std::unordered_map<std::string, StmtPtr> type_decl_map;  // Track named type declarations for constructor emission
     std::unordered_map<std::string, ExprPtr> expr_param_substitutions;  // Maps $param names to their expressions
     std::unordered_map<std::string, std::string> value_param_replacements;  // Maps value params when inlining
     std::string underscore_var;  // Current loop underscore variable name (empty when not in iteration)

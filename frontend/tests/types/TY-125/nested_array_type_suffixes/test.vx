@@ -1,0 +1,12 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Array types accept repeated size suffixes in declarations and function return signatures. | Nested suffix syntax #T[a][b][c] is parsed consistently.
+
+&mk() -> #i8[2][3] {
+    [[2, 3, 4], [5, 6, 7]]
+}
+
+&^main() -> #i32 {
+    m:#i8[2][3][4];
+    m[1][2][3] = 9;
+    (#i32)mk()[1][2] + (#i32)m[1][2][3] - 15
+}

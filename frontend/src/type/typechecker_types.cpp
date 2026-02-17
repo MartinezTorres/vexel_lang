@@ -87,17 +87,27 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                 }
 
                 const CTValue& size_val = size_query.value;
+                uint64_t normalized_size = 0;
                 if (std::holds_alternative<int64_t>(size_val)) {
-                    if (std::get<int64_t>(size_val) < 0) {
+                    const int64_t signed_size = std::get<int64_t>(size_val);
+                    if (signed_size < 0) {
                         throw CompileError("Array size must be non-negative", loc);
                     }
+                    normalized_size = static_cast<uint64_t>(signed_size);
                 } else if (std::holds_alternative<uint64_t>(size_val)) {
-                    // Already non-negative.
+                    normalized_size = std::get<uint64_t>(size_val);
                 } else if (std::holds_alternative<bool>(size_val)) {
-                    // Allow #b values as 0/1 in size position.
+                    normalized_size = std::get<bool>(size_val) ? 1ULL : 0ULL;
                 } else {
                     throw CompileError("Array size must be an integer compile-time constant", loc);
                 }
+
+                // Canonicalize array-size expressions to integer literals so all later
+                // type comparisons/hashing use semantic size identity.
+                SourceLocation size_loc = type->array_size->location;
+                type->array_size = Expr::make_uint(normalized_size,
+                                                   size_loc,
+                                                   std::to_string(normalized_size));
             }
             return type;
         }

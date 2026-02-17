@@ -200,47 +200,104 @@ bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
         return true;
     }
 
-    TypePtr var_type = stmt->var_type;
-    if (var_type->kind == Type::Kind::Array) {
-        if (!var_type->array_size) {
-            error_msg = "Array local requires compile-time size";
-            return false;
+    auto resolve_named_type_decl = [&](TypePtr type) -> Symbol* {
+        if (!type || type->kind != Type::Kind::Named) {
+            return nullptr;
         }
-        CTValue size_val;
-        if (!try_evaluate(var_type->array_size, size_val)) {
-            error_msg = "Array local requires compile-time size";
-            return false;
+        Symbol* type_sym = type->resolved_symbol;
+        if (!type_sym && type_checker) {
+            type_sym = type_checker->binding_for(type.get());
+            type->resolved_symbol = type_sym;
         }
-        int64_t size = 0;
-        if (std::holds_alternative<int64_t>(size_val)) {
-            size = std::get<int64_t>(size_val);
-        } else if (std::holds_alternative<uint64_t>(size_val)) {
-            size = static_cast<int64_t>(std::get<uint64_t>(size_val));
-        } else {
-            error_msg = "Array local size must be an integer constant";
-            return false;
+        if (!type_sym && type_checker && type_checker->get_scope()) {
+            type_sym = type_checker->get_scope()->lookup(type->type_name);
+            type->resolved_symbol = type_sym;
         }
-        if (size < 0) {
-            error_msg = "Array local size cannot be negative";
-            return false;
+        if (type_sym &&
+            type_sym->declaration &&
+            type_sym->declaration->kind == Stmt::Kind::TypeDecl) {
+            return type_sym;
         }
-        auto array = std::make_shared<CTArray>();
-        array->elements.resize(static_cast<size_t>(size), CTUninitialized{});
-        constants[stmt->var_name] = array;
-        uninitialized_locals.erase(stmt->var_name);
-        return true;
-    }
+        return nullptr;
+    };
 
-    if (var_type->kind == Type::Kind::Named &&
-        var_type->resolved_symbol &&
-        var_type->resolved_symbol->declaration &&
-        var_type->resolved_symbol->declaration->kind == Stmt::Kind::TypeDecl) {
-        auto composite = std::make_shared<CTComposite>();
-        composite->type_name = var_type->type_name;
-        for (const auto& field : var_type->resolved_symbol->declaration->fields) {
-            composite->fields[field.name] = CTUninitialized{};
+    TypePtr var_type = stmt->var_type;
+    Symbol* var_named_type = resolve_named_type_decl(var_type);
+    const bool materializable_named =
+        var_type->kind == Type::Kind::Named &&
+        var_named_type;
+
+    if (var_type->kind == Type::Kind::Array || materializable_named) {
+        std::function<bool(TypePtr, CTValue&)> materialize =
+            [&](TypePtr type, CTValue& out) -> bool {
+            if (!type) {
+                out = CTUninitialized{};
+                return true;
+            }
+
+            if (type->kind == Type::Kind::Array) {
+                if (!type->array_size) {
+                    error_msg = "Array local requires compile-time size";
+                    return false;
+                }
+                CTValue size_val;
+                if (!try_evaluate(type->array_size, size_val)) {
+                    error_msg = "Array local requires compile-time size";
+                    return false;
+                }
+                int64_t size = 0;
+                if (std::holds_alternative<int64_t>(size_val)) {
+                    size = std::get<int64_t>(size_val);
+                } else if (std::holds_alternative<uint64_t>(size_val)) {
+                    size = static_cast<int64_t>(std::get<uint64_t>(size_val));
+                } else if (std::holds_alternative<bool>(size_val)) {
+                    size = std::get<bool>(size_val) ? 1 : 0;
+                } else {
+                    error_msg = "Array local size must be an integer constant";
+                    return false;
+                }
+                if (size < 0) {
+                    error_msg = "Array local size cannot be negative";
+                    return false;
+                }
+
+                auto array = std::make_shared<CTArray>();
+                array->elements.reserve(static_cast<size_t>(size));
+                for (int64_t i = 0; i < size; ++i) {
+                    CTValue elem = CTUninitialized{};
+                    if (!materialize(type->element_type, elem)) {
+                        return false;
+                    }
+                    array->elements.push_back(std::move(elem));
+                }
+                out = array;
+                return true;
+            }
+
+            Symbol* type_sym = resolve_named_type_decl(type);
+            if (type->kind == Type::Kind::Named && type_sym) {
+                auto composite = std::make_shared<CTComposite>();
+                composite->type_name = type->type_name;
+                for (const auto& field : type_sym->declaration->fields) {
+                    CTValue field_storage = CTUninitialized{};
+                    if (!materialize(field.type, field_storage)) {
+                        return false;
+                    }
+                    composite->fields[field.name] = std::move(field_storage);
+                }
+                out = composite;
+                return true;
+            }
+
+            out = CTUninitialized{};
+            return true;
+        };
+
+        CTValue storage = CTUninitialized{};
+        if (!materialize(var_type, storage)) {
+            return false;
         }
-        constants[stmt->var_name] = composite;
+        constants[stmt->var_name] = std::move(storage);
         uninitialized_locals.erase(stmt->var_name);
         return true;
     }

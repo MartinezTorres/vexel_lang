@@ -1,7 +1,10 @@
 #include "residualizer.h"
 
+#include "constants.h"
 #include "cte_value_utils.h"
 #include "expr_access.h"
+
+#include <algorithm>
 
 namespace vexel {
 
@@ -35,10 +38,49 @@ bool is_literal_expr_kind(Expr::Kind kind) {
     }
 }
 
+bool expr_structurally_equal(const ExprPtr& a, const ExprPtr& b) {
+    if (a.get() == b.get()) return true;
+    if (!a || !b) return false;
+    if (a->kind != b->kind) return false;
+
+    switch (a->kind) {
+        case Expr::Kind::IntLiteral:
+        case Expr::Kind::CharLiteral:
+            return a->uint_val == b->uint_val;
+        case Expr::Kind::FloatLiteral:
+            return a->float_val == b->float_val;
+        case Expr::Kind::StringLiteral:
+            return a->string_val == b->string_val;
+        case Expr::Kind::Identifier:
+            return a->name == b->name;
+        case Expr::Kind::ArrayLiteral:
+        case Expr::Kind::TupleLiteral:
+            if (a->elements.size() != b->elements.size()) return false;
+            for (size_t i = 0; i < a->elements.size(); ++i) {
+                if (!expr_structurally_equal(a->elements[i], b->elements[i])) return false;
+            }
+            return true;
+        case Expr::Kind::Call:
+            if (!expr_structurally_equal(a->operand, b->operand)) return false;
+            if (a->args.size() != b->args.size()) return false;
+            if (a->receivers.size() != b->receivers.size()) return false;
+            for (size_t i = 0; i < a->args.size(); ++i) {
+                if (!expr_structurally_equal(a->args[i], b->args[i])) return false;
+            }
+            for (size_t i = 0; i < a->receivers.size(); ++i) {
+                if (!expr_structurally_equal(a->receivers[i], b->receivers[i])) return false;
+            }
+            return true;
+        default:
+            return false;
+    }
+}
+
 } // namespace
 
 bool Residualizer::run(Module& mod) {
     changed_ = false;
+    rebuild_type_field_order(mod);
     if (mod.top_level_instance_ids.size() != mod.top_level.size()) {
         throw CompileError("Internal error: residualizer requires top-level instance IDs aligned with merged module",
                            mod.location);
@@ -67,6 +109,24 @@ bool Residualizer::run(Module& mod) {
     mod.top_level_instance_ids.swap(rewritten_instance_ids);
     current_instance_id_ = -1;
     return changed_;
+}
+
+void Residualizer::rebuild_type_field_order(const Module& mod) {
+    type_field_order_.clear();
+    type_field_types_.clear();
+    for (const auto& stmt : mod.top_level) {
+        if (!stmt || stmt->kind != Stmt::Kind::TypeDecl) continue;
+        std::vector<std::string> names;
+        names.reserve(stmt->fields.size());
+        std::unordered_map<std::string, TypePtr> field_types;
+        field_types.reserve(stmt->fields.size());
+        for (const auto& field : stmt->fields) {
+            names.push_back(field.name);
+            field_types[field.name] = field.type;
+        }
+        type_field_order_[stmt->type_decl_name] = std::move(names);
+        type_field_types_[stmt->type_decl_name] = std::move(field_types);
+    }
 }
 
 StmtPtr Residualizer::rewrite_stmt(StmtPtr stmt, bool top_level) {
@@ -129,8 +189,11 @@ ExprPtr Residualizer::rewrite_expr(ExprPtr expr, bool allow_fold) {
     if (allow_fold && can_fold_expr(expr) && !is_literal_expr_kind(expr->kind)) {
         auto value_it = facts_.constexpr_values.find(expr_fact_key(current_instance_id_, expr.get()));
         if (value_it != facts_.constexpr_values.end()) {
-            ExprPtr folded = ctvalue_to_expr(value_it->second, expr);
+            ExprPtr folded = ctvalue_to_expr(value_it->second, expr, expr ? expr->type : nullptr);
             if (folded) {
+                if (expr_structurally_equal(expr, folded)) {
+                    return expr;
+                }
                 changed_ = true;
                 return folded;
             }
@@ -307,12 +370,16 @@ bool Residualizer::is_terminal_stmt(const StmtPtr& stmt) {
 void Residualizer::copy_expr_meta(const ExprPtr& from, const ExprPtr& to) {
     if (!from || !to) return;
     to->location = from->location;
-    to->type = from->type;
     to->annotations = from->annotations;
     to->scope_instance_id = from->scope_instance_id;
 }
 
-ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origin) const {
+TypePtr Residualizer::expected_elem_type(TypePtr type) {
+    if (!type || type->kind != Type::Kind::Array) return nullptr;
+    return type->element_type;
+}
+
+ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origin, TypePtr expected_type) const {
     ExprPtr result;
     if (std::holds_alternative<int64_t>(value)) {
         result = Expr::make_int(std::get<int64_t>(value), origin ? origin->location : SourceLocation());
@@ -331,19 +398,100 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
 
         std::vector<ExprPtr> elems;
         elems.reserve(array->elements.size());
+        TypePtr elem_expected = expected_elem_type(expected_type);
         for (const auto& elem : array->elements) {
-            ExprPtr elem_expr = ctvalue_to_expr(elem, origin);
+            ExprPtr elem_expr = ctvalue_to_expr(elem, origin, elem_expected);
             if (!elem_expr) {
                 return nullptr;
             }
             elems.push_back(elem_expr);
         }
         result = Expr::make_array(std::move(elems), origin ? origin->location : SourceLocation());
+    } else if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) {
+        auto comp = std::get<std::shared_ptr<CTComposite>>(value);
+        if (!comp) return nullptr;
+
+        std::vector<std::string> field_order;
+        const bool is_tuple =
+            !comp->type_name.empty() &&
+            comp->type_name.rfind(TUPLE_TYPE_PREFIX, 0) == 0;
+
+        if (is_tuple || comp->type_name.empty()) {
+            std::vector<std::pair<int, std::string>> indexed_fields;
+            indexed_fields.reserve(comp->fields.size());
+            for (const auto& entry : comp->fields) {
+                const std::string& name = entry.first;
+                if (name.rfind(MANGLED_PREFIX, 0) != 0) continue;
+                const std::string index_str = name.substr(std::char_traits<char>::length(MANGLED_PREFIX));
+                if (index_str.empty()) continue;
+                bool numeric = true;
+                for (char c : index_str) {
+                    if (c < '0' || c > '9') {
+                        numeric = false;
+                        break;
+                    }
+                }
+                if (!numeric) continue;
+                indexed_fields.emplace_back(std::stoi(index_str), name);
+            }
+            std::sort(indexed_fields.begin(), indexed_fields.end(),
+                      [](const auto& a, const auto& b) { return a.first < b.first; });
+            field_order.reserve(indexed_fields.size());
+            for (const auto& entry : indexed_fields) {
+                field_order.push_back(entry.second);
+            }
+        } else {
+            auto ordered_it = type_field_order_.find(comp->type_name);
+            if (ordered_it != type_field_order_.end()) {
+                field_order = ordered_it->second;
+            } else {
+                field_order.reserve(comp->fields.size());
+                for (const auto& entry : comp->fields) {
+                    field_order.push_back(entry.first);
+                }
+                std::sort(field_order.begin(), field_order.end());
+            }
+        }
+
+        std::vector<ExprPtr> elems;
+        elems.reserve(field_order.size());
+        const auto field_types_it =
+            comp->type_name.empty() ? type_field_types_.end() : type_field_types_.find(comp->type_name);
+        for (const auto& name : field_order) {
+            auto it = comp->fields.find(name);
+            if (it == comp->fields.end()) {
+                return nullptr;
+            }
+            TypePtr field_expected = nullptr;
+            if (field_types_it != type_field_types_.end()) {
+                auto fit = field_types_it->second.find(name);
+                if (fit != field_types_it->second.end()) {
+                    field_expected = fit->second;
+                }
+            }
+            ExprPtr elem_expr = ctvalue_to_expr(it->second, origin, field_expected);
+            if (!elem_expr) {
+                return nullptr;
+            }
+            elems.push_back(elem_expr);
+        }
+
+        if (is_tuple || comp->type_name.empty()) {
+            result = Expr::make_tuple(std::move(elems), origin ? origin->location : SourceLocation());
+        } else {
+            ExprPtr callee = Expr::make_identifier(comp->type_name, origin ? origin->location : SourceLocation());
+            result = Expr::make_call(callee, std::move(elems), origin ? origin->location : SourceLocation());
+        }
     } else {
         return nullptr;
     }
 
     copy_expr_meta(origin, result);
+    if (expected_type) {
+        result->type = expected_type;
+    } else if (origin) {
+        result->type = origin->type;
+    }
     return result;
 }
 

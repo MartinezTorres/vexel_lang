@@ -12,6 +12,7 @@
 #include "typechecker.h"
 
 #include <iostream>
+#include <optional>
 #include <unordered_set>
 #include <vector>
 
@@ -87,11 +88,24 @@ Module merge_live_program_instances(const Program& program,
 void collect_internal_calls_in_stmt(const StmtPtr& stmt,
                                     int instance_id,
                                     TypeChecker& checker,
+                                    const OptimizationFacts& optimization,
                                     std::unordered_set<const Symbol*>& out);
+
+std::optional<bool> constexpr_condition_for(const OptimizationFacts& optimization,
+                                            int instance_id,
+                                            ExprPtr condition) {
+    if (!condition) return std::nullopt;
+    auto it = optimization.constexpr_conditions.find(expr_fact_key(instance_id, condition.get()));
+    if (it == optimization.constexpr_conditions.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
 
 void collect_internal_calls_in_expr(const ExprPtr& expr,
                                     int instance_id,
                                     TypeChecker& checker,
+                                    const OptimizationFacts& optimization,
                                     std::unordered_set<const Symbol*>& out) {
     if (!expr) return;
 
@@ -107,26 +121,57 @@ void collect_internal_calls_in_expr(const ExprPtr& expr,
         }
     }
 
+    if (expr->kind == Expr::Kind::Conditional) {
+        if (auto cond = constexpr_condition_for(optimization, instance_id, expr->condition)) {
+            if (cond.value()) {
+                collect_internal_calls_in_expr(expr->true_expr, instance_id, checker, optimization, out);
+            } else if (expr->false_expr) {
+                collect_internal_calls_in_expr(expr->false_expr, instance_id, checker, optimization, out);
+            }
+            return;
+        }
+    }
+
     for_each_expr_child(
         expr,
-        [&](const ExprPtr& child) { collect_internal_calls_in_expr(child, instance_id, checker, out); },
-        [&](const StmtPtr& child) { collect_internal_calls_in_stmt(child, instance_id, checker, out); });
+        [&](const ExprPtr& child) {
+            collect_internal_calls_in_expr(child, instance_id, checker, optimization, out);
+        },
+        [&](const StmtPtr& child) {
+            collect_internal_calls_in_stmt(child, instance_id, checker, optimization, out);
+        });
 }
 
 void collect_internal_calls_in_stmt(const StmtPtr& stmt,
                                     int instance_id,
                                     TypeChecker& checker,
+                                    const OptimizationFacts& optimization,
                                     std::unordered_set<const Symbol*>& out) {
     if (!stmt) return;
+
+    if (stmt->kind == Stmt::Kind::ConditionalStmt) {
+        if (auto cond = constexpr_condition_for(optimization, instance_id, stmt->condition)) {
+            if (cond.value()) {
+                collect_internal_calls_in_stmt(stmt->true_stmt, instance_id, checker, optimization, out);
+            }
+            return;
+        }
+    }
+
     for_each_stmt_child(
         stmt,
-        [&](const ExprPtr& expr) { collect_internal_calls_in_expr(expr, instance_id, checker, out); },
-        [&](const StmtPtr& child) { collect_internal_calls_in_stmt(child, instance_id, checker, out); });
+        [&](const ExprPtr& expr) {
+            collect_internal_calls_in_expr(expr, instance_id, checker, optimization, out);
+        },
+        [&](const StmtPtr& child) {
+            collect_internal_calls_in_stmt(child, instance_id, checker, optimization, out);
+        });
 }
 
 void validate_prune_linkage(const Program& program,
                             TypeChecker& checker,
-                            const AnalysisFacts& analysis) {
+                            const AnalysisFacts& analysis,
+                            const OptimizationFacts& optimization) {
     std::unordered_set<const Symbol*> kept_functions;
     std::unordered_set<const Symbol*> top_level_functions;
     std::vector<std::pair<int, StmtPtr>> kept_roots;
@@ -159,7 +204,19 @@ void validate_prune_linkage(const Program& program,
 
     std::unordered_set<const Symbol*> required_internal_calls;
     for (const auto& root : kept_roots) {
-        collect_internal_calls_in_stmt(root.second, root.first, checker, required_internal_calls);
+        if (root.second &&
+            root.second->kind == Stmt::Kind::VarDecl &&
+            root.second->var_init) {
+            const ExprFactKey init_key = expr_fact_key(root.first, root.second->var_init.get());
+            if (optimization.constexpr_values.count(init_key) != 0) {
+                continue;
+            }
+        }
+        collect_internal_calls_in_stmt(root.second,
+                                       root.first,
+                                       checker,
+                                       optimization,
+                                       required_internal_calls);
     }
 
     for (const Symbol* callee : required_internal_calls) {
@@ -246,7 +303,7 @@ FrontendPipelineResult run_frontend_pipeline(Program& program,
     checker.validate_type_usage(merged, analysis);
     validate_module_stage(merged, "post-type-use");
 
-    validate_prune_linkage(program, checker, analysis);
+    validate_prune_linkage(program, checker, analysis, optimization);
     merged = merge_live_program_instances(program, checker, analysis);
     validate_module_stage(merged, "post-dce-prune");
 

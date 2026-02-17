@@ -1329,20 +1329,27 @@ TypePtr Parser::parse_type() {
         }
     }
 
-    ExprPtr size = leading_size;
-    if (match(TokenType::LeftBracket)) {
-        if (size) {
+    std::vector<ExprPtr> dimensions;
+    if (leading_size) {
+        dimensions.push_back(leading_size);
+    }
+    while (match(TokenType::LeftBracket)) {
+        if (leading_size) {
             throw CompileError("Array size specified twice in type", loc);
         }
-        size = parse_expr();
+        dimensions.push_back(parse_expr());
         consume(TokenType::RightBracket, "Expected ']'");
     }
 
-    if (size) {
-        return Type::make_array(type, size, loc);
+    if (dimensions.empty()) {
+        return type;
     }
 
-    return type;
+    TypePtr shaped = type;
+    for (auto it = dimensions.rbegin(); it != dimensions.rend(); ++it) {
+        shaped = Type::make_array(shaped, *it, loc);
+    }
+    return shaped;
 }
 
 std::vector<Parameter> Parser::parse_params() {

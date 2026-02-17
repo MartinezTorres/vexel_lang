@@ -1,0 +1,26 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Compile-time writes through nested typed storage materialize shape recursively. | Pure construction of array fields in local composites can fold to exported constants.
+
+#Row(v:#u8[3]);
+
+&build() -> #Row[2] {
+    out:#Row[2];
+
+    y:#i32 = 0;
+    (y < 2)@{
+        x:#i32 = 0;
+        (x < 3)@{
+            out[y].v[x] = (#u8)(y * 3 + x);
+            x = x + 1;
+        };
+        y = y + 1;
+    };
+
+    out
+}
+
+^rows:#Row[2] = build();
+
+&^main() -> #i32 {
+    (#i32)rows[1].v[2] - 5
+}

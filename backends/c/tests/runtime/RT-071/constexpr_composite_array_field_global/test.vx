@@ -1,0 +1,29 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Constexpr constructor globals preserve array-typed composite fields in emitted C ABI and initializers. | Exported composite arrays with array fields compile and run without helper functions.
+// @expect-exit: 0
+// @run-generated: true
+// @command: {VEXEL} -b c test.vx && rg -n "uint8_t vx_v\[3\]" out.h && ! rg -n "uint8_t\* vx_v" out.h && ! rg -n "\\bvx_build\\b" out.c
+
+#Row(v:#u8[3]);
+
+&build() -> #Row[2] {
+    out:#Row[2];
+
+    y:#i32 = 0;
+    (y < 2)@{
+        x:#i32 = 0;
+        (x < 3)@{
+            out[y].v[x] = (#u8)(y * 3 + x);
+            x = x + 1;
+        };
+        y = y + 1;
+    };
+
+    out
+}
+
+^rows:#Row[2] = build();
+
+&^main() -> #i32 {
+    (#i32)rows[1].v[2] - 5
+}

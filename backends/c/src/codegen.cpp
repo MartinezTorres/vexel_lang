@@ -118,6 +118,8 @@ CCodegenResult CodeGenerator::generate(const Module& mod, const AnalyzedProgram&
     aggregate_out_param.clear();
     aggregate_out_type.clear();
     current_aggregate_params.clear();
+    type_map.clear();
+    type_decl_map.clear();
     tuple_types.clear();
     expr_param_substitutions.clear();
     value_param_replacements.clear();
@@ -530,6 +532,36 @@ void CodeGenerator::gen_module(const Module& mod) {
     });
     emit_header("");
 
+    // Type declarations (deduped by name)
+    std::unordered_set<std::string> emitted_types;
+    if (program) {
+        for (const auto& mod_info : program->modules) {
+            for (const auto& stmt : mod_info.module.top_level) {
+                if (!is_live_top_level(stmt)) continue;
+                if (stmt->kind != Stmt::Kind::TypeDecl) continue;
+                if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
+                    continue;
+                }
+                if (!emitted_types.insert(stmt->type_decl_name).second) {
+                    continue;
+                }
+                gen_type_decl(stmt);
+            }
+        }
+    } else {
+        for (const auto& stmt : mod.top_level) {
+            if (!is_live_top_level(stmt)) continue;
+            if (stmt->kind != Stmt::Kind::TypeDecl) continue;
+            if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
+                continue;
+            }
+            if (!emitted_types.insert(stmt->type_decl_name).second) {
+                continue;
+            }
+            gen_type_decl(stmt);
+        }
+    }
+
     // Exported global declarations
     std::unordered_set<std::string> emitted_exported_globals;
     for_instances([&](const Module& module) {
@@ -574,36 +606,6 @@ void CodeGenerator::gen_module(const Module& mod) {
         }
     });
     emit_header("");
-
-    // Type declarations (deduped by name)
-    std::unordered_set<std::string> emitted_types;
-    if (program) {
-        for (const auto& mod_info : program->modules) {
-            for (const auto& stmt : mod_info.module.top_level) {
-                if (!is_live_top_level(stmt)) continue;
-                if (stmt->kind != Stmt::Kind::TypeDecl) continue;
-                if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
-                    continue;
-                }
-                if (!emitted_types.insert(stmt->type_decl_name).second) {
-                    continue;
-                }
-                gen_type_decl(stmt);
-            }
-        }
-    } else {
-        for (const auto& stmt : mod.top_level) {
-            if (!is_live_top_level(stmt)) continue;
-            if (stmt->kind != Stmt::Kind::TypeDecl) continue;
-            if (!facts.used_type_names.empty() && !facts.used_type_names.count(stmt->type_decl_name)) {
-                continue;
-            }
-            if (!emitted_types.insert(stmt->type_decl_name).second) {
-                continue;
-            }
-            gen_type_decl(stmt);
-        }
-    }
 
     // Note: tuple type declarations will be emitted after code generation
 
@@ -1331,15 +1333,17 @@ void CodeGenerator::gen_type_decl(StmtPtr stmt) {
     if (!ann_comment.empty()) emit_header(ann_comment);
     emit_header("typedef struct {");
     for (const auto& field : stmt->fields) {
-        std::string ftype = require_type(field.type,
-                                         field.location,
-                                         "field '" + field.name + "' in type '" + stmt->type_decl_name + "'");
-        emit_header("  " + ftype + " " + mangle_name(field.name) + ";");
+        std::string field_decl = gen_object_decl(field.type,
+                                                 mangle_name(field.name),
+                                                 field.location,
+                                                 "field '" + field.name + "' in type '" + stmt->type_decl_name + "'");
+        emit_header("  " + field_decl + ";");
     }
     emit_header("} " + mangle_name(stmt->type_decl_name) + ";");
     emit_header("");
 
     type_map[stmt->type_decl_name] = mangle_name(stmt->type_decl_name);
+    type_decl_map[stmt->type_decl_name] = stmt;
 }
 
 void CodeGenerator::gen_var_decl(StmtPtr stmt) {

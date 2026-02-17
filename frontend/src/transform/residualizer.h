@@ -3,6 +3,8 @@
 #include "ast.h"
 #include "optimizer.h"
 #include <optional>
+#include <unordered_map>
+#include <vector>
 
 namespace vexel {
 
@@ -21,6 +23,8 @@ private:
     const OptimizationFacts& facts_;
     bool changed_ = false;
     int current_instance_id_ = -1;
+    std::unordered_map<std::string, std::vector<std::string>> type_field_order_;
+    std::unordered_map<std::string, std::unordered_map<std::string, TypePtr>> type_field_types_;
 
     StmtPtr rewrite_stmt(StmtPtr stmt, bool top_level);
     ExprPtr rewrite_expr(ExprPtr expr, bool allow_fold = true);
@@ -31,9 +35,11 @@ private:
     static bool is_terminal_stmt(const StmtPtr& stmt);
 
     static void copy_expr_meta(const ExprPtr& from, const ExprPtr& to);
+    static TypePtr expected_elem_type(TypePtr type);
     bool can_fold_expr(const ExprPtr& expr) const;
-    ExprPtr ctvalue_to_expr(const CTValue& value, const ExprPtr& origin) const;
+    ExprPtr ctvalue_to_expr(const CTValue& value, const ExprPtr& origin, TypePtr expected_type) const;
     std::optional<bool> constexpr_condition(const ExprPtr& cond, const Expr* original) const;
+    void rebuild_type_field_order(const Module& mod);
 };
 
 } // namespace vexel
