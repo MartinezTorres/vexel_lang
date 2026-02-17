@@ -41,6 +41,14 @@ Additional helper modules live under `examples/lib/` (e.g., `print.vx`, `vector.
 ## Additional Samples
 - `raytracer.vx` – full raytracer exercising floats, structs, and external I/O.
 - `compile_time_demo.vx` – compile-time heavy workload (also in core list for emphasis).
+- `bmp_to_matrix.vx` – reads `assets/random_256x192.bmp` at compile time and exports `bmp_pixels` as a `#u8[height][width][3]` matrix (shape inferred from nested literals).
+
+### Asset-Based Example
+- `assets/random_256x192.bmp` is a deterministic random 24-bit BMP used by `bmp_to_matrix.vx`.
+- Regenerate both the BMP and the Vexel source with:
+```bash
+python3 examples/tools/generate_bmp_to_matrix_example.py
+```
 
 ## Lexer Edge Cases
 - `lexer_edge_cases/` – 11 tiny files covering EOF handling, escapes, unterminated literals, and whitespace-only input.

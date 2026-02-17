@@ -1,0 +1,12 @@
+// @rfc: backends/c/README.md#types--layout
+// @desc: Nested array declaration/assignment copies preserve full object shape and execute correctly.
+// @expect-exit: 4
+// @run-generated: true
+// @command: {VEXEL} -b c test.vx
+
+&^main() -> #i32 {
+    a = [ [2, 3], [4, 5] ];
+    b = a;
+    c = b;
+    c[1][0]
+}

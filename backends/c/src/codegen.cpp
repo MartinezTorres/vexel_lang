@@ -551,12 +551,12 @@ void CodeGenerator::gen_module(const Module& mod) {
 
             std::string mutability = mutability_prefix(stmt);
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
-                std::string elem_type = require_type(stmt->var_type->element_type,
-                                                     stmt->location,
-                                                     "exported global '" + stmt->var_name + "' element type");
-                int64_t length = resolve_array_length(stmt->var_type, stmt->location);
-                emit_header("extern " + mutability + elem_type + " " + var_name +
-                            "[" + std::to_string(length) + "];");
+                emit_header("extern " + mutability +
+                            gen_object_decl(stmt->var_type,
+                                            var_name,
+                                            stmt->location,
+                                            "exported global '" + stmt->var_name + "'") +
+                            ";");
             } else {
                 std::string vtype = require_type(stmt->var_type,
                                                  stmt->location,
@@ -1397,8 +1397,10 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
             (stmt->var_init->kind == Expr::Kind::ArrayLiteral || stmt->var_init->kind == Expr::Kind::Range)) {
 
-            std::string elem_type = gen_type(stmt->var_type->element_type);
-            std::string size_str = std::to_string(resolve_array_length(stmt->var_type, stmt->location));
+            std::string array_decl = gen_object_decl(stmt->var_type,
+                                                     mangle_name(var_name),
+                                                     stmt->location,
+                                                     "array variable '" + stmt->var_name + "'");
 
             // Handle range expansion
             if (stmt->var_init->kind == Expr::Kind::Range) {
@@ -1411,7 +1413,11 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     }
                     int64_t count = (start < end) ? (end - start) : (start - end);
                     std::ostringstream init;
-                    init << storage << mutability << elem_type << " " << mangle_name(var_name) << "[" << count << "] = {";
+                    int64_t declared = resolve_array_length(stmt->var_type, stmt->location);
+                    if (count != declared) {
+                        throw CompileError("Range length does not match declared array size", stmt->var_init->location);
+                    }
+                    init << storage << mutability << array_decl << " = {";
                     bool first = true;
                     if (start < end) {
                         for (int64_t i = start; i < end; ++i) {
@@ -1435,15 +1441,7 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
 
                 // Handle array literal
                 if (stmt->var_init->kind == Expr::Kind::ArrayLiteral) {
-                    emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "] = {");
-                    {
-                        VoidCallGuard guard(*this, false);
-                        for (size_t i = 0; i < stmt->var_init->elements.size(); i++) {
-                            if (i > 0) emit(", ");
-                            emit(gen_expr(stmt->var_init->elements[i]));
-                        }
-                    }
-                    emit("};");
+                    emit(storage + mutability + array_decl + " = " + gen_array_initializer(stmt->var_init) + ";");
                     finalize();
                     return;
                 }
@@ -1451,9 +1449,11 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
 
             // Fallback for arrays initialized from existing arrays/expressions: allocate and copy
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
-                std::string elem_type = gen_type(stmt->var_type->element_type);
-                std::string size_str = std::to_string(resolve_array_length(stmt->var_type, stmt->location));
-                emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
+                emit(storage + mutability +
+                     gen_object_decl(stmt->var_type,
+                                     mangle_name(var_name),
+                                     stmt->location,
+                                     "array variable '" + stmt->var_name + "'") + ";");
                 std::string init_expr;
                 {
                     VoidCallGuard guard(*this, false);
@@ -1544,9 +1544,11 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     } else {
         // No initializer - special handling for arrays
         if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array) {
-            std::string elem_type = gen_type(stmt->var_type->element_type);
-            std::string size_str = std::to_string(resolve_array_length(stmt->var_type, stmt->location));
-            emit(storage + mutability + elem_type + " " + mangle_name(var_name) + "[" + size_str + "];");
+            emit(storage + mutability +
+                 gen_object_decl(stmt->var_type,
+                                 mangle_name(var_name),
+                                 stmt->location,
+                                 "array variable '" + stmt->var_name + "'") + ";");
         } else {
             emit(storage + mutability + vtype + " " + mangle_name(var_name) + ";");
         }

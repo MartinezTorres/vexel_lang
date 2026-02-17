@@ -141,6 +141,7 @@ private:
     std::string gen_call(ExprPtr expr);
     std::string gen_index(ExprPtr expr);
     std::string gen_member(ExprPtr expr);
+    std::string gen_array_initializer(ExprPtr expr);
     std::string gen_array_literal(ExprPtr expr);
     std::string gen_tuple_literal(ExprPtr expr);
     std::string gen_block(ExprPtr expr);
@@ -180,6 +181,14 @@ private:
     bool expr_has_side_effects(ExprPtr expr) const;
     std::string require_type(TypePtr type, const SourceLocation& loc, const std::string& context);
     std::string gen_type(TypePtr type);
+    std::string gen_object_decl(TypePtr type,
+                                const std::string& name,
+                                const SourceLocation& loc,
+                                const std::string& context);
+    void append_array_suffix(TypePtr type,
+                             const SourceLocation& loc,
+                             const std::string& context,
+                             std::string& out);
     std::string mangle_name(const std::string& name);
     std::string fresh_temp();
     void release_temp(const std::string& temp);

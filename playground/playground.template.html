@@ -366,6 +366,7 @@
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
           <option value="sieve">Prime Sieve (&lt;1000)</option>
+          <option value="bmp_matrix">BMP to Matrix (256x192)</option>
           <option value="banked">Banked Calls + Globals</option>
           <option value="reentrant">Recursive (Reentrant)</option>
           <option value="globals">ROM + RAM Globals</option>
@@ -417,6 +418,7 @@
             "&!putchar(c:#u8);\n\n&print_newline() {\n  putchar(10);\n}\n\n&^main() -> #i32 {\n  putchar(72);\n  putchar(101);\n  putchar(108);\n  putchar(108);\n  putchar(111);\n  print_newline();\n  0\n}\n"
         }
       ],
+      assets: [],
       outputs: [],
       activeSource: 0,
       activeOutput: 0,
@@ -460,6 +462,21 @@
             "&^main() -> #i32 {\n  limit:#i32 = 1000;\n  prime:#b[1000];\n\n  i:#i32 = 0;\n  (i < limit)@{\n    prime[i] = 1;\n    i = i + 1;\n  };\n  prime[0] = 0;\n  prime[1] = 0;\n\n  p:#i32 = 2;\n  (p * p < limit)@{\n    prime[p] ? {\n      k:#i32 = p * p;\n      (k < limit)@{\n        prime[k] = 0;\n        k = k + p;\n      };\n    };\n    p = p + 1;\n  };\n\n  sum:#i32 = 0;\n  n:#i32 = 2;\n  (n < limit)@{\n    prime[n] ? { sum = sum + n; };\n    n = n + 1;\n  };\n\n  sum\n}\n"
         }
       ],
+      bmp_matrix: {
+        sources: [
+          {
+            name: "main.vx",
+            content: __EXAMPLE_BMP_TO_MATRIX_SOURCE_JSON__
+          }
+        ],
+        assets: [
+          {
+            name: "assets/random_256x192.bmp",
+            encoding: "base64",
+            contentBase64: "__EXAMPLE_BMP_RANDOM_256X192_B64__"
+          }
+        ]
+      },
       banked: [
         {
           name: "main.vx",
@@ -569,6 +586,37 @@
       return clean.replace(/\s+/g, "_");
     }
 
+    function sanitizeAssetPath(name) {
+      let clean = String(name || "").trim().replace(/\\/g, "/");
+      if (!clean) return null;
+      if (clean.startsWith("/") || clean.includes("..")) return null;
+      clean = clean.replace(/\/+/g, "/");
+      if (clean === "." || clean === "..") return null;
+      return clean.replace(/\s+/g, "_");
+    }
+
+    function decodeBase64ToBytes(text) {
+      const binary = atob(text);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function normalizeExamplePayload(raw) {
+      if (Array.isArray(raw)) {
+        return { sources: raw, assets: [] };
+      }
+      if (raw && typeof raw === "object" && Array.isArray(raw.sources)) {
+        return {
+          sources: raw.sources,
+          assets: Array.isArray(raw.assets) ? raw.assets : []
+        };
+      }
+      return null;
+    }
+
     function addFile() {
       const name = sanitizeName(prompt("New file name", "extra.vx"));
       if (!name) return;
@@ -617,6 +665,25 @@
         ensureDir(FS, dir);
         FS.writeFile(fullPath, src.content);
       });
+      state.assets.forEach((asset) => {
+        const clean = sanitizeAssetPath(asset.name);
+        if (!clean) {
+          log(`Skipping invalid asset path: ${asset.name}`, "error");
+          return;
+        }
+        if ((asset.encoding || "base64") !== "base64") {
+          log(`Unsupported asset encoding for ${clean}`, "error");
+          return;
+        }
+        if (typeof asset.contentBase64 !== "string" || asset.contentBase64.length === 0) {
+          log(`Skipping empty asset payload: ${clean}`, "error");
+          return;
+        }
+        const fullPath = `/project/${clean}`;
+        const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+        ensureDir(FS, dir);
+        FS.writeFile(fullPath, decodeBase64ToBytes(asset.contentBase64));
+      });
     }
 
     function selectEntry() {
@@ -645,16 +712,22 @@
       return files;
     }
 
-    function readOutputs(FS, sourceNames) {
+    function readOutputs(FS, sourceNames, assetNames) {
       const sourceSet = new Set(
         sourceNames
           .map((name) => sanitizeName(name))
+          .filter((name) => !!name)
+      );
+      const assetSet = new Set(
+        assetNames
+          .map((name) => sanitizeAssetPath(name))
           .filter((name) => !!name)
       );
       const results = [];
       const files = listWorkspaceFiles(FS, "/project");
       files.forEach((file) => {
         if (sourceSet.has(file.relPath)) return;
+        if (assetSet.has(file.relPath)) return;
         results.push({
           name: file.relPath,
           content: FS.readFile(file.absPath, { encoding: "utf8" })
@@ -721,7 +794,11 @@
         }
       }
 
-      const outputs = readOutputs(module.FS, state.sources.map((src) => src.name));
+      const outputs = readOutputs(
+        module.FS,
+        state.sources.map((src) => src.name),
+        state.assets.map((asset) => asset.name)
+      );
       state.outputs = outputs;
       state.activeOutput = 0;
       renderOutputTabs();
@@ -740,7 +817,20 @@
 
     function loadExample(key) {
       if (!examples[key]) return;
-      state.sources = examples[key].map((src) => ({ ...src }));
+      const payload = normalizeExamplePayload(examples[key]);
+      if (!payload) return;
+      state.sources = payload.sources.map((src) => ({ ...src }));
+      state.assets = payload.assets
+        .map((asset) => {
+          const name = sanitizeAssetPath(asset.name);
+          if (!name) return null;
+          return {
+            name,
+            encoding: "base64",
+            contentBase64: typeof asset.contentBase64 === "string" ? asset.contentBase64 : ""
+          };
+        })
+        .filter((asset) => !!asset);
       state.activeSource = 0;
       clearOutputs();
       renderSourceTabs();
@@ -818,6 +908,7 @@
       if (restored.length === 0) return false;
 
       state.sources = restored.slice(0, 64);
+      state.assets = [];
       state.activeSource = 0;
       if (typeof parsed.backend === "string" && parsed.backend.trim().length > 0) {
         state.backend = parsed.backend.trim();
@@ -910,6 +1001,10 @@
     });
 
     shareBtn.addEventListener("click", () => {
+      if (state.assets.length > 0) {
+        log("Share URL is not supported for examples with binary assets", "error");
+        return;
+      }
       const url = buildShareUrl();
       if (!url) {
         log("Source set is too large to encode into a share URL", "error");
