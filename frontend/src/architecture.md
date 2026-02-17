@@ -21,6 +21,9 @@ Exactly one subsystem owns each concern:
 - Parsing and AST shape:
   - Owner: `parse/*`
   - Must not perform semantic decisions beyond syntax validity.
+  - Annotation syntax disambiguation must be context-aware:
+    - A `[[...]]` token sequence is treated as annotations only when it is a complete annotation block and is followed by a syntactically valid annotation target for that parse context.
+    - Otherwise the same token sequence must remain available to normal expression parsing (for example nested array literals like `[[input(), 2], [3, 4]]`).
 - Name/module binding and symbol identity:
   - Owner: `resolve/*`
   - Must not duplicate compile-time evaluation logic.

@@ -98,6 +98,179 @@ bool Parser::is_annotation_start() {
            peek(2).type == TokenType::Identifier;
 }
 
+bool Parser::token_starts_expression(TokenType type) const {
+    switch (type) {
+        case TokenType::IntLiteral:
+        case TokenType::FloatLiteral:
+        case TokenType::StringLiteral:
+        case TokenType::CharLiteral:
+        case TokenType::LeftBrace:
+        case TokenType::LeftBracket:
+        case TokenType::Dollar:
+        case TokenType::Identifier:
+        case TokenType::DoubleColon:
+        case TokenType::LeftParen:
+        case TokenType::Minus:
+        case TokenType::LogicalNot:
+        case TokenType::BitNot:
+        case TokenType::BitOr:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool Parser::token_starts_statement(TokenType type) const {
+    switch (type) {
+        case TokenType::Arrow:
+        case TokenType::BreakArrow:
+        case TokenType::ContinueArrow:
+        case TokenType::Hash:
+        case TokenType::Ampersand:
+        case TokenType::DoubleColon:
+            return true;
+        default:
+            return token_starts_expression(type);
+    }
+}
+
+bool Parser::token_starts_top_level(TokenType type) const {
+    switch (type) {
+        case TokenType::Ampersand:
+        case TokenType::AmpersandBang:
+        case TokenType::AmpersandCaret:
+        case TokenType::Hash:
+        case TokenType::DoubleColon:
+        case TokenType::BitXor:
+        case TokenType::Identifier:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool Parser::token_starts_annotation_target(TokenType type, AnnotationContext context) const {
+    switch (context) {
+        case AnnotationContext::TopLevel:
+            return token_starts_top_level(type);
+        case AnnotationContext::Statement:
+            return token_starts_statement(type);
+        case AnnotationContext::Expression:
+            return token_starts_expression(type);
+    }
+    return false;
+}
+
+bool Parser::token_can_be_annotation_arg(TokenType type) const {
+    switch (type) {
+        case TokenType::Identifier:
+        case TokenType::StringLiteral:
+        case TokenType::IntLiteral:
+        case TokenType::FloatLiteral:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool Parser::try_parse_annotation_block(size_t start, size_t& end, std::vector<Annotation>& out) const {
+    size_t cursor = start;
+    out.clear();
+
+    if (cursor >= tokens.size() || tokens[cursor].type != TokenType::LeftBracket) {
+        return false;
+    }
+    if (cursor + 1 >= tokens.size() || tokens[cursor + 1].type != TokenType::LeftBracket) {
+        return false;
+    }
+
+    auto token_at = [&](size_t idx) -> const Token& {
+        if (idx < tokens.size()) return tokens[idx];
+        return tokens.back();
+    };
+
+    while (cursor + 1 < tokens.size() &&
+           token_at(cursor).type == TokenType::LeftBracket &&
+           token_at(cursor + 1).type == TokenType::LeftBracket) {
+        cursor += 2;
+
+        for (;;) {
+            if (token_at(cursor).type != TokenType::Identifier) {
+                return false;
+            }
+            Annotation ann;
+            ann.name = token_at(cursor).lexeme;
+            ann.location = token_at(cursor).location;
+            cursor++;
+
+            if (token_at(cursor).type == TokenType::LeftParen) {
+                cursor++;
+                if (token_at(cursor).type != TokenType::RightParen) {
+                    for (;;) {
+                        if (!token_can_be_annotation_arg(token_at(cursor).type)) {
+                            return false;
+                        }
+                        ann.args.push_back(token_at(cursor).lexeme);
+                        cursor++;
+                        if (token_at(cursor).type == TokenType::Comma) {
+                            cursor++;
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                if (token_at(cursor).type != TokenType::RightParen) {
+                    return false;
+                }
+                cursor++;
+            }
+
+            out.push_back(ann);
+            if (token_at(cursor).type == TokenType::Comma) {
+                cursor++;
+                continue;
+            }
+            break;
+        }
+
+        if (token_at(cursor).type != TokenType::RightBracket) {
+            return false;
+        }
+        cursor++;
+        if (token_at(cursor).type != TokenType::RightBracket) {
+            return false;
+        }
+        cursor++;
+    }
+
+    if (out.empty()) {
+        return false;
+    }
+
+    end = cursor;
+    return true;
+}
+
+std::vector<Annotation> Parser::parse_annotations_disambiguated(AnnotationContext context) {
+    if (!check(TokenType::LeftBracket) || peek().type != TokenType::LeftBracket) {
+        return {};
+    }
+
+    size_t end = pos;
+    std::vector<Annotation> parsed;
+    if (!try_parse_annotation_block(pos, end, parsed)) {
+        return {};
+    }
+
+    TokenType next = (end < tokens.size()) ? tokens[end].type : TokenType::EndOfFile;
+    if (!token_starts_annotation_target(next, context)) {
+        return {};
+    }
+
+    pos = end;
+    return parsed;
+}
+
 std::string Parser::parse_annotation_arg() {
     Token tok = current();
     switch (tok.type) {
@@ -158,7 +331,7 @@ Module Parser::parse_module(const std::string& name, const std::string& path) {
         }
 
         try {
-            std::vector<Annotation> annotations = parse_annotations();
+            std::vector<Annotation> annotations = parse_annotations_disambiguated(AnnotationContext::TopLevel);
             StmtPtr top = parse_top_level();
             top->annotations = annotations;
             mod.top_level.push_back(top);
@@ -404,7 +577,7 @@ StmtPtr Parser::parse_global() {
 }
 
 StmtPtr Parser::parse_stmt() {
-    std::vector<Annotation> annotations = parse_annotations();
+    std::vector<Annotation> annotations = parse_annotations_disambiguated(AnnotationContext::Statement);
     StmtPtr stmt = parse_stmt_no_semi();
     stmt->annotations = annotations;
     skip_semis();
@@ -941,7 +1114,7 @@ ExprPtr Parser::parse_postfix_suffix(ExprPtr expr) {
 }
 
 ExprPtr Parser::parse_primary() {
-    std::vector<Annotation> annotations = parse_annotations();
+    std::vector<Annotation> annotations = parse_annotations_disambiguated(AnnotationContext::Expression);
     SourceLocation loc = current().location;
 
     if (match(TokenType::DoubleColon)) {

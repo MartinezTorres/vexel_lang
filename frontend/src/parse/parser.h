@@ -13,6 +13,12 @@ class Parser {
     int statement_expr_depth;
     int statement_expr_allowed_depth;
 
+    enum class AnnotationContext {
+        TopLevel,
+        Statement,
+        Expression
+    };
+
 public:
     Parser(std::vector<Token> toks);
     Module parse_module(const std::string& name, const std::string& path);
@@ -28,6 +34,13 @@ private:
     Token consume(TokenType type, const std::string& msg);
     void skip_semis();
     bool is_annotation_start();
+    bool token_starts_expression(TokenType type) const;
+    bool token_starts_statement(TokenType type) const;
+    bool token_starts_top_level(TokenType type) const;
+    bool token_starts_annotation_target(TokenType type, AnnotationContext context) const;
+    bool token_can_be_annotation_arg(TokenType type) const;
+    bool try_parse_annotation_block(size_t start, size_t& end, std::vector<Annotation>& out) const;
+    std::vector<Annotation> parse_annotations_disambiguated(AnnotationContext context);
     std::vector<Annotation> parse_annotations();
     std::string parse_annotation_arg();
 
