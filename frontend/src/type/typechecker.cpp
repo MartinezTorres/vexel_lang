@@ -369,14 +369,8 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     bool inferred_mutable = stmt->is_mutable;
     if (!sym->is_local && !inferred_mutable) {
         if (stmt->var_init) {
-            if (type && type->kind == Type::Kind::Array &&
-                (stmt->var_init->kind == Expr::Kind::ArrayLiteral ||
-                 stmt->var_init->kind == Expr::Kind::Range)) {
-                constexpr_init = true;
-            } else {
-                CTValue result;
-                constexpr_init = try_evaluate_constexpr(stmt->var_init, result);
-            }
+            CTValue result;
+            constexpr_init = try_evaluate_constexpr(stmt->var_init, result);
         }
         inferred_mutable = !constexpr_init;
         stmt->is_mutable = inferred_mutable;

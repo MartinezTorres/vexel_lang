@@ -34,7 +34,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 2. Make compile-time-init classification frontend-owned and singular
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Compile-time init decisions are split across frontend typing and backend shortcuts.
   - Array/range special-casing appears outside optimizer facts.
