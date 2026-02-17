@@ -13,7 +13,9 @@ namespace vexel {
 
 namespace {
 
-bool ctvalue_equal(const CTValue& a, const CTValue& b) {
+// Strict semantic equality is used only where monotonic symbol promotion
+// requires value identity across fixpoint iterations.
+bool ctvalue_equal_strict(const CTValue& a, const CTValue& b) {
     if (a.index() != b.index()) return false;
 
     if (std::holds_alternative<int64_t>(a)) {
@@ -43,7 +45,7 @@ bool ctvalue_equal(const CTValue& a, const CTValue& b) {
         for (const auto& field : ca->fields) {
             auto it = cb->fields.find(field.first);
             if (it == cb->fields.end()) return false;
-            if (!ctvalue_equal(field.second, it->second)) return false;
+            if (!ctvalue_equal_strict(field.second, it->second)) return false;
         }
         return true;
     }
@@ -53,9 +55,44 @@ bool ctvalue_equal(const CTValue& a, const CTValue& b) {
         if (!aa || !ab) return aa == ab;
         if (aa->elements.size() != ab->elements.size()) return false;
         for (size_t i = 0; i < aa->elements.size(); ++i) {
-            if (!ctvalue_equal(aa->elements[i], ab->elements[i])) return false;
+            if (!ctvalue_equal_strict(aa->elements[i], ab->elements[i])) return false;
         }
         return true;
+    }
+
+    return false;
+}
+
+// Scheduler equality must stay O(1). Aggregates compare by shared storage
+// identity, not deep structure, to avoid quadratic fixpoint behavior.
+bool ctvalue_equal_scheduler(const CTValue& a, const CTValue& b) {
+    if (a.index() != b.index()) return false;
+
+    if (std::holds_alternative<int64_t>(a)) {
+        return std::get<int64_t>(a) == std::get<int64_t>(b);
+    }
+    if (std::holds_alternative<uint64_t>(a)) {
+        return std::get<uint64_t>(a) == std::get<uint64_t>(b);
+    }
+    if (std::holds_alternative<double>(a)) {
+        return std::get<double>(a) == std::get<double>(b);
+    }
+    if (std::holds_alternative<bool>(a)) {
+        return std::get<bool>(a) == std::get<bool>(b);
+    }
+    if (std::holds_alternative<std::string>(a)) {
+        return std::get<std::string>(a) == std::get<std::string>(b);
+    }
+    if (std::holds_alternative<CTUninitialized>(a)) {
+        return true;
+    }
+    if (std::holds_alternative<std::shared_ptr<CTComposite>>(a)) {
+        return std::get<std::shared_ptr<CTComposite>>(a) ==
+               std::get<std::shared_ptr<CTComposite>>(b);
+    }
+    if (std::holds_alternative<std::shared_ptr<CTArray>>(a)) {
+        return std::get<std::shared_ptr<CTArray>>(a) ==
+               std::get<std::shared_ptr<CTArray>>(b);
     }
 
     return false;
@@ -421,6 +458,7 @@ public:
         }
         for (const auto& candidate : collector_.global_constant_candidates()) {
             tracked_symbols_.insert(candidate.first);
+            strict_stability_keys_.insert(candidate.second);
         }
     }
 
@@ -498,6 +536,16 @@ private:
     std::unordered_map<size_t, std::unordered_set<const Symbol*>> root_to_symbols_;
     std::unordered_map<const Symbol*, std::unordered_set<ExprFactKey, ExprFactKeyHash>> symbol_to_exprs_;
     std::unordered_map<ExprFactKey, std::unordered_set<const Symbol*>, ExprFactKeyHash> expr_to_symbols_;
+    std::unordered_set<ExprFactKey, ExprFactKeyHash> strict_stability_keys_;
+
+    bool values_equal_for_stability(const ExprFactKey& key,
+                                    const CTValue& a,
+                                    const CTValue& b) const {
+        if (strict_stability_keys_.count(key)) {
+            return ctvalue_equal_strict(a, b);
+        }
+        return ctvalue_equal_scheduler(a, b);
+    }
 
     static std::unordered_set<const Symbol*> normalize_symbol_set(
         const std::unordered_set<const Symbol*>& in,
@@ -581,7 +629,7 @@ private:
             return true;
         }
 
-        if (ctvalue_equal(it->second, value)) {
+        if (values_equal_for_stability(key, it->second, value)) {
             return false;
         }
 
@@ -620,7 +668,8 @@ private:
                     local_stable.emplace(expr_node, copy_ct_value(value));
                     return;
                 }
-                if (!ctvalue_equal(it->second, value)) {
+                const ExprFactKey key = expr_fact_key(root.instance_id, expr_node);
+                if (!values_equal_for_stability(key, it->second, value)) {
                     local_stable.erase(it);
                     local_unstable.insert(expr_node);
                 }
@@ -737,7 +786,7 @@ private:
                 continue;
             }
 
-            if (!ctvalue_equal(known_it->second, value_it->second)) {
+            if (!ctvalue_equal_strict(known_it->second, value_it->second)) {
                 throw CompileError("Internal error: non-monotonic compile-time value for symbol '" + sym->name + "'",
                                    sym->declaration ? sym->declaration->location : SourceLocation());
             }
