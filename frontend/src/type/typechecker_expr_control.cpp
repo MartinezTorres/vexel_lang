@@ -340,34 +340,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         TypePtr rhs_type = check_expr(expr->right);
         TypePtr rhs_inferred_type = rhs_type;
         TypePtr var_type = expr->left->type ? expr->left->type : rhs_type;
-        if (expr->right->kind == Expr::Kind::Cast && expr->left->type) {
-            rhs_type = var_type;
-        }
-
-        if (expr->left->type &&
-            var_type && var_type->kind == Type::Kind::Array &&
-            expr->right->kind == Expr::Kind::ArrayLiteral) {
-            bool compatible = true;
-            for (auto& el : expr->right->elements) {
-                if (!types_compatible(el->type, var_type->element_type) &&
-                    !literal_assignable_to(var_type->element_type, el)) {
-                    compatible = false;
-                    break;
-                }
-            }
-            if (compatible) {
-                rhs_type = var_type;
-            }
-        }
-
-        if (expr->left->type && !types_compatible(rhs_type, var_type)) {
-            if (expr->right->kind == Expr::Kind::Cast) {
-                expr->right->type = var_type;
-            } else if (literal_assignable_to(var_type, expr->right)) {
-                expr->right->type = var_type;
-            } else {
-                throw CompileError("Type mismatch in variable initialization", expr->location);
-            }
+        if (expr->left->type) {
+            enforce_declared_initializer_type(var_type, expr->right, rhs_type, expr->location);
         }
 
         Symbol* lhs_sym = lookup_binding(expr->left.get());

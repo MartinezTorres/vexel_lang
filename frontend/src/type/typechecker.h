@@ -152,6 +152,10 @@ private:
     void check_func_decl(StmtPtr stmt);
     void check_type_decl(StmtPtr stmt);
     void check_var_decl(StmtPtr stmt);
+    void enforce_declared_initializer_type(TypePtr declared_type,
+                                           ExprPtr init_expr,
+                                           TypePtr& init_type,
+                                           const SourceLocation& loc);
 
     TypePtr check_expr(ExprPtr expr);
     TypePtr check_binary(ExprPtr expr);

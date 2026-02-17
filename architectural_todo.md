@@ -48,7 +48,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 3. Deduplicate declaration-assignment compatibility logic
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Similar type-compatibility logic is duplicated in var-decl and declaration-assignment paths.
   - Drift risk for array literals, casts, and literal assignability.

@@ -321,6 +321,41 @@ void TypeChecker::check_type_decl(StmtPtr stmt) {
     check_recursive_type(stmt->type_decl_name, stmt, stmt->location);
 }
 
+void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
+                                                    ExprPtr init_expr,
+                                                    TypePtr& init_type,
+                                                    const SourceLocation& loc) {
+    if (!declared_type || !init_expr) return;
+
+    if (declared_type->kind == Type::Kind::Array &&
+        init_expr->kind == Expr::Kind::ArrayLiteral) {
+        for (const auto& el : init_expr->elements) {
+            if (!types_compatible(el->type, declared_type->element_type) &&
+                !literal_assignable_to(declared_type->element_type, el)) {
+                throw CompileError("Type mismatch in variable initialization", loc);
+            }
+        }
+        init_expr->type = declared_type;
+        init_type = declared_type;
+        return;
+    }
+
+    if (init_expr->kind == Expr::Kind::Cast) {
+        init_expr->type = declared_type;
+        init_type = declared_type;
+        return;
+    }
+
+    if (!types_compatible(init_type, declared_type)) {
+        if (literal_assignable_to(declared_type, init_expr)) {
+            init_expr->type = declared_type;
+            init_type = declared_type;
+            return;
+        }
+        throw CompileError("Type mismatch in variable initialization", loc);
+    }
+}
+
 void TypeChecker::check_var_decl(StmtPtr stmt) {
     TypePtr type = stmt->var_type;
     bool constexpr_init = false;
@@ -329,30 +364,8 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
         if (!type) {
             type = init_type;
             stmt->var_type = type;
-        } else if (type->kind == Type::Kind::Array &&
-                   stmt->var_init->kind == Expr::Kind::ArrayLiteral) {
-            bool compatible = true;
-            for (auto& el : stmt->var_init->elements) {
-                if (!types_compatible(el->type, type->element_type) &&
-                    !literal_assignable_to(type->element_type, el)) {
-                    compatible = false;
-                    break;
-                }
-            }
-            if (compatible) {
-                stmt->var_init->type = type;
-            } else {
-                throw CompileError("Type mismatch in variable initialization", stmt->location);
-            }
-        } else if (stmt->var_init->kind == Expr::Kind::Cast) {
-            // Allow explicit casts to satisfy the annotated type
-            stmt->var_init->type = type;
-        } else if (!types_compatible(init_type, type)) {
-            if (literal_assignable_to(type, stmt->var_init)) {
-                stmt->var_init->type = type;
-            } else {
-                throw CompileError("Type mismatch in variable initialization", stmt->location);
-            }
+        } else {
+            enforce_declared_initializer_type(type, stmt->var_init, init_type, stmt->location);
         }
     } else if (!type) {
         throw CompileError("Variable must have type annotation or initializer", stmt->location);
