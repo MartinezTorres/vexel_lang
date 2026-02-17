@@ -692,7 +692,7 @@ private:
             }
 
             // Root execution can short-circuit on runtime-dependent paths.
-            // Queue only unresolved nodes from this root for targeted fallback
+            // Queue only unresolved nodes from this root for targeted deferred
             // queries instead of maintaining a full eager per-expression pass.
             for (const Expr* expr_node : root_expr_list) {
                 if (!expr_node) continue;

@@ -2,7 +2,6 @@
 #include "constants.h"
 #include "cte_value_utils.h"
 #include "evaluator_internal.h"
-#include "expr_access.h"
 #include "typechecker.h"
 #include <algorithm>
 #include <functional>
