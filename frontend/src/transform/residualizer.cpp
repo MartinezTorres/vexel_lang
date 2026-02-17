@@ -1,30 +1,11 @@
 #include "residualizer.h"
 
+#include "cte_value_utils.h"
 #include "expr_access.h"
 
 namespace vexel {
 
 namespace {
-
-bool scalar_to_bool(const CTValue& value, bool& out) {
-    if (std::holds_alternative<int64_t>(value)) {
-        out = std::get<int64_t>(value) != 0;
-        return true;
-    }
-    if (std::holds_alternative<uint64_t>(value)) {
-        out = std::get<uint64_t>(value) != 0;
-        return true;
-    }
-    if (std::holds_alternative<bool>(value)) {
-        out = std::get<bool>(value);
-        return true;
-    }
-    if (std::holds_alternative<double>(value)) {
-        out = std::get<double>(value) != 0.0;
-        return true;
-    }
-    return false;
-}
 
 bool literal_to_bool(const ExprPtr& expr, bool& out) {
     if (!expr) return false;
@@ -385,7 +366,7 @@ std::optional<bool> Residualizer::constexpr_condition(const ExprPtr& cond, const
         auto value_it = facts_.constexpr_values.find(expr_fact_key(current_instance_id_, cond.get()));
         if (value_it != facts_.constexpr_values.end()) {
             bool out = false;
-            if (scalar_to_bool(value_it->second, out)) {
+            if (cte_scalar_to_bool(value_it->second, out)) {
                 return out;
             }
         }

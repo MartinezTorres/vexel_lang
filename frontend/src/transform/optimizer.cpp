@@ -1,6 +1,7 @@
 #include "optimizer.h"
 
 #include "cte_engine.h"
+#include "cte_value_utils.h"
 #include "expr_access.h"
 #include "typechecker.h"
 
@@ -95,26 +96,6 @@ bool ctvalue_equal_scheduler(const CTValue& a, const CTValue& b) {
                std::get<std::shared_ptr<CTArray>>(b);
     }
 
-    return false;
-}
-
-bool scalar_to_bool(const CTValue& value, bool& out) {
-    if (std::holds_alternative<int64_t>(value)) {
-        out = std::get<int64_t>(value) != 0;
-        return true;
-    }
-    if (std::holds_alternative<uint64_t>(value)) {
-        out = std::get<uint64_t>(value) != 0;
-        return true;
-    }
-    if (std::holds_alternative<bool>(value)) {
-        out = std::get<bool>(value);
-        return true;
-    }
-    if (std::holds_alternative<double>(value)) {
-        out = std::get<double>(value) != 0.0;
-        return true;
-    }
     return false;
 }
 
@@ -497,7 +478,7 @@ public:
             auto it = stable_values_.find(key);
             if (it == stable_values_.end()) continue;
             bool cond = false;
-            if (!scalar_to_bool(it->second, cond)) continue;
+            if (!cte_scalar_to_bool(it->second, cond)) continue;
             facts.constexpr_conditions[key] = cond;
         }
 

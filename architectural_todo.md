@@ -62,7 +62,7 @@ No step is considered complete unless all six sub-steps are done.
 
 ### 4. Consolidate scalar-to-bool semantics
 
-- Status: [ ] Open
+- Status: [x] Done
 - Root problem:
   - Scalar-to-bool conversion logic is implemented in multiple places.
   - Behavior drift risk between optimizer, residualizer, analyzed program builder, evaluator, and backends.

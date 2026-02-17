@@ -1,28 +1,9 @@
 #include "analyzed_program_builder.h"
 
+#include "cte_value_utils.h"
 #include "typechecker.h"
 
 namespace vexel {
-
-namespace {
-
-std::optional<bool> scalar_to_bool(const CTValue& value) {
-    if (std::holds_alternative<int64_t>(value)) {
-        return std::get<int64_t>(value) != 0;
-    }
-    if (std::holds_alternative<uint64_t>(value)) {
-        return std::get<uint64_t>(value) != 0;
-    }
-    if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value);
-    }
-    if (std::holds_alternative<double>(value)) {
-        return std::get<double>(value) != 0.0;
-    }
-    return std::nullopt;
-}
-
-} // namespace
 
 AnalyzedProgram make_analyzed_program(const Module& merged,
                                       TypeChecker& checker,
@@ -59,7 +40,7 @@ AnalyzedProgram make_analyzed_program(const Module& merged,
         if (value_it == optimization.constexpr_values.end()) {
             return std::nullopt;
         }
-        return scalar_to_bool(value_it->second);
+        return cte_scalar_to_bool(value_it->second);
     };
 
     out.lookup_type_symbol = [&checker](int instance_id, const std::string& type_name) -> Symbol* {

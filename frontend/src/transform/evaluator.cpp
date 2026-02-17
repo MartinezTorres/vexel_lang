@@ -1,5 +1,6 @@
 #include "evaluator.h"
 #include "constants.h"
+#include "cte_value_utils.h"
 #include "expr_access.h"
 #include "typechecker.h"
 #include <algorithm>
@@ -313,26 +314,6 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
         }
     };
 
-    auto scalar_to_bool = [&](const CTValue& v, bool& out) -> bool {
-        if (std::holds_alternative<int64_t>(v)) {
-            out = std::get<int64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<uint64_t>(v)) {
-            out = std::get<uint64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<bool>(v)) {
-            out = std::get<bool>(v);
-            return true;
-        }
-        if (std::holds_alternative<double>(v)) {
-            out = std::get<double>(v) != 0.0;
-            return true;
-        }
-        return false;
-    };
-
     std::function<bool(const StmtPtr&)> eval_stmt = [&](const StmtPtr& stmt) -> bool {
         if (!stmt) return true;
 
@@ -381,7 +362,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
                     return false;
                 }
                 bool is_true = false;
-                if (!scalar_to_bool(cond_val, is_true)) {
+                if (!cte_scalar_to_bool(cond_val, is_true)) {
                     error_msg = "Conditional expression condition must be a scalar value";
                     cleanup_locals();
                     return false;
@@ -480,29 +461,9 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         return std::holds_alternative<int64_t>(v) || std::holds_alternative<uint64_t>(v);
     };
 
-    auto to_bool = [&](const CTValue& v, bool& out) -> bool {
-        if (std::holds_alternative<int64_t>(v)) {
-            out = std::get<int64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<uint64_t>(v)) {
-            out = std::get<uint64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<bool>(v)) {
-            out = std::get<bool>(v);
-            return true;
-        }
-        if (std::holds_alternative<double>(v)) {
-            out = std::get<double>(v) != 0.0;
-            return true;
-        }
-        return false;
-    };
-
     if (expr->op == "&&" || expr->op == "||") {
         bool left_bool = false;
-        if (!to_bool(left_val, left_bool)) {
+        if (!cte_scalar_to_bool(left_val, left_bool)) {
             error_msg = "Unsupported operand types for logical operation";
             return false;
         }
@@ -518,7 +479,7 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
 
         if (!try_evaluate(expr->right, right_val)) return false;
         bool right_bool = false;
-        if (!to_bool(right_val, right_bool)) {
+        if (!cte_scalar_to_bool(right_val, right_bool)) {
             error_msg = "Unsupported operand types for logical operation";
             return false;
         }
@@ -2015,26 +1976,6 @@ bool CompileTimeEvaluator::eval_repeat(ExprPtr expr, CTValue& result) {
         ~LoopGuard() { depth--; }
     } loop_guard(loop_depth);
 
-    auto to_bool = [&](const CTValue& v, bool& out) -> bool {
-        if (std::holds_alternative<int64_t>(v)) {
-            out = std::get<int64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<uint64_t>(v)) {
-            out = std::get<uint64_t>(v) != 0;
-            return true;
-        }
-        if (std::holds_alternative<bool>(v)) {
-            out = std::get<bool>(v);
-            return true;
-        }
-        if (std::holds_alternative<double>(v)) {
-            out = std::get<double>(v) != 0.0;
-            return true;
-        }
-        return false;
-    };
-
     int iterations = 0;
     while (true) {
         CTValue cond_val;
@@ -2042,7 +1983,7 @@ bool CompileTimeEvaluator::eval_repeat(ExprPtr expr, CTValue& result) {
             return false;
         }
         bool is_true = false;
-        if (!to_bool(cond_val, is_true)) {
+        if (!cte_scalar_to_bool(cond_val, is_true)) {
             error_msg = "Repeat condition must be a scalar value";
             return false;
         }
