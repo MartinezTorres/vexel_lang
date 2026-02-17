@@ -20,7 +20,7 @@ struct Annotation {
 };
 
 struct Type {
-    enum class Kind { Primitive, Array, Named, TypeVar };
+    enum class Kind { Primitive, Array, Named, TypeVar, TypeOf };
     Kind kind;
     SourceLocation location;
     Symbol* resolved_symbol = nullptr;
@@ -34,11 +34,14 @@ struct Type {
     std::string type_name;
     // For TypeVar
     std::string var_name;
+    // For TypeOf
+    ExprPtr typeof_expr;
 
     static TypePtr make_primitive(PrimitiveType p, const SourceLocation& loc = SourceLocation());
     static TypePtr make_array(TypePtr elem, ExprPtr size, const SourceLocation& loc = SourceLocation());
     static TypePtr make_named(const std::string& name, const SourceLocation& loc = SourceLocation());
     static TypePtr make_typevar(const std::string& name, const SourceLocation& loc = SourceLocation());
+    static TypePtr make_typeof(ExprPtr expr, const SourceLocation& loc = SourceLocation());
 
     std::string to_string() const;
 };

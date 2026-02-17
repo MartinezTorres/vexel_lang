@@ -47,6 +47,8 @@ std::string mangle_type_component(TypePtr type) {
         }
         case Type::Kind::TypeVar:
             return "tv_" + type->var_name;
+        case Type::Kind::TypeOf:
+            return "typeof";
     }
     return "unknown";
 }
@@ -69,6 +71,8 @@ bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
             return a->type_name == b->type_name;
         case Type::Kind::TypeVar:
             return a->var_name == b->var_name;
+        case Type::Kind::TypeOf:
+            return a->typeof_expr.get() == b->typeof_expr.get();
     }
     return false;
 }
@@ -90,6 +94,9 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
             break;
         case Type::Kind::TypeVar:
             hash ^= std::hash<std::string>{}(t->var_name);
+            break;
+        case Type::Kind::TypeOf:
+            hash ^= std::hash<const Expr*>{}(t->typeof_expr.get());
             break;
     }
 

@@ -20,6 +20,8 @@ bool type_is_concrete(const TypeUseContext* ctx, TypePtr type) {
     switch (type->kind) {
         case Type::Kind::TypeVar:
             return false;
+        case Type::Kind::TypeOf:
+            return false;
         case Type::Kind::Array:
             return type_is_concrete(ctx, type->element_type);
         default:

@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Type expression #[expr] is valid in cast targets and declaration assignments | Cast target and declaration use #[expr]
+
+&!input() -> #u8;
+
+&^main() -> #i32 {
+    x:#u8 = input();
+    y:#[x] = (#[x])x;
+    (#i32)y
+}

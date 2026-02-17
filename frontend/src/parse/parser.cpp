@@ -1130,24 +1130,30 @@ TypePtr Parser::parse_type() {
 
     consume(TokenType::Hash, "Expected '#'");
 
-    std::string name = consume(TokenType::Identifier, "Expected type name").lexeme;
-
-    // Check for primitive types
-    static std::unordered_map<std::string, PrimitiveType> primitives = {
-        {"i8", PrimitiveType::I8}, {"i16", PrimitiveType::I16},
-        {"i32", PrimitiveType::I32}, {"i64", PrimitiveType::I64},
-        {"u8", PrimitiveType::U8}, {"u16", PrimitiveType::U16},
-        {"u32", PrimitiveType::U32}, {"u64", PrimitiveType::U64},
-        {"f32", PrimitiveType::F32}, {"f64", PrimitiveType::F64},
-        {"b", PrimitiveType::Bool}, {"s", PrimitiveType::String}
-    };
-
     TypePtr type;
-    auto it = primitives.find(name);
-    if (it != primitives.end()) {
-        type = Type::make_primitive(it->second, loc);
+    if (match(TokenType::LeftBracket)) {
+        ExprPtr typeof_expr = parse_expr();
+        consume(TokenType::RightBracket, "Expected ']'");
+        type = Type::make_typeof(typeof_expr, loc);
     } else {
-        type = Type::make_named(name, loc);
+        std::string name = consume(TokenType::Identifier, "Expected type name").lexeme;
+
+        // Check for primitive types
+        static std::unordered_map<std::string, PrimitiveType> primitives = {
+            {"i8", PrimitiveType::I8}, {"i16", PrimitiveType::I16},
+            {"i32", PrimitiveType::I32}, {"i64", PrimitiveType::I64},
+            {"u8", PrimitiveType::U8}, {"u16", PrimitiveType::U16},
+            {"u32", PrimitiveType::U32}, {"u64", PrimitiveType::U64},
+            {"f32", PrimitiveType::F32}, {"f64", PrimitiveType::F64},
+            {"b", PrimitiveType::Bool}, {"s", PrimitiveType::String}
+        };
+
+        auto it = primitives.find(name);
+        if (it != primitives.end()) {
+            type = Type::make_primitive(it->second, loc);
+        } else {
+            type = Type::make_named(name, loc);
+        }
     }
 
     ExprPtr size = leading_size;

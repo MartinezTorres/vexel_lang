@@ -37,6 +37,14 @@ TypePtr Type::make_typevar(const std::string& name, const SourceLocation& loc) {
     return t;
 }
 
+TypePtr Type::make_typeof(ExprPtr expr, const SourceLocation& loc) {
+    auto t = std::make_shared<Type>();
+    t->kind = Kind::TypeOf;
+    t->typeof_expr = expr;
+    t->location = loc;
+    return t;
+}
+
 std::string Type::to_string() const {
     std::ostringstream os;
     switch (kind) {
@@ -51,6 +59,9 @@ std::string Type::to_string() const {
             break;
         case Kind::TypeVar:
             os << var_name;
+            break;
+        case Kind::TypeOf:
+            os << "[...]";
             break;
     }
     return os.str();

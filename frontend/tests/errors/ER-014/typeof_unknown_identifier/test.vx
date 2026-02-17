@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Type expression #[expr] must reference valid symbols in scope | #[missing] is rejected
+
+&^main() -> #i32 {
+    x:#[missing] = 0;
+    0
+}

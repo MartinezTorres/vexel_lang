@@ -44,6 +44,7 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
                 break;
             case Type::Kind::Primitive:
             case Type::Kind::TypeVar:
+            case Type::Kind::TypeOf:
             default:
                 break;
             }

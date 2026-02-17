@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Type expression #[expr] uses the same smallest-fitting type rules as expression typing | #[1] resolves to #b
+
+&^main() -> #i32 {
+    flag:#[1] = 1;
+    (#i32)flag
+}

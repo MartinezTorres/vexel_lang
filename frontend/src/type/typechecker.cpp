@@ -213,6 +213,21 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         throw CompileError("Internal error: unresolved function '" + func_name + "'", stmt->location);
     }
 
+    // Signature types are part of frontend semantics; materialize all #[expr] types here.
+    for (auto& param : stmt->params) {
+        if (param.type) {
+            param.type = validate_type(param.type, param.location);
+        }
+    }
+    for (auto& rt : stmt->return_types) {
+        if (rt) {
+            rt = validate_type(rt, stmt->location);
+        }
+    }
+    if (stmt->return_type) {
+        stmt->return_type = validate_type(stmt->return_type, stmt->location);
+    }
+
     // Validate external function signatures (primitives only)
     if (stmt->is_external) {
         for (const auto& param : stmt->params) {
@@ -314,6 +329,8 @@ void TypeChecker::check_type_decl(StmtPtr stmt) {
     for (auto& field : stmt->fields) {
         if (!field.type) {
             field.type = make_fresh_typevar();
+        } else {
+            field.type = validate_type(field.type, field.location);
         }
     }
 
@@ -372,7 +389,8 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     }
 
     // Validate the type
-    validate_type(type, stmt->location);
+    type = validate_type(type, stmt->location);
+    stmt->var_type = type;
 
     Symbol* sym = lookup_binding(stmt.get());
     if (!sym) {

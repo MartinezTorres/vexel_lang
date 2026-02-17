@@ -82,6 +82,13 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Type annotation**: `x:#T`
 
+**Type expressions**: `#[expr]`
+- Resolves to the static type of `expr` in the current scope.
+- Uses normal type inference rules (for example, `#[1]` resolves to `#b`).
+- `expr` is type-checked only; `#[expr]` does not evaluate `expr` or trigger side effects.
+- Must resolve to a concrete type before backend handoff.
+- Valid anywhere a type is expected, including cast targets and declaration annotations.
+
 **Comparison semantics**:
 - All values support `<`, `>`, `<=`, `>=`, `==`, and `!=`.
 - Primitives (`#i*`, `#u*`, `#f*`, `#b`, `#s`) use numeric or lexicographic ordering.
@@ -520,7 +527,7 @@ array        ::= '[' [ expr { ',' expr } ] ']'
 qname        ::= ident { '::' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
-type         ::= '#' ident [ '[' expr ']' ]
+type         ::= [ '[' expr ']' ] '#' ( ident | '[' expr ']' ) [ '[' expr ']' ]
 
 lvalue       ::= var | methodcall | index | member
 

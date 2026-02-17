@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Type expression #[expr] can be used as the array element type with a size suffix | #[expr][N] is a valid array type
+
+&!input() -> #u8;
+
+&^main() -> #i32 {
+    seed:#u8 = input();
+    values:#[seed][4];
+    (#i32)|values|
+}

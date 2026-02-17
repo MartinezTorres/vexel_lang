@@ -189,7 +189,7 @@ private:
     TypePtr make_fresh_typevar();
 
     TypePtr parse_type_from_string(const std::string& type_str, const SourceLocation& loc);
-    void validate_type(TypePtr type, const SourceLocation& loc);
+    TypePtr validate_type(TypePtr type, const SourceLocation& loc);
     void check_recursive_type(const std::string& type_name, StmtPtr type_decl, const SourceLocation& loc);
     bool is_primitive_type(TypePtr type);
 

@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Type expression #[expr] reuses the static type of a local identifier in type positions | #[expr] resolves to identifier static type
+
+&!input() -> #u16;
+
+&^main() -> #i32 {
+    base:#u16 = input();
+    copy:#[base] = base;
+    (#i32)copy
+}

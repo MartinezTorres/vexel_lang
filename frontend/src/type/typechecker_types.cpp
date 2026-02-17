@@ -67,13 +67,13 @@ bool TypeChecker::is_generic_function(StmtPtr func) {
 
     return has_untyped_param || has_typevar_return;
 }
-void TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
-    if (!type) return;
+TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
+    if (!type) return nullptr;
 
     switch (type->kind) {
         case Type::Kind::Array: {
-            // Recursively validate element type
-            validate_type(type->element_type, loc);
+            // Recursively validate element type and materialize any type expression.
+            type->element_type = validate_type(type->element_type, loc);
             if (type->array_size) {
                 CTEQueryResult size_query = query_constexpr(type->array_size);
                 if (size_query.status == CTEQueryStatus::Error) {
@@ -99,7 +99,7 @@ void TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                     throw CompileError("Array size must be an integer compile-time constant", loc);
                 }
             }
-            break;
+            return type;
         }
         case Type::Kind::Named: {
             // Check for recursive types
@@ -113,11 +113,31 @@ void TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
             if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
                 check_recursive_type(type->type_name, type_sym->declaration, loc);
             }
-            break;
+            return type;
         }
-        default:
-            break;
+        case Type::Kind::TypeOf: {
+            if (!type->typeof_expr) {
+                throw CompileError("Type expression #[...] requires an expression", loc);
+            }
+            TypePtr resolved = check_expr(type->typeof_expr);
+            if (!resolved) {
+                throw CompileError("Type expression #[...] does not resolve to a type", type->typeof_expr->location);
+            }
+            resolved = resolve_type(resolved);
+            if (resolved && resolved->kind == Type::Kind::TypeVar) {
+                throw CompileError("Type expression #[...] resolved to an unknown type", type->typeof_expr->location);
+            }
+            if (resolved && resolved->kind == Type::Kind::TypeOf) {
+                throw CompileError("Type expression #[...] must resolve to a concrete type", type->typeof_expr->location);
+            }
+            return validate_type(resolved, loc);
+        }
+        case Type::Kind::Primitive:
+        case Type::Kind::TypeVar:
+            return type;
     }
+
+    return type;
 }
 void TypeChecker::check_recursive_type(const std::string& type_name, StmtPtr type_decl, const SourceLocation& loc) {
     // Check if any field has the same type as the parent (direct recursion)

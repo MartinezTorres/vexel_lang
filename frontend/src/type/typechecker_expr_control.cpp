@@ -296,7 +296,8 @@ std::optional<bool> TypeChecker::constexpr_condition(ExprPtr expr) {
 
 TypePtr TypeChecker::check_cast(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
-    TypePtr target_type = expr->target_type;
+    TypePtr target_type = validate_type(expr->target_type, expr->location);
+    expr->target_type = target_type;
 
     // Special-case: casting packed bool arrays to unsigned integers requires matching size
     if (target_type && target_type->kind == Type::Kind::Primitive &&
@@ -327,7 +328,10 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         if (expr->left->kind != Expr::Kind::Identifier) {
             throw CompileError("Internal error: invalid declaration assignment", expr->location);
         }
-        const TypePtr explicit_decl_type = expr->left->type;
+        TypePtr explicit_decl_type = expr->left->type
+            ? validate_type(expr->left->type, expr->left->location)
+            : nullptr;
+        expr->left->type = explicit_decl_type;
 
         // Check if RHS is a function reference (not allowed)
         if (expr->right->kind == Expr::Kind::Identifier) {

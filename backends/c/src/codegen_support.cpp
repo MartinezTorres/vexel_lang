@@ -78,6 +78,8 @@ std::string CodeGenerator::gen_type(TypePtr type) {
 
         case Type::Kind::TypeVar:
             throw CompileError("Type could not be inferred; add an explicit type annotation", type->location);
+        case Type::Kind::TypeOf:
+            throw CompileError("Internal error: unresolved #[...] reached C backend", type->location);
     }
 
     return "void";
@@ -292,6 +294,8 @@ std::string CodeGenerator::ensure_comparator(TypePtr type) {
         }
         case Type::Kind::TypeVar:
             throw CompileError("Cannot compare generic type without concrete instantiation", type->location);
+        case Type::Kind::TypeOf:
+            throw CompileError("Internal error: unresolved #[...] reached C backend", type->location);
     }
 
     fn << "}\n";

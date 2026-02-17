@@ -714,6 +714,8 @@ bool TypeChecker::types_equal(TypePtr a, TypePtr b) {
             return a->type_name == b->type_name;
         case Type::Kind::TypeVar:
             return a->var_name == b->var_name;
+        case Type::Kind::TypeOf:
+            return a->typeof_expr.get() == b->typeof_expr.get();
     }
     return false;
 }
@@ -797,6 +799,9 @@ TypePtr TypeChecker::resolve_type(TypePtr type) {
             cloned->element_type = elem;
             return cloned;
         }
+    }
+    if (type->kind == Type::Kind::TypeOf && type->typeof_expr && type->typeof_expr->type) {
+        return resolve_type(type->typeof_expr->type);
     }
     return type;
 }

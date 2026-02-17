@@ -570,6 +570,11 @@ void Resolver::resolve_type(TypePtr type) {
         case Type::Kind::Primitive:
         case Type::Kind::TypeVar:
             break;
+        case Type::Kind::TypeOf:
+            if (type->typeof_expr) {
+                resolve_expr(type->typeof_expr);
+            }
+            break;
     }
 }
 

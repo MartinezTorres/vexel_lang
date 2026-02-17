@@ -89,6 +89,8 @@ private:
                 return "#" + type->type_name;
             case Type::Kind::TypeVar:
                 return "#" + type->var_name;
+            case Type::Kind::TypeOf:
+                throw CompileError("Internal error: unresolved #[...] reached vexel backend", type->location);
             case Type::Kind::Array: {
                 std::string size = "...";
                 if (type->array_size) {
