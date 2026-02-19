@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#annotations
+// @desc: Backend-recognized annotations are validated by the frontend. | [[noinline]] is accepted by the frontend
+
+[[noinline]]
+&helper(x:#i32) -> #i32 {
+    x + 1
+}
+
+&^main() -> #i32 {
+    helper(1)
+}

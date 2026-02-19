@@ -12,6 +12,7 @@ const std::unordered_set<std::string>& known_annotations() {
     static const std::unordered_set<std::string> kKnown = {
         "nonreentrant",
         "nonbanked",
+        "noinline",
     };
     return kKnown;
 }
