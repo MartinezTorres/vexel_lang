@@ -244,7 +244,11 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **External functions**: `&!name(p:Type,...)[-> Type];`
 - Declaration only
-- Primitive types only
+- ABI boundary types only:
+  - Primitives (`#i8`, `#i16`, `#i32`, `#i64`, `#u8`, `#u16`, `#u32`, `#u64`, `#f32`, `#f64`, `#b`, `#s`)
+  - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
+  - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
+  - Tuple returns are not allowed
 - Backend defines calling/linking
 
 **Type constructors**: `#Point(x:#i32, y:#i32);`

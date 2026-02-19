@@ -192,6 +192,10 @@ private:
     TypePtr validate_type(TypePtr type, const SourceLocation& loc);
     void check_recursive_type(const std::string& type_name, StmtPtr type_decl, const SourceLocation& loc);
     bool is_primitive_type(TypePtr type);
+    bool is_abi_data_type(TypePtr type,
+                          std::unordered_set<std::string>& visiting_named_types,
+                          std::string* reason = nullptr);
+    bool is_external_abi_boundary_type(TypePtr type, std::string* reason = nullptr);
 
     enum class TypeFamily { Signed, Unsigned, Float, Other };
     TypeFamily get_type_family(TypePtr type);

@@ -163,6 +163,107 @@ bool TypeChecker::is_primitive_type(TypePtr type) {
     if (!type) return false;
     return type->kind == Type::Kind::Primitive;
 }
+
+bool TypeChecker::is_abi_data_type(TypePtr type,
+                                   std::unordered_set<std::string>& visiting_named_types,
+                                   std::string* reason) {
+    if (!type) {
+        if (reason) *reason = "missing type";
+        return false;
+    }
+
+    type = resolve_type(type);
+    if (!type) {
+        if (reason) *reason = "missing type";
+        return false;
+    }
+
+    switch (type->kind) {
+        case Type::Kind::Primitive:
+            return true;
+        case Type::Kind::Array:
+            if (!type->array_size) {
+                if (reason) *reason = "array size must be compile-time known";
+                return false;
+            }
+            return is_abi_data_type(type->element_type, visiting_named_types, reason);
+        case Type::Kind::Named: {
+            if (type->type_name.empty()) {
+                if (reason) *reason = "named type has no identifier";
+                return false;
+            }
+            if (type->type_name.rfind(TUPLE_TYPE_PREFIX, 0) == 0) {
+                if (reason) *reason = "tuple types are not allowed at ABI boundaries";
+                return false;
+            }
+            if (!visiting_named_types.insert(type->type_name).second) {
+                if (reason) *reason = "recursive named types are not allowed at ABI boundaries";
+                return false;
+            }
+
+            Symbol* type_sym = nullptr;
+            if (bindings) {
+                type_sym = bindings->lookup(current_instance_id, type.get());
+            }
+            if (!type_sym && type->resolved_symbol) {
+                type_sym = type->resolved_symbol;
+            }
+            if (!type_sym) {
+                type_sym = lookup_global(type->type_name);
+            }
+            if (!type_sym || type_sym->kind != Symbol::Kind::Type || !type_sym->declaration ||
+                type_sym->declaration->kind != Stmt::Kind::TypeDecl) {
+                visiting_named_types.erase(type->type_name);
+                if (reason) *reason = "named ABI type must resolve to a declared type";
+                return false;
+            }
+
+            for (const auto& field : type_sym->declaration->fields) {
+                if (!is_abi_data_type(field.type, visiting_named_types, reason)) {
+                    visiting_named_types.erase(type->type_name);
+                    return false;
+                }
+            }
+
+            visiting_named_types.erase(type->type_name);
+            return true;
+        }
+        case Type::Kind::TypeVar:
+            if (reason) *reason = "type variables are not allowed at ABI boundaries";
+            return false;
+        case Type::Kind::TypeOf:
+            if (reason) *reason = "type expressions are not allowed at ABI boundaries";
+            return false;
+    }
+
+    if (reason) *reason = "unsupported ABI type";
+    return false;
+}
+
+bool TypeChecker::is_external_abi_boundary_type(TypePtr type, std::string* reason) {
+    if (!type) {
+        if (reason) *reason = "missing type";
+        return false;
+    }
+
+    type = resolve_type(type);
+    if (!type) {
+        if (reason) *reason = "missing type";
+        return false;
+    }
+
+    if (type->kind == Type::Kind::Primitive) {
+        return true;
+    }
+    if (type->kind == Type::Kind::Array) {
+        if (reason) *reason = "top-level arrays are not allowed at function ABI boundaries";
+        return false;
+    }
+
+    std::unordered_set<std::string> visiting_named_types;
+    return is_abi_data_type(type, visiting_named_types, reason);
+}
+
 void TypeChecker::require_boolean(TypePtr type, const SourceLocation& loc, const std::string& context) {
     if (!type || type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) {
         throw CompileError(context + " requires a boolean expression", loc);

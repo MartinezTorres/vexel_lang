@@ -228,17 +228,28 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         stmt->return_type = validate_type(stmt->return_type, stmt->location);
     }
 
-    // Validate external function signatures (primitives only)
+    // Validate external function ABI signatures.
     if (stmt->is_external) {
+        if (!stmt->return_types.empty()) {
+            throw CompileError("External functions cannot use tuple return types at ABI boundaries", stmt->location);
+        }
         for (const auto& param : stmt->params) {
-            if (param.type && !is_primitive_type(param.type)) {
-                throw CompileError("External functions can only use primitive types (found " +
-                                 param.type->to_string() + " in parameter " + param.name + ")", stmt->location);
+            if (!param.type) continue;
+            std::string reason;
+            if (!is_external_abi_boundary_type(param.type, &reason)) {
+                throw CompileError("External function parameter '" + param.name +
+                                   "' has unsupported ABI type '" + param.type->to_string() +
+                                   "': " + reason,
+                                   param.location);
             }
         }
-        if (stmt->return_type && !is_primitive_type(stmt->return_type)) {
-            throw CompileError("External functions can only use primitive types in return type (found " +
-                             stmt->return_type->to_string() + ")", stmt->location);
+        if (stmt->return_type) {
+            std::string reason;
+            if (!is_external_abi_boundary_type(stmt->return_type, &reason)) {
+                throw CompileError("External function return type '" + stmt->return_type->to_string() +
+                                   "' is not supported at ABI boundary: " + reason,
+                                   stmt->location);
+            }
         }
     }
 

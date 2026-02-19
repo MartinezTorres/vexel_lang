@@ -44,6 +44,8 @@ Source-of-truth integration points:
 - When both reentrant and non-reentrant call paths reach a function, the backend emits two variants (`__reent` and `__nonreent`) and call sites select the appropriate variant.
 - Exported (`&^`) functions are non-`static` and declared in the header; internal functions are `static`.
 - External (`&!`) declarations emit as `extern` prototypes only.
+  - The frontend currently allows ABI-safe named struct signatures on `&!` (including nested fixed arrays inside structs).
+  - Tuple returns and top-level array parameters/returns are rejected at the frontend ABI boundary.
 - Function declarations/definitions are preceded by `// VEXEL: ...` line comments carrying backend-visible traits (`reentrant`, receiver ref-mask, export, purity, no-global-write, ABI shape).
 
 ## Reentrancy Contract (Key Behavior)

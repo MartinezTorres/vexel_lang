@@ -1,0 +1,14 @@
+// @rfc: docs/vexel-rfc.md#functions-and-declarations
+// @desc: External declarations can use named struct ABI types and emit matching C prototypes. | Struct-valued externs appear in generated header
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && rg -n "vx_Packet vx_recv\\(" out.h && rg -n "int32_t vx_send\\(" out.h
+
+#Packet(bytes:#u8[4], tag:#u16);
+
+&!recv() -> #Packet;
+&!send(p:#Packet) -> #i32;
+
+&^main() -> #i32 {
+    p:#Packet = recv();
+    send(p)
+}
