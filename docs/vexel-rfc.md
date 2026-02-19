@@ -153,6 +153,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Exported immutable global**: `^name[:Type] = expr`
   - ABI-visible symbol
   - Must be immutable and compile-time constant
+  - Type must be ABI-safe data (`primitive`, fixed-size arrays of ABI-safe data, or named structs recursively composed of ABI-safe fields)
+  - Tuple types, type variables, and unresolved type expressions are rejected at the ABI boundary
+  - Exported globals are retained as ABI roots (not removed by dead-code elimination)
 - **Mutable (variables)**: `name:Type`
   - No initialization at declaration
   - Can be modified at runtime
@@ -451,7 +454,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Compiler mode determines execution:
   - Executable: compiler specifies entry point from exports
   - Library: all exports visible
-  - C generation: exports become C functions
+  - Backend generation: exports become backend ABI symbols (functions and globals)
 
 ---
 

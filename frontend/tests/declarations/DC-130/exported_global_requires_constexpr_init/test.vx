@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported globals must be compile-time materialized values. | Runtime-initialized exported globals are rejected
+
+seed:#i32;
+
+^value:#i32 = seed;
+
+&^main() -> #i32 {
+    0
+}

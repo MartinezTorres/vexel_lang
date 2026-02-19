@@ -429,6 +429,14 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
                                "' must be immutable and compile-time constant",
                                stmt->location);
         }
+        std::unordered_set<std::string> visiting_named_types;
+        std::string reason;
+        if (!is_abi_data_type(type, visiting_named_types, &reason)) {
+            throw CompileError("Exported global '" + stmt->var_name +
+                               "' has unsupported ABI type '" + type->to_string() +
+                               "': " + reason,
+                               stmt->location);
+        }
     }
 
     sym->kind = inferred_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;

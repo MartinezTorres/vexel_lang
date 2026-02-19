@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported globals use ABI-safe data shapes only. | Tuple-typed exported globals are rejected at ABI boundary
+
+^pair = (1, 2);
+
+&^main() -> #i32 {
+    0
+}
