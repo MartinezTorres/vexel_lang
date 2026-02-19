@@ -14,7 +14,8 @@ namespace {
 
 void print_usage(const char* prog,
                  const std::vector<vexel::BackendInfo>& backends,
-                 const vexel::Backend* selected_backend = nullptr) {
+                 const vexel::Backend* selected_backend = nullptr,
+                 bool show_all_backend_usage = false) {
     const bool has_native_tcc = vexel::native_tcc_supported();
     std::cout << "Vexel Compiler (multi-backend)\n";
     std::cout << "Usage: " << prog << " [options] <input.vx>\n\n";
@@ -38,6 +39,18 @@ void print_usage(const char* prog,
     if (selected_backend && selected_backend->print_usage) {
         std::cout << "\nBackend-specific options (" << selected_backend->info.name << "):\n";
         selected_backend->print_usage(std::cout);
+    } else if (show_all_backend_usage) {
+        std::cout << "\nBackend-specific options:\n";
+        for (const auto& info : backends) {
+            const vexel::Backend* backend = vexel::find_backend(info.name);
+            if (!backend || !backend->print_usage) continue;
+            std::cout << "\n  [" << info.name << "]";
+            if (!info.description.empty()) {
+                std::cout << " " << info.description;
+            }
+            std::cout << "\n";
+            backend->print_usage(std::cout);
+        }
     }
 }
 
@@ -107,7 +120,7 @@ int main(int argc, char** argv) {
     }
 
     if (help_requested) {
-        print_usage(argv[0], available_backends, selected_backend);
+        print_usage(argv[0], available_backends, selected_backend, selected_backend == nullptr);
         return 0;
     }
     if (native_mode) {
