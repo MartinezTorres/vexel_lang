@@ -19,8 +19,9 @@ cat >"$SRC" <<'VXEOF'
 }
 VXEOF
 
-if "$DRIVER" -b vexel -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
-  echo "frontend must reject unknown annotations" >&2
+if ! "$DRIVER" -b vexel -o "$OUT" "$SRC" >"$STDOUT_FILE" 2>"$STDERR_FILE"; then
+  echo "frontend must pass unknown annotations through to the selected backend" >&2
+  cat "$STDERR_FILE" >&2
   exit 1
 fi
 

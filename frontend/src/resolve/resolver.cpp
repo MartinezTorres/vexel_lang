@@ -1,5 +1,4 @@
 #include "resolver.h"
-#include "annotation_validator.h"
 #include "ast_walk.h"
 #include "expr_access.h"
 #include "path_utils.h"
@@ -57,10 +56,6 @@ Symbol* Resolver::lookup_in_instance(int instance_id, const std::string& name) c
 }
 
 void Resolver::resolve() {
-    for (auto& mod : program.modules) {
-        validate_annotations(mod.module);
-    }
-
     if (program.modules.empty()) return;
     build_module_imports();
 

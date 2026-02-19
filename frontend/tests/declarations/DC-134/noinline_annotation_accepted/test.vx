@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#annotations
-// @desc: Backend-recognized annotations are validated by the frontend. | [[noinline]] is accepted by the frontend
+// @desc: Frontend passes annotations through; backend-specific annotations parse without frontend validation.
 
 [[noinline]]
 &helper(x:#i32) -> #i32 {
