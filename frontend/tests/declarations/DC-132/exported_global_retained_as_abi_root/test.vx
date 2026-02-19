@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported globals are ABI roots and are not removed by frontend DCE. | Non-exported dead globals in the same module are still pruned
+
+^kept:#i32 = 11;
+dead:#i32 = 99;
+
+&^main() -> #i32 {
+    0
+}

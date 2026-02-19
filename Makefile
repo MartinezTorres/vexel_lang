@@ -72,11 +72,14 @@ backend-conformance-test:
 	@bash backends/conformance_test.sh
 
 #tests
-.PHONY: backend-conformance-test docs-check
+.PHONY: backend-conformance-test backend-abi-test docs-check
 docs-check:
 	@bash tools/check_docs_landing.sh
 
-test: driver-test frontend-test backend-conformance-test docs-check $(BACKENDS_TEST_TARGETS)
+backend-abi-test:
+	@bash backends/abi_contract_test.sh
+
+test: driver-test frontend-test backend-conformance-test backend-abi-test docs-check $(BACKENDS_TEST_TARGETS)
 
 # CLEAN
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)

@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#whole-program-compilation
+// @desc: Non-exported immutable globals without live uses are removed before backend lowering. | Frontend DCE removes dead global symbols
+
+dead:#i32 = 99;
+
+&^main() -> #i32 {
+    0
+}
