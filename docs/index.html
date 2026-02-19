@@ -180,6 +180,23 @@
       margin: 0 0 12px;
     }
 
+    .section ul {
+      margin: 0 0 12px 20px;
+      padding: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .section li {
+      margin: 0 0 7px;
+    }
+
+    .tutorial-step {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid #223245;
+    }
+
     pre {
       margin: 0;
       padding: 14px;
@@ -202,14 +219,17 @@
       color: #d3e2f8;
     }
 
-    .tutorial-step {
-      margin-top: 14px;
-    }
-
     .tutorial-step h3 {
       margin: 0 0 8px;
       font-size: 1rem;
       color: var(--accent-2);
+    }
+
+    .code-title {
+      margin: 8px 0 8px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      letter-spacing: 0.02em;
     }
 
     .playground-frame {
@@ -255,6 +275,7 @@
         <span>Vexel Language</span>
       </div>
       <nav class="nav">
+        <a class="btn" href="#tutorial">Tutorial</a>
         <a class="btn" href="vexel-rfc.md">RFC</a>
         <a class="btn" href="../README.md">Repository Guide</a>
         <a class="btn primary" href="playground.html">Open Playground</a>
@@ -290,29 +311,130 @@
     </section>
 
     <section class="section" id="tutorial">
-      <h2>Quick Tutorial</h2>
-      <p>This is a short path from source to emitted backend output.</p>
+      <h2>Language Tutorial</h2>
+      <p>
+        This page is a practical tour of Vexel syntax and workflow. It starts from a tiny program and
+        ends at backend-oriented output inspection.
+      </p>
 
       <div class="tutorial-step">
-        <h3>1. Write a tiny program</h3>
-        <pre><code>&amp;add(a:#i32, b:#i32) -&gt; #i32 { a + b }
+        <h3>1) Program shape and ABI boundaries</h3>
+        <p>
+          Function declarations use <code>&amp;</code>. Entry points/exports use <code>&amp;^</code>.
+          External imports use <code>&amp;!</code>.
+        </p>
+        <pre><code>&amp;!putchar(c:#u8);
+
+&amp;print_char(c:#u8) {
+  putchar(c)
+}
 
 &amp;^main() -&gt; #i32 {
-  add(40, 2)
+  print_char(65);
+  0
 }</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>2. Compile with explicit backend</h3>
-        <pre><code>./build/vexel -b c examples/simple.vx -o out</code></pre>
-        <p>The unified driver requires backend selection on every compile mode.</p>
+        <h3>2) Types, literals, and declarations</h3>
+        <p>
+          Primitive types are explicit (<code>#b</code>, <code>#i32</code>, <code>#u16</code>, <code>#f32</code>, <code>#s</code>).
+          Literal typing follows smallest-fitting rules.
+        </p>
+        <pre><code>flag:#b = 1;
+count:#i32 = -10;
+size:#u16 = 65535;
+name:#s = "Vexel";
+bytes:#u8[4] = [1, 2, 3, 4];</code></pre>
+        <p>
+          Type expressions are supported with <code>#[expr]</code> and use the static type of <code>expr</code>.
+        </p>
+        <pre><code>seed:#u16 = 42;
+table:#[seed][8];
+value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>3. Explore output quickly in browser</h3>
+        <h3>3) Control flow, loops, and iteration</h3>
         <p>
-          Use the playground to compare backend output files directly.
-          The playground runs fully client-side and keeps source files in an in-memory filesystem.
+          Conditionals can be expression-level (<code>a ? b : c</code>) or block-style. Loops use <code>@{ ... }</code>.
+        </p>
+        <pre><code>&amp;^main() -&gt; #i32 {
+  sum:#i32 = 0;
+  i:#i32 = 0;
+  (i &lt; 4)@{
+    sum = sum + i;
+    i = i + 1;
+  };
+  sum
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>4) Structs, methods, and operators</h3>
+        <p>
+          Named structs use <code>#Type(...)</code>. Methods use receiver syntax.
+        </p>
+        <pre><code>#Vec2(x:#i32, y:#i32);
+
+&amp;(self)#Vec2::len2() -&gt; #i32 {
+  self.x * self.x + self.y * self.y
+}
+
+&amp;(lhs)#Vec2::+(rhs:#Vec2) -&gt; #Vec2 {
+  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>5) Compile-time execution and dead-code elimination</h3>
+        <p>
+          Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
+        </p>
+        <pre><code>&amp;mul(a:#i32, b:#i32) -&gt; #i32 { a * b }
+&amp;add(a:#i32, b:#i32) -&gt; #i32 { a + b }
+
+result:#i32 = add(mul(6, 7), 0);
+dead:#i32 = mul(9, 9);
+
+&amp;^main() -&gt; #i32 { result }</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>6) Multi-file modules</h3>
+        <p>Use module imports and keep related logic in separate files.</p>
+        <div class="code-title">main.vx</div>
+        <pre><code>::math;
+
+&amp;^main() -&gt; #i32 {
+  add(20, 22)
+}</code></pre>
+        <div class="code-title">math.vx</div>
+        <pre><code>&amp;add(a:#i32, b:#i32) -&gt; #i32 {
+  a + b
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>7) Backend hints (annotation pass-through)</h3>
+        <p>
+          Frontend parses annotations but does not globally whitelist them. Backend-specific hints are consumed by the selected backend.
+        </p>
+        <ul>
+          <li><code>[[nonreentrant]]</code>: recognized by C and megalinker on ABI boundaries.</li>
+          <li><code>[[nonbanked]]</code>: recognized by megalinker for global placement.</li>
+          <li><code>[[sdcccall(0)]]</code> / <code>[[sdcccall(1)]]</code>: recognized by megalinker on <code>&amp;!</code> and <code>&amp;^</code>.</li>
+        </ul>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>8) Compile and inspect outputs</h3>
+        <p>The unified driver always requires a backend.</p>
+        <pre><code>./build/vexel -b c -o out path/to/main.vx
+./build/vexel -b megalinker -o out path/to/main.vx
+./build/vexel -b vexel -o out path/to/main.vx</code></pre>
+        <p>
+          Run <code>./build/vexel --help</code> to see frontend flags and backend-specific options for all discovered backends.
         </p>
       </div>
     </section>

@@ -366,6 +366,11 @@
           <option value="structs">Structs + Methods</option>
           <option value="iteration">Iteration</option>
           <option value="sieve">Prime Sieve (&lt;1000)</option>
+          <option value="constexpr_dce">Compile-Time + DCE</option>
+          <option value="typeof_demo">Type Expression #[expr]</option>
+          <option value="multifile">Multi-File Import</option>
+          <option value="matrix_sum">Nested Arrays (2D)</option>
+          <option value="abi_hints">ABI Hints</option>
           <option value="bmp_matrix">BMP to Matrix (256x192)</option>
           <option value="banked">Banked Calls + Globals</option>
           <option value="reentrant">Recursive (Reentrant)</option>
@@ -461,6 +466,46 @@
           name: "main.vx",
           content:
             "&^main() -> #i32 {\n  limit:#i32 = 1000;\n  prime:#b[1000];\n\n  i:#i32 = 0;\n  (i < limit)@{\n    prime[i] = 1;\n    i = i + 1;\n  };\n  prime[0] = 0;\n  prime[1] = 0;\n\n  p:#i32 = 2;\n  (p * p < limit)@{\n    prime[p] ? {\n      k:#i32 = p * p;\n      (k < limit)@{\n        prime[k] = 0;\n        k = k + p;\n      };\n    };\n    p = p + 1;\n  };\n\n  sum:#i32 = 0;\n  n:#i32 = 2;\n  (n < limit)@{\n    prime[n] ? { sum = sum + n; };\n    n = n + 1;\n  };\n\n  sum\n}\n"
+        }
+      ],
+      constexpr_dce: [
+        {
+          name: "main.vx",
+          content:
+            "&square(x:#i32) -> #i32 {\n  x * x\n}\n\n&triple(x:#i32) -> #i32 {\n  x + x + x\n}\n\nresult:#i32 = square(6) + triple(2);\ndead:#i32 = square(99);\n\n&^main() -> #i32 {\n  result\n}\n"
+        }
+      ],
+      typeof_demo: [
+        {
+          name: "main.vx",
+          content:
+            "&^main() -> #i32 {\n  seed:#u16 = 42;\n  values:#[seed][4] = [10, 20, 30, 40];\n  out:#[seed] = values[2];\n  (#i32)out\n}\n"
+        }
+      ],
+      multifile: [
+        {
+          name: "main.vx",
+          content:
+            "::math;\n\n&^main() -> #i32 {\n  add(20, 22)\n}\n"
+        },
+        {
+          name: "math.vx",
+          content:
+            "&add(a:#i32, b:#i32) -> #i32 {\n  a + b\n}\n"
+        }
+      ],
+      matrix_sum: [
+        {
+          name: "main.vx",
+          content:
+            "&^main() -> #i32 {\n  grid:#b[2][3] = [[1, 0, 1], [1, 1, 0]];\n  count:#i32 = 0;\n\n  y:#i32 = 0;\n  (y < 2)@{\n    x:#i32 = 0;\n    (x < 3)@{\n      grid[y][x] ? {\n        count = count + 1\n      };\n      x = x + 1;\n    };\n    y = y + 1;\n  };\n\n  count\n}\n"
+        }
+      ],
+      abi_hints: [
+        {
+          name: "main.vx",
+          content:
+            "[[sdcccall(0)]]\n&!ext_add(a:#i32, b:#i32) -> #i32;\n\n[[sdcccall(1)]]\n&^entry_add(x:#i32) -> #i32 {\n  ext_add(x, 1)\n}\n\n[[nonreentrant]]\n&^main() -> #i32 {\n  entry_add(41)\n}\n"
         }
       ],
       bmp_matrix: {
