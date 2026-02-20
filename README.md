@@ -156,4 +156,4 @@ In repository settings, configure Pages to use **GitHub Actions** as the source.
 
 ## Examples
 
-Example programs live in `examples/`. Optional helper modules are in `examples/lib/` (import with `::lib::print;`, `::lib::vector;`, etc.). Example smoke tests run with the main test harness (`make test`).
+Example programs live in `examples/`. The playground loads this tree recursively and lets you compile whichever `.vx` file is currently selected in the source navigator.

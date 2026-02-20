@@ -162,6 +162,19 @@
       letter-spacing: 0.08em;
     }
 
+    .pane-path {
+      flex: 1;
+      margin-left: 10px;
+      margin-right: 10px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #8fa1be;
+      font-size: 0.8rem;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
     .tabs {
       display: flex;
       align-items: center;
@@ -192,6 +205,16 @@
       color: var(--ink);
       background: var(--tab-active);
       border-color: #394258;
+    }
+
+    .tab.dir {
+      color: #8ed0ff;
+      border-color: #35506f;
+    }
+
+    .tab.parent {
+      color: #ffd18a;
+      border: 1px dashed #5c4b2f;
     }
 
     .tab.add {
@@ -357,26 +380,8 @@
       <div class="controls">
         <button class="btn primary" id="compileBtn" disabled>Compile</button>
         <button class="btn" id="addFileBtn">Add File</button>
-        <button class="btn" id="shareBtn">Copy Share URL</button>
+        <button class="btn" id="shareBtn">Copy Link</button>
         <select id="backendSelect"></select>
-        <select id="exampleSelect">
-          <option value="">Load example</option>
-          <option value="quickadd">Quick Add</option>
-          <option value="hello">Hello</option>
-          <option value="structs">Structs + Methods</option>
-          <option value="iteration">Iteration</option>
-          <option value="sieve">Prime Sieve (&lt;1000)</option>
-          <option value="constexpr_dce">Compile-Time + DCE</option>
-          <option value="typeof_demo">Type Expression #[expr]</option>
-          <option value="multifile">Multi-File Import</option>
-          <option value="matrix_sum">Nested Arrays (2D)</option>
-          <option value="abi_hints">ABI Hints</option>
-          <option value="bmp_matrix">BMP to Matrix (256x192)</option>
-          <option value="banked">Banked Calls + Globals</option>
-          <option value="reentrant">Recursive (Reentrant)</option>
-          <option value="globals">ROM + RAM Globals</option>
-          <option value="exports">Exported Globals (ABI)</option>
-        </select>
         <span class="status"><span class="status-dot loading" id="statusDot"></span><span id="statusText">Loading</span></span>
       </div>
     </header>
@@ -385,6 +390,7 @@
       <div class="pane" id="sourcePane">
         <div class="pane-header">
           <span class="pane-title">Sources</span>
+          <span class="pane-path" id="sourcePath"></span>
           <button class="btn ghost" id="addFileBtnInline">New file</button>
         </div>
         <div class="tabs" id="sourceTabs"></div>
@@ -416,141 +422,17 @@
   <script>
     const VEXEL_WASM_BASE64 = "__VEXEL_WASM_BASE64__";
     const BACKENDS = __VEXEL_BACKENDS_JSON__;
+    const BUNDLED_EXAMPLES = __VEXEL_EXAMPLES_JSON__;
+    const ROOT_DIR = "examples";
+
     const state = {
-      sources: [
-        {
-          name: "main.vx",
-          content:
-            "&!putchar(c:#u8);\n\n&print_newline() {\n  putchar(10);\n}\n\n&^main() -> #i32 {\n  putchar(72);\n  putchar(101);\n  putchar(108);\n  putchar(108);\n  putchar(111);\n  print_newline();\n  0\n}\n"
-        }
-      ],
-      assets: [],
+      files: [],
+      currentDir: ROOT_DIR,
+      selectedPath: "",
       outputs: [],
-      activeSource: 0,
       activeOutput: 0,
       messages: [],
       backend: (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS[0] : "c"
-    };
-
-    const examples = {
-      quickadd: [
-        {
-          name: "main.vx",
-          content:
-            "// Vexel example\n&add(a:#i32, b:#i32) -> #i32 { a + b }\n\nres:#i32 = add(40, 2)\n\n&^main() -> #i32 {\n  res\n}\n"
-        }
-      ],
-      hello: [
-        {
-          name: "main.vx",
-          content:
-            "&!putchar(c:#u8);\n\n&print_newline() {\n  putchar(10);\n}\n\n&^main() -> #i32 {\n  putchar(72);\n  putchar(101);\n  putchar(108);\n  putchar(108);\n  putchar(111);\n  print_newline();\n  0\n}\n"
-        }
-      ],
-      structs: [
-        {
-          name: "main.vx",
-          content:
-            "#Vec2(x:#i32, y:#i32);\n\n&(self)#Vec2::len2() -> #i32 {\n  self.x * self.x + self.y * self.y\n}\n\n&(lhs)#Vec2::+(rhs:#Vec2) -> #Vec2 {\n  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)\n}\n\n&^main() -> #i32 {\n  v = Vec2(3, 4);\n  sum = v + Vec2(1, 2);\n  sum.len2()\n}\n"
-        }
-      ],
-      iteration: [
-        {
-          name: "main.vx",
-          content:
-            "arr:#i32[4] = [1, 2, 3, 4];\n\n&^main() -> #i32 {\n  sum:#i32 = 0;\n  arr@{\n    sum = sum + _\n  };\n  sum\n}\n"
-        }
-      ],
-      sieve: [
-        {
-          name: "main.vx",
-          content:
-            "&^main() -> #i32 {\n  limit:#i32 = 1000;\n  prime:#b[1000];\n\n  i:#i32 = 0;\n  (i < limit)@{\n    prime[i] = 1;\n    i = i + 1;\n  };\n  prime[0] = 0;\n  prime[1] = 0;\n\n  p:#i32 = 2;\n  (p * p < limit)@{\n    prime[p] ? {\n      k:#i32 = p * p;\n      (k < limit)@{\n        prime[k] = 0;\n        k = k + p;\n      };\n    };\n    p = p + 1;\n  };\n\n  sum:#i32 = 0;\n  n:#i32 = 2;\n  (n < limit)@{\n    prime[n] ? { sum = sum + n; };\n    n = n + 1;\n  };\n\n  sum\n}\n"
-        }
-      ],
-      constexpr_dce: [
-        {
-          name: "main.vx",
-          content:
-            "&square(x:#i32) -> #i32 {\n  x * x\n}\n\n&triple(x:#i32) -> #i32 {\n  x + x + x\n}\n\nresult:#i32 = square(6) + triple(2);\ndead:#i32 = square(99);\n\n&^main() -> #i32 {\n  result\n}\n"
-        }
-      ],
-      typeof_demo: [
-        {
-          name: "main.vx",
-          content:
-            "&^main() -> #i32 {\n  seed:#u16 = 42;\n  values:#[seed][4] = [10, 20, 30, 40];\n  out:#[seed] = values[2];\n  (#i32)out\n}\n"
-        }
-      ],
-      multifile: [
-        {
-          name: "main.vx",
-          content:
-            "::math;\n\n&^main() -> #i32 {\n  add(20, 22)\n}\n"
-        },
-        {
-          name: "math.vx",
-          content:
-            "&add(a:#i32, b:#i32) -> #i32 {\n  a + b\n}\n"
-        }
-      ],
-      matrix_sum: [
-        {
-          name: "main.vx",
-          content:
-            "&^main() -> #i32 {\n  grid:#b[2][3] = [[1, 0, 1], [1, 1, 0]];\n  count:#i32 = 0;\n\n  y:#i32 = 0;\n  (y < 2)@{\n    x:#i32 = 0;\n    (x < 3)@{\n      grid[y][x] ? {\n        count = count + 1\n      };\n      x = x + 1;\n    };\n    y = y + 1;\n  };\n\n  count\n}\n"
-        }
-      ],
-      abi_hints: [
-        {
-          name: "main.vx",
-          content:
-            "[[sdcccall(0)]]\n&!ext_add(a:#i32, b:#i32) -> #i32;\n\n[[sdcccall(1)]]\n&^entry_add(x:#i32) -> #i32 {\n  ext_add(x, 1)\n}\n\n[[nonreentrant]]\n&^main() -> #i32 {\n  entry_add(41)\n}\n"
-        }
-      ],
-      bmp_matrix: {
-        sources: [
-          {
-            name: "main.vx",
-            content: __EXAMPLE_BMP_TO_MATRIX_SOURCE_JSON__
-          }
-        ],
-        assets: [
-          {
-            name: "assets/random_256x192.bmp",
-            encoding: "base64",
-            contentBase64: "__EXAMPLE_BMP_RANDOM_256X192_B64__"
-          }
-        ]
-      },
-      banked: [
-        {
-          name: "main.vx",
-          content:
-            "G1:#i32 = 5;\nG2:#i32 = 7;\nGM:#i32;\n\n&reader() -> #i32 {\n  GM = GM + 1;\n  x:#i32 = G1;\n  x + GM\n}\n\n&callee(n:#i32) -> #i32 {\n  n + GM + G2\n}\n\n&caller1() -> #i32 {\n  reader() + callee(1)\n}\n\n&caller2() -> #i32 {\n  callee(2)\n}\n\n&^entry_add(n:#i32) -> #i32 {\n  callee(n)\n}\n\n&^main() -> #i32 {\n  GM = 0;\n  caller1() + caller2()\n}\n"
-        }
-      ],
-      reentrant: [
-        {
-          name: "main.vx",
-          content:
-            "&fib(n:#i32) -> #i32 {\n  n < 2 ? n : fib(n - 1) + fib(n - 2)\n}\n\n&^main() -> #i32 {\n  fib(8)\n}\n"
-        }
-      ],
-      globals: [
-        {
-          name: "main.vx",
-          content:
-            "LUT:#i32[6] = [2, 4, 6, 8, 10, 12];\nstate:#i32;\n\n&accumulate() -> #i32 {\n  sum:#i32 = 0;\n  LUT@{ sum = sum + _ };\n  state = state + 1;\n  sum + state\n}\n\n&^main() -> #i32 {\n  state = 10;\n  accumulate()\n}\n"
-        }
-      ],
-      exports: [
-        {
-          name: "main.vx",
-          content:
-            "#Pixel(r:#u8, g:#u8, b:#u8);\n\n^palette:#Pixel[2] = [Pixel(1, 2, 3), Pixel(4, 5, 6)];\n^bw = [ [2, 3, 4], [5, 6, 7] ];\ndead:#i32 = 99;\n\n&^main() -> #i32 {\n  0\n}\n"
-        }
-      ]
     };
 
     const sourceTabs = document.getElementById("sourceTabs");
@@ -563,11 +445,11 @@
     const addFileBtnInline = document.getElementById("addFileBtnInline");
     const clearLogBtn = document.getElementById("clearLogBtn");
     const backendSelect = document.getElementById("backendSelect");
-    const exampleSelect = document.getElementById("exampleSelect");
     const copyOutputBtn = document.getElementById("copyOutputBtn");
     const shareBtn = document.getElementById("shareBtn");
     const statusText = document.getElementById("statusText");
     const statusDot = document.getElementById("statusDot");
+    const sourcePath = document.getElementById("sourcePath");
 
     let wasmBinaryCache = null;
     let compilerReady = false;
@@ -590,19 +472,153 @@
       }
     }
 
+    function sanitizeRelativePath(path) {
+      let clean = String(path || "").trim().replace(/\\/g, "/");
+      if (!clean) return null;
+      clean = clean.replace(/\/+/g, "/");
+      clean = clean.replace(/^\/+/, "");
+      if (!clean || clean.includes("..")) return null;
+      return clean;
+    }
+
+    function sanitizeLeafName(name) {
+      let clean = String(name || "").trim().replace(/\\/g, "/");
+      if (!clean) return null;
+      if (clean.includes("/")) return null;
+      if (!clean.endsWith(".vx")) clean += ".vx";
+      return clean.replace(/\s+/g, "_");
+    }
+
+    function parentDir(path) {
+      const clean = sanitizeRelativePath(path);
+      if (!clean) return ROOT_DIR;
+      const idx = clean.lastIndexOf("/");
+      if (idx <= 0) return ROOT_DIR;
+      return clean.slice(0, idx);
+    }
+
+    function isCompilableFile(file) {
+      return !!file && file.encoding === "utf8" && file.path.endsWith(".vx");
+    }
+
+    function decodeBase64ToBytes(text) {
+      const binary = atob(text);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function ensureDir(FS, path) {
+      const parts = path.split("/").filter(Boolean);
+      let current = "";
+      for (const part of parts) {
+        current += `/${part}`;
+        if (!FS.analyzePath(current).exists) {
+          FS.mkdir(current);
+        }
+      }
+    }
+
+    function findFile(path) {
+      const clean = sanitizeRelativePath(path);
+      if (!clean) return null;
+      return state.files.find((file) => file.path === clean) || null;
+    }
+
+    function chooseDefaultFile() {
+      if (findFile("examples/simple.vx")) {
+        return "examples/simple.vx";
+      }
+      const vxFile = state.files.find((file) => file.path.endsWith(".vx"));
+      if (vxFile) return vxFile.path;
+      if (state.files.length > 0) return state.files[0].path;
+      return "";
+    }
+
+    function listDirEntries(dirPath) {
+      const cleanDir = sanitizeRelativePath(dirPath) || ROOT_DIR;
+      const prefix = cleanDir ? `${cleanDir}/` : "";
+      const dirs = new Set();
+      const files = [];
+
+      state.files.forEach((file) => {
+        if (!file.path.startsWith(prefix)) return;
+        const rest = file.path.slice(prefix.length);
+        if (!rest) return;
+        const slashIdx = rest.indexOf("/");
+        if (slashIdx === -1) {
+          files.push({
+            kind: "file",
+            name: rest,
+            path: file.path
+          });
+        } else {
+          const child = rest.slice(0, slashIdx);
+          dirs.add(child);
+        }
+      });
+
+      const dirEntries = Array.from(dirs)
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({
+          kind: "dir",
+          name,
+          path: `${cleanDir}/${name}`
+        }));
+      files.sort((a, b) => a.name.localeCompare(b.name));
+      return dirEntries.concat(files);
+    }
+
+    function updateCompileButtonState() {
+      compileBtn.disabled = !compilerReady || !isCompilableFile(findFile(state.selectedPath));
+    }
+
     function renderSourceTabs() {
       sourceTabs.innerHTML = "";
-      state.sources.forEach((src, idx) => {
-        const button = document.createElement("button");
-        button.className = "tab" + (idx === state.activeSource ? " active" : "");
-        button.textContent = src.name;
-        button.addEventListener("click", () => {
-          state.activeSource = idx;
-          renderEditors();
+      sourcePath.textContent = state.currentDir;
+
+      if (state.currentDir !== ROOT_DIR) {
+        const up = document.createElement("button");
+        up.className = "tab parent";
+        up.textContent = "..";
+        up.title = "Parent folder";
+        up.addEventListener("click", () => {
+          state.currentDir = parentDir(state.currentDir);
           renderSourceTabs();
+          renderEditor();
+        });
+        sourceTabs.appendChild(up);
+      }
+
+      const entries = listDirEntries(state.currentDir);
+      entries.forEach((entry) => {
+        const button = document.createElement("button");
+        const active = entry.kind === "file" && entry.path === state.selectedPath;
+        button.className = `tab ${entry.kind === "dir" ? "dir" : "file"}${active ? " active" : ""}`;
+        button.textContent = entry.kind === "dir" ? `${entry.name}/` : entry.name;
+        button.addEventListener("click", () => {
+          if (entry.kind === "dir") {
+            state.currentDir = entry.path;
+            renderSourceTabs();
+            renderEditor();
+            return;
+          }
+          state.selectedPath = entry.path;
+          state.currentDir = parentDir(entry.path);
+          renderSourceTabs();
+          renderEditor();
         });
         sourceTabs.appendChild(button);
       });
+
+      if (entries.length === 0) {
+        const empty = document.createElement("span");
+        empty.className = "tab";
+        empty.textContent = "(empty)";
+        sourceTabs.appendChild(empty);
+      }
     }
 
     function renderOutputTabs() {
@@ -620,68 +636,28 @@
       });
     }
 
-    function renderEditors() {
-      const active = state.sources[state.activeSource];
-      sourceEditor.value = active ? active.content : "";
+    function renderEditor() {
+      const file = findFile(state.selectedPath);
+      if (!file) {
+        sourceEditor.value = "";
+        sourceEditor.readOnly = true;
+        updateCompileButtonState();
+        return;
+      }
+
+      if (file.encoding === "utf8") {
+        sourceEditor.readOnly = false;
+        sourceEditor.value = file.content;
+      } else {
+        sourceEditor.readOnly = true;
+        sourceEditor.value = `[binary] ${file.path}\n\nThis file is embedded as binary and cannot be edited in the playground.`;
+      }
+      updateCompileButtonState();
     }
 
     function renderOutput() {
       const active = state.outputs[state.activeOutput];
       outputViewer.value = active ? active.content : "";
-    }
-
-    function sanitizeName(name) {
-      let clean = name.trim();
-      if (!clean) return null;
-      if (!clean.endsWith(".vx")) clean += ".vx";
-      clean = clean.replace(/\\/g, "/");
-      if (clean.startsWith("/") || clean.includes("..") || clean.includes("/")) return null;
-      return clean.replace(/\s+/g, "_");
-    }
-
-    function sanitizeAssetPath(name) {
-      let clean = String(name || "").trim().replace(/\\/g, "/");
-      if (!clean) return null;
-      if (clean.startsWith("/") || clean.includes("..")) return null;
-      clean = clean.replace(/\/+/g, "/");
-      if (clean === "." || clean === "..") return null;
-      return clean.replace(/\s+/g, "_");
-    }
-
-    function decodeBase64ToBytes(text) {
-      const binary = atob(text);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes;
-    }
-
-    function normalizeExamplePayload(raw) {
-      if (Array.isArray(raw)) {
-        return { sources: raw, assets: [] };
-      }
-      if (raw && typeof raw === "object" && Array.isArray(raw.sources)) {
-        return {
-          sources: raw.sources,
-          assets: Array.isArray(raw.assets) ? raw.assets : []
-        };
-      }
-      return null;
-    }
-
-    function addFile() {
-      const name = sanitizeName(prompt("New file name", "extra.vx"));
-      if (!name) return;
-      if (state.sources.some((src) => src.name === name)) {
-        log(`File '${name}' already exists`, "error");
-        return;
-      }
-      state.sources.push({ name, content: "// New source file\n" });
-      state.activeSource = state.sources.length - 1;
-      renderSourceTabs();
-      renderEditors();
-      log(`Added ${name}`);
     }
 
     function clearOutputs() {
@@ -691,15 +667,26 @@
       renderOutput();
     }
 
-    function ensureDir(FS, path) {
-      const parts = path.split("/").filter(Boolean);
-      let current = "";
-      for (const part of parts) {
-        current += `/${part}`;
-        if (!FS.analyzePath(current).exists) {
-          FS.mkdir(current);
+    function loadBundledFiles() {
+      const files = [];
+      (Array.isArray(BUNDLED_EXAMPLES) ? BUNDLED_EXAMPLES : []).forEach((entry) => {
+        if (!entry || typeof entry !== "object") return;
+        const path = sanitizeRelativePath(entry.path);
+        if (!path) return;
+        if (entry.encoding === "base64") {
+          files.push({ path, encoding: "base64", contentBase64: String(entry.contentBase64 || "") });
+          return;
         }
-      }
+        files.push({ path, encoding: "utf8", content: String(entry.content || "") });
+      });
+      files.sort((a, b) => a.path.localeCompare(b.path));
+      state.files = files;
+
+      const params = new URLSearchParams(window.location.search);
+      const requestedFile = sanitizeRelativePath(params.get("file") || "");
+      const selected = requestedFile && findFile(requestedFile) ? requestedFile : chooseDefaultFile();
+      state.selectedPath = selected;
+      state.currentDir = selected ? parentDir(selected) : ROOT_DIR;
     }
 
     function prepareWorkspace(FS) {
@@ -707,41 +694,19 @@
         FS.mkdir("/project");
       }
       FS.chdir("/project");
-      state.sources.forEach((src) => {
-        const clean = sanitizeName(src.name);
-        if (!clean) {
-          log(`Skipping invalid file name: ${src.name}`, "error");
-          return;
-        }
-        const fullPath = `/project/${clean}`;
-        const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
-        ensureDir(FS, dir);
-        FS.writeFile(fullPath, src.content);
-      });
-      state.assets.forEach((asset) => {
-        const clean = sanitizeAssetPath(asset.name);
-        if (!clean) {
-          log(`Skipping invalid asset path: ${asset.name}`, "error");
-          return;
-        }
-        if ((asset.encoding || "base64") !== "base64") {
-          log(`Unsupported asset encoding for ${clean}`, "error");
-          return;
-        }
-        if (typeof asset.contentBase64 !== "string" || asset.contentBase64.length === 0) {
-          log(`Skipping empty asset payload: ${clean}`, "error");
-          return;
-        }
-        const fullPath = `/project/${clean}`;
-        const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
-        ensureDir(FS, dir);
-        FS.writeFile(fullPath, decodeBase64ToBytes(asset.contentBase64));
-      });
-    }
 
-    function selectEntry() {
-      const main = state.sources.find((src) => src.name === "main.vx");
-      return main || state.sources[state.activeSource];
+      state.files.forEach((file) => {
+        const rel = sanitizeRelativePath(file.path);
+        if (!rel) return;
+        const fullPath = `/project/${rel}`;
+        const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+        ensureDir(FS, dir);
+        if (file.encoding === "base64") {
+          FS.writeFile(fullPath, decodeBase64ToBytes(file.contentBase64));
+        } else {
+          FS.writeFile(fullPath, file.content);
+        }
+      });
     }
 
     function listWorkspaceFiles(FS, root) {
@@ -765,54 +730,49 @@
       return files;
     }
 
-    function readOutputs(FS, sourceNames, assetNames) {
-      const sourceSet = new Set(
-        sourceNames
-          .map((name) => sanitizeName(name))
-          .filter((name) => !!name)
-      );
-      const assetSet = new Set(
-        assetNames
-          .map((name) => sanitizeAssetPath(name))
-          .filter((name) => !!name)
-      );
+    function readOutputs(FS) {
+      const sourceSet = new Set(state.files.map((file) => file.path));
       const results = [];
       const files = listWorkspaceFiles(FS, "/project");
       files.forEach((file) => {
         if (sourceSet.has(file.relPath)) return;
-        if (assetSet.has(file.relPath)) return;
-        results.push({
-          name: file.relPath,
-          content: FS.readFile(file.absPath, { encoding: "utf8" })
-        });
+        try {
+          results.push({
+            name: file.relPath,
+            content: FS.readFile(file.absPath, { encoding: "utf8" })
+          });
+        } catch (_) {
+          results.push({
+            name: file.relPath,
+            content: "[binary output omitted]"
+          });
+        }
       });
       return results;
     }
 
+    function buildOutputBase(path) {
+      const clean = sanitizeRelativePath(path) || "main.vx";
+      const stem = clean.replace(/\.vx$/, "").replace(/[^A-Za-z0-9_]/g, "_");
+      return `/project/__build/${stem || "out"}`;
+    }
+
     async function compile() {
+      const entry = findFile(state.selectedPath);
+      if (!isCompilableFile(entry)) {
+        log("Select a .vx source file to compile", "error");
+        return;
+      }
       if (!compilerReady || !wasmBinaryCache) {
         log("Compiler not loaded. Run 'make web' to embed the compiler.", "error");
         return;
       }
+
       compileBtn.disabled = true;
       setStatus("Compiling", "loading");
       clearOutputs();
+      log(`Compiling ${entry.path} (${state.backend})...`);
 
-      const entry = selectEntry();
-      if (!entry) {
-        log("No source files to compile", "error");
-        compileBtn.disabled = false;
-        setStatus("Ready", "ready");
-        return;
-      }
-      const entryName = sanitizeName(entry.name);
-      if (!entryName) {
-        log(`Invalid entry file name: ${entry.name}`, "error");
-        compileBtn.disabled = false;
-        setStatus("Ready", "ready");
-        return;
-      }
-      log(`Compiling ${entryName} (${state.backend})...`);
       let exitCode = 0;
       let module;
       try {
@@ -829,30 +789,25 @@
         });
       } catch (err) {
         log(`Compiler crashed during init: ${err}`, "error");
-        compileBtn.disabled = false;
         setStatus("Ready", "ready");
+        updateCompileButtonState();
         return;
       }
 
       try {
-        module.callMain(["-b", state.backend, "-o", `/project/__build/${entryName.replace(/\.vx$/, "")}`, entryName]);
+        module.callMain(["-b", state.backend, "-o", buildOutputBase(entry.path), entry.path]);
       } catch (err) {
         if (err && err.name === "ExitStatus") {
           exitCode = err.status;
         } else {
           log(`Compiler crashed: ${err}`, "error");
-          compileBtn.disabled = false;
           setStatus("Ready", "ready");
+          updateCompileButtonState();
           return;
         }
       }
 
-      const outputs = readOutputs(
-        module.FS,
-        state.sources.map((src) => src.name),
-        state.assets.map((asset) => asset.name)
-      );
-      state.outputs = outputs;
+      state.outputs = readOutputs(module.FS);
       state.activeOutput = 0;
       renderOutputTabs();
       renderOutput();
@@ -864,110 +819,54 @@
       } else {
         log(`Compilation finished (${state.outputs.length} file(s))`);
       }
-      compileBtn.disabled = false;
+
       setStatus("Ready", "ready");
+      updateCompileButtonState();
     }
 
-    function loadExample(key) {
-      if (!examples[key]) return;
-      const payload = normalizeExamplePayload(examples[key]);
-      if (!payload) return;
-      state.sources = payload.sources.map((src) => ({ ...src }));
-      state.assets = payload.assets
-        .map((asset) => {
-          const name = sanitizeAssetPath(asset.name);
-          if (!name) return null;
-          return {
-            name,
-            encoding: "base64",
-            contentBase64: typeof asset.contentBase64 === "string" ? asset.contentBase64 : ""
-          };
-        })
-        .filter((asset) => !!asset);
-      state.activeSource = 0;
-      clearOutputs();
+    function addFile() {
+      const leaf = sanitizeLeafName(prompt("New file name", "scratch.vx"));
+      if (!leaf) return;
+      const path = sanitizeRelativePath(`${state.currentDir}/${leaf}`);
+      if (!path) return;
+      if (findFile(path)) {
+        log(`File '${path}' already exists`, "error");
+        return;
+      }
+      state.files.push({ path, encoding: "utf8", content: "// New source file\n" });
+      state.files.sort((a, b) => a.path.localeCompare(b.path));
+      state.selectedPath = path;
+      state.currentDir = parentDir(path);
       renderSourceTabs();
-      renderEditors();
-      log(`Loaded example: ${key}`);
+      renderEditor();
+      log(`Added ${path}`);
     }
 
-    function encodeShareState() {
-      const payload = {
-        backend: state.backend,
-        sources: state.sources.map((src) => ({
-          name: src.name,
-          content: src.content
-        }))
-      };
-      const json = JSON.stringify(payload);
-      if (typeof TextEncoder !== "undefined") {
-        const bytes = new TextEncoder().encode(json);
-        let binary = "";
-        bytes.forEach((b) => {
-          binary += String.fromCharCode(b);
-        });
-        return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-      }
-      return btoa(unescape(encodeURIComponent(json))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-    }
+    function populateBackends() {
+      const list = (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS : ["c"];
+      backendSelect.textContent = "";
+      list.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = `Backend: ${name}`;
+        backendSelect.appendChild(option);
+      });
 
-    function decodeShareState(token) {
-      try {
-        const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
-        const padded = b64 + "===".slice((b64.length + 3) % 4);
-        const binary = atob(padded);
-        if (typeof TextDecoder !== "undefined") {
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-          }
-          return JSON.parse(new TextDecoder().decode(bytes));
-        }
-        return JSON.parse(decodeURIComponent(escape(binary)));
-      } catch (_) {
-        return null;
-      }
+      const params = new URLSearchParams(window.location.search);
+      const requestedBackend = (params.get("backend") || "").trim();
+      state.backend = list.includes(requestedBackend) ? requestedBackend : list[0];
+      backendSelect.value = state.backend;
     }
 
     function buildShareUrl() {
-      const token = encodeShareState();
-      if (!token || token.length > 8000) {
-        return null;
-      }
       const url = new URL(window.location.href);
-      url.searchParams.set("state", token);
-      url.hash = "";
-      return url.toString();
-    }
-
-    function applyShareStateFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get("state");
-      if (!token) return false;
-
-      const parsed = decodeShareState(token);
-      if (!parsed || !Array.isArray(parsed.sources)) return false;
-
-      const restored = [];
-      parsed.sources.forEach((src) => {
-        if (!src || typeof src !== "object") return;
-        const name = sanitizeName(String(src.name || ""));
-        if (!name) return;
-        restored.push({
-          name,
-          content: typeof src.content === "string" ? src.content : ""
-        });
-      });
-      if (restored.length === 0) return false;
-
-      state.sources = restored.slice(0, 64);
-      state.assets = [];
-      state.activeSource = 0;
-      if (typeof parsed.backend === "string" && parsed.backend.trim().length > 0) {
-        state.backend = parsed.backend.trim();
+      if (state.selectedPath) {
+        url.searchParams.set("file", state.selectedPath);
+      } else {
+        url.searchParams.delete("file");
       }
-      clearOutputs();
-      return true;
+      url.searchParams.set("backend", state.backend);
+      return url.toString();
     }
 
     function decodeWasmBase64() {
@@ -996,9 +895,11 @@
         }
         compilerReady = true;
         setStatus("Ready", "ready");
-        compileBtn.disabled = false;
+        updateCompileButtonState();
         log("Compiler ready");
-        compile();
+        if (isCompilableFile(findFile(state.selectedPath))) {
+          compile();
+        }
       } catch (err) {
         log(`Failed to load compiler: ${err}`, "error");
         setStatus("Error", "error");
@@ -1006,42 +907,23 @@
     }
 
     sourceEditor.addEventListener("input", (event) => {
-      const active = state.sources[state.activeSource];
-      if (active) {
-        active.content = event.target.value;
+      const file = findFile(state.selectedPath);
+      if (file && file.encoding === "utf8") {
+        file.content = event.target.value;
       }
     });
 
     compileBtn.addEventListener("click", compile);
     addFileBtn.addEventListener("click", addFile);
     addFileBtnInline.addEventListener("click", addFile);
-    function populateBackends() {
-      const list = (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS : ["c"];
-      backendSelect.textContent = "";
-      list.forEach((name) => {
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = `Backend: ${name}`;
-        backendSelect.appendChild(option);
-      });
-      state.backend = list[0] || "c";
-      backendSelect.value = state.backend;
-    }
 
     backendSelect.addEventListener("change", (event) => {
       state.backend = event.target.value || state.backend || "c";
     });
+
     clearLogBtn.addEventListener("click", () => {
       state.messages = [];
       debugLog.textContent = "";
-    });
-
-    exampleSelect.addEventListener("change", (event) => {
-      const key = event.target.value;
-      if (key) {
-        loadExample(key);
-        event.target.value = "";
-      }
     });
 
     copyOutputBtn.addEventListener("click", () => {
@@ -1054,37 +936,19 @@
     });
 
     shareBtn.addEventListener("click", () => {
-      if (state.assets.length > 0) {
-        log("Share URL is not supported for examples with binary assets", "error");
-        return;
-      }
       const url = buildShareUrl();
-      if (!url) {
-        log("Source set is too large to encode into a share URL", "error");
-        return;
-      }
       navigator.clipboard.writeText(url).then(
-        () => log("Copied share URL to clipboard"),
-        () => log("Share URL copy failed", "error")
+        () => log("Copied link to clipboard"),
+        () => log("Link copy failed", "error")
       );
     });
 
-    renderSourceTabs();
-    renderEditors();
-    clearOutputs();
     window.addEventListener("DOMContentLoaded", () => {
+      loadBundledFiles();
       populateBackends();
-      if (applyShareStateFromUrl()) {
-        const available = Array.from(backendSelect.options).map((opt) => opt.value);
-        if (!available.includes(state.backend)) {
-          state.backend = available[0] || "c";
-        }
-        backendSelect.value = state.backend;
-        renderSourceTabs();
-        renderEditors();
-        clearOutputs();
-        log("Loaded shared state from URL");
-      }
+      renderSourceTabs();
+      renderEditor();
+      clearOutputs();
       initCompiler();
     });
   </script>

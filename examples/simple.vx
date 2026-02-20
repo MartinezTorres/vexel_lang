@@ -24,7 +24,7 @@ res:#i32 = compute(10, 20)
 }
 
 // Compile this example:
-//   ../../bin/vexel-c simple.vx -o simple.c
+//   ./build/vexel -b c examples/simple.vx -o out
 //
 // Generated C will only contain:
 //   int32_t vx_res = 60;

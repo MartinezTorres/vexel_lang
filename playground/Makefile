@@ -14,6 +14,7 @@ BACKEND_INCLUDES := $(foreach dir,$(BACKEND_DIRS),-I$(dir)src)
 AUTO_REGISTER := $(VEXEL_ROOT_DIR)/build/playground/autoregister.cpp
 FRONTEND_INCLUDE_DIRS := $(shell find $(VEXEL_ROOT_DIR)/frontend/src -type d -print)
 FRONTEND_SOURCES := $(sort $(filter-out $(VEXEL_ROOT_DIR)/frontend/src/cli/frontend_main.cpp,$(call rwildcard,$(VEXEL_ROOT_DIR)/frontend/src/,*.cpp)))
+EXAMPLE_FILES := $(shell find $(VEXEL_ROOT_DIR)/examples -type f -print)
 
 SOURCES := \
   $(FRONTEND_SOURCES) \
@@ -52,7 +53,7 @@ $(TARGET): $(SOURCES)
 $(WASM): $(TARGET)
 	@:
 
-$(PLAYGROUND): $(PLAYGROUND_TEMPLATE) $(TARGET) $(WASM)
+$(PLAYGROUND): $(PLAYGROUND_TEMPLATE) $(TARGET) $(WASM) $(EXAMPLE_FILES)
 	@mkdir -p $(DOCS_DIR)
 	VEXEL_BACKENDS="$(BACKEND_NAMES)" python3 $(OUT_DIR)/embed.py $(PLAYGROUND_TEMPLATE) $(TARGET) $(WASM) $(PLAYGROUND)
 

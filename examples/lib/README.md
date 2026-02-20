@@ -1,6 +1,6 @@
 # Vexel Standard Library
 
-Core utility modules for Vexel programs.
+This folder contains workbench helper modules used by some examples.
 
 ## Modules
 
@@ -60,11 +60,7 @@ Global counter helpers:
 - `increment() -> #i32` – increments and returns the new count
 - `get_count() -> #i32`
 
-## Design Notes
+## Status
 
-- **No heap allocation** - All structures use fixed-size backing arrays
-- **Value semantics** - All operations respect copy-on-assignment
-- **Generics via type inference** - Field types omitted to enable monomorphization
-- **Expression parameters** - Containers use `each($expr)` for iteration
-- **Bounds safety** - Callers responsible for bounds checking; push/insert functions are no-ops when full
-- **Pure functions** - Math helpers are safe for compile-time evaluation
+- `config.vx` and `counter.vx` compile with the current frontend.
+- Other files in this folder are kept as workbench modules and may not compile under the current grammar/type rules.

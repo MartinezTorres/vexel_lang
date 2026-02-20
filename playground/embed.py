@@ -21,17 +21,39 @@ backends_json = json.dumps(backends)
 
 playground_dir = Path(__file__).resolve().parent
 repo_root = playground_dir.parent
-bmp_example_source = (repo_root / "examples" / "bmp_to_matrix.vx").read_text()
-bmp_example_source_json = json.dumps(bmp_example_source)
-bmp_asset_b64 = base64.b64encode(
-    (repo_root / "examples" / "assets" / "random_256x192.bmp").read_bytes()
-).decode("ascii")
+
+
+def encode_example_file(path: Path) -> dict:
+    rel_path = path.relative_to(repo_root).as_posix()
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return {
+            "path": rel_path,
+            "encoding": "base64",
+            "contentBase64": base64.b64encode(raw).decode("ascii"),
+        }
+    return {
+        "path": rel_path,
+        "encoding": "utf8",
+        "content": text,
+    }
+
+
+example_root = repo_root / "examples"
+example_files = []
+if example_root.exists():
+    for path in sorted(example_root.rglob("*")):
+        if not path.is_file():
+            continue
+        example_files.append(encode_example_file(path))
+example_files_json = json.dumps(example_files).replace("</", "<\\/")
 
 html = (
     template.replace("/*__VEXEL_JS__*/", js)
     .replace("__VEXEL_WASM_BASE64__", wasm_b64)
     .replace("__VEXEL_BACKENDS_JSON__", backends_json)
-    .replace("__EXAMPLE_BMP_TO_MATRIX_SOURCE_JSON__", bmp_example_source_json)
-    .replace("__EXAMPLE_BMP_RANDOM_256X192_B64__", bmp_asset_b64)
+    .replace("__VEXEL_EXAMPLES_JSON__", example_files_json)
 )
 Path(out_path).write_text(html)
