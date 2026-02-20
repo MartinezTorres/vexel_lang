@@ -1,0 +1,12 @@
+[[sdcccall(0)]]
+&!ext_add(a:#i32, b:#i32) -> #i32;
+
+[[sdcccall(1)]]
+&^entry_add(x:#i32) -> #i32 {
+  ext_add(x, 1)
+}
+
+[[nonreentrant]]
+&^main() -> #i32 {
+  entry_add(41)
+}

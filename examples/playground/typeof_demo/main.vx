@@ -1,0 +1,6 @@
+&^main() -> #i32 {
+  seed:#u16 = 42;
+  values:#[seed][4] = [10, 20, 30, 40];
+  out:#[seed] = values[2];
+  (#i32)out
+}

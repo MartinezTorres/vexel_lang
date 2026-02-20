@@ -1,0 +1,14 @@
+LUT:#i32[6] = [2, 4, 6, 8, 10, 12];
+state:#i32;
+
+&accumulate() -> #i32 {
+  sum:#i32 = 0;
+  LUT@{ sum = sum + _ };
+  state = state + 1;
+  sum + state
+}
+
+&^main() -> #i32 {
+  state = 10;
+  accumulate()
+}

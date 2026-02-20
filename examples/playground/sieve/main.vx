@@ -1,0 +1,33 @@
+&^main() -> #i32 {
+  limit:#i32 = 1000;
+  prime:#b[1000];
+
+  i:#i32 = 0;
+  (i < limit)@{
+    prime[i] = 1;
+    i = i + 1;
+  };
+  prime[0] = 0;
+  prime[1] = 0;
+
+  p:#i32 = 2;
+  (p * p < limit)@{
+    prime[p] ? {
+      k:#i32 = p * p;
+      (k < limit)@{
+        prime[k] = 0;
+        k = k + p;
+      };
+    };
+    p = p + 1;
+  };
+
+  sum:#i32 = 0;
+  n:#i32 = 2;
+  (n < limit)@{
+    prime[n] ? { sum = sum + n; };
+    n = n + 1;
+  };
+
+  sum
+}

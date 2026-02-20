@@ -528,6 +528,9 @@
     }
 
     function chooseDefaultFile() {
+      if (findFile("examples/playground/quickadd/main.vx")) {
+        return "examples/playground/quickadd/main.vx";
+      }
       if (findFile("examples/simple.vx")) {
         return "examples/simple.vx";
       }

@@ -1,0 +1,8 @@
+// Quick Add
+&add(a:#i32, b:#i32) -> #i32 { a + b }
+
+res:#i32 = add(40, 2)
+
+&^main() -> #i32 {
+  res
+}

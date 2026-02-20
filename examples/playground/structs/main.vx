@@ -1,0 +1,15 @@
+#Vec2(x:#i32, y:#i32);
+
+&(self)#Vec2::len2() -> #i32 {
+  self.x * self.x + self.y * self.y
+}
+
+&(lhs)#Vec2::+(rhs:#Vec2) -> #Vec2 {
+  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)
+}
+
+&^main() -> #i32 {
+  v = Vec2(3, 4);
+  sum = v + Vec2(1, 2);
+  sum.len2()
+}
