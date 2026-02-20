@@ -2,19 +2,21 @@
 // Demonstrates module imports, vectors, strings, and printing
 
 ::lib::print;
-::lib::vector;
 
-&print_vector_strings(v) {
-  0..v.len@{
-    print_str(v.data[_]);
-    print_newline()
-  }
+#StrVec(data:#s[4], len:#i32, cap:#i32);
+
+&print_vector_strings(v:#StrVec) {
+  i:#i32 = 0;
+  (i < v.len)@{
+    print_str(v.data[i]);
+    print_newline();
+    i = i + (#i32)1;
+  };
 }
 
 &^main() -> #i32 {
   // Create a vector of strings
-  data:#s[4] = ["Hello", "World", "from", "Vexel"];
-  v:#Vec = Vec(data, 4, 4);
+  v:#StrVec = StrVec(["Hello", "World", "from", "Vexel"], 4, 4);
 
   print_vector_strings(v);
 

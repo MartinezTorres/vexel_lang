@@ -1,81 +1,91 @@
-// Set implementation using sorted array
+// Set implementation using a sorted backing array.
 
-#Set(data, len, cap);
+#Set(data, len:#i32, cap:#i32);
 
-&Set(capacity) -> {
-  Set(data, 0, capacity)
-}
-
-&(s)#Set::contains(item) -> {
+&(s)#Set::contains(item) -> #b {
   found:#b = 0;
-  0..s.len@{
-    s.data[_] == item ? {
+  i:#i32 = 0;
+  (i < s.len)@{
+    s.data[i] == item ? {
       found = 1;
-      ->|
-    } : ->
+      ->|;
+    };
+    i = i + 1;
   };
   found
 }
 
 &(s)#Set::insert(item) {
-  s.contains(item) ? -> : {
-    s.len < s.cap ? {
-      pos:#u32 = s.len;
-      0..s.len@{
-        s.data[_] > item ? {
-          pos = _;
-          ->|
-        } : ->
-      };
+  s.contains(item) ? { ->; };
 
-      (s.len > pos)@(_ < s.len - pos) {
-        idx:#u32 = s.len - _ - 1;
-        s.data[idx + 1] = s.data[idx]
+  s.len < s.cap ? {
+    pos:#i32 = s.len;
+    i:#i32 = 0;
+    (i < s.len)@{
+      s.data[i] > item ? {
+        pos = i;
+        ->|;
       };
+      i = i + 1;
+    };
 
-      s.data[pos] = item;
-      s.len = s.len + 1
-    } : ->
-  }
+    pos < s.len ? {
+      idx:#i32 = s.len;
+      (idx > pos)@{
+        s.data[idx] = s.data[idx - 1];
+        idx = idx - 1;
+      };
+    };
+
+    s.data[pos] = item;
+    s.len = s.len + 1;
+  };
 }
 
 &(s)#Set::remove(item) {
-  pos:#u32 = s.len;
-  0..s.len@{
-    s.data[_] == item ? {
-      pos = _;
-      ->|
-    } : ->
+  pos:#i32 = -1;
+  i:#i32 = 0;
+  (i < s.len)@{
+    s.data[i] == item ? {
+      pos = i;
+      ->|;
+    };
+    i = i + 1;
   };
 
-  pos < s.len ? {
-    (s.len - pos - 1)@{
-      idx:#u32 = pos + _;
-      s.data[idx] = s.data[idx + 1]
+  pos >= 0 ? {
+    idx:#i32 = pos;
+    (idx + 1 < s.len)@{
+      s.data[idx] = s.data[idx + 1];
+      idx = idx + 1;
     };
-    s.len = s.len - 1
-  } : ->
+    s.len = s.len - 1;
+  };
 }
 
 &(s)#Set::clear() {
   s.len = 0
 }
 
-&(s)#Set::size() -> {
+&(s)#Set::size() -> #i32 {
   s.len
 }
 
-&(s)#Set::is_empty() -> {
+&(s)#Set::is_empty() -> #b {
   s.len == 0
 }
 
-&(s)#Set::is_full() -> {
+&(s)#Set::is_full() -> #b {
   s.len == s.cap
 }
 
 &(s)#Set::each($expr) {
-  0..s.len@{
-    item = s.data[_];
-    $expr
-  }
+  i:#i32 = 0;
+  (i < s.len)@{
+    {
+      _ = s.data[i];
+      $expr
+    };
+    i = i + 1;
+  };
 }

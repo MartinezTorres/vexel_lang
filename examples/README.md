@@ -14,33 +14,21 @@ gcc build/simple.c -o build/simple -lm
 
 Use `-b megalinker` or `-b vexel` to inspect other backend outputs.
 
-## Files That Currently Compile Cleanly
+## C Backend Status
 
-- `arrays_simple.vx`
-- `bmp_to_matrix.vx` (uses `assets/random_256x192.bmp`)
-- `compile_time_demo.vx`
-- `comprehensive.vx`
-- `custom_iteration.vx`
-- `demo.vx`
-- `operator_methods.vx`
-- `print_strings_simple.vx`
-- `simple.vx`
+All `.vx` files in `examples/` currently compile with `-b c` except:
+
+- `raytracer.vx` (known backend typing gap in C codegen; it compiles with `-b vexel`)
 
 ## Tutorial Examples
 
 - `tutorial/` contains the curated learning examples used by the playground.
 - Most files are single-file examples; `tutorial/multifile/` shows a multi-file module import.
 
-## Workbench Files
+## Library and Showcase
 
-Some files here are kept for parser/runtime exploration and may fail with the current grammar/semantics:
-
-- `arrays.vx`, `range.vx`
-- `char_lit.vx`, `chars.vx`, `strings.vx`
-- `print_strings.vx`
-- `raytracer.vx`
-- `vector_demo.vx`, `vector_strings.vx`
-- `lib/` modules (except `config.vx`, `counter.vx`)
+- `lib/` contains reusable helper modules (`math`, `print`, `vector`, `stack`, `set`, `config`, `counter`).
+- `raytracer.vx` is a large showcase example and is validated with the `vexel` backend.
 
 ## Notes
 

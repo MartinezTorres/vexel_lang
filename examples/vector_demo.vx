@@ -1,44 +1,32 @@
-// Vector of strings example - simplified to work with current compiler
-// Demonstrates type constructors and member access
+// Vector of bytes demo.
+// Demonstrates module import, struct constructor use, and member access.
 
-&!putchar(c:#u8) -> #i32;
+::lib::vector;
 
-#Vec(data, len, cap);
+&!putchar(c:#u8);
 
-&print_char(c:#u8) -> #i32 {
-  putchar(c)
+&print_newline() {
+  putchar((#u8)10)
 }
 
-&print_newline() -> #i32 {
-  putchar(10)
-}
-
-&print_vector_strings(v:#Vec) {
-  // Print each string in the vector
-  // For simplicity, we'll manually iterate since runtime ranges aren't done yet
-  putchar(v.data[0]);
-  putchar(v.data[1]);
-  putchar(v.data[2]);
-  putchar(v.data[3]);
-  putchar(v.data[4]);
+&print_vector_bytes(v) {
+  putchar((#u8)v.data[0]);
+  putchar((#u8)v.data[1]);
+  putchar((#u8)v.data[2]);
+  putchar((#u8)v.data[3]);
+  putchar((#u8)v.data[4]);
   print_newline();
 
-  putchar(v.data[6]);
-  putchar(v.data[7]);
-  putchar(v.data[8]);
-  putchar(v.data[9]);
-  putchar(v.data[10]);
-  print_newline()
+  putchar((#u8)v.data[6]);
+  putchar((#u8)v.data[7]);
+  putchar((#u8)v.data[8]);
+  putchar((#u8)v.data[9]);
+  putchar((#u8)v.data[10]);
+  print_newline();
 }
 
 &^main() -> #i32 {
-  // Create a data array with ASCII characters for "Hello World"
-  data:#u8[12] = [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33];
-
-  // Create a vector with this data
-  v:#Vec = Vec(data, 12, 12);
-
-  print_vector_strings(v);
-
+  v = Vec([72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33], 12, 12);
+  print_vector_bytes(v);
   v.len
 }

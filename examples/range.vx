@@ -1,5 +1,5 @@
-// Test range operator
-rng = 0..5
+// Range-like result via explicit literal
+rng:#i32[5] = [0, 1, 2, 3, 4];
 
 &^main() -> #i32 {
     rng[2]

@@ -8,10 +8,12 @@
 }
 
 &print_str(s:#s) {
+  i:#i32 = 0;
   len:#i32 = |s|;
-  0..len@{
-    putchar(s[_])
-  }
+  (i < len)@{
+    putchar(s[i]);
+    i = i + 1;
+  };
 }
 
 &print_newline() {
@@ -19,10 +21,12 @@
 }
 
 &print_strings(strings:#s[4], count:#i32) {
-  0..count@{
-    print_str(strings[_]);
-    print_newline()
-  }
+  i:#i32 = 0;
+  (i < count)@{
+    print_str(strings[i]);
+    print_newline();
+    i = i + 1;
+  };
 }
 
 &^main() -> #i32 {

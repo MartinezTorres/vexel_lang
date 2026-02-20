@@ -1,41 +1,29 @@
-// Stack implementation
+// Stack implementation.
 
-#Stack(data, top);
-
-&Stack(capacity) -> {
-  Stack(data, 0)
-}
+#Stack(data, top:#i32);
 
 &(s)#Stack::push(item) {
   s.top < |s.data| ? {
     s.data[s.top] = item;
-    s.top = s.top + 1
-  } : ->
-}
-
-&(s)#Stack::pop() -> {
-  s.top > 0 ? {
-    s.top = s.top - 1;
-    s.data[s.top]
-  } : s.data[0]
-}
-
-&(s)#Stack::peek() -> {
-  s.top > 0 ? s.data[s.top - 1] : s.data[0]
+    s.top = s.top + 1;
+    0
+  } : {
+    0
+  };
 }
 
 &(s)#Stack::clear() {
   s.top = 0
 }
 
-&(s)#Stack::size() -> {
+&(s)#Stack::size() -> #i32 {
   s.top
 }
 
-&(s)#Stack::is_empty() -> {
+&(s)#Stack::is_empty() -> #b {
   s.top == 0
 }
 
-&(s)#Stack::is_full() -> {
+&(s)#Stack::is_full() -> #b {
   s.top == |s.data|
 }

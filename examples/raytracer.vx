@@ -12,45 +12,45 @@
 // 3D Vector Math
 // ============================================================================
 
-#Vec3(x:#f32, y:#f32, z:#f32);
+#Vec3(x:#f64, y:#f64, z:#f64);
 
-&(v)dot(o:#Vec3) -> #f32 {
+&(v)#Vec3::dot(o:#Vec3) -> #f64 {
     -> v.x * o.x + v.y * o.y + v.z * o.z;
 }
 
-&(v)length_sq -> #f32 {
+&(v)#Vec3::length_sq() -> #f64 {
     -> v.dot(v);
 }
 
-&(v)length -> #f32 {
+&(v)#Vec3::length() -> #f64 {
     -> sqrt(v.length_sq());
 }
 
-&(v)normalize -> #Vec3 {
+&(v)#Vec3::normalize() -> #Vec3 {
     len = v.length();
     -> Vec3(v.x / len, v.y / len, v.z / len);
 }
 
-&(v)add(o:#Vec3) -> #Vec3 {
+&(v)#Vec3::add(o:#Vec3) -> #Vec3 {
     -> Vec3(v.x + o.x, v.y + o.y, v.z + o.z);
 }
 
-&(v)sub(o:#Vec3) -> #Vec3 {
+&(v)#Vec3::sub(o:#Vec3) -> #Vec3 {
     -> Vec3(v.x - o.x, v.y - o.y, v.z - o.z);
 }
 
-&(v)mul(s:#f32) -> #Vec3 {
+&(v)#Vec3::mul(s:#f64) -> #Vec3 {
     -> Vec3(v.x * s, v.y * s, v.z * s);
 }
 
-&(v)reflect(n:#Vec3) -> #Vec3 {
+&(v)#Vec3::reflect(n:#Vec3) -> #Vec3 {
     // r = v - 2 * dot(v, n) * n
     d = v.dot(n);
     -> v.sub(n.mul(2.0 * d));
 }
 
 // Component-wise multiply for colors
-&(v)cmul(o:#Vec3) -> #Vec3 {
+&(v)#Vec3::cmul(o:#Vec3) -> #Vec3 {
     -> Vec3(v.x * o.x, v.y * o.y, v.z * o.z);
 }
 
@@ -60,7 +60,7 @@
 
 #Ray(origin:#Vec3, direction:#Vec3);
 
-&(r)point_at(t:#f32) -> #Vec3 {
+&(r)#Ray::point_at(t:#f64) -> #Vec3 {
     -> r.origin.add(r.direction.mul(t));
 }
 
@@ -70,15 +70,15 @@
 
 #Sphere(
     center:#Vec3,
-    radius:#f32,
+    radius:#f64,
     color:#Vec3,
-    specular:#f32,
-    reflective:#f32
+    specular:#f64,
+    reflective:#f64
 );
 
 // Ray-sphere intersection
 // Returns hit distance (negative if no hit)
-&(s)intersect(r:#Ray) -> #f32 {
+&(s)#Sphere::intersect(r:#Ray) -> #f64 {
     oc = r.origin.sub(s.center);
     a = r.direction.dot(r.direction);
     b = 2.0 * oc.dot(r.direction);
@@ -109,19 +109,19 @@
 // Light
 // ============================================================================
 
-#Light(position:#Vec3, intensity:#f32);
+#Light(position:#Vec3, intensity:#f64);
 
 // ============================================================================
 // Math Utilities
 // ============================================================================
 
-&sqrt(x:#f32) -> #f32 {
+&sqrt(x:#f64) -> #f64 {
     // Newton-Raphson method
     x <= 0.0 ? {
         -> 0.0;
     };
 
-    guess:#f32 = x;
+    guess:#f64 = x;
     i:#u8 = 0;
 
     (i < 10)@{
@@ -132,15 +132,15 @@
     -> guess;
 }
 
-&min(a:#f32, b:#f32) -> #f32 {
+&min(a:#f64, b:#f64) -> #f64 {
     -> a < b ? a : b;
 }
 
-&max(a:#f32, b:#f32) -> #f32 {
+&max(a:#f64, b:#f64) -> #f64 {
     -> a > b ? a : b;
 }
 
-&clamp(x:#f32, lo:#f32, hi:#f32) -> #f32 {
+&clamp(x:#f64, lo:#f64, hi:#f64) -> #f64 {
     -> min(max(x, lo), hi);
 }
 
@@ -151,7 +151,7 @@
 // Fixed-size arrays demonstrate stack-only constraint
 // Scene has 5 spheres and 2 lights
 
-&make_spheres -> #Sphere[5] {
+&make_spheres() -> #Sphere[5] {
     -> [
         // Large sphere - floor
         Sphere(
@@ -196,7 +196,7 @@
     ];
 }
 
-&make_lights -> #Light[2] {
+&make_lights() -> #Light[2] {
     -> [
         Light(Vec3(3.0, 5.0, -2.0), 0.6),
         Light(Vec3(-3.0, 5.0, -3.0), 0.4)
@@ -209,7 +209,7 @@
 
 #HitRecord(
     hit:#b,
-    t:#f32,
+    t:#f64,
     point:#Vec3,
     normal:#Vec3,
     sphere_idx:#u8
@@ -219,26 +219,38 @@
 // Scene Intersection
 // ============================================================================
 
-&trace_scene(r:#Ray, spheres:#Sphere[5], min_t:#f32, max_t:#f32) -> #HitRecord {
-    closest_t:#f32 = max_t;
+&trace_scene(r:#Ray, spheres:#Sphere[5], min_t:#f64, max_t:#f64) -> #HitRecord {
+    closest_t:#f64 = max_t;
     hit:#b = 0;
     hit_idx:#u8 = 0;
 
     i:#u8 = 0;
-    (i < 5)@{
+    (i < (#u8)5)@{
         t = spheres[i].intersect(r);
         (t > min_t) && (t < closest_t) ? {
             closest_t = t;
             hit = 1;
             hit_idx = i;
         };
-        i = i + 1;
+        i = i + (#u8)1;
     };
 
     hit ? {
-        hit_point = r.point_at(closest_t);
-        hit_sphere = spheres[hit_idx];
-        normal = hit_point.sub(hit_sphere.center).normalize();
+        hit_point:#Vec3;
+        hit_point.x = r.origin.x + r.direction.x * closest_t;
+        hit_point.y = r.origin.y + r.direction.y * closest_t;
+        hit_point.z = r.origin.z + r.direction.z * closest_t;
+        hit_sphere:#Sphere = spheres[hit_idx];
+
+        nx:#f64 = hit_point.x - hit_sphere.center.x;
+        ny:#f64 = hit_point.y - hit_sphere.center.y;
+        nz:#f64 = hit_point.z - hit_sphere.center.z;
+        nlen:#f64 = sqrt(nx * nx + ny * ny + nz * nz);
+        normal:#Vec3;
+        normal.x = nx / nlen;
+        normal.y = ny / nlen;
+        normal.z = nz / nlen;
+
         -> HitRecord(1, closest_t, hit_point, normal, hit_idx);
     };
 
@@ -253,11 +265,11 @@
     point:#Vec3,
     normal:#Vec3,
     view:#Vec3,
-    specular:#f32,
+    specular:#f64,
     spheres:#Sphere[5],
     lights:#Light[2]
-) -> #f32 {
-    intensity:#f32 = 0.1; // Ambient light
+) -> #f64 {
+    intensity:#f64 = 0.1; // Ambient light
 
     // Iterate through lights
     li:#u8 = 0;
@@ -274,6 +286,7 @@
 
         // Only add lighting if not in shadow
         shadow_hit.hit ? {
+            0
         } : {
             // Diffuse
             n_dot_l = normal.dot(light_dir);
@@ -290,6 +303,7 @@
                     intensity = intensity + light.intensity * spec_factor;
                 };
             };
+            0
         };
 
         li = li + 1;
@@ -299,20 +313,20 @@
 }
 
 // Power function for specular highlights
-&pow(base:#f32, exp:#f32) -> #f32 {
+&pow(base:#f64, exp:#f64) -> #f64 {
     // Simple iterative power for positive integer exponents
     // For specular calculations, exp is large but we approximate
     exp < 1.0 ? {
         -> 1.0;
     };
 
-    result:#f32 = 1.0;
+    result:#f64 = 1.0;
     i:#u32 = 0;
     exp_int = (#u32)exp;
 
-    (i < exp_int) && (i < 1000)@{
+    ((i < exp_int) && (i < (#u32)1000))@{
         result = result * base;
-        i = i + 1;
+        i = i + (#u32)1;
     };
 
     -> result;
@@ -380,7 +394,7 @@
 // Image dimensions - compile-time constants
 WIDTH = 320;
 HEIGHT = 240;
-ASPECT_RATIO = (#f32)WIDTH / (#f32)HEIGHT;
+ASPECT_RATIO = (#f64)WIDTH / (#f64)HEIGHT;
 
 // Camera setup
 VIEWPORT_HEIGHT = 2.0;
@@ -404,33 +418,33 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
 }
 
 &print_num(n:#u32) {
-    n >= 10 ? {
-        print_num(n / 10);
+    n >= (#u32)10 ? {
+        print_num(n / (#u32)10);
     };
-    print_char(48 + (#u8)(n % 10));
+    print_char((#u8)((#i32)48 + (#i32)(n % (#u32)10)));
 }
 
 &print_str(s:#s) {
     i:#u32 = 0;
-    (i < |s|)@{
+    (i < (#u32)|s|)@{
         print_char(s[i]);
-        i = i + 1;
+        i = i + (#u32)1;
     };
 }
 
-&print_newline {
-    print_char(10);
+&print_newline() {
+    print_char((#u8)10);
 }
 
-&print_space {
-    print_char(32);
+&print_space() {
+    print_char((#u8)32);
 }
 
 // ============================================================================
 // Main Render Function
 // ============================================================================
 
-&^main -> #i32 {
+&^main() -> #i32 {
     // Initialize scene
     spheres = make_spheres();
     lights = make_lights();
@@ -438,21 +452,21 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
     // PPM header
     print_str("P3");
     print_newline();
-    print_num(WIDTH);
+    print_num((#u32)WIDTH);
     print_space();
-    print_num(HEIGHT);
+    print_num((#u32)HEIGHT);
     print_newline();
     print_str("255");
     print_newline();
 
     // Render loop
     y:#u32 = 0;
-    (y < HEIGHT)@{
+    (y < (#u32)HEIGHT)@{
         x:#u32 = 0;
-        (x < WIDTH)@{
+        (x < (#u32)WIDTH)@{
             // Calculate ray direction
-            u = (#f32)x / (#f32)(WIDTH - 1);
-            v = (#f32)y / (#f32)(HEIGHT - 1);
+            u = (#f64)x / (#f64)(WIDTH - (#i32)1);
+            v = (#f64)y / (#f64)(HEIGHT - (#i32)1);
 
             pixel_pos = VIEWPORT_LOWER_LEFT
                 .add(VIEWPORT_U.mul(u))
@@ -462,7 +476,7 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
             ray = Ray(CAMERA_ORIGIN, ray_dir);
 
             // Trace ray with reflections (max depth 3)
-            color = trace_ray(ray, spheres, lights, 3);
+            color = trace_ray(ray, spheres, lights, (#u8)3);
 
             // Clamp and convert to RGB
             r = (#u32)(clamp(color.x, 0.0, 1.0) * 255.0);
@@ -476,10 +490,10 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
             print_num(b);
             print_space();
 
-            x = x + 1;
+            x = x + (#u32)1;
         };
         print_newline();
-        y = y + 1;
+        y = y + (#u32)1;
     };
 
     -> 0;

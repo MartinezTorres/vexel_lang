@@ -7,49 +7,62 @@
 }
 
 &print_str(s:#s) {
-  0..|s|@{
-    putchar(s[_])
-  }
+  i:#i32 = 0;
+  len:#i32 = |s|;
+  (i < len)@{
+    putchar(s[i]);
+    i = i + 1;
+  };
 }
 
 &print_newline() {
-  putchar(10)
+  putchar((#u8)10)
 }
 
 &print_digit(d:#u8) {
-  putchar(48 + d)
+  putchar((#u8)(48 + (#i32)d))
 }
 
 &print_u32(n:#u32) {
-  n == 0 ? putchar(48) : {
+  n == 0 ? {
+    putchar((#u8)48);
+    0
+  } : {
     buf:#u8[10];
     idx:#u32 = 0;
     temp:#u32 = n;
 
-    (temp > 0)@{
-      buf[idx] = (temp % 10);
-      temp = temp / 10;
-      idx = idx + 1
+    (temp > (#u32)0)@{
+      buf[idx] = (#u8)(temp % (#u32)10);
+      temp = temp / (#u32)10;
+      idx = idx + (#u32)1
     };
 
-    (idx > 0)@{
-      idx = idx - 1;
-      putchar(48 + buf[idx])
-    }
-  }
+    (idx > (#u32)0)@{
+      idx = idx - (#u32)1;
+      putchar((#u8)(48 + (#i32)buf[idx]))
+    };
+    0
+  };
 }
 
 &print_i32(n:#i32) {
   n < 0 ? {
-    putchar(45);
-    print_u32((#u32)(-n))
-  } : print_u32((#u32)n)
+    putchar((#u8)45);
+    print_u32((#u32)(-n));
+    0
+  } : {
+    print_u32((#u32)n);
+    0
+  };
 }
 
 &print_bool(b:#b) {
   b ? {
-    print_str("true")
+    print_str("true");
+    0
   } : {
-    print_str("false")
-  }
+    print_str("false");
+    0
+  };
 }
