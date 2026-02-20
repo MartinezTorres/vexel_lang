@@ -4,6 +4,7 @@ set -euo pipefail
 # Backend conformance source of truth:
 # validates minimum backend build/registration contract for every discovered backend directory.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRIVER="$ROOT/build/vexel"
 
 discover_backends() {
   local dirs=()
@@ -36,7 +37,6 @@ check_backend_dir() {
   rel="${dir#$ROOT/}"
   local mk="$dir/Makefile"
   local backend_cpp="$dir/src/${name}_backend.cpp"
-  local driver="$ROOT/build/vexel"
 
   [[ -f "$mk" ]] || { echo "FAIL: missing Makefile in $dir" >&2; exit 1; }
   [[ -f "$backend_cpp" ]] || { echo "FAIL: missing $backend_cpp" >&2; exit 1; }
@@ -54,14 +54,7 @@ check_backend_dir() {
     exit 1
   fi
 
-  # Backend isolation contract:
-  # - no shared backend code directory
-  # - no direct references to another backend's source tree
-  if [[ -d "$ROOT/backends/common" ]]; then
-    echo "FAIL: backends/common is not allowed; keep codegen backend-owned" >&2
-    exit 1
-  fi
-
+  # Backend isolation contract: no direct references to another backend's source tree.
   mapfile -t refs < <(rg -n "backends/(common|c/|ext/[^/]+/)" "$mk" "$dir/src" 2>/dev/null || true)
   local ref
   for ref in "${refs[@]}"; do
@@ -81,12 +74,15 @@ check_backend_dir() {
     exit 1
   fi
 
-  make -s -C "$dir" all >/dev/null
-  make -s -C "$ROOT" driver >/dev/null
-  [[ -x "$driver" ]] || { echo "FAIL: expected unified driver $driver not found/executable" >&2; exit 1; }
+  # Backend-owned suite is part of conformance.
+  make -s -C "$dir" test
 
-  "$driver" -b "$name" -h >/dev/null 2>&1 || {
-    echo "FAIL: $driver -b $name -h failed" >&2
+  # Backend must still build in isolation.
+  make -s -C "$dir" all
+  [[ -x "$DRIVER" ]] || { echo "FAIL: expected unified driver $DRIVER not found/executable" >&2; exit 1; }
+
+  "$DRIVER" -b "$name" -h >/dev/null 2>&1 || {
+    echo "FAIL: $DRIVER -b $name -h failed" >&2
     exit 1
   }
 
@@ -97,8 +93,8 @@ check_backend_dir() {
     0
 }
 EOF
-  "$driver" -b "$name" -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>&1 || {
-    echo "FAIL: $driver failed to compile minimal program with backend '$name'" >&2
+  "$DRIVER" -b "$name" -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>&1 || {
+    echo "FAIL: $DRIVER failed to compile minimal program with backend '$name'" >&2
     rm -rf "$tmp"
     exit 1
   }
@@ -111,6 +107,14 @@ main() {
     echo "No discovered backends for conformance checks."
     exit 0
   fi
+
+  if [[ -d "$ROOT/backends/common" ]]; then
+    echo "FAIL: backends/common is not allowed; keep codegen backend-owned" >&2
+    exit 1
+  fi
+
+  make -s -C "$ROOT" driver
+  [[ -x "$DRIVER" ]] || { echo "FAIL: expected unified driver $DRIVER not found/executable" >&2; exit 1; }
 
   for dir in "${backends[@]}"; do
     check_backend_dir "$dir"

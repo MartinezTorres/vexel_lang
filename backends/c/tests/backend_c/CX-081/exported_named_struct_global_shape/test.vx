@@ -1,0 +1,15 @@
+// @rfc: docs/vexel-rfc.md#global-variables
+// @desc: Exported globals keep ABI-visible array shape while dead non-exported globals are elided. | Header shape checks compile as C11
+// @expect-exit: 0
+// @command: {VEXEL} -b c -o out test.vx && gcc -std=c11 -fsyntax-only out.c abi_check.c && ! rg -n "\\bvx_drop\\b" out.h out.c
+
+#Pixel(r:#u8, g:#u8, b:#u8);
+
+^palette:#Pixel[2] = [Pixel(1, 2, 3), Pixel(4, 5, 6)];
+^bw = [[2, 3, 4], [5, 6, 7]];
+
+drop:#i32 = 99;
+
+&^main() -> #i32 {
+  0
+}

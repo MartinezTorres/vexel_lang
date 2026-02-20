@@ -44,7 +44,6 @@ frontend-clean:
 BACKEND_DIRS := $(filter-out backends/ext/ backends/tests/,$(wildcard backends/*/ backends/ext/*/))
 BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
 BACKENDS_TARGETS := $(addprefix backend-,$(BACKEND_NAMES))
-BACKENDS_TEST_TARGETS := $(addprefix backend-,$(addsuffix -test,$(BACKEND_NAMES)))
 BACKENDS_CLEAN_TARGETS := $(addprefix backend-,$(addsuffix -clean,$(BACKEND_NAMES)))
 
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
@@ -72,7 +71,7 @@ backend-conformance-test:
 	@bash backends/conformance_test.sh
 
 #tests
-.PHONY: backend-conformance-test backend-abi-test docs-check
+.PHONY: backend-conformance-test docs-check
 docs-check:
 	@index="docs/index.html"; \
 	if [ ! -f "$$index" ]; then \
@@ -89,10 +88,7 @@ docs-check:
 	fi; \
 	echo "ok"
 
-backend-abi-test:
-	@bash backends/abi_contract_test.sh
-
-test: driver-test frontend-test backend-conformance-test backend-abi-test docs-check $(BACKENDS_TEST_TARGETS)
+test: driver-test frontend-test backend-conformance-test docs-check
 
 # CLEAN
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
