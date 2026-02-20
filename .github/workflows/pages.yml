@@ -30,7 +30,7 @@ jobs:
         run: make web
 
       - name: Verify docs landing separation
-        run: bash tools/check_docs_landing.sh
+        run: make docs-check
 
       - name: Validate docs payload
         run: |

@@ -74,7 +74,20 @@ backend-conformance-test:
 #tests
 .PHONY: backend-conformance-test backend-abi-test docs-check
 docs-check:
-	@bash tools/check_docs_landing.sh
+	@index="docs/index.html"; \
+	if [ ! -f "$$index" ]; then \
+		echo "docs/index.html not found" >&2; \
+		exit 1; \
+	fi; \
+	if rg -q "VEXEL_WASM_BASE64|createVexelModule|wasmBinaryFile=\"vexel.wasm\"|/\\*__VEXEL_JS__\\*/" "$$index"; then \
+		echo "docs/index.html appears to contain generated playground payload" >&2; \
+		exit 1; \
+	fi; \
+	if ! rg -q "playground\\.html" "$$index"; then \
+		echo "docs/index.html must link to docs/playground.html" >&2; \
+		exit 1; \
+	fi; \
+	echo "ok"
 
 backend-abi-test:
 	@bash backends/abi_contract_test.sh
