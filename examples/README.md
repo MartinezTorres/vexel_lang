@@ -26,10 +26,10 @@ Use `-b megalinker` or `-b vexel` to inspect other backend outputs.
 - `print_strings_simple.vx`
 - `simple.vx`
 
-## Playground-Curated Examples
+## Tutorial Examples
 
-- `playground/` contains the curated examples that were previously hardcoded in the web playground (including `sieve`, `structs`, `typeof_demo`, `abi_hints`, and others).
-- Each subfolder is an entry example (`main.vx`), with local helper files/assets when needed (for example `playground/bmp_matrix/assets/random_256x192.bmp`).
+- `tutorial/` contains the curated learning examples used by the playground.
+- Most files are single-file examples; `tutorial/multifile/` shows a multi-file module import.
 
 ## Workbench Files
 
