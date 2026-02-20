@@ -50,6 +50,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Size must be a non-negative integer resolvable at compile time
 - Cannot depend on external calls, runtime values, or I/O
 - Examples: `#i32[10]`, `#u8[2+3]`, `#f32[pow(2,3)]` (if pow is pure)
+- Equivalent prefix spelling is accepted for a single dimension: `[N]#T`
 - - Array length: `|arr|` yields compile-time constant integer (array size)
 - Literal `[e1,e2,...]` infers size from element count (may be empty)
   - `[ ]` produces `#T[0]` for the target type `#T` when context requires an array
@@ -71,7 +72,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Type constructors**: `#Name(field[:Type],...);`
 - Defines record type `#Name`
-- Auto-generates constructor `&#Name(args...)`
+- Auto-generates constructor callable as `Name(args...)`
 - Fields accessed via `.field`
 - Can be defined at module level or within any scope
 - **Cannot be recursive** (no self-reference in fields, no pointers)
@@ -240,8 +241,11 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Exported functions**: `&^name(p:Type,...)[-> Type] block`
 - Callable externally
-- Primitive types only: `#i8`, `#i16`, `#i32`, `#i64`, `#u8`, `#u16`, `#u32`, `#u64`, `#f32`, `#f64`, `#b`
-- **No tuple returns** in exported functions (ABI compatibility)
+- ABI boundary types only:
+  - Primitives (`#i8`, `#i16`, `#i32`, `#i64`, `#u8`, `#u16`, `#u32`, `#u64`, `#f32`, `#f64`, `#b`, `#s`)
+  - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
+  - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
+  - Tuple returns are not allowed
 - Cannot be eliminated
 - Serve as entry points for executables or library exports
 
@@ -483,12 +487,16 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 ```
 program      ::= { top }
 
-top          ::= func | refunc | export | extern | type | import | global
+top          ::= func | export | extern | type_decl | import | global
 
-func         ::= '&' ident '(' [ params ] ')' [ '->' type ] block
-refunc       ::= '&' '(' refparams ')' ident '(' [ params ] ')' [ '->' type ] block
-export       ::= '&^' ident '(' [ params ] ')' [ '->' type ] block
-extern       ::= '&!' ident '(' [ params ] ')' [ '->' type ] ';'
+func         ::= '&' [ recv_prefix ] func_name '(' [ params ] ')' [ '->' ret_spec ] block
+export       ::= '&^' [ recv_prefix ] func_name '(' [ params ] ')' [ '->' ret_spec ] block
+extern       ::= '&!' [ recv_prefix ] func_name '(' [ params ] ')' [ '->' ret_spec ] ';'
+
+recv_prefix  ::= '(' refparams ')' [ '#' ident '::' ]
+func_name    ::= ident | op_name
+ret_spec     ::= type | '(' type ',' type { ',' type } ')'
+op_name      ::= '+' | '-' | '*' | '/' | '%' | '==' | '!=' | '<' | '<=' | '>' | '>=' | '@' | '@@'
 
 params       ::= param { ',' param }
 param        ::= [ '$' ] ident [ ':' type ]
@@ -534,7 +542,8 @@ array        ::= '[' [ expr { ',' expr } ] ']'
 qname        ::= ident { '::' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
-type         ::= [ '[' expr ']' ] '#' ( ident | '[' expr ']' ) [ '[' expr ']' ]
+type         ::= '[' expr ']' '#' ( ident | '[' expr ']' )
+               | '#' ( ident | '[' expr ']' ) { '[' expr ']' }
 
 lvalue       ::= var | methodcall | index | member
 

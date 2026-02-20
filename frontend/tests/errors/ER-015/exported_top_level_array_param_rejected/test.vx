@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported function ABI forbids top-level array parameters | Exported top-level array parameter is rejected at ABI boundary
+
+&^sum(arr:#u8[4]) -> #u8 {
+    arr[0]
+}
+
+&^main() -> #i32 {
+    0
+}

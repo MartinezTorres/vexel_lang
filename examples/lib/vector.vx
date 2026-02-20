@@ -2,7 +2,7 @@
 
 #Vec(data, len, cap);
 
-&#Vec(capacity) -> {
+&Vec(capacity) -> {
   Vec(data, 0, capacity)
 }
 

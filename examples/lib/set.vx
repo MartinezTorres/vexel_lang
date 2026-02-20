@@ -2,7 +2,7 @@
 
 #Set(data, len, cap);
 
-&#Set(capacity) -> {
+&Set(capacity) -> {
   Set(data, 0, capacity)
 }
 

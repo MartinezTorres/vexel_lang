@@ -445,7 +445,7 @@ StmtPtr Parser::parse_func_decl() {
         }
     }
 
-    // Check for Type::method syntax
+    // Check for #Type::method syntax.
     std::string type_namespace;
     size_t saved_pos = pos;
     bool namespace_found = false;
@@ -463,25 +463,14 @@ StmtPtr Parser::parse_func_decl() {
             pos = saved_pos;
         }
     }
-    if (!namespace_found) {
-        saved_pos = pos;
-        if (check(TokenType::Identifier)) {
-            Token maybe_type = current();
-            pos++;
-            if (match(TokenType::DoubleColon)) {
-                type_namespace = maybe_type.lexeme;
-                namespace_found = true;
-            } else {
-                pos = saved_pos;
-            }
-        }
+    if (!namespace_found &&
+        check(TokenType::Identifier) &&
+        peek().type == TokenType::DoubleColon) {
+        throw CompileError("Method declarations must use '#TypeName::method' syntax",
+                           current().location);
     }
     if (namespace_found && ref_params.size() != 1) {
         throw CompileError("Type::method syntax requires exactly one receiver parameter", current().location);
-    }
-
-    if (match(TokenType::Hash)) {
-        // Sigil belongs to function name; consume and ignore for storage
     }
     std::string name = parse_function_name();
     consume(TokenType::LeftParen, "Expected '('");

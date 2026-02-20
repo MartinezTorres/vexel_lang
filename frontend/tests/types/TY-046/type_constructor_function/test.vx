@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#types
-// @desc: Type constructor auto-generates constructor function &#Name(args...) | Type constructor auto-generates constructor function
+// @desc: Type constructor auto-generates callable constructor Name(args...) | Type constructor auto-generates constructor function
 
 
 #Color(r:#u8, g:#u8, b:#u8);

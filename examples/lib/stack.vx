@@ -2,7 +2,7 @@
 
 #Stack(data, top);
 
-&#Stack(capacity) -> {
+&Stack(capacity) -> {
   Stack(data, 0)
 }
 

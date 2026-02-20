@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#declarations
-// @desc: Type constructors auto-generate constructor function '"'"'&#Name(args...)'"'"' | Type auto-generated constructor
+// @desc: Type constructors auto-generate callable constructor '"'"'Name(args...)'"'"' | Type auto-generated constructor
 
 
 // DC-120: Type constructors auto-generate constructor function

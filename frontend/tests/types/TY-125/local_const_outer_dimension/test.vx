@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Multidimensional array sizes can use compile-time-known local constants on outer dimensions | Local constexpr outer dimension in #T[N][M] is accepted
+
+&^main() -> #i32 {
+    limit:#i32 = 4;
+    grid:#b[limit][2];
+    (#i32)|grid|
+}

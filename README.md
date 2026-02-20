@@ -1,6 +1,6 @@
 # Vexel Compiler
 
-C++ implementation of the Vexel language front-end plus the portable C backend. The SDCC banked backend is currently out-of-tree.
+C++ implementation of the Vexel language front-end plus the portable C backend.
 
 **Status**: Language RFC v0.2.1 is implemented for the c backend.
 

@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Exported function ABI must reject tuple returns | Exported tuple return is rejected at ABI boundary
+
+&^make_pair() -> (#i32, #i32) {
+    (1, 2)
+}
+
+&^main() -> #i32 {
+    0
+}

@@ -44,6 +44,9 @@ Symbol* TypeChecker::binding_for(int instance_id, const void* node) const {
 }
 
 void TypeChecker::set_current_instance(int instance_id) {
+    if (current_instance_id == instance_id) {
+        return;
+    }
     current_instance_id = instance_id;
     global_scope = resolver ? resolver->instance_scope(current_instance_id) : nullptr;
     forget_all_constexpr_values();
@@ -228,16 +231,19 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         stmt->return_type = validate_type(stmt->return_type, stmt->location);
     }
 
-    // Validate external function ABI signatures.
-    if (stmt->is_external) {
+    // Validate ABI-boundary function signatures.
+    if (stmt->is_external || stmt->is_exported) {
+        const bool is_external_boundary = stmt->is_external;
+        const std::string boundary_prefix = is_external_boundary ? "External" : "Exported";
         if (!stmt->return_types.empty()) {
-            throw CompileError("External functions cannot use tuple return types at ABI boundaries", stmt->location);
+            throw CompileError(boundary_prefix + " functions cannot use tuple return types at ABI boundaries",
+                               stmt->location);
         }
         for (const auto& param : stmt->params) {
             if (!param.type) continue;
             std::string reason;
             if (!is_external_abi_boundary_type(param.type, &reason)) {
-                throw CompileError("External function parameter '" + param.name +
+                throw CompileError(boundary_prefix + " function parameter '" + param.name +
                                    "' has unsupported ABI type '" + param.type->to_string() +
                                    "': " + reason,
                                    param.location);
@@ -246,7 +252,7 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
         if (stmt->return_type) {
             std::string reason;
             if (!is_external_abi_boundary_type(stmt->return_type, &reason)) {
-                throw CompileError("External function return type '" + stmt->return_type->to_string() +
+                throw CompileError(boundary_prefix + " function return type '" + stmt->return_type->to_string() +
                                    "' is not supported at ABI boundary: " + reason,
                                    stmt->location);
             }

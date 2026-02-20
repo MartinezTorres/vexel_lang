@@ -77,7 +77,7 @@ Exactly one subsystem owns each concern:
 - Backends consume frontend `constexpr` facts and residualized AST only.
 - Backends must not instantiate compile-time evaluators or semantic fallback evaluators.
 
-5. Whole-program semantics
+6. Whole-program semantics
 - Analysis assumes all source is available.
 - Cross-module graph decisions are frontend responsibilities.
 
@@ -146,7 +146,7 @@ Test-update policy:
 - There must be no fixture/target/script that rewrites many `expected_report.md` files at once.
 - Expected outputs must be updated only per-test, with root-cause explanation in the commit.
 
-## Failure Patterns (Wall-of-Shame Driven)
+## Recurring Failure Patterns
 
 Recurring failure modes seen in this codebase:
 
@@ -197,20 +197,3 @@ Reject a change if any item below is true:
 - Keeps or adds a placeholder semantic path without hard failure.
 - Converts a defect test into a characterization test without explicit approval.
 - Updates expected outputs broadly instead of per-test root-cause updates.
-
-## Wall-of-Shame Escalation Protocol
-
-When working on an existing issue, if a newly discovered problem is meaningful
-enough to be logged in `WallOfShame.md`, interrupt the current task and apply
-this protocol immediately:
-
-1. Log the new issue in `WallOfShame.md` with evidence and `UNRESOLVED` status.
-2. Add a red-first regression test that captures the current wrong behavior.
-3. Commit current repository state immediately, even if the original task is partial.
-4. Resume the original task only after the new issue and failing test are recorded.
-
-Rationale:
-
-- Prevents hidden architectural debt from being silently carried forward.
-- Preserves root-cause visibility at discovery time.
-- Avoids long sessions that mix fixes with undocumented new regressions.
