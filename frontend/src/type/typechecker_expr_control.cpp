@@ -245,7 +245,7 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
         if (branch->kind != Expr::Kind::IntLiteral) return;
         if (branch_type->kind != Type::Kind::Primitive ||
             branch_type->primitive != PrimitiveType::Bool) return;
-        branch_type = Type::make_primitive(PrimitiveType::I8, branch->location);
+        branch_type = Type::make_primitive(PrimitiveType::Int, branch->location, 8);
         branch->type = branch_type;
     };
     coerce_bool_literal_branch(expr->true_expr, true_type);
@@ -264,6 +264,9 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
 
     if (primitive_family_match) {
         expr->type = unify_types(true_type, false_type);
+        if (!expr->type) {
+            throw CompileError("Conditional branches must be compatible in numeric family", expr->location);
+        }
         return expr->type;
     }
 
@@ -311,9 +314,9 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
         if (operand_type->array_size && operand_type->array_size->kind == Expr::Kind::IntLiteral) {
             count = operand_type->array_size->uint_val;
         }
-        if (count != static_cast<uint64_t>(type_bits(target_type->primitive))) {
+        if (count != static_cast<uint64_t>(type_bits(target_type->primitive, target_type->integer_bits))) {
             throw CompileError("Boolean array size mismatch for cast to #" +
-                               primitive_name(target_type->primitive), expr->location);
+                               primitive_name(target_type->primitive, target_type->integer_bits), expr->location);
         }
     }
 
@@ -524,6 +527,9 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
     }
 
     TypePtr elem_type = unify_types(start_type, end_type);
+    if (!elem_type) {
+        throw CompileError("Range bounds must have compatible numeric types", expr->location);
+    }
     uint64_t count = (start_val < end_val)
         ? static_cast<uint64_t>(end_val - start_val)
         : static_cast<uint64_t>(start_val - end_val);
@@ -534,7 +540,7 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
 
 TypePtr TypeChecker::check_length(ExprPtr expr) {
     check_expr(expr->operand);
-    expr->type = Type::make_primitive(PrimitiveType::I32, expr->location);
+    expr->type = Type::make_primitive(PrimitiveType::Int, expr->location, 32);
     return expr->type;
 }
 

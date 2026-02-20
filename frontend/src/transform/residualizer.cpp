@@ -5,6 +5,7 @@
 #include "expr_access.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace vexel {
 
@@ -74,6 +75,19 @@ bool expr_structurally_equal(const ExprPtr& a, const ExprPtr& b) {
         default:
             return false;
     }
+}
+
+bool reads_external_binding(const ExprPtr& expr) {
+    if (!expr) return false;
+    if (expr->kind == Expr::Kind::Identifier) {
+        const Symbol* sym = expr->resolved_symbol;
+        return sym && sym->is_external &&
+               (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
+    }
+    if (expr->kind == Expr::Kind::Member || expr->kind == Expr::Kind::Index) {
+        return reads_external_binding(expr->operand);
+    }
+    return false;
 }
 
 } // namespace
@@ -312,8 +326,9 @@ bool Residualizer::is_pure_expr(const ExprPtr& expr) const {
         case Expr::Kind::FloatLiteral:
         case Expr::Kind::StringLiteral:
         case Expr::Kind::CharLiteral:
+            return true;
         case Expr::Kind::Identifier:
-            return !expr->is_expr_param_ref;
+            return !expr->is_expr_param_ref && !reads_external_binding(expr);
         case Expr::Kind::Resource:
             return true;
 
@@ -329,6 +344,7 @@ bool Residualizer::is_pure_expr(const ExprPtr& expr) const {
         case Expr::Kind::Cast:
         case Expr::Kind::Length:
         case Expr::Kind::Member:
+            if (reads_external_binding(expr)) return false;
             return is_pure_expr(expr->operand);
 
         case Expr::Kind::Binary:
@@ -336,6 +352,7 @@ bool Residualizer::is_pure_expr(const ExprPtr& expr) const {
             return is_pure_expr(expr->left) && is_pure_expr(expr->right);
 
         case Expr::Kind::Index: {
+            if (reads_external_binding(expr)) return false;
             if (!is_pure_expr(expr->operand)) return false;
             for (const auto& arg : expr->args) {
                 if (!is_pure_expr(arg)) return false;
@@ -380,18 +397,56 @@ TypePtr Residualizer::expected_elem_type(TypePtr type) {
 }
 
 ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origin, TypePtr expected_type) const {
+    const SourceLocation value_loc = origin ? origin->location : SourceLocation();
+    TypePtr scalar_expected = expected_type;
+    if (!scalar_expected && origin && origin->kind == Expr::Kind::Identifier && origin->resolved_symbol) {
+        scalar_expected = origin->resolved_symbol->type;
+    }
+
+    auto make_signed_literal = [&](int64_t signed_value, const SourceLocation& loc) -> ExprPtr {
+        if (signed_value < 0) {
+            uint64_t magnitude = 0;
+            if (signed_value == std::numeric_limits<int64_t>::min()) {
+                magnitude = uint64_t(1) << 63;
+            } else {
+                magnitude = static_cast<uint64_t>(-signed_value);
+            }
+            ExprPtr magnitude_expr = Expr::make_uint(magnitude, loc, std::to_string(magnitude));
+            magnitude_expr->type = Type::make_primitive(PrimitiveType::UInt, loc, 64);
+            return Expr::make_unary("-", magnitude_expr, loc);
+        }
+        return Expr::make_int(signed_value, loc, std::to_string(signed_value));
+    };
+
     ExprPtr result;
     if (std::holds_alternative<int64_t>(value)) {
-        result = Expr::make_int(std::get<int64_t>(value), origin ? origin->location : SourceLocation());
+        result = make_signed_literal(std::get<int64_t>(value), value_loc);
     } else if (std::holds_alternative<uint64_t>(value)) {
-        result = Expr::make_uint(std::get<uint64_t>(value), origin ? origin->location : SourceLocation());
+        const uint64_t raw_value = std::get<uint64_t>(value);
+        if (scalar_expected &&
+            scalar_expected->kind == Type::Kind::Primitive &&
+            scalar_expected->primitive == PrimitiveType::Int &&
+            scalar_expected->integer_bits > 0 &&
+            scalar_expected->integer_bits <= 64) {
+            uint64_t raw = raw_value;
+            if (scalar_expected->integer_bits < 64) {
+                const uint64_t mask = (uint64_t(1) << scalar_expected->integer_bits) - 1u;
+                raw &= mask;
+                const uint64_t sign_bit = uint64_t(1) << (scalar_expected->integer_bits - 1u);
+                if (raw & sign_bit) {
+                    raw |= ~mask;
+                }
+            }
+            result = make_signed_literal(static_cast<int64_t>(raw), value_loc);
+        } else {
+            result = Expr::make_uint(raw_value, value_loc);
+        }
     } else if (std::holds_alternative<bool>(value)) {
-        result = Expr::make_uint(std::get<bool>(value) ? 1u : 0u,
-                                 origin ? origin->location : SourceLocation());
+        result = Expr::make_uint(std::get<bool>(value) ? 1u : 0u, value_loc);
     } else if (std::holds_alternative<double>(value)) {
-        result = Expr::make_float(std::get<double>(value), origin ? origin->location : SourceLocation());
+        result = Expr::make_float(std::get<double>(value), value_loc);
     } else if (std::holds_alternative<std::string>(value)) {
-        result = Expr::make_string(std::get<std::string>(value), origin ? origin->location : SourceLocation());
+        result = Expr::make_string(std::get<std::string>(value), value_loc);
     } else if (std::holds_alternative<std::shared_ptr<CTArray>>(value)) {
         auto array = std::get<std::shared_ptr<CTArray>>(value);
         if (!array) return nullptr;
@@ -406,7 +461,7 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
             }
             elems.push_back(elem_expr);
         }
-        result = Expr::make_array(std::move(elems), origin ? origin->location : SourceLocation());
+        result = Expr::make_array(std::move(elems), value_loc);
     } else if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) {
         auto comp = std::get<std::shared_ptr<CTComposite>>(value);
         if (!comp) return nullptr;
@@ -477,10 +532,10 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
         }
 
         if (is_tuple || comp->type_name.empty()) {
-            result = Expr::make_tuple(std::move(elems), origin ? origin->location : SourceLocation());
+            result = Expr::make_tuple(std::move(elems), value_loc);
         } else {
-            ExprPtr callee = Expr::make_identifier(comp->type_name, origin ? origin->location : SourceLocation());
-            result = Expr::make_call(callee, std::move(elems), origin ? origin->location : SourceLocation());
+            ExprPtr callee = Expr::make_identifier(comp->type_name, value_loc);
+            result = Expr::make_call(callee, std::move(elems), value_loc);
         }
     } else {
         return nullptr;
@@ -491,6 +546,19 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
         result->type = expected_type;
     } else if (origin) {
         result->type = origin->type;
+    }
+    if (!result->type) {
+        if (std::holds_alternative<int64_t>(value)) {
+            result->type = Type::make_primitive(PrimitiveType::Int, value_loc, 64);
+        } else if (std::holds_alternative<uint64_t>(value)) {
+            result->type = Type::make_primitive(PrimitiveType::UInt, value_loc, 64);
+        } else if (std::holds_alternative<bool>(value)) {
+            result->type = Type::make_primitive(PrimitiveType::Bool, value_loc);
+        } else if (std::holds_alternative<double>(value)) {
+            result->type = Type::make_primitive(PrimitiveType::F64, value_loc);
+        } else if (std::holds_alternative<std::string>(value)) {
+            result->type = Type::make_primitive(PrimitiveType::String, value_loc);
+        }
     }
     return result;
 }

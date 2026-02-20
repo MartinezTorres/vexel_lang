@@ -12,6 +12,7 @@
 #include <tuple>
 #include <sstream>
 #include <deque>
+#include <optional>
 
 namespace {
 std::string escape_c_string(const std::string& input) {
@@ -44,6 +45,19 @@ std::string escape_c_string(const std::string& input) {
         }
     }
     return oss.str();
+}
+
+std::optional<std::string> backend_bound_address_from_annotations(const std::vector<vexel::Annotation>& annotations) {
+    for (const auto& ann : annotations) {
+        if (ann.name != "addr" && ann.name != "address") {
+            continue;
+        }
+        if (ann.args.size() != 1) {
+            throw vexel::CompileError("C backend: [[" + ann.name + "]] requires exactly one argument", ann.location);
+        }
+        return ann.args.front();
+    }
+    return std::nullopt;
 }
 
 }
@@ -1396,6 +1410,31 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
         }
     }
     std::string mutability = mutability_prefix(stmt);
+
+    if (stmt->var_linkage != VarLinkageKind::Normal) {
+        if (stmt->var_linkage == VarLinkageKind::ExternalSymbol) {
+            if (is_local) {
+                throw CompileError("C backend does not support local '!' external variables; use top-level declarations", stmt->location);
+            }
+            emit("extern " + vtype + " " + mangle_name(var_name) + ";");
+            finalize();
+            return;
+        }
+        auto addr = backend_bound_address_from_annotations(stmt->annotations);
+        if (!addr.has_value()) {
+            throw CompileError("C backend: backend-bound variable '" + stmt->var_name +
+                               "' requires [[addr(...)]] or [[address(...)]] annotation", stmt->location);
+        }
+        if (is_local) {
+            emit("volatile " + vtype + "* const " + mangle_name(var_name) +
+                 "__ptr = (volatile " + vtype + "*)(uintptr_t)(" + addr.value() + ");");
+        } else {
+            emit("#define " + mangle_name(var_name) + " (*((volatile " + vtype + "*)(uintptr_t)(" + addr.value() + ")))");
+        }
+        finalize();
+        return;
+    }
+
     if (stmt->var_init) {
         // Special handling for array literals and ranges
             if (stmt->var_type && stmt->var_type->kind == Type::Kind::Array &&
@@ -1479,27 +1518,22 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     // For integer types, ensure the value is in range for C
                     // Apply wrapping if needed
                     if (stmt->var_type && stmt->var_type->kind == Type::Kind::Primitive) {
-                        switch (stmt->var_type->primitive) {
-                            case PrimitiveType::I8:
-                                val = static_cast<int8_t>(val);
-                                break;
-                            case PrimitiveType::I16:
-                                val = static_cast<int16_t>(val);
-                                break;
-                            case PrimitiveType::I32:
-                                val = static_cast<int32_t>(val);
-                                break;
-                            case PrimitiveType::U8:
-                                val = static_cast<uint8_t>(val);
-                                break;
-                            case PrimitiveType::U16:
-                                val = static_cast<uint16_t>(val);
-                                break;
-                            case PrimitiveType::U32:
-                                val = static_cast<uint32_t>(val);
-                                break;
-                            default:
-                                break;
+                        if (stmt->var_type->primitive == PrimitiveType::Int &&
+                            stmt->var_type->integer_bits > 0 &&
+                            stmt->var_type->integer_bits < 64) {
+                            uint64_t raw = static_cast<uint64_t>(val) &
+                                           ((uint64_t(1) << stmt->var_type->integer_bits) - 1u);
+                            const uint64_t sign_bit = uint64_t(1) << (stmt->var_type->integer_bits - 1u);
+                            if (raw & sign_bit) {
+                                raw |= ~((uint64_t(1) << stmt->var_type->integer_bits) - 1u);
+                            }
+                            val = static_cast<int64_t>(raw);
+                        } else if (stmt->var_type->primitive == PrimitiveType::UInt &&
+                                   stmt->var_type->integer_bits > 0 &&
+                                   stmt->var_type->integer_bits < 64) {
+                            uint64_t wrapped = static_cast<uint64_t>(val) &
+                                               ((uint64_t(1) << stmt->var_type->integer_bits) - 1u);
+                            val = static_cast<int64_t>(wrapped);
                         }
                     }
                     init_val = std::to_string(val);
@@ -1507,18 +1541,14 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                     uint64_t val = std::get<uint64_t>(result);
                     // Apply wrapping for smaller unsigned types
                     if (stmt->var_type && stmt->var_type->kind == Type::Kind::Primitive) {
-                        switch (stmt->var_type->primitive) {
-                            case PrimitiveType::U8:
-                                val = static_cast<uint8_t>(val);
-                                break;
-                            case PrimitiveType::U16:
-                                val = static_cast<uint16_t>(val);
-                                break;
-                            case PrimitiveType::U32:
-                                val = static_cast<uint32_t>(val);
-                                break;
-                            default:
-                                break;
+                        if (stmt->var_type->primitive == PrimitiveType::UInt &&
+                            stmt->var_type->integer_bits > 0 &&
+                            stmt->var_type->integer_bits < 64) {
+                            val &= ((uint64_t(1) << stmt->var_type->integer_bits) - 1u);
+                        } else if (stmt->var_type->primitive == PrimitiveType::Int &&
+                                   stmt->var_type->integer_bits > 0 &&
+                                   stmt->var_type->integer_bits < 64) {
+                            val &= ((uint64_t(1) << stmt->var_type->integer_bits) - 1u);
                         }
                     }
                     init_val = std::to_string(val);

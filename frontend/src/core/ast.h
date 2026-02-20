@@ -19,6 +19,12 @@ struct Annotation {
     SourceLocation location;
 };
 
+enum class VarLinkageKind {
+    Normal,
+    ExternalSymbol,
+    BackendBound
+};
+
 struct Type {
     enum class Kind { Primitive, Array, Named, TypeVar, TypeOf };
     Kind kind;
@@ -27,6 +33,7 @@ struct Type {
 
     // For Primitive
     PrimitiveType primitive;
+    uint64_t integer_bits = 0;
     // For Array
     TypePtr element_type;
     ExprPtr array_size;
@@ -37,7 +44,9 @@ struct Type {
     // For TypeOf
     ExprPtr typeof_expr;
 
-    static TypePtr make_primitive(PrimitiveType p, const SourceLocation& loc = SourceLocation());
+    static TypePtr make_primitive(PrimitiveType p,
+                                  const SourceLocation& loc = SourceLocation(),
+                                  uint64_t int_bits = 0);
     static TypePtr make_array(TypePtr elem, ExprPtr size, const SourceLocation& loc = SourceLocation());
     static TypePtr make_named(const std::string& name, const SourceLocation& loc = SourceLocation());
     static TypePtr make_typevar(const std::string& name, const SourceLocation& loc = SourceLocation());
@@ -181,6 +190,7 @@ struct Stmt {
     TypePtr var_type;
     ExprPtr var_init;
     bool is_mutable;
+    VarLinkageKind var_linkage = VarLinkageKind::Normal;
 
     // FuncDecl
     std::string func_name;
@@ -213,7 +223,8 @@ struct Stmt {
     static StmtPtr make_continue(const SourceLocation& loc = SourceLocation());
     static StmtPtr make_var(const std::string& name, TypePtr type, ExprPtr init, bool mut,
                             const SourceLocation& loc = SourceLocation(),
-                            bool exported = false);
+                            bool exported = false,
+                            VarLinkageKind linkage = VarLinkageKind::Normal);
     static StmtPtr make_func(const std::string& name, std::vector<Parameter> params, std::vector<std::string> ref_params,
                              TypePtr ret, ExprPtr body, bool external, bool exported, const SourceLocation& loc = SourceLocation(),
                              const std::string& type_ns = "", const std::vector<TypePtr>& ret_types = {});

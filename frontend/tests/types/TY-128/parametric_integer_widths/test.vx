@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Parametric integer primitives #iN/#uN are accepted with arbitrary positive widths. | Parametric integer widths type-check and execute
+
+&^main() -> #i32 {
+    a:#u13 = 4095;
+    b:#i27 = -12345;
+    c:#u5 = 17;
+    (#i32)a + (#i32)b + (#i32)c + 12345
+}

@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Literal assignment must respect explicit parametric integer width bounds. | Overflowing literal assignment to #uN is rejected
+
+&^main() -> #i32 {
+    x:#u3 = 8;
+    (#i32)x
+}

@@ -1,0 +1,9 @@
+// @rfc: backends/c/README.md#target--abi
+// @desc: C backend supports integer ABI widths 8/16/32/64 only. | Unsupported #uN widths are rejected with a clear backend diagnostic
+// @expect-exit: 1
+// @expect-stderr: C backend supports unsigned integer widths 8/16/32/64 only
+// @command: {VEXEL} -b c test.vx
+
+&^main() -> #u13 {
+    7
+}

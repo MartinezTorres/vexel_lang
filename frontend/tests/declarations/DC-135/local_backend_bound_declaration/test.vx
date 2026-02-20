@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Local backend-bound declarations use `!!` and remain available to backend-specific lowering. | Local backend-bound declaration syntax compiles
+
+&^main() -> #i32 {
+    [[addr(0x4000)]]
+    !!reg:#u8;
+    reg = 7;
+    (#i32)reg
+}

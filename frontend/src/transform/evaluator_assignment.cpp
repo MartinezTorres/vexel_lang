@@ -34,6 +34,13 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         Symbol* sym = type_checker && type_checker->get_scope()
             ? type_checker->get_scope()->lookup(base)
             : nullptr;
+        if (!creates_local_identifier &&
+            sym &&
+            sym->is_external &&
+            (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
+            error_msg = "External binding cannot be written at compile time: " + base;
+            return false;
+        }
         if (!creates_local_identifier && sym && !sym->is_mutable && !is_local(base)) {
             error_msg = "Cannot assign to immutable constant: " + base;
             return false;

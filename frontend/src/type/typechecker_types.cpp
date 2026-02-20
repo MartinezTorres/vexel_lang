@@ -1,20 +1,35 @@
 #include "typechecker.h"
 #include "evaluator.h"
 #include "constants.h"
+#include <cctype>
 #include <limits>
 
 namespace vexel {
 
 TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const SourceLocation& loc) {
     // Parse primitive types
-    if (type_str == "i8") return Type::make_primitive(PrimitiveType::I8, loc);
-    if (type_str == "i16") return Type::make_primitive(PrimitiveType::I16, loc);
-    if (type_str == "i32") return Type::make_primitive(PrimitiveType::I32, loc);
-    if (type_str == "i64") return Type::make_primitive(PrimitiveType::I64, loc);
-    if (type_str == "u8") return Type::make_primitive(PrimitiveType::U8, loc);
-    if (type_str == "u16") return Type::make_primitive(PrimitiveType::U16, loc);
-    if (type_str == "u32") return Type::make_primitive(PrimitiveType::U32, loc);
-    if (type_str == "u64") return Type::make_primitive(PrimitiveType::U64, loc);
+    auto parse_int_family = [&](char prefix, PrimitiveType kind) -> TypePtr {
+        if (type_str.size() < 2 || type_str[0] != prefix) return nullptr;
+        for (size_t i = 1; i < type_str.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(type_str[i]))) {
+                return nullptr;
+            }
+        }
+        uint64_t bits = 0;
+        try {
+            bits = std::stoull(type_str.substr(1));
+        } catch (const std::exception&) {
+            throw CompileError("Invalid integer width in type '#" + type_str + "'", loc);
+        }
+        if (bits == 0) {
+            throw CompileError("Integer width must be greater than zero in type '#" + type_str + "'", loc);
+        }
+        return Type::make_primitive(kind, loc, bits);
+    };
+
+    if (auto int_type = parse_int_family('i', PrimitiveType::Int)) return int_type;
+    if (auto uint_type = parse_int_family('u', PrimitiveType::UInt)) return uint_type;
+    if (type_str == "f16") return Type::make_primitive(PrimitiveType::F16, loc);
     if (type_str == "f32") return Type::make_primitive(PrimitiveType::F32, loc);
     if (type_str == "f64") return Type::make_primitive(PrimitiveType::F64, loc);
     if (type_str == "b") return Type::make_primitive(PrimitiveType::Bool, loc);

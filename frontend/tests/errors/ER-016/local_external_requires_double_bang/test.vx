@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Local external declarations must use `!!`; single-bang `!` is top-level-only. | Local `!name:#T;` is rejected
+
+&^main() -> #i32 {
+    !port:#u8;
+    0
+}

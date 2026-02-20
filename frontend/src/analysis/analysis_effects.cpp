@@ -71,6 +71,16 @@ void Analyzer::analyze_effects(const Module& /*mod*/, AnalysisFacts& facts) {
             func->body,
             [&](ExprPtr expr) {
                 if (!expr) return;
+                if (expr->kind == Expr::Kind::Identifier ||
+                    expr->kind == Expr::Kind::Member ||
+                    expr->kind == Expr::Kind::Index) {
+                    auto base = base_identifier_symbol(expr);
+                    if (base &&
+                        (*base)->is_external &&
+                        ((*base)->kind == Symbol::Kind::Variable || (*base)->kind == Symbol::Kind::Constant)) {
+                        direct_impure = true;
+                    }
+                }
                 if (expr->kind == Expr::Kind::Assignment) {
                     if (expr->creates_new_variable &&
                         expr->left && expr->left->kind == Expr::Kind::Identifier) {

@@ -1,6 +1,9 @@
 #include "parser.h"
 #include "constants.h"
 
+#include <cctype>
+#include <limits>
+
 namespace vexel {
 
 Parser::Parser(std::vector<Token> toks)
@@ -45,6 +48,7 @@ void Parser::synchronize() {
                 case TokenType::Hash:
                 case TokenType::DoubleColon:
                 case TokenType::Identifier:
+                case TokenType::LogicalNot:
                     // Valid statement start, we're synchronized
                     return;
                 default:
@@ -60,6 +64,7 @@ void Parser::synchronize() {
                 case TokenType::AmpersandCaret:
                 case TokenType::Hash:
                 case TokenType::DoubleColon:
+                case TokenType::LogicalNot:
                     return;
                 default:
                     pos++;
@@ -128,6 +133,7 @@ bool Parser::token_starts_statement(TokenType type) const {
         case TokenType::Hash:
         case TokenType::Ampersand:
         case TokenType::DoubleColon:
+        case TokenType::LogicalNot:
             return true;
         default:
             return token_starts_expression(type);
@@ -142,11 +148,103 @@ bool Parser::token_starts_top_level(TokenType type) const {
         case TokenType::Hash:
         case TokenType::DoubleColon:
         case TokenType::BitXor:
+        case TokenType::LogicalNot:
         case TokenType::Identifier:
             return true;
         default:
             return false;
     }
+}
+
+bool Parser::looks_like_var_decl_with_linkage(bool allow_double_bang_local) const {
+    size_t cursor = pos;
+
+    if (cursor < tokens.size() && tokens[cursor].type == TokenType::BitXor) {
+        cursor++;
+    }
+
+    VarLinkageKind linkage = VarLinkageKind::Normal;
+    if (cursor < tokens.size() && tokens[cursor].type == TokenType::LogicalNot) {
+        cursor++;
+        if (cursor < tokens.size() && tokens[cursor].type == TokenType::LogicalNot) {
+            linkage = VarLinkageKind::BackendBound;
+            cursor++;
+        } else {
+            linkage = VarLinkageKind::ExternalSymbol;
+            if (allow_double_bang_local) {
+                return false;
+            }
+        }
+    }
+
+    if (cursor >= tokens.size() || tokens[cursor].type != TokenType::Identifier) {
+        return false;
+    }
+    cursor++;
+
+    if (cursor >= tokens.size()) return false;
+    const TokenType next = tokens[cursor].type;
+    const bool typed = next == TokenType::Colon || next == TokenType::Hash || next == TokenType::LeftBracket;
+    if (!typed && next != TokenType::Assign && next != TokenType::Semicolon) {
+        return false;
+    }
+
+    if (linkage != VarLinkageKind::Normal && !typed) {
+        return false;
+    }
+
+    return true;
+}
+
+StmtPtr Parser::parse_var_decl(bool allow_double_bang_local) {
+    SourceLocation loc = current().location;
+    bool is_exported = match(TokenType::BitXor);
+
+    VarLinkageKind linkage = VarLinkageKind::Normal;
+    if (match(TokenType::LogicalNot)) {
+        if (match(TokenType::LogicalNot)) {
+            linkage = VarLinkageKind::BackendBound;
+        } else {
+            linkage = VarLinkageKind::ExternalSymbol;
+            if (allow_double_bang_local) {
+                throw CompileError("Local external declarations must use '!!'", loc);
+            }
+        }
+    }
+
+    if (is_exported && linkage != VarLinkageKind::Normal) {
+        throw CompileError("Declarations cannot be both exported and external", loc);
+    }
+
+    std::string name = consume(TokenType::Identifier, "Expected variable name").lexeme;
+
+    TypePtr type = nullptr;
+    if (match(TokenType::Colon)) {
+        type = parse_type();
+    } else if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
+        type = parse_type();
+    }
+
+    ExprPtr init = nullptr;
+    if (match(TokenType::Assign)) {
+        init = parse_expr();
+    }
+
+    if (linkage != VarLinkageKind::Normal) {
+        if (!type) {
+            throw CompileError("External declaration '" + name + "' must include a type annotation", loc);
+        }
+        if (init) {
+            throw CompileError("External declaration '" + name + "' cannot have an initializer", loc);
+        }
+    }
+
+    if (!type && !init) {
+        throw CompileError("Global declaration without initializer must have type annotation", loc);
+    }
+
+    bool is_mut = linkage != VarLinkageKind::Normal || (!init && type);
+    return Stmt::make_var(name, type, init, is_mut, loc, is_exported, linkage);
 }
 
 bool Parser::token_starts_annotation_target(TokenType type, AnnotationContext context) const {
@@ -365,6 +463,9 @@ StmtPtr Parser::parse_top_level() {
     if (t == TokenType::DoubleColon) {
         return parse_import();
     }
+    if (t == TokenType::LogicalNot || t == TokenType::BitXor || t == TokenType::Identifier) {
+        return parse_global();
+    }
     return parse_global();
 }
 
@@ -541,28 +642,7 @@ StmtPtr Parser::parse_import() {
 }
 
 StmtPtr Parser::parse_global() {
-    SourceLocation loc = current().location;
-    bool is_exported = match(TokenType::BitXor);
-    std::string name = consume(TokenType::Identifier, "Expected variable name").lexeme;
-
-    TypePtr type = nullptr;
-    if (match(TokenType::Colon)) {
-        type = parse_type();
-    } else if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
-        type = parse_type();
-    }
-
-    ExprPtr init = nullptr;
-    if (match(TokenType::Assign)) {
-        init = parse_expr();
-    }
-
-    if (!type && !init) {
-        throw CompileError("Global declaration without initializer must have type annotation", loc);
-    }
-
-    bool is_mut = (!init && type);
-    return Stmt::make_var(name, type, init, is_mut, loc, is_exported);
+    return parse_var_decl(false);
 }
 
 StmtPtr Parser::parse_stmt() {
@@ -613,6 +693,13 @@ StmtPtr Parser::parse_stmt_no_semi() {
 
     if (check(TokenType::Ampersand)) {
         return parse_func_decl();
+    }
+
+    // Local linkage declarations use parse_var_decl so `!name:#T;` can emit a
+    // direct diagnostic while `!!name:#T;` remains valid.
+    if (check(TokenType::LogicalNot) &&
+        looks_like_var_decl_with_linkage(false)) {
+        return parse_var_decl(true);
     }
 
     // Check for multi-assignment: a, b, c = expr
@@ -1301,18 +1388,41 @@ TypePtr Parser::parse_type() {
         std::string name = consume(TokenType::Identifier, "Expected type name").lexeme;
 
         // Check for primitive types
-        static std::unordered_map<std::string, PrimitiveType> primitives = {
-            {"i8", PrimitiveType::I8}, {"i16", PrimitiveType::I16},
-            {"i32", PrimitiveType::I32}, {"i64", PrimitiveType::I64},
-            {"u8", PrimitiveType::U8}, {"u16", PrimitiveType::U16},
-            {"u32", PrimitiveType::U32}, {"u64", PrimitiveType::U64},
-            {"f32", PrimitiveType::F32}, {"f64", PrimitiveType::F64},
-            {"b", PrimitiveType::Bool}, {"s", PrimitiveType::String}
+        auto parse_integer_primitive = [&](char prefix, PrimitiveType primitive_kind) -> TypePtr {
+            if (name.size() < 2 || name[0] != prefix) {
+                return nullptr;
+            }
+            for (size_t i = 1; i < name.size(); ++i) {
+                if (!std::isdigit(static_cast<unsigned char>(name[i]))) {
+                    return nullptr;
+                }
+            }
+            uint64_t bits = 0;
+            try {
+                bits = std::stoull(name.substr(1));
+            } catch (const std::exception&) {
+                throw CompileError("Invalid integer width in type '#" + name + "'", loc);
+            }
+            if (bits == 0) {
+                throw CompileError("Integer width must be greater than zero in type '#" + name + "'", loc);
+            }
+            return Type::make_primitive(primitive_kind, loc, bits);
         };
 
-        auto it = primitives.find(name);
-        if (it != primitives.end()) {
-            type = Type::make_primitive(it->second, loc);
+        if (name == "b") {
+            type = Type::make_primitive(PrimitiveType::Bool, loc);
+        } else if (name == "s") {
+            type = Type::make_primitive(PrimitiveType::String, loc);
+        } else if (name == "f16") {
+            type = Type::make_primitive(PrimitiveType::F16, loc);
+        } else if (name == "f32") {
+            type = Type::make_primitive(PrimitiveType::F32, loc);
+        } else if (name == "f64") {
+            type = Type::make_primitive(PrimitiveType::F64, loc);
+        } else if (auto i_type = parse_integer_primitive('i', PrimitiveType::Int)) {
+            type = i_type;
+        } else if (auto u_type = parse_integer_primitive('u', PrimitiveType::UInt)) {
+            type = u_type;
         } else {
             type = Type::make_named(name, loc);
         }

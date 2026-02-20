@@ -1,0 +1,15 @@
+// @rfc: backends/c/README.md#globals--data
+// @desc: C backend lowers `!` as extern symbols and `!!` as address-backed lvalues (top-level and local). | External/backend-bound globals emit expected C forms
+// @command: {VEXEL} -b c test.vx && rg -n "^extern uint8_t vx_PORT;" out.c && rg -n "^#define vx_CTRL .*0x4001" out.c && rg -n "volatile uint8_t\* const vx_data__ptr = \(volatile uint8_t\*\)\(uintptr_t\)\(0x4002\);" out.c
+
+!PORT:#u8;
+
+[[addr(0x4001)]]
+!!CTRL:#u8;
+
+&^main() -> #i32 {
+    [[addr(0x4002)]]
+    !!data:#u8;
+    data = CTRL;
+    (#i32)data + (#i32)PORT
+}

@@ -12,6 +12,7 @@ struct Symbol {
     TypePtr type = nullptr;
     bool is_mutable = false;
     bool is_external = false;
+    bool is_backend_bound = false;
     bool is_exported = false;
     StmtPtr declaration = nullptr;
     int module_id = -1;

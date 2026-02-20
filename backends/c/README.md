@@ -20,7 +20,11 @@ Source-of-truth integration points:
 
 ## Target & ABI
 - Target: portable C output for host C11 toolchains.
-- Integer widths in generated code: `i8/u8 → int8_t/uint8_t`, `i16/u16 → int16_t/uint16_t`, `i32/u32 → int32_t/uint32_t`, `i64/u64 → int64_t/uint64_t`.
+- Frontend integers are parametric (`#iN`/`#uN`), but this backend currently accepts ABI/codegen widths 8/16/32/64 only:
+  - `i8/u8 → int8_t/uint8_t`
+  - `i16/u16 → int16_t/uint16_t`
+  - `i32/u32 → int32_t/uint32_t`
+  - `i64/u64 → int64_t/uint64_t`
 - Floats: `f32 → float`, `f64 → double`.
 - Bool: `_Bool`.
 - Pointers: emitted as native C pointers for the host toolchain.
@@ -58,6 +62,11 @@ Source-of-truth integration points:
 - Non-exported globals emit as `static` in the `.c` file.
 - Exported immutable globals (`^name = ...`) emit as `const` with external linkage and are declared in the generated header.
 - Exported globals must be compile-time constants (enforced in the frontend).
+- `!name:#T;` lowers as `extern` symbol declarations (top-level only).
+- `!!name:#T;` lowers as address-backed lvalues:
+  - top-level: emitted as `#define` address dereference
+  - local scope: emitted as `volatile <T>* const <name>__ptr` and dereferenced on use
+  - both forms require `[[addr(...)]]`/`[[address(...)]]` backend hints
 - Strings and read-only data are placed in `.rodata` via `const`.
 - No per-backend runtime state beyond standard C.
 - The C output annotates variables with `VX_MUTABLE`, `VX_NON_MUTABLE`, and `VX_CONSTEXPR` for visibility. Defaults live in the generated header (`VX_MUTABLE` empty, others `const`) and can be overridden before inclusion.

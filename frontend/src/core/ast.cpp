@@ -4,10 +4,11 @@
 namespace vexel {
 
 // Type factory methods
-TypePtr Type::make_primitive(PrimitiveType p, const SourceLocation& loc) {
+TypePtr Type::make_primitive(PrimitiveType p, const SourceLocation& loc, uint64_t int_bits) {
     auto t = std::make_shared<Type>();
     t->kind = Kind::Primitive;
     t->primitive = p;
+    t->integer_bits = int_bits;
     t->location = loc;
     return t;
 }
@@ -49,7 +50,7 @@ std::string Type::to_string() const {
     std::ostringstream os;
     switch (kind) {
         case Kind::Primitive:
-            os << primitive_name(primitive);
+            os << primitive_name(primitive, integer_bits);
             break;
         case Kind::Array:
             os << element_type->to_string() << "[...]";
@@ -309,7 +310,8 @@ StmtPtr Stmt::make_var(const std::string& name,
                        ExprPtr init,
                        bool mut,
                        const SourceLocation& loc,
-                       bool exported) {
+                       bool exported,
+                       VarLinkageKind linkage) {
     auto s = std::make_shared<Stmt>();
     s->kind = Kind::VarDecl;
     s->var_name = name;
@@ -317,6 +319,7 @@ StmtPtr Stmt::make_var(const std::string& name,
     s->var_init = init;
     s->is_mutable = mut;
     s->is_exported = exported;
+    s->var_linkage = linkage;
     s->location = loc;
     return s;
 }

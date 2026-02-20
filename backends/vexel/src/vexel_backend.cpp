@@ -84,7 +84,7 @@ private:
         if (!type) return "#T";
         switch (type->kind) {
             case Type::Kind::Primitive:
-                return "#" + primitive_name(type->primitive);
+                return "#" + primitive_name(type->primitive, type->integer_bits);
             case Type::Kind::Named:
                 return "#" + type->type_name;
             case Type::Kind::TypeVar:
@@ -184,6 +184,11 @@ private:
                 out << indent(level);
                 if (stmt->is_exported) {
                     out << "^";
+                }
+                if (stmt->var_linkage == VarLinkageKind::ExternalSymbol) {
+                    out << "!";
+                } else if (stmt->var_linkage == VarLinkageKind::BackendBound) {
+                    out << "!!";
                 }
                 out << stmt->var_name;
                 if (stmt->var_type) {

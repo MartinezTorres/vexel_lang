@@ -393,6 +393,7 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
 void TypeChecker::check_var_decl(StmtPtr stmt) {
     TypePtr type = stmt->var_type;
     bool constexpr_init = false;
+    const bool is_external_binding = stmt->var_linkage != VarLinkageKind::Normal;
     if (stmt->var_init) {
         TypePtr init_type = check_expr(stmt->var_init);
         if (!type) {
@@ -415,7 +416,10 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     }
 
     bool inferred_mutable = stmt->is_mutable;
-    if (!sym->is_local && !inferred_mutable) {
+    if (is_external_binding) {
+        inferred_mutable = true;
+        stmt->is_mutable = true;
+    } else if (!sym->is_local && !inferred_mutable) {
         if (stmt->var_init) {
             CTValue result;
             constexpr_init = try_evaluate_constexpr(stmt->var_init, result);
@@ -448,6 +452,8 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     sym->kind = inferred_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant;
     sym->type = type;
     sym->is_mutable = inferred_mutable;
+    sym->is_external = is_external_binding;
+    sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
     sym->declaration = stmt;
 
     if (sym->is_local) {

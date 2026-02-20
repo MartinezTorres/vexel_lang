@@ -321,12 +321,17 @@
         <h3>1) Program shape and ABI boundaries</h3>
         <p>
           Function declarations use <code>&amp;</code>. Entry points/exports use <code>&amp;^</code>.
-          External imports use <code>&amp;!</code>.
+          External function imports use <code>&amp;!</code>. Global imports use <code>!</code> (external symbol)
+          or <code>!!</code> (backend-bound binding).
         </p>
         <pre><code>&amp;!putchar(c:#u8);
+!PORT:#u8;
+[[addr(0x4000)]]
+!!CTRL:#u8;
 
 &amp;print_char(c:#u8) {
-  putchar(c)
+  putchar(c);
+  CTRL = PORT
 }
 
 &amp;^main() -&gt; #i32 {
@@ -338,12 +343,12 @@
       <div class="tutorial-step">
         <h3>2) Types, literals, and declarations</h3>
         <p>
-          Primitive types are explicit (<code>#b</code>, <code>#i32</code>, <code>#u16</code>, <code>#f32</code>, <code>#s</code>).
-          Literal typing follows smallest-fitting rules.
+          Primitive types are explicit (<code>#b</code>, <code>#iN</code>, <code>#uN</code>, <code>#f16/#f32/#f64</code>, <code>#s</code>).
+          Frontend accepts any positive integer width; backends can support subsets (for C/megalinker: 8/16/32/64).
         </p>
         <pre><code>flag:#b = 1;
-count:#i32 = -10;
-size:#u16 = 65535;
+count:#i27 = -10;
+size:#u13 = 4095;
 name:#s = "Vexel";
 bytes:#u8[4] = [1, 2, 3, 4];</code></pre>
         <p>
@@ -424,6 +429,7 @@ dead:#i32 = mul(9, 9);
           <li><code>[[nonreentrant]]</code>: recognized by C and megalinker on ABI boundaries.</li>
           <li><code>[[nonbanked]]</code>: recognized by megalinker for global placement.</li>
           <li><code>[[sdcccall(0)]]</code> / <code>[[sdcccall(1)]]</code>: recognized by megalinker on <code>&amp;!</code> and <code>&amp;^</code>.</li>
+          <li><code>[[addr(...)]]</code> / <code>[[address(...)]]</code>: recognized by C and megalinker for <code>!!</code> bindings.</li>
         </ul>
       </div>
 

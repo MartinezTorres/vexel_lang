@@ -47,22 +47,38 @@ std::string CodeGenerator::gen_type(TypePtr type) {
     if (!type) return "void";
 
     switch (type->kind) {
-        case Type::Kind::Primitive:
+        case Type::Kind::Primitive: {
             switch (type->primitive) {
-                case PrimitiveType::I8: return "int8_t";
-                case PrimitiveType::I16: return "int16_t";
-                case PrimitiveType::I32: return "int32_t";
-                case PrimitiveType::I64: return "int64_t";
-                case PrimitiveType::U8: return "uint8_t";
-                case PrimitiveType::U16: return "uint16_t";
-                case PrimitiveType::U32: return "uint32_t";
-                case PrimitiveType::U64: return "uint64_t";
+                case PrimitiveType::Int:
+                    switch (type->integer_bits) {
+                        case 8: return "int8_t";
+                        case 16: return "int16_t";
+                        case 32: return "int32_t";
+                        case 64: return "int64_t";
+                        default:
+                            throw CompileError("C backend supports signed integer widths 8/16/32/64 only (found #" +
+                                               primitive_name(type->primitive, type->integer_bits) + ")",
+                                               type->location);
+                    }
+                case PrimitiveType::UInt:
+                    switch (type->integer_bits) {
+                        case 8: return "uint8_t";
+                        case 16: return "uint16_t";
+                        case 32: return "uint32_t";
+                        case 64: return "uint64_t";
+                        default:
+                            throw CompileError("C backend supports unsigned integer widths 8/16/32/64 only (found #" +
+                                               primitive_name(type->primitive, type->integer_bits) + ")",
+                                               type->location);
+                    }
+                case PrimitiveType::F16: return "_Float16";
                 case PrimitiveType::F32: return "float";
                 case PrimitiveType::F64: return "double";
                 case PrimitiveType::Bool: return "_Bool";
                 case PrimitiveType::String: return "const char*";
             }
             break;
+        }
 
         case Type::Kind::Array: {
             std::string elem = gen_type(type->element_type);

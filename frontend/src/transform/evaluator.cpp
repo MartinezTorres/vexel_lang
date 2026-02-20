@@ -195,6 +195,11 @@ bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
         return false;
     }
 
+    if (stmt->var_linkage != VarLinkageKind::Normal) {
+        // External/bound variables are runtime-only storage locations.
+        return true;
+    }
+
     if (!stmt->var_type) {
         uninitialized_locals.insert(stmt->var_name);
         return true;
@@ -567,6 +572,13 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
         expr->resolved_symbol = sym;
     }
 
+    if (sym &&
+        sym->is_external &&
+        (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
+        error_msg = "External binding cannot be read at compile time: " + expr->name;
+        return false;
+    }
+
     auto it = constants.find(expr->name);
     if (it != constants.end()) {
         if (std::holds_alternative<CTUninitialized>(it->second)) {
@@ -771,18 +783,45 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
 
     if (target_type->kind == Type::Kind::Primitive) {
         switch (target_type->primitive) {
-            case PrimitiveType::I8:
-            case PrimitiveType::I16:
-            case PrimitiveType::I32:
-            case PrimitiveType::I64:
-                output = to_int(input);
+            case PrimitiveType::Int: {
+                if (target_type->integer_bits == 0) {
+                    error_msg = "Signed integer target type is missing width";
+                    return false;
+                }
+                if (target_type->integer_bits > 64) {
+                    error_msg = "Compile-time integer coercion supports signed widths up to 64 bits";
+                    return false;
+                }
+                int64_t casted = to_int(input);
+                if (target_type->integer_bits < 64) {
+                    uint64_t raw = static_cast<uint64_t>(casted) &
+                                   ((uint64_t(1) << target_type->integer_bits) - 1u);
+                    const uint64_t sign_bit = uint64_t(1) << (target_type->integer_bits - 1u);
+                    if (raw & sign_bit) {
+                        raw |= ~((uint64_t(1) << target_type->integer_bits) - 1u);
+                    }
+                    casted = static_cast<int64_t>(raw);
+                }
+                output = casted;
                 return true;
-            case PrimitiveType::U8:
-            case PrimitiveType::U16:
-            case PrimitiveType::U32:
-            case PrimitiveType::U64:
-                output = static_cast<uint64_t>(to_int(input));
+            }
+            case PrimitiveType::UInt: {
+                if (target_type->integer_bits == 0) {
+                    error_msg = "Unsigned integer target type is missing width";
+                    return false;
+                }
+                if (target_type->integer_bits > 64) {
+                    error_msg = "Compile-time integer coercion supports unsigned widths up to 64 bits";
+                    return false;
+                }
+                uint64_t casted = static_cast<uint64_t>(to_int(input));
+                if (target_type->integer_bits < 64) {
+                    casted &= ((uint64_t(1) << target_type->integer_bits) - 1u);
+                }
+                output = casted;
                 return true;
+            }
+            case PrimitiveType::F16:
             case PrimitiveType::F32:
             case PrimitiveType::F64:
                 output = to_float(input);

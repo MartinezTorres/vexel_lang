@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Top-level `!!name:#T;` declares a backend-bound global symbol that is backend-resolved via annotations. | Backend-bound global syntax compiles
+
+[[addr(0x4000)]]
+!!REG:#u8;
+
+&^main() -> #i32 {
+    (#i32)REG
+}

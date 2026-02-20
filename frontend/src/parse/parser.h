@@ -44,6 +44,9 @@ private:
     std::vector<Annotation> parse_annotations();
     std::string parse_annotation_arg();
 
+    bool looks_like_var_decl_with_linkage(bool allow_double_bang_local) const;
+    StmtPtr parse_var_decl(bool allow_double_bang_local);
+
     StmtPtr parse_top_level();
     StmtPtr parse_func_decl();
     StmtPtr parse_type_decl();

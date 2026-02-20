@@ -4,7 +4,7 @@
 
 Vexel: strongly typed, minimal, operator-based language with no keywords.
 
-**No keywords**: All syntax via sigils and operators. No reserved words. Primitive type names (i8, u8, i32, f32, b, s, etc.) are only special after the `#` sigil; they may be used as identifiers elsewhere.
+**No keywords**: All syntax via sigils and operators. No reserved words. Primitive type names (`iN`, `uN`, `f16`, `f32`, `f64`, `b`, `s`) are only special after the `#` sigil; they may be used as identifiers elsewhere.
 
 **No standard library**: Language defines syntax and semantics only. External functions provide I/O and platform services.
 
@@ -26,7 +26,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Floats: `1.23`. Default: `#f64`
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
-- **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external), `&^` (exported function), `^` (exported global), `#` (type)
+- **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external function), `&^` (exported function), `^` (exported global), `!` (external global symbol), `!!` (backend-bound global), `#` (type)
 - **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` (user types may overload `+ - * / % == != < <= > >=` via operator methods)
   - Note: `|` serves as both unary (length/absolute) and binary (bitwise OR) operator
 - **Statement termination**: `;` or any whitespace when unambiguous (see Section 8 for ambiguous parsing rules)
@@ -37,9 +37,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 ## Types
 
 **Primitives**:
-- Core (always available): `#i8`, `#u8`
-- Optional (backend may not support): `#i16`, `#i32`, `#i64`, `#u16`, `#u32`, `#u64`
-- Floating point (optional): `#f32`, `#f64`
+- Parametric signed integers: `#iN` where `N` is any positive integer width
+- Parametric unsigned integers: `#uN` where `N` is any positive integer width
+- Floating point: `#f16`, `#f32`, `#f64`
+- Backends may support only a subset of integer widths (for example, C/megalinker currently support 8/16/32/64)
 - Boolean: `#b` (values 0 or 1 only, no true/false literals)
   - Use 0 for false, 1 for true
   - Arrays of booleans can be bit-packed: `#b[8]` fits in one byte
@@ -101,19 +102,19 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **All casts create copies**: Cast result is a new value, never a reference
   - Modifying cast result doesn't affect original
   - Backend can optimize copy away when safe
-- **Boolean array casts**: `#b[N]` can cast to/from integer types if bit sizes match exactly
-  - `#b[8]` ↔ `#u8`, `#b[16]` ↔ `#u16`, `#b[32]` ↔ `#u32`, `#b[64]` ↔ `#u64`
+- **Boolean array casts**: `#b[N]` can cast to/from `#uN` when bit sizes match exactly
   - Size mismatch is compile-time error
+  - Portable frontend compile-time cast support is currently bounded to integer widths up to 64 bits
   - Bit 0 is LSB, bit N-1 is MSB
 - **Composite type casts**: Can cast between composites and byte arrays
   - Creates byte representation (portable across backends)
   - Size must match exactly in bytes
   - Backend handles layout conversion transparently
 
-**Automatic promotion**: Smaller types automatically widen to larger types in mixed operations:
-- i8 → i16 → i32 → i64
-- u8 → u16 → u32 → u64
-- f32 → f64
+**Automatic promotion**: Numeric operations widen within the same family to the larger bit width:
+- `#iA` with `#iB` promotes to `#i(max(A,B))`
+- `#uA` with `#uB` promotes to `#u(max(A,B))`
+- `#f16`/`#f32`/`#f64` promote to the wider float type
 - No implicit narrowing
 - No implicit signed/unsigned conversion (must use explicit cast)
 
@@ -122,17 +123,11 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 **Memory model**: No heap allocation. All data is stack-allocated or compile-time constant.
 
 **Literal type inference**:
-- Integer literals use smallest type that fits:
-  - 0, 1 → `#b`
-  - 2-255 → `#u8`
-  - 256-65535 → `#u16`
-  - 65536-4294967295 → `#u32`
-  - -128 to -2 → `#i8`
-  - -32768 to -129 → `#i16`
-  - -2147483648 to -32769 → `#i32`
-  - Larger values → `#u64` (positive) or `#i64` (negative)
-  - If value exceeds all available types: compile error
-  - Automatic promotion applies when assigning to larger types
+- Integer literals use minimal semantic width, then normalize to backend-oriented buckets:
+  - `0`, `1` → `#b`
+  - unsigned literals normalize to `#u8` / `#u16` / `#u32` / `#u64`
+  - signed literals normalize to `#i8` / `#i16` / `#i32` / `#i64`
+  - Assignment/casts can target any explicit `#iN`/`#uN` width when values fit
 - Floating literals: `#f64`
 - Character literals: `#u8`
 
@@ -163,6 +158,17 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Contents undefined until first assignment
   - Backend typically places in RAM
   - Must be initialized before use (compiler may not enforce)
+- **External symbol global**: `!name:Type;`
+  - Declares a symbol provided outside the compilation unit
+  - No initializer allowed
+  - Treated as runtime-readable/runtime-writable by frontend analysis
+  - Top-level only
+- **Backend-bound global**: `!!name:Type;`
+  - Declares a backend-resolved binding (address/segment/channel details come from backend-specific annotations)
+  - No initializer allowed
+  - Treated as runtime-readable/runtime-writable by frontend analysis
+  - Allowed at top level and in local scopes
+  - Frontend validates syntax only; selected backend validates whether annotations are sufficient to materialize the binding
 
 **Declaration order**:
 - No forward declarations needed (whole-program compilation)
@@ -242,20 +248,22 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 **Exported functions**: `&^name(p:Type,...)[-> Type] block`
 - Callable externally
 - ABI boundary types only:
-  - Primitives (`#i8`, `#i16`, `#i32`, `#i64`, `#u8`, `#u16`, `#u32`, `#u64`, `#f32`, `#f64`, `#b`, `#s`)
+  - Primitives (`#iN`, `#uN`, `#f16`, `#f32`, `#f64`, `#b`, `#s`)
   - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
   - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
   - Tuple returns are not allowed
+- Backends may restrict the accepted integer widths at ABI boundaries
 - Cannot be eliminated
 - Serve as entry points for executables or library exports
 
 **External functions**: `&!name(p:Type,...)[-> Type];`
 - Declaration only
 - ABI boundary types only:
-  - Primitives (`#i8`, `#i16`, `#i32`, `#i64`, `#u8`, `#u16`, `#u32`, `#u64`, `#f32`, `#f64`, `#b`, `#s`)
+  - Primitives (`#iN`, `#uN`, `#f16`, `#f32`, `#f64`, `#b`, `#s`)
   - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
   - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
   - Tuple returns are not allowed
+- Backends may restrict the accepted integer widths at ABI boundaries
 - Backend defines calling/linking
 
 **Type constructors**: `#Point(x:#i32, y:#i32);`

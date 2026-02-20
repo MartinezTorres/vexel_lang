@@ -206,6 +206,8 @@ void Resolver::predeclare_instance_symbols(ModuleInstance& instance) {
                                         stmt,
                                         stmt->is_mutable,
                                         false);
+            sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
+            sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
             sym->is_exported = stmt->is_exported;
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
@@ -401,8 +403,13 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
     }
 
     if (sym && !sym->is_local) {
+        sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
+        sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
         sym->is_exported = stmt->is_exported;
         defined_globals.insert(sym);
+    } else if (sym) {
+        sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
+        sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
     }
 }
 

@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Top-level `!name:#T;` declares an external global symbol with frontend-level readability/writability. | External global symbol declaration syntax compiles
+
+!PORT:#u8;
+
+&^main() -> #i32 {
+    (#i32)PORT
+}

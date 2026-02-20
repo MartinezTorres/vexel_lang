@@ -31,7 +31,7 @@ std::string mangle_type_component(TypePtr type) {
 
     switch (type->kind) {
         case Type::Kind::Primitive:
-            return primitive_name(type->primitive);
+            return primitive_name(type->primitive, type->integer_bits);
         case Type::Kind::Named:
             return type->type_name;
         case Type::Kind::Array: {
@@ -63,7 +63,11 @@ bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
 
     switch (a->kind) {
         case Type::Kind::Primitive:
-            return a->primitive == b->primitive;
+            if (a->primitive != b->primitive) return false;
+            if (is_signed_int(a->primitive) || is_unsigned_int(a->primitive)) {
+                return a->integer_bits == b->integer_bits;
+            }
+            return true;
         case Type::Kind::Array:
             return types_equal_static(a->element_type, b->element_type) &&
                    array_sizes_equal(a->array_size, b->array_size);
@@ -84,6 +88,9 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
     switch (t->kind) {
         case Type::Kind::Primitive:
             hash ^= static_cast<size_t>(t->primitive) << 8;
+            if (is_signed_int(t->primitive) || is_unsigned_int(t->primitive)) {
+                hash ^= std::hash<uint64_t>{}(t->integer_bits) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            }
             break;
         case Type::Kind::Array:
             hash ^= type_hash(t->element_type) << 4;
@@ -268,6 +275,8 @@ StmtPtr TypeChecker::clone_stmt(StmtPtr stmt) {
             cloned->var_type = stmt->var_type;
             cloned->var_init = clone_expr(stmt->var_init);
             cloned->is_mutable = stmt->is_mutable;
+            cloned->is_exported = stmt->is_exported;
+            cloned->var_linkage = stmt->var_linkage;
             break;
 
         case Stmt::Kind::ConditionalStmt:

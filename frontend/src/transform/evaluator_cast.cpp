@@ -21,7 +21,8 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
     if (target_type->kind == Type::Kind::Array &&
         target_type->element_type &&
         target_type->element_type->kind == Type::Kind::Primitive &&
-        target_type->element_type->primitive == PrimitiveType::U8 &&
+        target_type->element_type->primitive == PrimitiveType::UInt &&
+        target_type->element_type->integer_bits == 8 &&
         expr->operand && expr->operand->type &&
         expr->operand->type->kind == Type::Kind::Primitive &&
         !is_float(expr->operand->type->primitive)) {
@@ -43,9 +44,13 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             return false;
         }
 
-        int bits = type_bits(expr->operand->type->primitive);
+        int64_t bits = type_bits(expr->operand->type->primitive, expr->operand->type->integer_bits);
         if (bits < 0 || bits / 8 != length) {
             error_msg = "Array length/type size mismatch in cast";
+            return false;
+        }
+        if (bits > 64) {
+            error_msg = "Compile-time cast to byte array supports integer widths up to 64 bits";
             return false;
         }
 
@@ -109,9 +114,17 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             error_msg = "Boolean array size must be non-zero";
             return false;
         }
-        if (length != type_bits(target_type->primitive)) {
+        if (target_type->integer_bits == 0) {
+            error_msg = "Unsigned integer cast target is missing width";
+            return false;
+        }
+        if (target_type->integer_bits > 64) {
+            error_msg = "Compile-time bool-array cast supports unsigned integer widths up to 64 bits";
+            return false;
+        }
+        if (length != static_cast<int64_t>(target_type->integer_bits)) {
             error_msg = "Boolean array size mismatch for cast to #" +
-                        primitive_name(target_type->primitive);
+                        primitive_name(target_type->primitive, target_type->integer_bits);
             return false;
         }
 
@@ -143,7 +156,7 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         }
         if (static_cast<int64_t>(array->elements.size()) != length) {
             error_msg = "Boolean array size mismatch for cast to #" +
-                        primitive_name(target_type->primitive);
+                        primitive_name(target_type->primitive, target_type->integer_bits);
             return false;
         }
         for (int64_t i = 0; i < length; ++i) {
@@ -168,17 +181,44 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
     }
 
     // Perform the cast based on target primitive type
-    if (target_type->primitive == PrimitiveType::I8 || target_type->primitive == PrimitiveType::I16 ||
-        target_type->primitive == PrimitiveType::I32 || target_type->primitive == PrimitiveType::I64) {
+    if (is_signed_int(target_type->primitive)) {
+        if (target_type->integer_bits == 0) {
+            error_msg = "Signed integer cast target is missing width";
+            return false;
+        }
+        if (target_type->integer_bits > 64) {
+            error_msg = "Compile-time signed integer casts support widths up to 64 bits";
+            return false;
+        }
         // Cast to signed integer
-        result = to_int(operand_val);
+        int64_t casted = to_int(operand_val);
+        if (target_type->integer_bits < 64) {
+            uint64_t raw = static_cast<uint64_t>(casted) & ((uint64_t(1) << target_type->integer_bits) - 1u);
+            const uint64_t sign_bit = uint64_t(1) << (target_type->integer_bits - 1u);
+            if (raw & sign_bit) {
+                raw |= ~((uint64_t(1) << target_type->integer_bits) - 1u);
+            }
+            casted = static_cast<int64_t>(raw);
+        }
+        result = casted;
         return true;
-    } else if (target_type->primitive == PrimitiveType::U8 || target_type->primitive == PrimitiveType::U16 ||
-               target_type->primitive == PrimitiveType::U32 || target_type->primitive == PrimitiveType::U64) {
+    } else if (is_unsigned_int(target_type->primitive)) {
+        if (target_type->integer_bits == 0) {
+            error_msg = "Unsigned integer cast target is missing width";
+            return false;
+        }
+        if (target_type->integer_bits > 64) {
+            error_msg = "Compile-time unsigned integer casts support widths up to 64 bits";
+            return false;
+        }
         // Cast to unsigned integer
-        result = (uint64_t)to_int(operand_val);
+        uint64_t casted = static_cast<uint64_t>(to_int(operand_val));
+        if (target_type->integer_bits < 64) {
+            casted &= ((uint64_t(1) << target_type->integer_bits) - 1u);
+        }
+        result = casted;
         return true;
-    } else if (target_type->primitive == PrimitiveType::F32 || target_type->primitive == PrimitiveType::F64) {
+    } else if (is_float(target_type->primitive)) {
         // Cast to float
         result = to_float(operand_val);
         return true;
