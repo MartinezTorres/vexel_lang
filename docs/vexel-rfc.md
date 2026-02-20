@@ -43,7 +43,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Backends may support only a subset of integer widths (for example, some targets may accept only 8/16/32/64)
 - Boolean: `#b` (values 0 or 1 only, no true/false literals)
   - Use 0 for false, 1 for true
-  - Arrays of booleans can be bit-packed: `#b[8]` fits in one byte
+  - `#b[N]` is semantically an array of N logical bits; backends may choose packed or unpacked physical storage
 - String: `#s` (immutable, compile-time constant)
   - String length: `|str|` yields compile-time constant integer (number of bytes)
 
@@ -52,7 +52,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Cannot depend on external calls, runtime values, or I/O
 - Examples: `#i32[10]`, `#u8[2+3]`, `#f32[pow(2,3)]` (if pow is pure)
 - Equivalent prefix spelling is accepted for a single dimension: `[N]#T`
-- - Array length: `|arr|` yields compile-time constant integer (array size)
+- Array length: `|arr|` yields compile-time constant integer (array size)
 - Literal `[e1,e2,...]` infers size from element count (may be empty)
   - `[ ]` produces `#T[0]` for the target type `#T` when context requires an array
   - Element type is inferred by unifying element expression types
@@ -77,8 +77,15 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Resolves to the static type of `expr` in the current scope.
 - Uses the same inference state as normal expression typing (including unresolved integer literal types until constrained).
 - `expr` is type-checked only; `#[expr]` does not evaluate `expr` or trigger side effects.
-- Must resolve to a concrete type before backend handoff.
+- Must satisfy the same concreteness requirements as any other type use site.
 - Valid anywhere a type is expected, including cast targets and declaration annotations.
+
+**Concreteness requirements**:
+- Primitive integer types with unknown width (`#i?` / `#u?`) are unresolved.
+- Unresolved types are allowed in dead code and in value paths whose results are never used.
+- Any reachable value-required use must have a concrete type before successful compilation.
+- ABI boundaries (`&^`, `&!`, exported globals) require concrete ABI-safe types.
+- If unresolved types reach backend code generation, the selected backend may reject emission.
 
 **Comparison semantics**:
 - All values support `<`, `>`, `<=`, `>=`, `==`, and `!=`.
@@ -116,7 +123,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Concretization happens when a context requires a concrete type (for example typed declarations, casts, concrete operator partners, ABI-boundary checks).
 - Representability checks are strict at concretization time; non-representable literals are compile-time errors.
 - Boolean contexts accept only integer literals representable as `#b` (0 or 1).
-- Compilers may expose stricter modes that require earlier concretization (for example explicit local type annotations and explicit call-boundary casts).
+- Reference compiler strictness modes:
+  - level 0 (default): relaxed unresolved literal flow
+  - level 1: explicit type annotation required for newly-declared variables
+  - level 2: additionally rejects unresolved literal flow across unconstrained call boundaries
 - Floating literals: `#f64`
 - Character literals: `#u8`
 
@@ -170,6 +180,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 **Internal functions**: `&name(p[:Type],...)[-> Type] block`
 - Returns last expression or `-> expr;` for explicit return
 - Type inference when `->` omitted
+- Omitted return types may remain unresolved only when no reachable value-required path consumes the function's result
 - `->` is the only return operator (last expression = implicit return, `-> expr;` = explicit, `->;` = empty)
 - Return exits only the current function (not enclosing functions)
 - May be eliminated if unused
@@ -236,6 +247,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Exported functions**: `&^name(p:Type,...)[-> Type] block`
 - Callable externally
+- Return type must be concrete at the ABI boundary
 - ABI boundary types only:
   - Primitives (`#iN`, `#uN`, `#f16`, `#f32`, `#f64`, `#b`, `#s`)
   - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
@@ -294,7 +306,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - `arr@@print(_)` visits the same elements but in lexicographic order
   - Named types can override iteration by defining `&(self)#Type::@($loop)` / `&(self)#Type::@@($loop)` (see Iteration methods above); without an override, only arrays and ranges are accepted
   - Nested loops shadow `_` (innermost wins)
-- **Process expressions**: execute host commands during compilation; implementations should default to disabling them and provide an opt-in flag (e.g., `--allow-process`) to enable. Compilers that allow them MUST treat the input program as fully trusted; sandboxes should default to disabling process execution for untrusted sources.
+- **Process import**: `::"command" -> name;` executes host command `command` at compile time and binds stdout to immutable `name:#s`; implementations should default to disabling this behavior and provide an explicit opt-in flag (e.g., `--allow-process`). Inputs enabling process execution must be treated as fully trusted.
 - **Repeat**: `(cond)@expr` repeats expr while cond is true
   - Condition re-evaluates before every iteration; no `_` is bound in this form
 - **Loop control**: `->|;` (break), `->>;` (continue) - affect innermost enclosing loop
@@ -386,6 +398,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Omitted parameter/field types create fresh type variables inferred from call sites
 - Unresolved integer literals may flow through inference until a concrete requirement appears
 - Implementations may offer strictness modes that reject unresolved flow earlier; this strengthens diagnostics, not core runtime semantics
+- Unresolved returns are permitted only for call chains whose values are not consumed by reachable value-required paths
 - Argument types include full array shape (element type + length); mismatched lengths form distinct instantiations
 - Generic functions may not be exported or external; they must resolve within the compiling program
 - Specialization semantics are pure language behavior—implementations may inline, share, or eliminate copies as long as observable semantics match a concrete instantiation
@@ -423,7 +436,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Results must be convertible to target types
   - Example: use #f64 math to build #u8 lookup table
 - Compile-time conditionals eliminate dead branches before type checking
-- No external calls, I/O, or side effects during compile-time execution
+- Pure compile-time function evaluation performs no external calls, I/O, or side effects (`process import` is a separate opt-in module feature)
 
 **Memory**:
 - Primitives by value
@@ -483,10 +496,17 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 ## Grammar
 
+The grammar below is operational (close to parser behavior). `';'` is optional on expression/variable statements when the next token boundary is unambiguous.
+
 ```
 program      ::= { top }
 
-top          ::= func | export | extern | type_decl | import | global
+top          ::= [ annots ] top_item
+top_item     ::= func | export | extern | type_decl | import | var_decl
+
+annots       ::= annotation { annotation }
+annotation   ::= '[[' ident [ '(' [ ann_arg { ',' ann_arg } ] ')' ] ']]'
+ann_arg      ::= ident | string | number | float
 
 func         ::= '&' [ recv_prefix ] func_name '(' [ params ] ')' [ '->' ret_spec ] block
 export       ::= '&^' [ recv_prefix ] func_name '(' [ params ] ')' [ '->' ret_spec ] block
@@ -501,17 +521,28 @@ params       ::= param { ',' param }
 param        ::= [ '$' ] ident [ ':' type ]
 refparams    ::= ident { ',' ident }
 
-global       ::= [ '^' ] ident [ ':' type ] '=' expr    // immutable constant
-             |   ident ':' type                          // mutable variable
-             |   '!' ident ':' type ';'                  // external symbol global
-             |   '!!' ident ':' type ';'                 // backend-bound global
+var_decl     ::= [ '^' ] ident [ ':' type ] [ '=' expr ] [ ';' ]
+               | '!' ident ':' type [ ';' ]     // top-level only
+               | '!!' ident ':' type [ ';' ]    // top-level or local
 type_decl    ::= '#' ident '(' [ fields ] ')' ';'
 fields       ::= ident [ ':' type ] { ',' ident [ ':' type ] }
 
 import       ::= '::' qname ';'
+               | '::' string '->' ident ';'    // process import
 
 block        ::= '{' { stmt } [ expr ] '}'
-stmt         ::= expr ';' | '->' [ expr ] ';' | '->|' ';' | '->>' ';' | expr '@' expr | '(' expr ')' '@' expr | expr '?' stmt | type_decl | import | func | refunc
+stmt         ::= [ annots ] stmt_core
+stmt_core    ::= var_decl
+               | expr [ ';' ]
+               | '->' [ expr ] ';'
+               | '->|' ';'
+               | '->>' ';'
+               | expr ('@' | '@@') expr
+               | '(' expr ')' '@' expr
+               | expr '?' stmt
+               | type_decl
+               | import
+               | func
 
 expr         ::= assign
 assign       ::= cond | (lvalue '=' expr)
@@ -528,26 +559,25 @@ sum          ::= prod { ('+'|'-') prod }
 prod         ::= unary { ('*'|'/'|'%') unary }
 unary        ::= postfix | ('-'|'!'|'~') unary | '|' unary '|' | '(' type ')' unary
 postfix      ::= primary { call | index | member }
-primary      ::= literal | var | '(' expr ')' | block | array | funccall | methodcall | constructor
+primary      ::= literal | var | resource | '(' expr ')' | block | array
 
 var          ::= ident [ ':' type ]
-funccall     ::= qname '(' [ arglist ] ')'
-methodcall   ::= (ident | '(' ident { ',' ident } ')') '.' ident '(' [ arglist ] ')'
-constructor  ::= qname '(' [ arglist ] ')'
+resource     ::= '::' qname
 call         ::= '(' [ arglist ] ')'
 index        ::= '[' expr ']'
 member       ::= '.' ident
 arglist      ::= expr { ',' expr }
 array        ::= '[' [ expr { ',' expr } ] ']'
 
-qname        ::= ident { '::' ident }
+qname        ::= path_seg { '::' path_seg }
+path_seg     ::= ident { '.' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
 type         ::= '#' type_atom { '[' expr ']' }
-               | '[' expr ']' '#' type_atom
+             | '[' expr ']' '#' type_atom
 type_atom    ::= ident | '[' expr ']'
 
-lvalue       ::= var | methodcall | index | member
+lvalue       ::= var | index | member
 
 literal      ::= number | float | string | char
 number       ::= [0-9]+ | '0x' [0-9A-Fa-f]+
