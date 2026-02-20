@@ -18,6 +18,12 @@ bool type_is_concrete(const TypeUseContext* ctx, TypePtr type) {
         type = ctx->resolve_type(type);
     }
     switch (type->kind) {
+        case Type::Kind::Primitive:
+            if ((type->primitive == PrimitiveType::Int || type->primitive == PrimitiveType::UInt) &&
+                type->integer_bits == 0) {
+                return false;
+            }
+            return true;
         case Type::Kind::TypeVar:
             return false;
         case Type::Kind::TypeOf:

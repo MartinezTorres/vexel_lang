@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
+// @desc: Untyped integer literals passed to typed parameters must be representable. | Function call rejects non-representable literal argument
+
+&echo(x:#u8) -> #u8 {
+    x
+}
+
+&^main() -> #i32 {
+    (#i32)echo(256)
+}

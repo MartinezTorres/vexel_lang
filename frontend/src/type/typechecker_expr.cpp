@@ -52,6 +52,79 @@ TypePtr make_int_type(const SourceLocation& loc, uint64_t bits, bool is_unsigned
     return Type::make_primitive(is_unsigned ? PrimitiveType::UInt : PrimitiveType::Int, loc, bits);
 }
 
+TypePtr infer_integer_type_from_const_value(const CTValue& value, const SourceLocation& loc) {
+    if (std::holds_alternative<uint64_t>(value)) {
+        uint64_t bits = normalize_inferred_int_bits(min_unsigned_bits(std::get<uint64_t>(value)));
+        return make_int_type(loc, bits, true);
+    }
+    if (std::holds_alternative<int64_t>(value)) {
+        int64_t signed_value = std::get<int64_t>(value);
+        if (signed_value < 0) {
+            uint64_t bits = normalize_inferred_int_bits(min_signed_bits(signed_value));
+            return make_int_type(loc, bits, false);
+        }
+        uint64_t bits = normalize_inferred_int_bits(
+            min_unsigned_bits(static_cast<uint64_t>(signed_value)));
+        return make_int_type(loc, bits, true);
+    }
+    if (std::holds_alternative<bool>(value)) {
+        return Type::make_primitive(PrimitiveType::Bool, loc);
+    }
+    return nullptr;
+}
+
+bool is_untyped_integer_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_int(type->primitive) || is_unsigned_int(type->primitive)) &&
+           type->integer_bits == 0;
+}
+
+bool is_numeric_primitive_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) || is_float(type->primitive));
+}
+
+void apply_context_type_to_terminal_expr_local(const ExprPtr& expr, const TypePtr& target) {
+    if (!expr || !target) return;
+    if (expr->kind == Expr::Kind::Block) {
+        apply_context_type_to_terminal_expr_local(expr->result_expr, target);
+        expr->type = target;
+        return;
+    }
+    if (expr->type &&
+        expr->type->kind == Type::Kind::Primitive &&
+        (expr->type->primitive == PrimitiveType::Int || expr->type->primitive == PrimitiveType::UInt) &&
+        expr->type->integer_bits == 0) {
+        expr->type = target;
+    } else if (expr->kind == Expr::Kind::IntLiteral) {
+        expr->type = target;
+    }
+
+    switch (expr->kind) {
+        case Expr::Kind::Binary:
+            apply_context_type_to_terminal_expr_local(expr->left, target);
+            apply_context_type_to_terminal_expr_local(expr->right, target);
+            break;
+        case Expr::Kind::Unary:
+            apply_context_type_to_terminal_expr_local(expr->operand, target);
+            break;
+        case Expr::Kind::Conditional:
+            apply_context_type_to_terminal_expr_local(expr->true_expr, target);
+            apply_context_type_to_terminal_expr_local(expr->false_expr, target);
+            break;
+        case Expr::Kind::Assignment:
+            apply_context_type_to_terminal_expr_local(expr->right, target);
+            break;
+        case Expr::Kind::Cast:
+            apply_context_type_to_terminal_expr_local(expr->operand, target);
+            break;
+        default:
+            break;
+    }
+}
+
 } // namespace
 
 TypePtr TypeChecker::check_expr(ExprPtr expr) {
@@ -160,20 +233,23 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     TypePtr left_type = check_expr(expr->left);
     TypePtr right_type = check_expr(expr->right);
-    auto coerce_bool_literal = [](ExprPtr node, TypePtr& type, bool unsigned_target) {
-        if (!node || !type) return;
-        if (node->kind != Expr::Kind::IntLiteral) return;
-        if (type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) return;
-        type = make_int_type(node->location, 8, unsigned_target);
-        node->type = type;
-    };
-    auto is_numeric_primitive = [](TypePtr t) {
-        return t &&
-               t->kind == Type::Kind::Primitive &&
-               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) || is_float(t->primitive));
-    };
     auto is_numeric_like = [&](TypePtr t) {
-        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive(t);
+        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
+    };
+    auto concretize_untyped_against = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_type, const std::string& op_name) {
+        if (!is_untyped_integer_type(side_type)) {
+            return;
+        }
+        if (!target_type || target_type->kind != Type::Kind::Primitive ||
+            target_type->primitive == PrimitiveType::Bool) {
+            return;
+        }
+        if (!literal_assignable_to(target_type, side_expr)) {
+            throw CompileError("Integer literal is not representable for operator " + op_name,
+                               side_expr ? side_expr->location : expr->location);
+        }
+        apply_context_type_to_terminal_expr_local(side_expr, target_type);
+        side_type = target_type;
     };
 
     if (expr->op == "&&" || expr->op == "||") {
@@ -193,16 +269,8 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     // Arithmetic operators
     if (expr->op == "+" || expr->op == "-" || expr->op == "*" || expr->op == "/") {
-        const bool left_wants_unsigned =
-            right_type &&
-            right_type->kind == Type::Kind::Primitive &&
-            is_unsigned_int(right_type->primitive);
-        const bool right_wants_unsigned =
-            left_type &&
-            left_type->kind == Type::Kind::Primitive &&
-            is_unsigned_int(left_type->primitive);
-        coerce_bool_literal(expr->left, left_type, left_wants_unsigned);
-        coerce_bool_literal(expr->right, right_type, right_wants_unsigned);
+        concretize_untyped_against(expr->left, left_type, right_type, expr->op);
+        concretize_untyped_against(expr->right, right_type, left_type, expr->op);
         if (!is_numeric_like(left_type) || !is_numeric_like(right_type)) {
             throw CompileError("Operator " + expr->op + " requires numeric operands", expr->location);
         }
@@ -217,8 +285,39 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
     // Modulo and bitwise: unsigned only
     if (expr->op == "%" || expr->op == "&" || expr->op == "|" || expr->op == "^" ||
         expr->op == "<<" || expr->op == ">>") {
-        coerce_bool_literal(expr->left, left_type, true);
-        coerce_bool_literal(expr->right, right_type, true);
+        concretize_untyped_against(expr->left, left_type, right_type, expr->op);
+        concretize_untyped_against(expr->right, right_type, left_type, expr->op);
+        auto materialize_unsigned_untyped = [&](ExprPtr side_expr, TypePtr& side_type) {
+            if (!is_untyped_integer_type(side_type)) return;
+            CTEQueryResult query = query_constexpr(side_expr);
+            if (query.status != CTEQueryStatus::Known) {
+                return;
+            }
+
+            uint64_t value = 0;
+            if (std::holds_alternative<uint64_t>(query.value)) {
+                value = std::get<uint64_t>(query.value);
+            } else if (std::holds_alternative<int64_t>(query.value)) {
+                int64_t signed_value = std::get<int64_t>(query.value);
+                if (signed_value < 0) {
+                    throw CompileError("Operator " + expr->op + " requires unsigned integer operands",
+                                       side_expr ? side_expr->location : expr->location);
+                }
+                value = static_cast<uint64_t>(signed_value);
+            } else if (std::holds_alternative<bool>(query.value)) {
+                value = std::get<bool>(query.value) ? 1ULL : 0ULL;
+            } else {
+                return;
+            }
+
+            TypePtr inferred = make_int_type(side_expr ? side_expr->location : expr->location,
+                                             normalize_inferred_int_bits(min_unsigned_bits(value)),
+                                             true);
+            apply_context_type_to_terminal_expr_local(side_expr, inferred);
+            side_type = inferred;
+        };
+        materialize_unsigned_untyped(expr->left, left_type);
+        materialize_unsigned_untyped(expr->right, right_type);
         require_unsigned_integer(left_type, expr->left ? expr->left->location : expr->location,
                                  "Operator " + expr->op);
         require_unsigned_integer(right_type, expr->right ? expr->right->location : expr->location,
@@ -299,26 +398,19 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
 
 TypePtr TypeChecker::check_unary(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
-    auto coerce_bool_literal = [](ExprPtr node, TypePtr& type, bool unsigned_target) {
-        if (!node || !type) return;
-        if (node->kind != Expr::Kind::IntLiteral) return;
-        if (type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) return;
-        type = make_int_type(node->location, 8, unsigned_target);
-        node->type = type;
-    };
-    auto is_numeric_primitive = [](TypePtr t) {
-        return t &&
-               t->kind == Type::Kind::Primitive &&
-               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) || is_float(t->primitive));
-    };
     auto is_numeric_like = [&](TypePtr t) {
-        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive(t);
+        return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
     };
 
     if (expr->op == "-") {
-        coerce_bool_literal(expr->operand, operand_type, false);
         if (!is_numeric_like(operand_type)) {
             throw CompileError("Unary - requires numeric operand", expr->location);
+        }
+        if (is_untyped_integer_type(operand_type)) {
+            operand_type = make_int_type(expr->location, 0, false);
+            if (expr->operand) {
+                expr->operand->type = operand_type;
+            }
         }
         expr->type = operand_type;
         return operand_type;
@@ -333,7 +425,6 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     }
 
     if (expr->op == "~") {
-        coerce_bool_literal(expr->operand, operand_type, true);
         if (operand_type && operand_type->kind == Type::Kind::Primitive &&
             !is_unsigned_int(operand_type->primitive)) {
             throw CompileError("Bitwise NOT requires unsigned integer", expr->location);
@@ -439,9 +530,24 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
 
     if (sym->kind == Symbol::Kind::Type && sym->declaration) {
         for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
-            if (!sym->declaration->fields[i].type ||
-                sym->declaration->fields[i].type->kind == Type::Kind::TypeVar) {
-                sym->declaration->fields[i].type = expr->args[i]->type;
+            TypePtr field_type = sym->declaration->fields[i].type;
+            ExprPtr arg_expr = expr->args[i];
+
+            if (!field_type || field_type->kind == Type::Kind::TypeVar) {
+                sym->declaration->fields[i].type = arg_expr->type;
+                continue;
+            }
+
+            if (is_untyped_integer_type(arg_expr->type) &&
+                literal_assignable_to(field_type, arg_expr)) {
+                apply_context_type_to_terminal_expr_local(arg_expr, field_type);
+            }
+
+            if (!types_compatible(arg_expr->type, field_type) &&
+                !literal_assignable_to(field_type, arg_expr)) {
+                throw CompileError("Constructor argument is not compatible with field '" +
+                                   sym->declaration->fields[i].name + "'",
+                                   arg_expr->location);
             }
         }
 
@@ -505,7 +611,21 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             for (size_t i = 0; i < expr->args.size() && i < sym->declaration->params.size(); i++) {
                 ExprPtr arg_expr = expr->args[i];
                 TypePtr param_type = sym->declaration->params[i].type;
+                if (is_untyped_integer_type(arg_expr->type)) {
+                    CTEQueryResult query = query_constexpr(arg_expr);
+                    if (query.status == CTEQueryStatus::Known) {
+                        TypePtr inferred = infer_integer_type_from_const_value(query.value, arg_expr->location);
+                        if (inferred) {
+                            apply_context_type_to_terminal_expr_local(arg_expr, inferred);
+                        }
+                    }
+                }
                 if (param_type && param_type->kind != Type::Kind::TypeVar) {
+                    if (is_untyped_integer_type(arg_expr->type) &&
+                        (types_compatible(arg_expr->type, param_type) ||
+                         literal_assignable_to(param_type, arg_expr))) {
+                        apply_context_type_to_terminal_expr_local(arg_expr, param_type);
+                    }
                     if (!types_compatible(arg_expr->type, param_type) &&
                         !literal_assignable_to(param_type, arg_expr)) {
                         throw CompileError(
@@ -574,6 +694,11 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                 throw CompileError(
                     "Type mismatch for parameter '" + param.name + "' in call to '" +
                     sym->declaration->func_name + "'", arg_expr->location);
+            }
+            if (is_untyped_integer_type(arg_expr->type) &&
+                (types_compatible(arg_expr->type, param_type) ||
+                 literal_assignable_to(param_type, arg_expr))) {
+                apply_context_type_to_terminal_expr_local(arg_expr, param_type);
             }
         }
 
@@ -709,19 +834,6 @@ TypePtr TypeChecker::check_array_literal(ExprPtr expr) {
         return expr->type;
     }
 
-    auto is_numeric_primitive = [](TypePtr t) {
-        return t &&
-               t->kind == Type::Kind::Primitive &&
-               (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) || is_float(t->primitive));
-    };
-    auto coerce_bool_literal = [](ExprPtr node, TypePtr& type, bool unsigned_target) {
-        if (!node || !type) return;
-        if (node->kind != Expr::Kind::IntLiteral) return;
-        if (type->kind != Type::Kind::Primitive || type->primitive != PrimitiveType::Bool) return;
-        type = make_int_type(node->location, 8, unsigned_target);
-        node->type = type;
-    };
-
     TypePtr elem_type = nullptr;
     for (size_t i = 0; i < expr->elements.size(); ++i) {
         auto& elem = expr->elements[i];
@@ -729,18 +841,99 @@ TypePtr TypeChecker::check_array_literal(ExprPtr expr) {
         if (!elem_type) {
             elem_type = et;
         } else {
-            if (elem_type->kind == Type::Kind::Primitive &&
-                elem_type->primitive == PrimitiveType::Bool &&
-                is_numeric_primitive(et)) {
-                bool unsigned_target = is_unsigned_int(et->primitive);
-                coerce_bool_literal(expr->elements[0], elem_type, unsigned_target);
-            } else if (et->kind == Type::Kind::Primitive &&
-                       et->primitive == PrimitiveType::Bool &&
-                       is_numeric_primitive(elem_type)) {
-                bool unsigned_target = is_unsigned_int(elem_type->primitive);
-                coerce_bool_literal(elem, et, unsigned_target);
+            TypePtr unified = unify_types(elem_type, et);
+            if (!unified) {
+                throw CompileError("Array literal elements must have compatible types", elem->location);
             }
-            elem_type = unify_types(elem_type, et);
+            elem_type = unified;
+        }
+    }
+
+    if (elem_type &&
+        elem_type->kind == Type::Kind::Primitive &&
+        !is_untyped_integer_type(elem_type)) {
+        for (auto& elem : expr->elements) {
+            if (!elem || !is_untyped_integer_type(elem->type)) {
+                continue;
+            }
+            if (!literal_assignable_to(elem_type, elem)) {
+                throw CompileError("Array literal element is not representable in inferred element type",
+                                   elem->location);
+            }
+            apply_context_type_to_terminal_expr_local(elem, elem_type);
+        }
+    }
+
+    if (is_untyped_integer_type(elem_type)) {
+        bool all_const = true;
+        bool has_negative = false;
+        bool all_bool_values = true;
+        uint64_t max_unsigned = 0;
+        int64_t min_signed = 0;
+        int64_t max_signed = 0;
+        bool signed_seen = false;
+
+        for (const auto& elem : expr->elements) {
+            CTEQueryResult query = query_constexpr(elem);
+            if (query.status != CTEQueryStatus::Known) {
+                all_const = false;
+                break;
+            }
+            const CTValue& value = query.value;
+            if (std::holds_alternative<bool>(value)) {
+                uint64_t v = std::get<bool>(value) ? 1ULL : 0ULL;
+                max_unsigned = std::max(max_unsigned, v);
+                continue;
+            }
+            if (std::holds_alternative<uint64_t>(value)) {
+                uint64_t v = std::get<uint64_t>(value);
+                max_unsigned = std::max(max_unsigned, v);
+                if (v > 1ULL) {
+                    all_bool_values = false;
+                }
+                continue;
+            }
+            if (std::holds_alternative<int64_t>(value)) {
+                int64_t v = std::get<int64_t>(value);
+                if (!signed_seen) {
+                    min_signed = v;
+                    max_signed = v;
+                    signed_seen = true;
+                } else {
+                    min_signed = std::min(min_signed, v);
+                    max_signed = std::max(max_signed, v);
+                }
+                if (v < 0) {
+                    has_negative = true;
+                    all_bool_values = false;
+                } else {
+                    uint64_t uv = static_cast<uint64_t>(v);
+                    max_unsigned = std::max(max_unsigned, uv);
+                    if (uv > 1ULL) {
+                        all_bool_values = false;
+                    }
+                }
+                continue;
+            }
+
+            all_const = false;
+            break;
+        }
+
+        if (all_const) {
+            if (all_bool_values) {
+                elem_type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+            } else if (has_negative) {
+                uint64_t bits = min_signed_bits(min_signed);
+                if (max_signed > 0) {
+                    bits = std::max(bits, min_signed_bits(max_signed));
+                }
+                elem_type = make_int_type(expr->location, normalize_inferred_int_bits(bits), false);
+            } else {
+                elem_type = make_int_type(expr->location,
+                                          normalize_inferred_int_bits(min_unsigned_bits(max_unsigned)),
+                                          true);
+            }
         }
     }
 
@@ -842,6 +1035,15 @@ bool TypeChecker::types_compatible(TypePtr a, TypePtr b) {
 
     // Enhanced type promotion for primitives
     if (a->kind == Type::Kind::Primitive && b->kind == Type::Kind::Primitive) {
+        // Untyped integers are not implicitly compatible with concrete numeric
+        // types. They must be concretized through representability checks.
+        if (is_untyped_integer_type(a)) {
+            return is_untyped_integer_type(b);
+        }
+        if (is_untyped_integer_type(b)) {
+            return false;
+        }
+
         // Same type family check
         if (types_in_same_family(a, b)) {
             return effective_type_bits(a) <= effective_type_bits(b);
@@ -902,6 +1104,27 @@ TypePtr TypeChecker::unify_types(TypePtr a, TypePtr b) {
 
     // Enhanced type unification respecting type families
     if (a->kind == Type::Kind::Primitive && b->kind == Type::Kind::Primitive) {
+        if (is_untyped_integer_type(a) && is_untyped_integer_type(b)) {
+            bool needs_signed = (a->primitive == PrimitiveType::Int) || (b->primitive == PrimitiveType::Int);
+            return make_int_type(a->location, 0, !needs_signed);
+        }
+        if (is_untyped_integer_type(a)) {
+            if (b->primitive == PrimitiveType::Bool) {
+                return nullptr;
+            }
+            if (is_numeric_primitive_type(b)) {
+                return b;
+            }
+        }
+        if (is_untyped_integer_type(b)) {
+            if (a->primitive == PrimitiveType::Bool) {
+                return nullptr;
+            }
+            if (is_numeric_primitive_type(a)) {
+                return a;
+            }
+        }
+
         // Same family - promote to larger
         if (types_in_same_family(a, b)) {
             if (effective_type_bits(a) <= effective_type_bits(b)) {
@@ -949,23 +1172,11 @@ TypePtr TypeChecker::bind_typevar(TypePtr var, TypePtr target) {
 TypePtr TypeChecker::infer_literal_type(ExprPtr expr) {
     switch (expr->kind) {
         case Expr::Kind::IntLiteral: {
-            if (expr->uint_val <= 1u) {
-                return Type::make_primitive(PrimitiveType::Bool, expr->location);
-            }
-            uint64_t raw = expr->uint_val;
-
-            if (expr->literal_is_unsigned) {
-                return make_int_type(expr->location, normalize_inferred_int_bits(min_unsigned_bits(raw)), true);
-            }
-
-            int64_t val = static_cast<int64_t>(raw);
-            if (val < 0) {
-                return make_int_type(expr->location, normalize_inferred_int_bits(min_signed_bits(val)), false);
-            }
-            if (raw > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-                return make_int_type(expr->location, normalize_inferred_int_bits(min_unsigned_bits(raw)), true);
-            }
-            return make_int_type(expr->location, normalize_inferred_int_bits(min_signed_bits(val)), false);
+            // Integer literals are context-typed. They start as unresolved integer
+            // carriers and are concretized by surrounding type constraints.
+            return Type::make_primitive(expr->literal_is_unsigned ? PrimitiveType::UInt : PrimitiveType::Int,
+                                        expr->location,
+                                        0);
         }
         case Expr::Kind::FloatLiteral:
             return Type::make_primitive(PrimitiveType::F64, expr->location);
@@ -990,27 +1201,83 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
                literal_assignable_to(target, expr->false_expr);
     }
 
-    auto fits_signed_width = [&](uint64_t bits) {
-        if (bits == 0) return false;
-        if (bits >= 65) return true;
-        if (expr->literal_is_unsigned) {
-            if (bits >= 64) {
-                return expr->uint_val <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
-            }
-            uint64_t maxv = (uint64_t(1) << (bits - 1)) - 1;
-            return expr->uint_val <= maxv;
+    struct IntConstValue {
+        bool known = false;
+        bool is_unsigned = false;
+        bool from_boolean = false;
+        uint64_t u = 0;
+        int64_t s = 0;
+    };
+
+    auto load_int_const = [&](ExprPtr node) -> IntConstValue {
+        IntConstValue out;
+        if (!node) {
+            return out;
         }
 
-        int64_t v = static_cast<int64_t>(expr->uint_val);
+        Expr::Kind kind = node->kind;
+        if (kind == Expr::Kind::CharLiteral) {
+            kind = Expr::Kind::IntLiteral;
+        }
+
+        if (kind == Expr::Kind::IntLiteral) {
+            out.known = true;
+            out.is_unsigned = node->literal_is_unsigned;
+            if (out.is_unsigned) {
+                out.u = node->uint_val;
+            } else {
+                out.s = static_cast<int64_t>(node->uint_val);
+            }
+            return out;
+        }
+
+        CTEQueryResult query = query_constexpr(node);
+        if (query.status != CTEQueryStatus::Known) {
+            return out;
+        }
+
+        const CTValue& value = query.value;
+        if (std::holds_alternative<uint64_t>(value)) {
+            out.known = true;
+            out.is_unsigned = true;
+            out.u = std::get<uint64_t>(value);
+        } else if (std::holds_alternative<int64_t>(value)) {
+            out.known = true;
+            out.is_unsigned = false;
+            out.s = std::get<int64_t>(value);
+        } else if (std::holds_alternative<bool>(value)) {
+            out.known = true;
+            out.is_unsigned = true;
+            out.from_boolean = true;
+            out.u = std::get<bool>(value) ? 1ULL : 0ULL;
+        }
+        return out;
+    };
+
+    IntConstValue value = load_int_const(expr);
+    auto fits_signed_width = [&](uint64_t bits) {
+        if (!value.known) return false;
+        if (bits == 0) return false;
+        if (bits >= 65) return true;
+        if (value.is_unsigned) {
+            if (bits >= 64) {
+                return value.u <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+            }
+            uint64_t maxv = (uint64_t(1) << (bits - 1)) - 1;
+            return value.u <= maxv;
+        }
+
+        int64_t v = value.s;
         if (bits >= 64) return true;
         int64_t minv = -(int64_t(1) << (bits - 1));
         int64_t maxv = (int64_t(1) << (bits - 1)) - 1;
         return v >= minv && v <= maxv;
     };
     auto fits_unsigned_width = [&](uint64_t bits) {
+        if (!value.known) return false;
         if (bits == 0) return false;
-        if (!expr->literal_is_unsigned) {
-            int64_t v = static_cast<int64_t>(expr->uint_val);
+        if (!value.is_unsigned) {
+            int64_t v = value.s;
             if (v < 0) return false;
             if (bits >= 64) return true;
             uint64_t maxv = (uint64_t(1) << bits) - 1;
@@ -1018,33 +1285,30 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
         }
         if (bits >= 64) return true;
         uint64_t maxv = (uint64_t(1) << bits) - 1;
-        return expr->uint_val <= maxv;
+        return value.u <= maxv;
     };
 
-    // Treat character literals like unsigned bytes
-    Expr::Kind kind = expr->kind;
-    if (kind == Expr::Kind::CharLiteral) {
-        kind = Expr::Kind::IntLiteral;
-    }
-
-    if (kind == Expr::Kind::IntLiteral) {
+    if (value.known) {
         switch (target->primitive) {
             case PrimitiveType::Bool:
                 return fits_unsigned_width(1);
             case PrimitiveType::Int:
+                if (value.from_boolean) return false;
                 return fits_signed_width(target->integer_bits);
             case PrimitiveType::UInt:
+                if (value.from_boolean) return false;
                 return fits_unsigned_width(target->integer_bits);
             case PrimitiveType::F16:
             case PrimitiveType::F32:
             case PrimitiveType::F64:
+                if (value.from_boolean) return false;
                 return true; // Integer literals can widen to floats
             case PrimitiveType::String:
                 return false;
         }
     }
 
-    if (kind == Expr::Kind::FloatLiteral) {
+    if (expr->kind == Expr::Kind::FloatLiteral) {
         if (target->primitive == PrimitiveType::F16 ||
             target->primitive == PrimitiveType::F32 ||
             target->primitive == PrimitiveType::F64) {

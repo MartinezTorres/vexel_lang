@@ -11,6 +11,110 @@
 
 namespace vexel {
 
+namespace {
+
+bool is_untyped_integer_type_local(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (type->primitive == PrimitiveType::Int || type->primitive == PrimitiveType::UInt) &&
+           type->integer_bits == 0;
+}
+
+void apply_context_type_to_terminal_expr(const ExprPtr& expr, const TypePtr& target) {
+    if (!expr || !target) return;
+    if (expr->kind == Expr::Kind::Block) {
+        apply_context_type_to_terminal_expr(expr->result_expr, target);
+        expr->type = target;
+        return;
+    }
+    if (expr->type &&
+        expr->type->kind == Type::Kind::Primitive &&
+        (expr->type->primitive == PrimitiveType::Int || expr->type->primitive == PrimitiveType::UInt) &&
+        expr->type->integer_bits == 0) {
+        expr->type = target;
+    } else if (expr->kind == Expr::Kind::IntLiteral) {
+        expr->type = target;
+    }
+
+    switch (expr->kind) {
+        case Expr::Kind::Binary:
+            apply_context_type_to_terminal_expr(expr->left, target);
+            apply_context_type_to_terminal_expr(expr->right, target);
+            break;
+        case Expr::Kind::Unary:
+            apply_context_type_to_terminal_expr(expr->operand, target);
+            break;
+        case Expr::Kind::Conditional:
+            apply_context_type_to_terminal_expr(expr->true_expr, target);
+            apply_context_type_to_terminal_expr(expr->false_expr, target);
+            break;
+        case Expr::Kind::Assignment:
+            apply_context_type_to_terminal_expr(expr->right, target);
+            break;
+        case Expr::Kind::Cast:
+            apply_context_type_to_terminal_expr(expr->operand, target);
+            break;
+        default:
+            break;
+    }
+}
+
+uint64_t min_unsigned_bits_for_value(uint64_t value) {
+    if (value == 0) return 1;
+    uint64_t bits = 0;
+    while (value > 0) {
+        value >>= 1;
+        bits++;
+    }
+    return bits;
+}
+
+uint64_t min_signed_bits_for_value(int64_t value) {
+    for (uint64_t bits = 1; bits <= 64; ++bits) {
+        if (bits == 64) {
+            return 64;
+        }
+        const int64_t min_v = -(int64_t(1) << (bits - 1));
+        const int64_t max_v = (int64_t(1) << (bits - 1)) - 1;
+        if (value >= min_v && value <= max_v) {
+            return bits;
+        }
+    }
+    return 64;
+}
+
+uint64_t normalize_inferred_int_bits_local(uint64_t bits) {
+    if (bits <= 8) return 8;
+    if (bits <= 16) return 16;
+    if (bits <= 32) return 32;
+    return 64;
+}
+
+TypePtr infer_integer_type_from_const_value_local(const CTValue& value, const SourceLocation& loc) {
+    if (std::holds_alternative<uint64_t>(value)) {
+        uint64_t bits = normalize_inferred_int_bits_local(
+            min_unsigned_bits_for_value(std::get<uint64_t>(value)));
+        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
+    }
+    if (std::holds_alternative<int64_t>(value)) {
+        int64_t signed_value = std::get<int64_t>(value);
+        if (signed_value < 0) {
+            uint64_t bits = normalize_inferred_int_bits_local(
+                min_signed_bits_for_value(signed_value));
+            return Type::make_primitive(PrimitiveType::Int, loc, bits);
+        }
+        uint64_t bits = normalize_inferred_int_bits_local(
+            min_unsigned_bits_for_value(static_cast<uint64_t>(signed_value)));
+        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
+    }
+    if (std::holds_alternative<bool>(value)) {
+        return Type::make_primitive(PrimitiveType::Bool, loc);
+    }
+    return nullptr;
+}
+
+} // namespace
+
 TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs, Resolver* resolver,
                          Bindings* bindings_in, Program* program_in)
     : resolver(resolver),
@@ -318,21 +422,36 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
                 stmt->return_type = stmt->return_types[0];
             }
         } else if (!stmt->return_type) {
-            stmt->return_type = body_type;
+            if (is_untyped_integer_type_local(body_type)) {
+                CTEQueryResult query = query_constexpr(stmt->body);
+                if (query.status == CTEQueryStatus::Known) {
+                    TypePtr inferred = infer_integer_type_from_const_value_local(query.value, stmt->location);
+                    if (inferred) {
+                        stmt->return_type = inferred;
+                        apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
+                    } else {
+                        stmt->return_type = body_type;
+                    }
+                } else {
+                    stmt->return_type = body_type;
+                }
+            } else {
+                stmt->return_type = body_type;
+            }
         } else if (!types_compatible(body_type, stmt->return_type)) {
             ExprPtr return_expr = stmt->body;
             if (return_expr && return_expr->kind == Expr::Kind::Block && return_expr->result_expr) {
                 return_expr = return_expr->result_expr;
             }
             if (return_expr && literal_assignable_to(stmt->return_type, return_expr)) {
-                return_expr->type = stmt->return_type;
-                if (stmt->body) {
-                    stmt->body->type = stmt->return_type;
-                }
+                apply_context_type_to_terminal_expr(return_expr, stmt->return_type);
+                apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
             } else {
                 throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
                                    stmt->location);
             }
+        } else if (is_untyped_integer_type_local(body_type)) {
+            apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
         }
     }
 }
@@ -380,9 +499,24 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
         return;
     }
 
+    if (is_untyped_integer_type_local(init_type) &&
+        declared_type->kind == Type::Kind::Primitive &&
+        (declared_type->primitive == PrimitiveType::Bool ||
+         declared_type->primitive == PrimitiveType::Int ||
+         declared_type->primitive == PrimitiveType::UInt ||
+         declared_type->primitive == PrimitiveType::F16 ||
+         declared_type->primitive == PrimitiveType::F32 ||
+         declared_type->primitive == PrimitiveType::F64)) {
+        if (literal_assignable_to(declared_type, init_expr)) {
+            apply_context_type_to_terminal_expr(init_expr, declared_type);
+            init_type = declared_type;
+            return;
+        }
+    }
+
     if (!types_compatible(init_type, declared_type)) {
         if (literal_assignable_to(declared_type, init_expr)) {
-            init_expr->type = declared_type;
+            apply_context_type_to_terminal_expr(init_expr, declared_type);
             init_type = declared_type;
             return;
         }
@@ -397,7 +531,22 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     if (stmt->var_init) {
         TypePtr init_type = check_expr(stmt->var_init);
         if (!type) {
-            type = init_type;
+            if (is_untyped_integer_type_local(init_type)) {
+                CTEQueryResult query = query_constexpr(stmt->var_init);
+                if (query.status == CTEQueryStatus::Known) {
+                    TypePtr inferred = infer_integer_type_from_const_value_local(query.value, stmt->location);
+                    if (inferred) {
+                        type = inferred;
+                        apply_context_type_to_terminal_expr(stmt->var_init, type);
+                    } else {
+                        type = init_type;
+                    }
+                } else {
+                    type = init_type;
+                }
+            } else {
+                type = init_type;
+            }
             stmt->var_type = type;
         } else {
             enforce_declared_initializer_type(type, stmt->var_init, init_type, stmt->location);

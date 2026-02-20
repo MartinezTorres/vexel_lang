@@ -2,6 +2,7 @@
 #include "evaluator.h"
 #include "constants.h"
 #include <cctype>
+#include <functional>
 #include <limits>
 
 namespace vexel {
@@ -292,7 +293,42 @@ void TypeChecker::require_boolean_expr(ExprPtr expr, TypePtr type, const SourceL
 
     TypePtr bool_type = Type::make_primitive(PrimitiveType::Bool, loc);
     if (expr && literal_assignable_to(bool_type, expr)) {
-        expr->type = bool_type;
+        std::function<void(ExprPtr)> apply_bool = [&](ExprPtr node) {
+            if (!node) return;
+            if ((node->type &&
+                 node->type->kind == Type::Kind::Primitive &&
+                 (node->type->primitive == PrimitiveType::Int ||
+                  node->type->primitive == PrimitiveType::UInt) &&
+                 node->type->integer_bits == 0) ||
+                node->kind == Expr::Kind::IntLiteral) {
+                node->type = bool_type;
+            }
+            switch (node->kind) {
+                case Expr::Kind::Block:
+                    apply_bool(node->result_expr);
+                    if (node->result_expr) {
+                        node->type = bool_type;
+                    }
+                    break;
+                case Expr::Kind::Binary:
+                    apply_bool(node->left);
+                    apply_bool(node->right);
+                    break;
+                case Expr::Kind::Unary:
+                    apply_bool(node->operand);
+                    break;
+                case Expr::Kind::Conditional:
+                    apply_bool(node->true_expr);
+                    apply_bool(node->false_expr);
+                    break;
+                case Expr::Kind::Assignment:
+                    apply_bool(node->right);
+                    break;
+                default:
+                    break;
+            }
+        };
+        apply_bool(expr);
         return;
     }
 

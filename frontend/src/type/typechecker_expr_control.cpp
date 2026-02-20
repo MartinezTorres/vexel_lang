@@ -135,6 +135,101 @@ static std::string run_process_command(const std::string& command, const SourceL
     return result;
 }
 
+bool is_untyped_integer_primitive(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (type->primitive == PrimitiveType::Int || type->primitive == PrimitiveType::UInt) &&
+           type->integer_bits == 0;
+}
+
+void apply_context_type_recursive(const ExprPtr& expr, const TypePtr& target) {
+    if (!expr || !target) return;
+    if (expr->kind == Expr::Kind::Block) {
+        apply_context_type_recursive(expr->result_expr, target);
+        expr->type = target;
+        return;
+    }
+
+    if ((expr->type && is_untyped_integer_primitive(expr->type)) ||
+        expr->kind == Expr::Kind::IntLiteral) {
+        expr->type = target;
+    }
+
+    switch (expr->kind) {
+        case Expr::Kind::Binary:
+            apply_context_type_recursive(expr->left, target);
+            apply_context_type_recursive(expr->right, target);
+            break;
+        case Expr::Kind::Unary:
+            apply_context_type_recursive(expr->operand, target);
+            break;
+        case Expr::Kind::Conditional:
+            apply_context_type_recursive(expr->true_expr, target);
+            apply_context_type_recursive(expr->false_expr, target);
+            break;
+        case Expr::Kind::Assignment:
+            apply_context_type_recursive(expr->right, target);
+            break;
+        case Expr::Kind::Cast:
+            apply_context_type_recursive(expr->operand, target);
+            break;
+        default:
+            break;
+    }
+}
+
+uint64_t min_unsigned_bits(uint64_t value) {
+    if (value == 0) return 1;
+    uint64_t bits = 0;
+    while (value > 0) {
+        value >>= 1;
+        bits++;
+    }
+    return bits;
+}
+
+uint64_t min_signed_bits(int64_t value) {
+    for (uint64_t bits = 1; bits <= 64; ++bits) {
+        if (bits == 64) {
+            return uint64_t(64);
+        }
+        const int64_t min_v = -(int64_t(1) << (bits - 1));
+        const int64_t max_v = (int64_t(1) << (bits - 1)) - 1;
+        if (value >= min_v && value <= max_v) {
+            return bits;
+        }
+    }
+    return uint64_t(64);
+}
+
+uint64_t normalize_inferred_int_bits(uint64_t bits) {
+    if (bits <= 8) return 8;
+    if (bits <= 16) return 16;
+    if (bits <= 32) return 32;
+    return 64;
+}
+
+TypePtr infer_integer_type_from_const_value(const CTValue& value, const SourceLocation& loc) {
+    if (std::holds_alternative<uint64_t>(value)) {
+        uint64_t bits = normalize_inferred_int_bits(min_unsigned_bits(std::get<uint64_t>(value)));
+        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
+    }
+    if (std::holds_alternative<int64_t>(value)) {
+        int64_t signed_value = std::get<int64_t>(value);
+        if (signed_value < 0) {
+            uint64_t bits = normalize_inferred_int_bits(min_signed_bits(signed_value));
+            return Type::make_primitive(PrimitiveType::Int, loc, bits);
+        }
+        uint64_t bits = normalize_inferred_int_bits(
+            min_unsigned_bits(static_cast<uint64_t>(signed_value)));
+        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
+    }
+    if (std::holds_alternative<bool>(value)) {
+        return Type::make_primitive(PrimitiveType::Bool, loc);
+    }
+    return nullptr;
+}
+
 } // namespace
 
 bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
@@ -240,33 +335,34 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
 
     TypePtr true_type = check_expr(expr->true_expr);
     TypePtr false_type = check_expr(expr->false_expr);
-    auto coerce_bool_literal_branch = [](ExprPtr branch, TypePtr& branch_type) {
-        if (!branch || !branch_type) return;
-        if (branch->kind != Expr::Kind::IntLiteral) return;
-        if (branch_type->kind != Type::Kind::Primitive ||
-            branch_type->primitive != PrimitiveType::Bool) return;
-        branch_type = Type::make_primitive(PrimitiveType::Int, branch->location, 8);
-        branch->type = branch_type;
+
+    auto concretize_branch = [&](ExprPtr branch_expr, TypePtr& branch_type, TypePtr target_type) -> bool {
+        if (!is_untyped_integer_primitive(branch_type)) return false;
+        if (!target_type || target_type->kind != Type::Kind::Primitive) return false;
+        if (target_type->primitive == PrimitiveType::Bool) return false;
+        if (!literal_assignable_to(target_type, branch_expr)) return false;
+        apply_context_type_recursive(branch_expr, target_type);
+        branch_type = target_type;
+        return true;
     };
-    coerce_bool_literal_branch(expr->true_expr, true_type);
-    coerce_bool_literal_branch(expr->false_expr, false_type);
+
+    if (concretize_branch(expr->true_expr, true_type, false_type)) {
+        expr->type = false_type;
+        return expr->type;
+    }
+    if (concretize_branch(expr->false_expr, false_type, true_type)) {
+        expr->type = true_type;
+        return expr->type;
+    }
 
     if (types_equal(true_type, false_type)) {
         expr->type = true_type;
         return expr->type;
     }
 
-    bool primitive_family_match =
-        true_type && false_type &&
-        true_type->kind == Type::Kind::Primitive &&
-        false_type->kind == Type::Kind::Primitive &&
-        types_in_same_family(true_type, false_type);
-
-    if (primitive_family_match) {
-        expr->type = unify_types(true_type, false_type);
-        if (!expr->type) {
-            throw CompileError("Conditional branches must be compatible in numeric family", expr->location);
-        }
+    TypePtr merged_type = unify_types(true_type, false_type);
+    if (merged_type) {
+        expr->type = merged_type;
         return expr->type;
     }
 
@@ -301,6 +397,14 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
     TypePtr target_type = validate_type(expr->target_type, expr->location);
     expr->target_type = target_type;
+    if (operand_type &&
+        operand_type->kind == Type::Kind::Primitive &&
+        (operand_type->primitive == PrimitiveType::Int || operand_type->primitive == PrimitiveType::UInt) &&
+        operand_type->integer_bits == 0 &&
+        literal_assignable_to(target_type, expr->operand)) {
+        apply_context_type_recursive(expr->operand, target_type);
+        operand_type = target_type;
+    }
 
     // Special-case: casting packed bool arrays to unsigned integers requires matching size
     if (target_type && target_type->kind == Type::Kind::Primitive &&
@@ -349,6 +453,18 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         TypePtr var_type = expr->left->type ? expr->left->type : rhs_type;
         if (expr->left->type) {
             enforce_declared_initializer_type(var_type, expr->right, rhs_type, expr->location);
+            rhs_inferred_type = rhs_type;
+        } else if (is_untyped_integer_primitive(rhs_type)) {
+            CTEQueryResult query = query_constexpr(expr->right);
+            if (query.status == CTEQueryStatus::Known) {
+                TypePtr inferred = infer_integer_type_from_const_value(query.value, expr->location);
+                if (inferred) {
+                    apply_context_type_recursive(expr->right, inferred);
+                    rhs_type = inferred;
+                    rhs_inferred_type = inferred;
+                    var_type = inferred;
+                }
+            }
         }
 
         Symbol* lhs_sym = lookup_binding(expr->left.get());
@@ -429,8 +545,15 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         throw CompileError("Arity mismatch in multi-assignment", expr->location);
     }
 
+    if (is_untyped_integer_primitive(rhs_type) &&
+        literal_assignable_to(lhs_type, expr->right)) {
+        apply_context_type_recursive(expr->right, lhs_type);
+        rhs_type = lhs_type;
+    }
+
     if (!types_compatible(rhs_type, lhs_type)) {
         if (literal_assignable_to(lhs_type, expr->right)) {
+            apply_context_type_recursive(expr->right, lhs_type);
             expr->type = lhs_type;
             return lhs_type;
         }
@@ -529,6 +652,23 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
     TypePtr elem_type = unify_types(start_type, end_type);
     if (!elem_type) {
         throw CompileError("Range bounds must have compatible numeric types", expr->location);
+    }
+    if (is_untyped_integer_primitive(elem_type)) {
+        if (start_val < 0 || end_val < 0) {
+            uint64_t bits = min_signed_bits(std::min(start_val, end_val));
+            if (std::max(start_val, end_val) > 0) {
+                bits = std::max(bits, min_signed_bits(std::max(start_val, end_val)));
+            }
+            elem_type = Type::make_primitive(PrimitiveType::Int,
+                                             expr->location,
+                                             normalize_inferred_int_bits(bits));
+        } else {
+            uint64_t max_v = static_cast<uint64_t>(std::max(start_val, end_val));
+            elem_type = Type::make_primitive(
+                PrimitiveType::UInt,
+                expr->location,
+                normalize_inferred_int_bits(min_unsigned_bits(max_v)));
+        }
     }
     uint64_t count = (start_val < end_val)
         ? static_cast<uint64_t>(end_val - start_val)

@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
+// @desc: Constructor arguments must be representable in declared field types. | Constructor rejects non-representable literal field value
+
+#Packet(size:#u8);
+
+&^main() -> #i32 {
+    p:#Packet = Packet(300);
+    0
+}

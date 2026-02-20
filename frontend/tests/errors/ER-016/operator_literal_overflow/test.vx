@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
+// @desc: Mixed typed/untyped arithmetic enforces representability on untyped literals. | Arithmetic rejects non-representable literal operand
+
+&^main() -> #i32 {
+    y:#u8 = 1;
+    x:#u8 = 300 + y;
+    (#i32)x
+}
