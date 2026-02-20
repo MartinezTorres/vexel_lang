@@ -16,9 +16,13 @@ Use `-b megalinker` or `-b vexel` to inspect other backend outputs.
 
 ## C Backend Status
 
-All `.vx` files in `examples/` currently compile with `-b c` except:
+Examples evolve with frontend/backend refactors. Do not assume every `.vx` file in this tree compiles with every backend at all times.
 
-- `raytracer.vx` (known backend typing gap in C codegen; it compiles with `-b vexel`)
+To check current status locally:
+
+```bash
+find examples -name '*.vx' -print0 | xargs -0 -n1 ./build/vexel -b c
+```
 
 ## Tutorial Examples
 
@@ -28,7 +32,7 @@ All `.vx` files in `examples/` currently compile with `-b c` except:
 ## Library and Showcase
 
 - `lib/` contains reusable helper modules (`math`, `print`, `vector`, `stack`, `set`, `config`, `counter`).
-- `raytracer.vx` is a large showcase example and is validated with the `vexel` backend.
+- `raytracer.vx` is a large showcase example.
 
 ## Notes
 

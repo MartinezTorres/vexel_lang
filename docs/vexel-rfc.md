@@ -22,7 +22,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Identifiers**: `[A-Za-z_][A-Za-z0-9_]*` (no length limit)
 - **Comments**: `//` to end-of-line
 - **Literals**:
-  - Integers: `123`, `0xFF`. Inferred as the smallest fitting integer type (see literal inference rules).
+  - Integers: `123`, `0xFF`. Parsed as unresolved signed/unsigned integer literals; concrete integer types are inferred from surrounding constraints.
   - Floats: `1.23`. Default: `#f64`
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
@@ -40,7 +40,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Parametric signed integers: `#iN` where `N` is any positive integer width
 - Parametric unsigned integers: `#uN` where `N` is any positive integer width
 - Floating point: `#f16`, `#f32`, `#f64`
-- Backends may support only a subset of integer widths (for example, C/megalinker currently support 8/16/32/64)
+- Backends may support only a subset of integer widths (for example, some targets may accept only 8/16/32/64)
 - Boolean: `#b` (values 0 or 1 only, no true/false literals)
   - Use 0 for false, 1 for true
   - Arrays of booleans can be bit-packed: `#b[8]` fits in one byte
@@ -55,20 +55,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - - Array length: `|arr|` yields compile-time constant integer (array size)
 - Literal `[e1,e2,...]` infers size from element count (may be empty)
   - `[ ]` produces `#T[0]` for the target type `#T` when context requires an array
-  - Type inferred as minimal type that fits all elements collectively:
-  - **Note**: Individual literal type inference (e.g., 0→#b, 1→#b) does NOT apply inside arrays
-  - Examine the full range of values: smallest to largest
-  - Values 0-1 only → `#b`
-  - Values 2-255 → `#u8`
-  - Any negative value → smallest signed type that fits range
-  - Examples:
-    - `[0]` → `#b[1]` (only 0)
-    - `[0,1]` → `#b[2]` (values 0-1 fit in b)
-    - `[0,1,2]` → `#u8[3]` (value 2 requires u8)
-    - `[0,1,255]` → `#u8[3]` (max value 255 fits in u8)
-    - `[-1,0,1]` → `#i8[3]` (has negative, fits in i8)
-    - `[0,1,256]` → `#u16[3]` (max value 256 needs u16)
-  - Automatic promotion applies when assigning to typed arrays
+  - Element type is inferred by unifying element expression types
+  - If all elements are unresolved integer literals, element type remains unresolved until constrained by context
+  - Once a concrete element type is known, each element must be representable in that type
 - Size is part of type: `#i32[10]` != `#i32[20]`
 
 **Type constructors**: `#Name(field[:Type],...);`
@@ -86,7 +75,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Type expressions**: `#[expr]`
 - Resolves to the static type of `expr` in the current scope.
-- Uses normal type inference rules (for example, `#[1]` resolves to `#b`).
+- Uses the same inference state as normal expression typing (including unresolved integer literal types until constrained).
 - `expr` is type-checked only; `#[expr]` does not evaluate `expr` or trigger side effects.
 - Must resolve to a concrete type before backend handoff.
 - Valid anywhere a type is expected, including cast targets and declaration annotations.
@@ -122,12 +111,12 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Memory model**: No heap allocation. All data is stack-allocated or compile-time constant.
 
-**Literal type inference**:
-- Integer literals use minimal semantic width, then normalize to backend-oriented buckets:
-  - `0`, `1` → `#b`
-  - unsigned literals normalize to `#u8` / `#u16` / `#u32` / `#u64`
-  - signed literals normalize to `#i8` / `#i16` / `#i32` / `#i64`
-  - Assignment/casts can target any explicit `#iN`/`#uN` width when values fit
+**Integer literal typing**:
+- Integer literals start as unresolved integer carriers (`#i?` / `#u?`).
+- Concretization happens when a context requires a concrete type (for example typed declarations, casts, concrete operator partners, ABI-boundary checks).
+- Representability checks are strict at concretization time; non-representable literals are compile-time errors.
+- Boolean contexts accept only integer literals representable as `#b` (0 or 1).
+- Compilers may expose stricter modes that require earlier concretization (for example explicit local type annotations and explicit call-boundary casts).
 - Floating literals: `#f64`
 - Character literals: `#u8`
 
@@ -395,6 +384,8 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 - Hindley-Milner per function body
 - Omitted parameter/field types create fresh type variables inferred from call sites
+- Unresolved integer literals may flow through inference until a concrete requirement appears
+- Implementations may offer strictness modes that reject unresolved flow earlier; this strengthens diagnostics, not core runtime semantics
 - Argument types include full array shape (element type + length); mismatched lengths form distinct instantiations
 - Generic functions may not be exported or external; they must resolve within the compiling program
 - Specialization semantics are pure language behavior—implementations may inline, share, or eliminate copies as long as observable semantics match a concrete instantiation
@@ -512,6 +503,8 @@ refparams    ::= ident { ',' ident }
 
 global       ::= [ '^' ] ident [ ':' type ] '=' expr    // immutable constant
              |   ident ':' type                          // mutable variable
+             |   '!' ident ':' type ';'                  // external symbol global
+             |   '!!' ident ':' type ';'                 // backend-bound global
 type_decl    ::= '#' ident '(' [ fields ] ')' ';'
 fields       ::= ident [ ':' type ] { ',' ident [ ':' type ] }
 
@@ -550,8 +543,9 @@ array        ::= '[' [ expr { ',' expr } ] ']'
 qname        ::= ident { '::' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
-type         ::= '[' expr ']' '#' ( ident | '[' expr ']' )
-               | '#' ( ident | '[' expr ']' ) { '[' expr ']' }
+type         ::= '#' type_atom { '[' expr ']' }
+               | '[' expr ']' '#' type_atom
+type_atom    ::= ident | '[' expr ']'
 
 lvalue       ::= var | methodcall | index | member
 

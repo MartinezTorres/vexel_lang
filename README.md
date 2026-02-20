@@ -17,7 +17,7 @@ gcc out.c -o simple -lm
 
 - `frontend/` - lexer/parser/typechecker/evaluator/AST + analysis pipeline (`libvexelfrontend.a`, `build/vexel-frontend`, tests).
 - `backends/c/` - portable C backend (`libvexel-c.a`, tests).
-- `backends/ext/megalinker/` - banked megalinker backend (WIP).
+- `backends/ext/` - optional local external backends discovered by the build/driver (for example `megalinker` when present).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
 - `docs/` - language RFC (`docs/vexel-rfc.md`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
@@ -36,7 +36,6 @@ Implementation index:
 - Frontend invariant checks: `frontend/src/pipeline/pass_invariants.h`, `frontend/src/pipeline/pass_invariants.cpp`
 - Lowered frontend contract: `frontend/src/transform/lowerer.h`
 - C backend code generator core: `backends/c/src/codegen.h`
-- Megalinker backend code generator core: `backends/ext/megalinker/src/codegen.h`
 - Backend plugin API: `frontend/src/support/backend_registry.h`
 - Driver CLI contract: `driver/src/vexel_main.cpp`
 - Backend discovery/build wiring: `Makefile`, `driver/Makefile`, `playground/Makefile`
@@ -67,7 +66,7 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ./build/vexel -b c --emit-analysis input.vx     # emit analysis report
 ./build/vexel -b c --type-strictness=1 input.vx # require explicit type annotations for new variables
 ./build/vexel -b c --strict-types=full input.vx # full strict mode (equivalent to --type-strictness=2)
-./build/vexel -b megalinker --backend-opt caller_limit=8 input.vx
+./build/vexel -b megalinker --backend-opt caller_limit=8 input.vx # when local megalinker backend is present
 ./build/vexel -b c --run input.vx               # optional: run via libtcc
 ./build/vexel -b c --emit-exe -o app input.vx   # optional: emit native exe via libtcc
 ./build/vexel-frontend input.vx                 # frontend-only validation (no backend emission)
@@ -88,13 +87,13 @@ Backend architecture rule:
 
 - The frontend/backend boundary is the `AnalyzedProgram` contract.
 - Backend code generation is intentionally backend-owned; no shared codegen layer.
-- C and megalinker are expected to diverge in lowering strategy and target behavior.
+- Backends are expected to diverge in lowering strategy and target behavior.
 - Reentrancy is analyzed in the frontend graph pass; each backend documents its boundary defaults and whether it consumes `[[nonreentrant]]`.
 
 Current reentrancy contract:
 
 - C backend (`backends/c/README.md`): recognizes `[[nonreentrant]]`; defaults to reentrant entry/exit boundaries (`R/R`).
-- Megalinker backend (`backends/ext/megalinker/README.md`): recognizes `[[nonreentrant]]`; defaults to reentrant entry/exit boundaries (`R/R`) and uses `[[nonreentrant]]` to opt specific boundaries into non-reentrant mode.
+- External backends under `backends/ext/<name>/` define their own reentrancy defaults in their local README.
 
 Each backend must provide:
 
