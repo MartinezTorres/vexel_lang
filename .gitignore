@@ -18,7 +18,7 @@ a.out
 
 # Executables
 example
-test_*
+/test_*
 
 # Temporary files
 *_main.c

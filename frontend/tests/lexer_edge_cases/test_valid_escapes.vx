@@ -1,0 +1,10 @@
+// Test that escape sequences are lexed correctly
+// This should compile without lexer errors
+s:#s = "hello\nworld\t\r\\\"";
+n:#i32 = 10;
+h:#i32 = 0x41;
+o:#i32 = 33;
+
+&^main() -> #i32 {
+    -> 0;
+}

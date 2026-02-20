@@ -45,4 +45,3 @@ Some files here are kept for parser/runtime exploration and may fail with the cu
 ## Notes
 
 - `-o` takes an output base path; backends emit one or more files from that base.
-- `lexer_edge_cases/` contains lexer-focused fixtures plus `test_runner.sh`.

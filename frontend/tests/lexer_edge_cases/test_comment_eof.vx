@@ -1,0 +1,4 @@
+&^main() -> #i32 {
+    -> 0;
+}
+// comment without newline at end
