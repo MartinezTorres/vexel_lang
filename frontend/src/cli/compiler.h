@@ -21,11 +21,12 @@ public:
         std::string project_root;     // Root directory for module resolution
         bool emit_analysis;           // Emit analysis report alongside backend output
         bool allow_process = false;   // Process expressions execute host commands; keep disabled by default
+        int type_strictness = 0;      // 0=relaxed, 1=annotated locals, 2=full strict typing
         std::string backend; // Backend name (registered via backend registry)
         std::unordered_map<std::string, std::string> backend_options; // Backend-specific key=value options
 
         Options() : verbose(false), project_root("."), emit_analysis(false),
-                    allow_process(false), backend("") {}
+                    allow_process(false), type_strictness(0), backend("") {}
     };
 
     struct OutputPaths {

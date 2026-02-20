@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#type-inference--generics
+// @desc: Type strictness level 2 rejects unresolved literal flow through inferred call boundaries. | strictness 2 rejects unresolved literal call argument
+
+&id(x) {
+    x
+}
+
+&^main() -> #i32 {
+    id(42);
+    0
+}

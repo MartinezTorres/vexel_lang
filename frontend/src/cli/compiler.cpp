@@ -112,7 +112,8 @@ PreparedCompilation prepare_compilation(const Compiler::Options& options, const 
                                       options.allow_process,
                                       prepared.resolver.get(),
                                       &prepared.bindings,
-                                      &prepared.program);
+                                      &prepared.program,
+                                      options.type_strictness);
     prepared.pipeline =
         run_frontend_pipeline(prepared.program,
                               *prepared.resolver,

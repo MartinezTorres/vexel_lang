@@ -52,27 +52,6 @@ TypePtr make_int_type(const SourceLocation& loc, uint64_t bits, bool is_unsigned
     return Type::make_primitive(is_unsigned ? PrimitiveType::UInt : PrimitiveType::Int, loc, bits);
 }
 
-TypePtr infer_integer_type_from_const_value(const CTValue& value, const SourceLocation& loc) {
-    if (std::holds_alternative<uint64_t>(value)) {
-        uint64_t bits = normalize_inferred_int_bits(min_unsigned_bits(std::get<uint64_t>(value)));
-        return make_int_type(loc, bits, true);
-    }
-    if (std::holds_alternative<int64_t>(value)) {
-        int64_t signed_value = std::get<int64_t>(value);
-        if (signed_value < 0) {
-            uint64_t bits = normalize_inferred_int_bits(min_signed_bits(signed_value));
-            return make_int_type(loc, bits, false);
-        }
-        uint64_t bits = normalize_inferred_int_bits(
-            min_unsigned_bits(static_cast<uint64_t>(signed_value)));
-        return make_int_type(loc, bits, true);
-    }
-    if (std::holds_alternative<bool>(value)) {
-        return Type::make_primitive(PrimitiveType::Bool, loc);
-    }
-    return nullptr;
-}
-
 bool is_untyped_integer_type(const TypePtr& type) {
     return type &&
            type->kind == Type::Kind::Primitive &&
@@ -611,14 +590,16 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             for (size_t i = 0; i < expr->args.size() && i < sym->declaration->params.size(); i++) {
                 ExprPtr arg_expr = expr->args[i];
                 TypePtr param_type = sym->declaration->params[i].type;
-                if (is_untyped_integer_type(arg_expr->type)) {
-                    CTEQueryResult query = query_constexpr(arg_expr);
-                    if (query.status == CTEQueryStatus::Known) {
-                        TypePtr inferred = infer_integer_type_from_const_value(query.value, arg_expr->location);
-                        if (inferred) {
-                            apply_context_type_to_terminal_expr_local(arg_expr, inferred);
-                        }
-                    }
+                bool param_is_unconstrained = !param_type || param_type->kind == Type::Kind::TypeVar;
+                if (type_strictness >= 2 &&
+                    !sym->declaration->params[i].is_expression_param &&
+                    is_untyped_integer_type(arg_expr->type) &&
+                    param_is_unconstrained) {
+                    throw CompileError(
+                        "Type strictness level 2 requires explicit cast or parameter type for argument '" +
+                            sym->declaration->params[i].name + "' in call to '" +
+                            sym->declaration->func_name + "'",
+                        expr->location);
                 }
                 if (param_type && param_type->kind != Type::Kind::TypeVar) {
                     if (is_untyped_integer_type(arg_expr->type) &&
@@ -675,6 +656,16 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
 
             TypePtr param_type = param.type;
+
+            bool param_is_unconstrained = !param_type || param_type->kind == Type::Kind::TypeVar;
+            if (type_strictness >= 2 &&
+                is_untyped_integer_type(arg_expr->type) &&
+                param_is_unconstrained) {
+                throw CompileError(
+                    "Type strictness level 2 requires explicit cast or parameter type for argument '" +
+                        param.name + "' in call to '" + sym->declaration->func_name + "'",
+                    expr->location);
+            }
 
             if (!param_type || param_type->kind == Type::Kind::TypeVar) {
                 // Infer generic parameter types from arguments
@@ -861,79 +852,6 @@ TypePtr TypeChecker::check_array_literal(ExprPtr expr) {
                                    elem->location);
             }
             apply_context_type_to_terminal_expr_local(elem, elem_type);
-        }
-    }
-
-    if (is_untyped_integer_type(elem_type)) {
-        bool all_const = true;
-        bool has_negative = false;
-        bool all_bool_values = true;
-        uint64_t max_unsigned = 0;
-        int64_t min_signed = 0;
-        int64_t max_signed = 0;
-        bool signed_seen = false;
-
-        for (const auto& elem : expr->elements) {
-            CTEQueryResult query = query_constexpr(elem);
-            if (query.status != CTEQueryStatus::Known) {
-                all_const = false;
-                break;
-            }
-            const CTValue& value = query.value;
-            if (std::holds_alternative<bool>(value)) {
-                uint64_t v = std::get<bool>(value) ? 1ULL : 0ULL;
-                max_unsigned = std::max(max_unsigned, v);
-                continue;
-            }
-            if (std::holds_alternative<uint64_t>(value)) {
-                uint64_t v = std::get<uint64_t>(value);
-                max_unsigned = std::max(max_unsigned, v);
-                if (v > 1ULL) {
-                    all_bool_values = false;
-                }
-                continue;
-            }
-            if (std::holds_alternative<int64_t>(value)) {
-                int64_t v = std::get<int64_t>(value);
-                if (!signed_seen) {
-                    min_signed = v;
-                    max_signed = v;
-                    signed_seen = true;
-                } else {
-                    min_signed = std::min(min_signed, v);
-                    max_signed = std::max(max_signed, v);
-                }
-                if (v < 0) {
-                    has_negative = true;
-                    all_bool_values = false;
-                } else {
-                    uint64_t uv = static_cast<uint64_t>(v);
-                    max_unsigned = std::max(max_unsigned, uv);
-                    if (uv > 1ULL) {
-                        all_bool_values = false;
-                    }
-                }
-                continue;
-            }
-
-            all_const = false;
-            break;
-        }
-
-        if (all_const) {
-            if (all_bool_values) {
-                elem_type = Type::make_primitive(PrimitiveType::Bool, expr->location);
-            } else if (has_negative) {
-                uint64_t bits = min_signed_bits(min_signed);
-                if (max_signed > 0) {
-                    bits = std::max(bits, min_signed_bits(max_signed));
-                }
-                elem_type = make_int_type(expr->location, normalize_inferred_int_bits(bits), false);
-            } else {
-                elem_type = make_int_type(expr->location,
-                                          normalize_inferred_int_bits(min_unsigned_bits(max_unsigned)),
-                                          true);
-            }
         }
     }
 

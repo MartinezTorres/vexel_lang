@@ -61,6 +61,7 @@ class TypeChecker {
     Scope* global_scope;
     int type_var_counter;
     int loop_depth;
+    int type_strictness;
     std::unordered_map<std::string, TypePtr> type_var_bindings;
 
     // Generic instantiation tracking
@@ -106,8 +107,12 @@ public:
         int saved_instance_;
     };
 
-    TypeChecker(const std::string& proj_root = ".", bool allow_process_exprs = false,
-                Resolver* resolver = nullptr, Bindings* bindings = nullptr, Program* program = nullptr);
+    TypeChecker(const std::string& proj_root = ".",
+                bool allow_process_exprs = false,
+                Resolver* resolver = nullptr,
+                Bindings* bindings = nullptr,
+                Program* program = nullptr,
+                int type_strictness_level = 0);
     ~TypeChecker();
     void check_program(Program& program);
     void check_module(Module& mod);

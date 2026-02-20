@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Type strictness level 1 requires explicit local variable annotations. | strictness 1 rejects untyped local declaration assignment
+
+&^main() -> #i32 {
+    x = 0;
+    0
+}

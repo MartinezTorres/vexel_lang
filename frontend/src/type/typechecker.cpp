@@ -20,6 +20,26 @@ bool is_untyped_integer_type_local(const TypePtr& type) {
            type->integer_bits == 0;
 }
 
+bool type_is_concrete_for_signature(const TypePtr& type) {
+    if (!type) return false;
+    switch (type->kind) {
+        case Type::Kind::Primitive:
+            if ((type->primitive == PrimitiveType::Int || type->primitive == PrimitiveType::UInt) &&
+                type->integer_bits == 0) {
+                return false;
+            }
+            return true;
+        case Type::Kind::TypeVar:
+        case Type::Kind::TypeOf:
+            return false;
+        case Type::Kind::Array:
+            return type_is_concrete_for_signature(type->element_type);
+        case Type::Kind::Named:
+            return true;
+    }
+    return false;
+}
+
 void apply_context_type_to_terminal_expr(const ExprPtr& expr, const TypePtr& target) {
     if (!expr || !target) return;
     if (expr->kind == Expr::Kind::Block) {
@@ -59,70 +79,21 @@ void apply_context_type_to_terminal_expr(const ExprPtr& expr, const TypePtr& tar
     }
 }
 
-uint64_t min_unsigned_bits_for_value(uint64_t value) {
-    if (value == 0) return 1;
-    uint64_t bits = 0;
-    while (value > 0) {
-        value >>= 1;
-        bits++;
-    }
-    return bits;
-}
-
-uint64_t min_signed_bits_for_value(int64_t value) {
-    for (uint64_t bits = 1; bits <= 64; ++bits) {
-        if (bits == 64) {
-            return 64;
-        }
-        const int64_t min_v = -(int64_t(1) << (bits - 1));
-        const int64_t max_v = (int64_t(1) << (bits - 1)) - 1;
-        if (value >= min_v && value <= max_v) {
-            return bits;
-        }
-    }
-    return 64;
-}
-
-uint64_t normalize_inferred_int_bits_local(uint64_t bits) {
-    if (bits <= 8) return 8;
-    if (bits <= 16) return 16;
-    if (bits <= 32) return 32;
-    return 64;
-}
-
-TypePtr infer_integer_type_from_const_value_local(const CTValue& value, const SourceLocation& loc) {
-    if (std::holds_alternative<uint64_t>(value)) {
-        uint64_t bits = normalize_inferred_int_bits_local(
-            min_unsigned_bits_for_value(std::get<uint64_t>(value)));
-        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
-    }
-    if (std::holds_alternative<int64_t>(value)) {
-        int64_t signed_value = std::get<int64_t>(value);
-        if (signed_value < 0) {
-            uint64_t bits = normalize_inferred_int_bits_local(
-                min_signed_bits_for_value(signed_value));
-            return Type::make_primitive(PrimitiveType::Int, loc, bits);
-        }
-        uint64_t bits = normalize_inferred_int_bits_local(
-            min_unsigned_bits_for_value(static_cast<uint64_t>(signed_value)));
-        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
-    }
-    if (std::holds_alternative<bool>(value)) {
-        return Type::make_primitive(PrimitiveType::Bool, loc);
-    }
-    return nullptr;
-}
-
 } // namespace
 
-TypeChecker::TypeChecker(const std::string& proj_root, bool allow_process_exprs, Resolver* resolver,
-                         Bindings* bindings_in, Program* program_in)
+TypeChecker::TypeChecker(const std::string& proj_root,
+                         bool allow_process_exprs,
+                         Resolver* resolver,
+                         Bindings* bindings_in,
+                         Program* program_in,
+                         int type_strictness_level)
     : resolver(resolver),
       bindings(bindings_in),
       program(program_in),
       global_scope(nullptr),
       type_var_counter(0),
       loop_depth(0),
+      type_strictness(type_strictness_level),
       project_root(proj_root),
       allow_process(allow_process_exprs),
       cte_engine(std::make_unique<CTEEngine>(this)) {}
@@ -422,22 +393,12 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
                 stmt->return_type = stmt->return_types[0];
             }
         } else if (!stmt->return_type) {
-            if (is_untyped_integer_type_local(body_type)) {
-                CTEQueryResult query = query_constexpr(stmt->body);
-                if (query.status == CTEQueryStatus::Known) {
-                    TypePtr inferred = infer_integer_type_from_const_value_local(query.value, stmt->location);
-                    if (inferred) {
-                        stmt->return_type = inferred;
-                        apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
-                    } else {
-                        stmt->return_type = body_type;
-                    }
-                } else {
-                    stmt->return_type = body_type;
-                }
-            } else {
-                stmt->return_type = body_type;
+            if (type_strictness >= 2 && !type_is_concrete_for_signature(body_type)) {
+                throw CompileError("Type strictness level 2 requires explicit concrete return type for function '" +
+                                       stmt->func_name + "'",
+                                   stmt->location);
             }
+            stmt->return_type = body_type;
         } else if (!types_compatible(body_type, stmt->return_type)) {
             ExprPtr return_expr = stmt->body;
             if (return_expr && return_expr->kind == Expr::Kind::Block && return_expr->result_expr) {
@@ -452,6 +413,14 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
             }
         } else if (is_untyped_integer_type_local(body_type)) {
             apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
+        }
+
+        if (stmt->is_exported &&
+            stmt->return_type &&
+            !type_is_concrete_for_signature(stmt->return_type)) {
+            throw CompileError("Exported function '" + stmt->func_name +
+                                   "' requires a concrete return type",
+                               stmt->location);
         }
     }
 }
@@ -525,28 +494,14 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
 }
 
 void TypeChecker::check_var_decl(StmtPtr stmt) {
+    const bool has_explicit_type = stmt->var_type != nullptr;
     TypePtr type = stmt->var_type;
     bool constexpr_init = false;
     const bool is_external_binding = stmt->var_linkage != VarLinkageKind::Normal;
     if (stmt->var_init) {
         TypePtr init_type = check_expr(stmt->var_init);
         if (!type) {
-            if (is_untyped_integer_type_local(init_type)) {
-                CTEQueryResult query = query_constexpr(stmt->var_init);
-                if (query.status == CTEQueryStatus::Known) {
-                    TypePtr inferred = infer_integer_type_from_const_value_local(query.value, stmt->location);
-                    if (inferred) {
-                        type = inferred;
-                        apply_context_type_to_terminal_expr(stmt->var_init, type);
-                    } else {
-                        type = init_type;
-                    }
-                } else {
-                    type = init_type;
-                }
-            } else {
-                type = init_type;
-            }
+            type = init_type;
             stmt->var_type = type;
         } else {
             enforce_declared_initializer_type(type, stmt->var_init, init_type, stmt->location);
@@ -562,6 +517,12 @@ void TypeChecker::check_var_decl(StmtPtr stmt) {
     Symbol* sym = lookup_binding(stmt.get());
     if (!sym) {
         throw CompileError("Internal error: unresolved variable '" + stmt->var_name + "'", stmt->location);
+    }
+
+    if (type_strictness >= 1 && !has_explicit_type) {
+        throw CompileError("Type strictness level 1 requires explicit type annotation for variable '" +
+                               stmt->var_name + "'",
+                           stmt->location);
     }
 
     bool inferred_mutable = stmt->is_mutable;
@@ -884,6 +845,7 @@ void TypeChecker::validate_type_usage(const Module& mod, const AnalysisFacts& fa
     ctx.binding = [this](int instance_id, ExprPtr expr) {
         return binding_for(instance_id, expr.get());
     };
+    ctx.type_strictness = type_strictness;
     ::vexel::validate_type_usage(mod, facts, ctx);
 }
 

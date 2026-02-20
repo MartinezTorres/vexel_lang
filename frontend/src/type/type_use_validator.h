@@ -11,6 +11,7 @@ struct TypeUseContext {
     std::function<TypePtr(TypePtr)> resolve_type;
     std::function<std::optional<bool>(int, ExprPtr)> constexpr_condition;
     std::function<const Symbol*(int, ExprPtr)> binding;
+    int type_strictness = 0;
 };
 
 void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const TypeUseContext& ctx);

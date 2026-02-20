@@ -35,6 +35,17 @@ bool type_is_concrete(const TypeUseContext* ctx, TypePtr type) {
     }
 }
 
+bool type_is_unresolved_integer(const TypeUseContext* ctx, TypePtr type) {
+    if (!type) return false;
+    if (ctx && ctx->resolve_type) {
+        type = ctx->resolve_type(type);
+    }
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (type->primitive == PrimitiveType::Int || type->primitive == PrimitiveType::UInt) &&
+           type->integer_bits == 0;
+}
+
 std::string qualified_func_name(const Symbol* sym) {
     if (!sym) return "";
     return sym->name;
@@ -57,7 +68,7 @@ void for_each_call_value_arg(const Symbol* callee, ExprPtr call_expr, const ArgF
                              param_index < callee->declaration->params.size() &&
                              callee->declaration->params[param_index].is_expression_param;
         if (!is_expr_param) {
-            fn(arg);
+            fn(param_index, arg);
         }
         ++param_index;
     }
@@ -96,7 +107,7 @@ struct CallCollector {
                     collect_expr(rec, true);
                 }
                 const Symbol* callee = bound_callee(ctx, instance_id, expr);
-                for_each_call_value_arg(callee, expr, [&](ExprPtr arg) { collect_expr(arg, true); });
+                for_each_call_value_arg(callee, expr, [&](size_t, ExprPtr arg) { collect_expr(arg, true); });
                 break;
             }
             case Expr::Kind::Binary:
@@ -229,16 +240,22 @@ struct TypeUseValidator {
                 throw CompileError("Expression produces no value", expr->location);
             }
             if (!type_is_concrete(ctx, expr->type)) {
-                if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
-                    std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
-                              << " type=" << (expr->type ? expr->type->to_string() : "<null>");
-                    if (expr->kind == Expr::Kind::Identifier) {
-                        std::cerr << " name=" << expr->name;
+                if (ctx->type_strictness < 2 &&
+                    type_is_unresolved_integer(ctx, expr->type)) {
+                    // Relaxed modes allow unresolved integer flow until a concrete
+                    // type context forces representability.
+                } else {
+                    if (const char* debug = std::getenv("VEXEL_DEBUG_TYPE_USE"); debug && *debug) {
+                        std::cerr << "Type-use debug: kind=" << static_cast<int>(expr->kind)
+                                  << " type=" << (expr->type ? expr->type->to_string() : "<null>");
+                        if (expr->kind == Expr::Kind::Identifier) {
+                            std::cerr << " name=" << expr->name;
+                        }
+                        std::cerr << " at " << expr->location.filename << ":" << expr->location.line
+                                  << ":" << expr->location.column << "\n";
                     }
-                    std::cerr << " at " << expr->location.filename << ":" << expr->location.line
-                              << ":" << expr->location.column << "\n";
+                    throw CompileError("Expression requires a concrete type", expr->location);
                 }
-                throw CompileError("Expression requires a concrete type", expr->location);
             }
         }
 
@@ -258,7 +275,24 @@ struct TypeUseValidator {
                 }
                 {
                     const Symbol* callee = bound_callee(ctx, instance_id, expr);
-                    for_each_call_value_arg(callee, expr, [&](ExprPtr arg) { validate_expr(arg, true); });
+                    for_each_call_value_arg(callee, expr, [&](size_t param_index, ExprPtr arg) {
+                        bool arg_value_required = true;
+                        bool arg_is_unresolved = type_is_unresolved_integer(ctx, arg ? arg->type : nullptr);
+                        if (arg_is_unresolved && !value_required) {
+                            arg_value_required = false;
+                        }
+                        if (callee && callee->kind == Symbol::Kind::Function && callee->declaration &&
+                            param_index < callee->declaration->params.size()) {
+                            TypePtr param_type = callee->declaration->params[param_index].type;
+                            bool param_allows_unresolved =
+                                !param_type || !type_is_concrete(ctx, param_type);
+                            if (param_allows_unresolved && arg_is_unresolved) {
+                                // Unresolved literal flow through unconstrained call boundaries is legal in relaxed modes.
+                                arg_value_required = false;
+                            }
+                        }
+                        validate_expr(arg, arg_value_required);
+                    });
                 }
                 break;
             case Expr::Kind::Index:
@@ -297,7 +331,14 @@ struct TypeUseValidator {
                 break;
             case Expr::Kind::Assignment:
                 validate_lvalue(expr->left);
-                validate_expr(expr->right, true);
+                {
+                    bool rhs_required = true;
+                    TypePtr lhs_type = expr->left ? expr->left->type : nullptr;
+                    if (!type_is_concrete(ctx, lhs_type)) {
+                        rhs_required = false;
+                    }
+                    validate_expr(expr->right, rhs_required);
+                }
                 break;
             case Expr::Kind::Range:
                 validate_expr(expr->left, true);
@@ -320,10 +361,13 @@ struct TypeUseValidator {
         if (!stmt) return;
         switch (stmt->kind) {
             case Stmt::Kind::VarDecl:
-                if (!type_is_concrete(ctx, stmt->var_type)) {
+                if (!type_is_concrete(ctx, stmt->var_type) && ctx->type_strictness >= 1) {
                     throw CompileError("Variable '" + stmt->var_name + "' requires a concrete type", stmt->location);
                 }
-                validate_expr(stmt->var_init, true);
+                {
+                    bool init_required = type_is_concrete(ctx, stmt->var_type);
+                    validate_expr(stmt->var_init, init_required);
+                }
                 break;
             case Stmt::Kind::Expr:
                 validate_expr(stmt->expr, false);
@@ -461,6 +505,12 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
                 continue;
             }
             if (!type_is_concrete(&ctx, param.type)) {
+                bool allow_relaxed_unresolved =
+                    ctx.type_strictness < 2 &&
+                    type_is_unresolved_integer(&ctx, param.type);
+                if (allow_relaxed_unresolved) {
+                    continue;
+                }
                 throw CompileError("Parameter '" + param.name + "' in function '" +
                                    qualified_func_name(sym) + "' requires a concrete type",
                                    param.location);

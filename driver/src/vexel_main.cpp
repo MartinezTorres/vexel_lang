@@ -29,6 +29,8 @@ void print_usage(const char* prog,
     std::cout << "\n";
     std::cout << "  --emit-analysis Emit analysis report alongside backend output\n";
     std::cout << "  --allow-process Enable process expressions (executes host commands; disabled by default)\n";
+    std::cout << "  --type-strictness <0|1|2> Literal/type strictness (0 relaxed, 1 annotated-locals, 2 full)\n";
+    std::cout << "  --strict-types[=full] Alias for --type-strictness=1 (or 2 with '=full')\n";
     std::cout << "  --backend-opt <k=v> Backend-specific option (repeatable)\n";
     if (has_native_tcc) {
         std::cout << "  --run         Compile with backend c and run in-process via libtcc (no .c/.h output)\n";

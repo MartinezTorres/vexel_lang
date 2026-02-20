@@ -209,27 +209,6 @@ uint64_t normalize_inferred_int_bits(uint64_t bits) {
     return 64;
 }
 
-TypePtr infer_integer_type_from_const_value(const CTValue& value, const SourceLocation& loc) {
-    if (std::holds_alternative<uint64_t>(value)) {
-        uint64_t bits = normalize_inferred_int_bits(min_unsigned_bits(std::get<uint64_t>(value)));
-        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
-    }
-    if (std::holds_alternative<int64_t>(value)) {
-        int64_t signed_value = std::get<int64_t>(value);
-        if (signed_value < 0) {
-            uint64_t bits = normalize_inferred_int_bits(min_signed_bits(signed_value));
-            return Type::make_primitive(PrimitiveType::Int, loc, bits);
-        }
-        uint64_t bits = normalize_inferred_int_bits(
-            min_unsigned_bits(static_cast<uint64_t>(signed_value)));
-        return Type::make_primitive(PrimitiveType::UInt, loc, bits);
-    }
-    if (std::holds_alternative<bool>(value)) {
-        return Type::make_primitive(PrimitiveType::Bool, loc);
-    }
-    return nullptr;
-}
-
 } // namespace
 
 bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
@@ -439,6 +418,12 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             ? validate_type(expr->left->type, expr->left->location)
             : nullptr;
         expr->left->type = explicit_decl_type;
+        if (type_strictness >= 1 && !explicit_decl_type) {
+            throw CompileError(
+                "Type strictness level 1 requires explicit type annotation for variable '" +
+                    expr->left->name + "'",
+                expr->location);
+        }
 
         // Check if RHS is a function reference (not allowed)
         if (expr->right->kind == Expr::Kind::Identifier) {
@@ -454,17 +439,6 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         if (expr->left->type) {
             enforce_declared_initializer_type(var_type, expr->right, rhs_type, expr->location);
             rhs_inferred_type = rhs_type;
-        } else if (is_untyped_integer_primitive(rhs_type)) {
-            CTEQueryResult query = query_constexpr(expr->right);
-            if (query.status == CTEQueryStatus::Known) {
-                TypePtr inferred = infer_integer_type_from_const_value(query.value, expr->location);
-                if (inferred) {
-                    apply_context_type_recursive(expr->right, inferred);
-                    rhs_type = inferred;
-                    rhs_inferred_type = inferred;
-                    var_type = inferred;
-                }
-            }
         }
 
         Symbol* lhs_sym = lookup_binding(expr->left.get());

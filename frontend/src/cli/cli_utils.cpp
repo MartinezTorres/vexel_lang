@@ -1,6 +1,7 @@
 #include "cli_utils.h"
 #include "common.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace vexel {
@@ -16,6 +17,34 @@ bool parse_backend_opt_value(const char* opt, Compiler::Options& opts, std::stri
     std::string key(opt, eq - opt);
     std::string value(eq + 1);
     opts.backend_options[key] = value;
+    return true;
+}
+
+bool parse_type_strictness_value(const char* value, int& out_level) {
+    if (!value || *value == '\0') return false;
+
+    if (std::strcmp(value, "0") == 0 || std::strcmp(value, "relaxed") == 0) {
+        out_level = 0;
+        return true;
+    }
+    if (std::strcmp(value, "1") == 0 || std::strcmp(value, "annotated-locals") == 0) {
+        out_level = 1;
+        return true;
+    }
+    if (std::strcmp(value, "2") == 0 || std::strcmp(value, "full") == 0) {
+        out_level = 2;
+        return true;
+    }
+    return false;
+}
+
+bool parse_type_strictness_arg(const char* value, Compiler::Options& opts, std::string& error) {
+    int parsed = 0;
+    if (!parse_type_strictness_value(value, parsed)) {
+        error = "--type-strictness expects one of: 0,1,2 (or relaxed,annotated-locals,full)";
+        return false;
+    }
+    opts.type_strictness = parsed;
     return true;
 }
 
@@ -63,6 +92,40 @@ bool try_parse_common_compiler_option(int argc,
     }
     if (std::strcmp(argv[index], "--allow-process") == 0) {
         opts.allow_process = true;
+        return true;
+    }
+    if (std::strcmp(argv[index], "--strict-types") == 0) {
+        opts.type_strictness = std::max(opts.type_strictness, 1);
+        return true;
+    }
+    constexpr const char* kStrictTypesPrefix = "--strict-types=";
+    if (std::strncmp(argv[index], kStrictTypesPrefix, std::strlen(kStrictTypesPrefix)) == 0) {
+        const char* value = argv[index] + std::strlen(kStrictTypesPrefix);
+        if (std::strcmp(value, "full") == 0) {
+            opts.type_strictness = std::max(opts.type_strictness, 2);
+            return true;
+        }
+        int parsed = 0;
+        if (!parse_type_strictness_value(value, parsed)) {
+            error = "--strict-types expects no value, '=full', or '=2'";
+            return true;
+        }
+        opts.type_strictness = std::max(opts.type_strictness, parsed);
+        return true;
+    }
+    if (std::strcmp(argv[index], "--type-strictness") == 0) {
+        if (index + 1 >= argc) {
+            error = "--type-strictness requires an argument";
+            return true;
+        }
+        const char* value = argv[++index];
+        (void)parse_type_strictness_arg(value, opts, error);
+        return true;
+    }
+    constexpr const char* kTypeStrictnessPrefix = "--type-strictness=";
+    if (std::strncmp(argv[index], kTypeStrictnessPrefix, std::strlen(kTypeStrictnessPrefix)) == 0) {
+        const char* value = argv[index] + std::strlen(kTypeStrictnessPrefix);
+        (void)parse_type_strictness_arg(value, opts, error);
         return true;
     }
     if (std::strcmp(argv[index], "-o") == 0) {

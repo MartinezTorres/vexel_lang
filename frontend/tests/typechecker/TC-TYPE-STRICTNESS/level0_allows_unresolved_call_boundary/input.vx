@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#type-inference--generics
+// @desc: Type strictness level 0 allows unresolved literal flow across inferred call boundaries. | relaxed strictness allows unresolved literal call argument
+
+&id(x) {
+    x
+}
+
+&^main() -> #i32 {
+    id(42);
+    0
+}

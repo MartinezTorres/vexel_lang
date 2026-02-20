@@ -65,6 +65,8 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ```bash
 ./build/vexel -b c input.vx                     # unified driver (backend selection is required)
 ./build/vexel -b c --emit-analysis input.vx     # emit analysis report
+./build/vexel -b c --type-strictness=1 input.vx # require explicit type annotations for new variables
+./build/vexel -b c --strict-types=full input.vx # full strict mode (equivalent to --type-strictness=2)
 ./build/vexel -b megalinker --backend-opt caller_limit=8 input.vx
 ./build/vexel -b c --run input.vx               # optional: run via libtcc
 ./build/vexel -b c --emit-exe -o app input.vx   # optional: emit native exe via libtcc
@@ -76,6 +78,7 @@ Vexel emits C; compile the generated `.c` with your host toolchain (e.g., `gcc -
 
 The unified driver forwards unknown options to the selected backend. If neither the frontend nor that backend recognizes an option, compilation fails with combined usage output.
 Backend selection is always explicit: pass `-b <name>` for every compile mode (`--run` / `--emit-exe` included).
+`--type-strictness` levels: `0` relaxed unresolved integer flow, `1` requires explicit type annotations for new variables, `2` additionally rejects unresolved literal flow across inferred call boundaries.
 
 ## Backend Extension Contract
 
