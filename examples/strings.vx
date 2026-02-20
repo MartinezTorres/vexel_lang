@@ -4,5 +4,5 @@ msg:#s = "Hello, World!"
 ch:#u8 = 'A'
 
 &^main() -> #i32 {
-    ch
+    (#i32)ch
 }

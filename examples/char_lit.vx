@@ -1,6 +1,6 @@
 // Test character literal
-ch = 'A'
+ch:#u8 = 'A'
 
 &^main() -> #i32 {
-    ch
+    (#i32)ch
 }
