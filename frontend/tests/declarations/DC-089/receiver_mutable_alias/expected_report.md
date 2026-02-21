@@ -6,8 +6,8 @@
     q = q + 1
 }
 &^main() -> #i32 {
-    x: #i32 = 5;
-    y: #i32 = 10;
+    x = 5;
+    y = 10;
     increment_both();
     x + y
 }

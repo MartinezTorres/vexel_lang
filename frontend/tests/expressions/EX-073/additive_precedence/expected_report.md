@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-073/additive_precedence/test.vx
 &^main() -> #i32 {
-    result: #i32 = 14;
+    result = 14;
     -> result;
 }
 ```

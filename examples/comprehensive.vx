@@ -16,8 +16,9 @@
 }
 
 // Global constants evaluated at compile-time
-result = multiply(add(10, 20), 2)  // 60
-arr_val = sum_three([5, 10, 15])   // 30
+result:#i32 = multiply(add(10, 20), 2)  // 60
+arr_seed:#i32[3] = [5, 10, 15]
+arr_val:#i32 = sum_three(arr_seed)      // 30
 
 // Runtime function (kept in binary because it's exported)
 &^main() -> #i32 {

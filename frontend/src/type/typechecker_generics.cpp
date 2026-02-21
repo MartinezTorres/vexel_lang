@@ -53,6 +53,23 @@ std::string mangle_type_component(TypePtr type) {
     return "unknown";
 }
 
+TypePtr freeze_signature_type(TypePtr type) {
+    if (!type) return nullptr;
+
+    TypePtr frozen = std::make_shared<Type>(*type);
+    if (type->kind == Type::Kind::Array) {
+        frozen->element_type = freeze_signature_type(type->element_type);
+        if (type->array_size && type->array_size->kind == Expr::Kind::IntLiteral) {
+            frozen->array_size = Expr::make_uint(type->array_size->uint_val,
+                                                 type->array_size->location,
+                                                 std::to_string(type->array_size->uint_val));
+        } else {
+            frozen->array_size = type->array_size;
+        }
+    }
+    return frozen;
+}
+
 } // namespace
 
 bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
@@ -114,11 +131,15 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
                                                      StmtPtr generic_func) {
     // Create type signature
     TypeSignature sig;
-    sig.param_types = arg_types;
+    sig.param_types.reserve(arg_types.size());
+    for (const auto& arg_type : arg_types) {
+        sig.param_types.push_back(freeze_signature_type(resolve_type(arg_type)));
+    }
 
     // Keep instantiations per module instance.
     int instance_id = current_instance_id;
     std::string lookup_key = func_name + "_inst" + std::to_string(instance_id);
+    std::string mangled = mangle_generic_name(func_name, sig.param_types);
 
     // Check if instantiation already exists
     auto func_it = instantiations.find(lookup_key);
@@ -129,12 +150,23 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
         }
     }
 
+    // Fallback: if an equivalent generated symbol already exists in scope,
+    // reuse it and rehydrate the cache entry.
+    if (Symbol* existing = lookup_global(mangled)) {
+        if (existing->kind == Symbol::Kind::Function && existing->declaration) {
+            GenericInstantiation inst;
+            inst.mangled_name = mangled;
+            inst.declaration = existing->declaration;
+            instantiations[lookup_key][sig] = inst;
+            return mangled;
+        }
+    }
+
     // Create new instantiation
     StmtPtr cloned = clone_function(generic_func);
-    substitute_types(cloned, arg_types);
+    substitute_types(cloned, sig.param_types);
 
     // Generate mangled name
-    std::string mangled = mangle_generic_name(func_name, arg_types);
     cloned->func_name = mangled;
 
     // Mark as non-generic since types have been substituted

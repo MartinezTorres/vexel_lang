@@ -3,9 +3,9 @@
 // Lowered Vexel module: tests/expressions/EX-051/loop_control_innermost/test.vx
 &!print(arg0: #i32);
 &^main() -> #i32 {
-    outer: #i32 = 0;
+    outer = 0;
     outer < 3@{
-            inner: #i32 = 0;
+            inner = 0;
             inner < 3@{
                     inner == 1 ? 
                         ->|;

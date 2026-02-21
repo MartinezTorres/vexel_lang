@@ -27,20 +27,6 @@ uint64_t min_unsigned_bits(uint64_t value) {
     return bits;
 }
 
-uint64_t min_signed_bits(int64_t value) {
-    for (uint64_t bits = 1; bits <= 64; ++bits) {
-        if (bits == 64) {
-            return 64;
-        }
-        const int64_t min_v = -(int64_t(1) << (bits - 1));
-        const int64_t max_v = (int64_t(1) << (bits - 1)) - 1;
-        if (value >= min_v && value <= max_v) {
-            return bits;
-        }
-    }
-    return 64;
-}
-
 uint64_t normalize_inferred_int_bits(uint64_t bits) {
     if (bits <= 8) return 8;
     if (bits <= 16) return 16;
@@ -63,45 +49,6 @@ bool is_numeric_primitive_type(const TypePtr& type) {
     return type &&
            type->kind == Type::Kind::Primitive &&
            (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) || is_float(type->primitive));
-}
-
-void apply_context_type_to_terminal_expr_local(const ExprPtr& expr, const TypePtr& target) {
-    if (!expr || !target) return;
-    if (expr->kind == Expr::Kind::Block) {
-        apply_context_type_to_terminal_expr_local(expr->result_expr, target);
-        expr->type = target;
-        return;
-    }
-    if (expr->type &&
-        expr->type->kind == Type::Kind::Primitive &&
-        (expr->type->primitive == PrimitiveType::Int || expr->type->primitive == PrimitiveType::UInt) &&
-        expr->type->integer_bits == 0) {
-        expr->type = target;
-    } else if (expr->kind == Expr::Kind::IntLiteral) {
-        expr->type = target;
-    }
-
-    switch (expr->kind) {
-        case Expr::Kind::Binary:
-            apply_context_type_to_terminal_expr_local(expr->left, target);
-            apply_context_type_to_terminal_expr_local(expr->right, target);
-            break;
-        case Expr::Kind::Unary:
-            apply_context_type_to_terminal_expr_local(expr->operand, target);
-            break;
-        case Expr::Kind::Conditional:
-            apply_context_type_to_terminal_expr_local(expr->true_expr, target);
-            apply_context_type_to_terminal_expr_local(expr->false_expr, target);
-            break;
-        case Expr::Kind::Assignment:
-            apply_context_type_to_terminal_expr_local(expr->right, target);
-            break;
-        case Expr::Kind::Cast:
-            apply_context_type_to_terminal_expr_local(expr->operand, target);
-            break;
-        default:
-            break;
-    }
 }
 
 } // namespace
@@ -220,14 +167,14 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             return;
         }
         if (!target_type || target_type->kind != Type::Kind::Primitive ||
-            target_type->primitive == PrimitiveType::Bool) {
+            target_type->primitive == PrimitiveType::Bool ||
+            is_untyped_integer_type(target_type)) {
             return;
         }
-        if (!literal_assignable_to(target_type, side_expr)) {
+        if (!apply_type_constraint(side_expr, target_type)) {
             throw CompileError("Integer literal is not representable for operator " + op_name,
                                side_expr ? side_expr->location : expr->location);
         }
-        apply_context_type_to_terminal_expr_local(side_expr, target_type);
         side_type = target_type;
     };
 
@@ -292,7 +239,7 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             TypePtr inferred = make_int_type(side_expr ? side_expr->location : expr->location,
                                              normalize_inferred_int_bits(min_unsigned_bits(value)),
                                              true);
-            apply_context_type_to_terminal_expr_local(side_expr, inferred);
+            apply_type_constraint(side_expr, inferred);
             side_type = inferred;
         };
         materialize_unsigned_untyped(expr->left, left_type);
@@ -513,14 +460,10 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             ExprPtr arg_expr = expr->args[i];
 
             if (!field_type || field_type->kind == Type::Kind::TypeVar) {
-                sym->declaration->fields[i].type = arg_expr->type;
                 continue;
             }
 
-            if (is_untyped_integer_type(arg_expr->type) &&
-                literal_assignable_to(field_type, arg_expr)) {
-                apply_context_type_to_terminal_expr_local(arg_expr, field_type);
-            }
+            (void)apply_type_constraint(arg_expr, field_type);
 
             if (!types_compatible(arg_expr->type, field_type) &&
                 !literal_assignable_to(field_type, arg_expr)) {
@@ -602,11 +545,7 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                         expr->location);
                 }
                 if (param_type && param_type->kind != Type::Kind::TypeVar) {
-                    if (is_untyped_integer_type(arg_expr->type) &&
-                        (types_compatible(arg_expr->type, param_type) ||
-                         literal_assignable_to(param_type, arg_expr))) {
-                        apply_context_type_to_terminal_expr_local(arg_expr, param_type);
-                    }
+                    (void)apply_type_constraint(arg_expr, param_type);
                     if (!types_compatible(arg_expr->type, param_type) &&
                         !literal_assignable_to(param_type, arg_expr)) {
                         throw CompileError(
@@ -686,11 +625,7 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                     "Type mismatch for parameter '" + param.name + "' in call to '" +
                     sym->declaration->func_name + "'", arg_expr->location);
             }
-            if (is_untyped_integer_type(arg_expr->type) &&
-                (types_compatible(arg_expr->type, param_type) ||
-                 literal_assignable_to(param_type, arg_expr))) {
-                apply_context_type_to_terminal_expr_local(arg_expr, param_type);
-            }
+            (void)apply_type_constraint(arg_expr, param_type);
         }
 
         if (!sym->declaration->return_types.empty()) {
@@ -788,7 +723,17 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
             }
 
             std::string field_type_str = field_type_names[field_index];
-            TypePtr field_type = parse_type_from_string(field_type_str, expr->location);
+            if (!field_type_str.empty() && field_type_str[0] == '#') {
+                field_type_str = field_type_str.substr(1);
+            }
+            TypePtr field_type;
+            if (field_type_str == "i") {
+                field_type = Type::make_primitive(PrimitiveType::Int, expr->location, 0);
+            } else if (field_type_str == "u") {
+                field_type = Type::make_primitive(PrimitiveType::UInt, expr->location, 0);
+            } else {
+                field_type = parse_type_from_string(field_type_str, expr->location);
+            }
             expr->type = field_type;
             return expr->type;
         }
@@ -840,18 +785,24 @@ TypePtr TypeChecker::check_array_literal(ExprPtr expr) {
         }
     }
 
-    if (elem_type &&
-        elem_type->kind == Type::Kind::Primitive &&
-        !is_untyped_integer_type(elem_type)) {
+    std::function<bool(TypePtr)> fully_concrete = [&](TypePtr t) -> bool {
+        if (!t) return false;
+        if (t->kind == Type::Kind::TypeVar || t->kind == Type::Kind::TypeOf) return false;
+        if (t->kind == Type::Kind::Primitive) {
+            return !is_untyped_integer_type(t);
+        }
+        if (t->kind == Type::Kind::Array) {
+            return fully_concrete(t->element_type);
+        }
+        return true;
+    };
+
+    if (elem_type && fully_concrete(elem_type)) {
         for (auto& elem : expr->elements) {
-            if (!elem || !is_untyped_integer_type(elem->type)) {
-                continue;
+            if (!elem) continue;
+            if (!apply_type_constraint(elem, elem_type)) {
+                throw CompileError("Array literal elements must have compatible types", elem->location);
             }
-            if (!literal_assignable_to(elem_type, elem)) {
-                throw CompileError("Array literal element is not representable in inferred element type",
-                                   elem->location);
-            }
-            apply_context_type_to_terminal_expr_local(elem, elem_type);
         }
     }
 
@@ -883,7 +834,20 @@ TypePtr TypeChecker::check_tuple_literal(ExprPtr expr) {
         }
     }
 
-    register_tuple_type(type_name, element_types);
+    bool tuple_fully_concrete = true;
+    for (const auto& et : element_types) {
+        TypePtr rt = resolve_type(et);
+        if (!rt ||
+            rt->kind == Type::Kind::TypeVar ||
+            rt->kind == Type::Kind::TypeOf ||
+            is_untyped_integer_type(rt)) {
+            tuple_fully_concrete = false;
+            break;
+        }
+    }
+    if (tuple_fully_concrete) {
+        register_tuple_type(type_name, element_types);
+    }
 
     // Create named type (the actual struct will be generated in codegen)
     expr->type = Type::make_named(type_name, expr->location);
@@ -1117,6 +1081,13 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
         }
         return literal_assignable_to(target, expr->true_expr) &&
                literal_assignable_to(target, expr->false_expr);
+    }
+
+    TypePtr source_type = resolve_type(expr->type);
+    if (source_type &&
+        source_type->kind == Type::Kind::Primitive &&
+        source_type->primitive == PrimitiveType::Bool) {
+        return target->primitive == PrimitiveType::Bool;
     }
 
     struct IntConstValue {

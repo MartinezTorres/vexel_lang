@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#runtime-semantics
 // @desc: Using a value from an unresolved return is rejected before code generation | Using unresolved return values is rejected
 // @expect-exit: 1
-// @expect-stderr: Expression produces no value
+// @expect-stderr: Return value of function 'foo' is used but its return type is unresolved
 // @command: {VEXEL} -b c test.vx
 
 

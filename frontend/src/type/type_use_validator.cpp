@@ -396,7 +396,7 @@ struct TypeUseValidator {
 
 } // namespace
 
-void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const TypeUseContext& ctx) {
+void validate_type_usage(const Module& /*mod*/, const AnalysisFacts& facts, const TypeUseContext& ctx) {
     // Invariants:
     // - This pass runs after Analyzer, so reachability/used-globals are known.
     // - Only *used* values must have concrete types; unused chains are allowed.
@@ -480,17 +480,9 @@ void validate_type_usage(const Module& mod, const AnalysisFacts& facts, const Ty
         }
     }
 
-    for (const auto& stmt : mod.top_level) {
-        if (stmt->kind != Stmt::Kind::TypeDecl) continue;
-        if (!facts.used_type_names.count(stmt->type_decl_name)) {
-            continue;
-        }
-        for (const auto& field : stmt->fields) {
-            if (!type_is_concrete(&ctx, field.type)) {
-                throw CompileError("Field '" + field.name + "' requires a concrete type", field.location);
-            }
-        }
-    }
+    // Named-type declarations may carry unresolved fields until a concrete
+    // value use or ABI boundary requires materialization. Enforce concreteness
+    // at those use sites instead of rejecting declarations preemptively.
 
     for (const auto& pair : functions) {
         const Symbol* sym = pair.first;

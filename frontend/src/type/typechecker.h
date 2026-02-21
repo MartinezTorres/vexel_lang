@@ -189,6 +189,10 @@ private:
     bool types_compatible(TypePtr a, TypePtr b);
     TypePtr unify_types(TypePtr a, TypePtr b);
     TypePtr bind_typevar(TypePtr var, TypePtr target);
+    // Applies a concrete type constraint recursively to an expression tree.
+    // Returns false when the expression cannot satisfy the requested type.
+    bool apply_type_constraint(const ExprPtr& expr, TypePtr target);
+    void sync_function_signature_from_bindings(const StmtPtr& func);
     TypePtr infer_literal_type(ExprPtr expr);
     bool literal_assignable_to(TypePtr target, ExprPtr expr);
     TypePtr make_fresh_typevar();

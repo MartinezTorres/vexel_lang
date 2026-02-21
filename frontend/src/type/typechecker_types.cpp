@@ -128,6 +128,9 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
             return type;
         }
         case Type::Kind::Named: {
+            if (type->type_name.rfind(TUPLE_TYPE_PREFIX, 0) == 0) {
+                return type;
+            }
             // Check for recursive types
             Symbol* type_sym = nullptr;
             if (bindings) {
@@ -136,7 +139,13 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
             if (!type_sym) {
                 type_sym = lookup_global(type->type_name);
             }
-            if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
+            if (!type_sym) {
+                throw CompileError("Undefined type: " + type->type_name, loc);
+            }
+            if (type_sym->kind != Symbol::Kind::Type) {
+                throw CompileError("Identifier is not a type: " + type->type_name, loc);
+            }
+            if (type_sym->declaration) {
                 check_recursive_type(type->type_name, type_sym->declaration, loc);
             }
             return type;

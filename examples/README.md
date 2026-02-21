@@ -27,6 +27,7 @@ find examples -name '*.vx' -print0 | xargs -0 -n1 ./build/vexel -b c
 ## Tutorial Examples
 
 - `tutorial/` contains the curated learning examples used by the playground.
+- `tutorial/manifest.json` defines tutorial order/title/summary for playground navigation.
 - Most files are single-file examples; `tutorial/multifile/` shows a multi-file module import.
 
 ## Library and Showcase

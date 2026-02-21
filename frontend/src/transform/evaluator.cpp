@@ -785,7 +785,13 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
         switch (target_type->primitive) {
             case PrimitiveType::Int: {
                 if (target_type->integer_bits == 0) {
-                    error_msg = "Signed integer target type is missing width";
+                    if (std::holds_alternative<int64_t>(input) ||
+                        std::holds_alternative<uint64_t>(input) ||
+                        std::holds_alternative<bool>(input)) {
+                        output = copy_ct_value(input);
+                        return true;
+                    }
+                    error_msg = "Type mismatch in compile-time coercion to unresolved signed integer";
                     return false;
                 }
                 if (target_type->integer_bits > 64) {
@@ -807,7 +813,13 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
             }
             case PrimitiveType::UInt: {
                 if (target_type->integer_bits == 0) {
-                    error_msg = "Unsigned integer target type is missing width";
+                    if (std::holds_alternative<int64_t>(input) ||
+                        std::holds_alternative<uint64_t>(input) ||
+                        std::holds_alternative<bool>(input)) {
+                        output = copy_ct_value(input);
+                        return true;
+                    }
+                    error_msg = "Type mismatch in compile-time coercion to unresolved unsigned integer";
                     return false;
                 }
                 if (target_type->integer_bits > 64) {

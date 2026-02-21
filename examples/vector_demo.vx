@@ -1,15 +1,15 @@
 // Vector of bytes demo.
-// Demonstrates module import, struct constructor use, and member access.
-
-::lib::vector;
+// Demonstrates fixed-shape byte vectors, struct construction, and member access.
 
 &!putchar(c:#u8);
+
+#ByteVec(data:#u8[12], len:#i32, cap:#i32);
 
 &print_newline() {
   putchar((#u8)10)
 }
 
-&print_vector_bytes(v) {
+&print_vector_bytes(v:#ByteVec) {
   putchar((#u8)v.data[0]);
   putchar((#u8)v.data[1]);
   putchar((#u8)v.data[2]);
@@ -26,7 +26,7 @@
 }
 
 &^main() -> #i32 {
-  v = Vec([72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33], 12, 12);
+  v:#ByteVec = ByteVec([72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100, 33], (#i32)12, (#i32)12);
   print_vector_bytes(v);
   v.len
 }

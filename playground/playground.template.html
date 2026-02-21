@@ -124,6 +124,10 @@
       font-weight: 600;
     }
 
+    #tutorialSelect {
+      min-width: 230px;
+    }
+
     .btn.ghost {
       background: transparent;
     }
@@ -186,6 +190,18 @@
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
       scroll-snap-type: x proximity;
+    }
+
+    .tutorial-banner {
+      border-bottom: 1px solid var(--outline);
+      background: #141b27;
+      color: var(--muted);
+      font-size: 0.84rem;
+      padding: 8px 12px;
+      line-height: 1.35;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
     }
 
     .tab {
@@ -342,6 +358,10 @@
         grid-column: 1 / -1;
       }
 
+      #tutorialSelect {
+        min-width: 0;
+      }
+
       .controls .btn,
       .controls select {
         width: 100%;
@@ -382,6 +402,9 @@
         <button class="btn" id="addFileBtn">Add File</button>
         <button class="btn" id="shareBtn">Copy Link</button>
         <select id="backendSelect"></select>
+        <button class="btn ghost" id="tutorialPrevBtn" title="Previous tutorial step">Prev</button>
+        <button class="btn ghost" id="tutorialNextBtn" title="Next tutorial step">Next</button>
+        <select id="tutorialSelect"></select>
         <span class="status"><span class="status-dot loading" id="statusDot"></span><span id="statusText">Loading</span></span>
       </div>
     </header>
@@ -394,6 +417,7 @@
           <button class="btn ghost" id="addFileBtnInline">New file</button>
         </div>
         <div class="tabs" id="sourceTabs"></div>
+        <div class="tutorial-banner" id="tutorialSummary"></div>
         <textarea class="editor" id="sourceEditor" spellcheck="false"></textarea>
       </div>
 
@@ -423,6 +447,7 @@
     const VEXEL_WASM_BASE64 = "__VEXEL_WASM_BASE64__";
     const BACKENDS = __VEXEL_BACKENDS_JSON__;
     const BUNDLED_EXAMPLES = __VEXEL_EXAMPLES_JSON__;
+    const TUTORIAL_STEPS = __VEXEL_TUTORIAL_JSON__;
     const ROOT_DIR = "examples";
 
     const state = {
@@ -432,7 +457,8 @@
       outputs: [],
       activeOutput: 0,
       messages: [],
-      backend: (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS[0] : "c"
+      backend: (Array.isArray(BACKENDS) && BACKENDS.length > 0) ? BACKENDS[0] : "c",
+      tutorialSteps: []
     };
 
     const sourceTabs = document.getElementById("sourceTabs");
@@ -445,6 +471,10 @@
     const addFileBtnInline = document.getElementById("addFileBtnInline");
     const clearLogBtn = document.getElementById("clearLogBtn");
     const backendSelect = document.getElementById("backendSelect");
+    const tutorialSelect = document.getElementById("tutorialSelect");
+    const tutorialPrevBtn = document.getElementById("tutorialPrevBtn");
+    const tutorialNextBtn = document.getElementById("tutorialNextBtn");
+    const tutorialSummary = document.getElementById("tutorialSummary");
     const copyOutputBtn = document.getElementById("copyOutputBtn");
     const shareBtn = document.getElementById("shareBtn");
     const statusText = document.getElementById("statusText");
@@ -489,6 +519,24 @@
       return clean.replace(/\s+/g, "_");
     }
 
+    function normalizeTutorialSteps() {
+      const steps = [];
+      (Array.isArray(TUTORIAL_STEPS) ? TUTORIAL_STEPS : []).forEach((entry, index) => {
+        if (!entry || typeof entry !== "object") return;
+        const path = sanitizeRelativePath(entry.path);
+        if (!path) return;
+        const title = String(entry.title || `Step ${index + 1}`).trim();
+        const summary = String(entry.summary || "").trim();
+        const id = String(entry.id || `step${index + 1}`).trim();
+        steps.push({ id, title, summary, path });
+      });
+      return steps;
+    }
+
+    function tutorialIndexByPath(path) {
+      return state.tutorialSteps.findIndex((step) => step.path === path);
+    }
+
     function parentDir(path) {
       const clean = sanitizeRelativePath(path);
       if (!clean) return ROOT_DIR;
@@ -528,6 +576,11 @@
     }
 
     function chooseDefaultFile() {
+      for (const step of state.tutorialSteps) {
+        if (findFile(step.path)) {
+          return step.path;
+        }
+      }
       if (findFile("examples/tutorial/quickadd.vx")) {
         return "examples/tutorial/quickadd.vx";
       }
@@ -622,6 +675,56 @@
         empty.textContent = "(empty)";
         sourceTabs.appendChild(empty);
       }
+
+      syncTutorialUI();
+    }
+
+    function populateTutorialPicker() {
+      tutorialSelect.textContent = "";
+
+      const optionNone = document.createElement("option");
+      optionNone.value = "";
+      optionNone.textContent = "Tutorial: select step";
+      tutorialSelect.appendChild(optionNone);
+
+      const available = state.tutorialSteps.filter((step) => !!findFile(step.path));
+      available.forEach((step, index) => {
+        const option = document.createElement("option");
+        option.value = step.path;
+        option.textContent = `${index + 1}. ${step.title}`;
+        tutorialSelect.appendChild(option);
+      });
+
+      const currentIndex = tutorialIndexByPath(state.selectedPath);
+      tutorialSelect.value = currentIndex >= 0 ? state.selectedPath : "";
+      syncTutorialUI();
+    }
+
+    function selectTutorialStep(index) {
+      const available = state.tutorialSteps.filter((step) => !!findFile(step.path));
+      if (index < 0 || index >= available.length) return;
+      const step = available[index];
+      state.selectedPath = step.path;
+      state.currentDir = parentDir(step.path);
+      renderSourceTabs();
+      renderEditor();
+    }
+
+    function syncTutorialUI() {
+      const available = state.tutorialSteps.filter((step) => !!findFile(step.path));
+      const idx = available.findIndex((step) => step.path === state.selectedPath);
+      const active = idx >= 0 ? available[idx] : null;
+
+      tutorialPrevBtn.disabled = idx <= 0;
+      tutorialNextBtn.disabled = idx < 0 || idx >= available.length - 1;
+      tutorialSelect.value = active ? active.path : "";
+
+      if (!active) {
+        tutorialSummary.textContent = "Tutorial step: select one from the top bar, or browse files directly.";
+        return;
+      }
+      const prefix = `Step ${idx + 1}/${available.length}: ${active.title}`;
+      tutorialSummary.textContent = active.summary ? `${prefix} — ${active.summary}` : prefix;
     }
 
     function renderOutputTabs() {
@@ -671,6 +774,7 @@
     }
 
     function loadBundledFiles() {
+      state.tutorialSteps = normalizeTutorialSteps();
       const files = [];
       (Array.isArray(BUNDLED_EXAMPLES) ? BUNDLED_EXAMPLES : []).forEach((entry) => {
         if (!entry || typeof entry !== "object") return;
@@ -924,6 +1028,34 @@
       state.backend = event.target.value || state.backend || "c";
     });
 
+    tutorialSelect.addEventListener("change", (event) => {
+      const path = sanitizeRelativePath(event.target.value || "");
+      if (!path || !findFile(path)) {
+        syncTutorialUI();
+        return;
+      }
+      state.selectedPath = path;
+      state.currentDir = parentDir(path);
+      renderSourceTabs();
+      renderEditor();
+    });
+
+    tutorialPrevBtn.addEventListener("click", () => {
+      const available = state.tutorialSteps.filter((step) => !!findFile(step.path));
+      const idx = available.findIndex((step) => step.path === state.selectedPath);
+      if (idx > 0) {
+        selectTutorialStep(idx - 1);
+      }
+    });
+
+    tutorialNextBtn.addEventListener("click", () => {
+      const available = state.tutorialSteps.filter((step) => !!findFile(step.path));
+      const idx = available.findIndex((step) => step.path === state.selectedPath);
+      if (idx >= 0 && idx < available.length - 1) {
+        selectTutorialStep(idx + 1);
+      }
+    });
+
     clearLogBtn.addEventListener("click", () => {
       state.messages = [];
       debugLog.textContent = "";
@@ -949,6 +1081,7 @@
     window.addEventListener("DOMContentLoaded", () => {
       loadBundledFiles();
       populateBackends();
+      populateTutorialPicker();
       renderSourceTabs();
       renderEditor();
       clearOutputs();

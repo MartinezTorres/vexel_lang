@@ -2,6 +2,6 @@
 // @desc: Division by zero traps at runtime | Modulo by zero compiles but traps at runtime
 
 
-&^main() -> #i32 {
-    10 % 0;
+&^main() -> #u8 {
+    10 % 0
 }

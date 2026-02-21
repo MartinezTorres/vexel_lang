@@ -6,8 +6,8 @@
     r2 = r2 + val
 }
 &^main() -> #i32 {
-    x: #i32 = 1;
-    y: #i32 = 2;
+    x = 1;
+    y = 2;
     add_assign(10);
     x + y
 }

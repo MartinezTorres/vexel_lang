@@ -3,9 +3,11 @@
 
 
 // EX-065: Runtime bounds error
+&!runtime_bound() -> #i32;
+
 &^main() -> #i32 {
-    x:#i32 = 5;
-    // ERROR: x is runtime value
+    x:#i32 = runtime_bound();
+    // ERROR: x is runtime value and not compile-time constant
     r = 0..x;
     -> 0;
 }

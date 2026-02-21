@@ -2,8 +2,8 @@
 // @desc: The @ sigil is used for iteration (iterable@expr). | Accept @ sigil for iteration
 
 
-&^main() -> #i32 {
-    total:#i32 = 0
+&^main() -> #u32 {
+    total:#u32 = 0
     2..5@{ total = total + _; }
     total
 }

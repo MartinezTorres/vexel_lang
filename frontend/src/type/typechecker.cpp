@@ -40,45 +40,6 @@ bool type_is_concrete_for_signature(const TypePtr& type) {
     return false;
 }
 
-void apply_context_type_to_terminal_expr(const ExprPtr& expr, const TypePtr& target) {
-    if (!expr || !target) return;
-    if (expr->kind == Expr::Kind::Block) {
-        apply_context_type_to_terminal_expr(expr->result_expr, target);
-        expr->type = target;
-        return;
-    }
-    if (expr->type &&
-        expr->type->kind == Type::Kind::Primitive &&
-        (expr->type->primitive == PrimitiveType::Int || expr->type->primitive == PrimitiveType::UInt) &&
-        expr->type->integer_bits == 0) {
-        expr->type = target;
-    } else if (expr->kind == Expr::Kind::IntLiteral) {
-        expr->type = target;
-    }
-
-    switch (expr->kind) {
-        case Expr::Kind::Binary:
-            apply_context_type_to_terminal_expr(expr->left, target);
-            apply_context_type_to_terminal_expr(expr->right, target);
-            break;
-        case Expr::Kind::Unary:
-            apply_context_type_to_terminal_expr(expr->operand, target);
-            break;
-        case Expr::Kind::Conditional:
-            apply_context_type_to_terminal_expr(expr->true_expr, target);
-            apply_context_type_to_terminal_expr(expr->false_expr, target);
-            break;
-        case Expr::Kind::Assignment:
-            apply_context_type_to_terminal_expr(expr->right, target);
-            break;
-        case Expr::Kind::Cast:
-            apply_context_type_to_terminal_expr(expr->operand, target);
-            break;
-        default:
-            break;
-    }
-}
-
 } // namespace
 
 TypeChecker::TypeChecker(const std::string& proj_root,
@@ -388,10 +349,69 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
 
         TypePtr body_type = check_expr(stmt->body);
 
+        if (stmt->return_type && stmt->body && stmt->body->kind == Expr::Kind::Block) {
+            bool saw_return_stmt = false;
+            std::function<void(const StmtPtr&)> constrain_return_stmt;
+            constrain_return_stmt = [&](const StmtPtr& nested) {
+                if (!nested) return;
+                switch (nested->kind) {
+                    case Stmt::Kind::Return:
+                        saw_return_stmt = true;
+                        if (!nested->return_expr ||
+                            !apply_type_constraint(nested->return_expr, stmt->return_type)) {
+                            throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                                               nested->location);
+                        }
+                        break;
+                    case Stmt::Kind::ConditionalStmt:
+                        constrain_return_stmt(nested->true_stmt);
+                        break;
+                    default:
+                        break;
+                }
+            };
+            for (const auto& body_stmt : stmt->body->statements) {
+                constrain_return_stmt(body_stmt);
+            }
+            if (saw_return_stmt) {
+                sync_function_signature_from_bindings(stmt);
+                body_type = stmt->body ? resolve_type(stmt->body->type) : body_type;
+            }
+        }
+
         if (!stmt->return_types.empty()) {
             if (!stmt->return_type) {
                 stmt->return_type = stmt->return_types[0];
             }
+            ExprPtr return_expr = stmt->body;
+            if (return_expr && return_expr->kind == Expr::Kind::Block && return_expr->result_expr) {
+                return_expr = return_expr->result_expr;
+            }
+            if (!return_expr || return_expr->kind != Expr::Kind::TupleLiteral) {
+                throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                                   stmt->location);
+            }
+            if (return_expr->elements.size() != stmt->return_types.size()) {
+                throw CompileError("Return arity mismatch in function '" + stmt->func_name + "'",
+                                   stmt->location);
+            }
+            for (size_t i = 0; i < stmt->return_types.size(); ++i) {
+                TypePtr target = stmt->return_types[i];
+                ExprPtr elem = return_expr->elements[i];
+                if (!apply_type_constraint(elem, target)) {
+                    throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                                       stmt->location);
+                }
+            }
+            std::string tuple_type_name = std::string(TUPLE_TYPE_PREFIX) +
+                                          std::to_string(stmt->return_types.size());
+            for (const auto& rt : stmt->return_types) {
+                tuple_type_name += "_";
+                tuple_type_name += rt ? rt->to_string() : "unknown";
+            }
+            register_tuple_type(tuple_type_name, stmt->return_types);
+            return_expr->type = Type::make_named(tuple_type_name, return_expr->location);
+            body_type = return_expr->type;
         } else if (!stmt->return_type) {
             if (type_strictness >= 2 && !type_is_concrete_for_signature(body_type)) {
                 throw CompileError("Type strictness level 2 requires explicit concrete return type for function '" +
@@ -399,20 +419,37 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
                                    stmt->location);
             }
             stmt->return_type = body_type;
-        } else if (!types_compatible(body_type, stmt->return_type)) {
+        } else if (!body_type || !types_compatible(body_type, stmt->return_type)) {
             ExprPtr return_expr = stmt->body;
             if (return_expr && return_expr->kind == Expr::Kind::Block && return_expr->result_expr) {
                 return_expr = return_expr->result_expr;
             }
+            bool constrained = false;
             if (return_expr && literal_assignable_to(stmt->return_type, return_expr)) {
-                apply_context_type_to_terminal_expr(return_expr, stmt->return_type);
-                apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
+                constrained = apply_type_constraint(return_expr, stmt->return_type) &&
+                             apply_type_constraint(stmt->body, stmt->return_type);
             } else {
-                throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
-                                   stmt->location);
+                constrained = apply_type_constraint(stmt->body, stmt->return_type);
+            }
+            if (constrained) {
+                sync_function_signature_from_bindings(stmt);
+            }
+
+            body_type = stmt->body ? resolve_type(stmt->body->type) : body_type;
+            if (!constrained || !types_compatible(body_type, stmt->return_type)) {
+                bool unresolved_body =
+                    !body_type ||
+                    body_type->kind == Type::Kind::TypeVar ||
+                    is_untyped_integer_type_local(body_type);
+                if (!unresolved_body) {
+                    throw CompileError("Return type mismatch in function '" + stmt->func_name + "'",
+                                       stmt->location);
+                }
             }
         } else if (is_untyped_integer_type_local(body_type)) {
-            apply_context_type_to_terminal_expr(stmt->body, stmt->return_type);
+            if (apply_type_constraint(stmt->body, stmt->return_type)) {
+                sync_function_signature_from_bindings(stmt);
+            }
         }
 
         if (stmt->is_exported &&
@@ -451,11 +488,8 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
 
     if (declared_type->kind == Type::Kind::Array &&
         init_expr->kind == Expr::Kind::ArrayLiteral) {
-        for (const auto& el : init_expr->elements) {
-            if (!types_compatible(el->type, declared_type->element_type) &&
-                !literal_assignable_to(declared_type->element_type, el)) {
-                throw CompileError("Type mismatch in variable initialization", loc);
-            }
+        if (!apply_type_constraint(init_expr, declared_type)) {
+            throw CompileError("Type mismatch in variable initialization", loc);
         }
         init_expr->type = declared_type;
         init_type = declared_type;
@@ -476,16 +510,16 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
          declared_type->primitive == PrimitiveType::F16 ||
          declared_type->primitive == PrimitiveType::F32 ||
          declared_type->primitive == PrimitiveType::F64)) {
-        if (literal_assignable_to(declared_type, init_expr)) {
-            apply_context_type_to_terminal_expr(init_expr, declared_type);
+        if (literal_assignable_to(declared_type, init_expr) ||
+            apply_type_constraint(init_expr, declared_type)) {
             init_type = declared_type;
             return;
         }
     }
 
     if (!types_compatible(init_type, declared_type)) {
-        if (literal_assignable_to(declared_type, init_expr)) {
-            apply_context_type_to_terminal_expr(init_expr, declared_type);
+        if (literal_assignable_to(declared_type, init_expr) ||
+            apply_type_constraint(init_expr, declared_type)) {
             init_type = declared_type;
             return;
         }

@@ -5,7 +5,7 @@ ok
 
 ## Stderr
 ```
-Error at input.vx:8:5: Expression produces no value
+Error at input.vx:5:1: Return value of function 'foo' is used but its return type is unresolved
 ```
 
 ## Exit Code

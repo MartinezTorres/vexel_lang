@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     ut = UserType([100, 200]);
-    total: #i32 = 0;
+    total = 0;
     UserType::@({
         total = total + _
     });

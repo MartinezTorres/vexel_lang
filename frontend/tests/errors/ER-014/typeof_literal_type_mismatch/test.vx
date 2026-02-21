@@ -1,7 +1,9 @@
 // @rfc: docs/vexel-rfc.md#types
 // @desc: Type expression #[expr] enforces the resolved type exactly | #[1] resolves to #b and rejects 2
 
+x:#u8 = 1;
+
 &^main() -> #i32 {
-    flag:#[1] = 2;
+    flag:#[x] = 300;
     0
 }

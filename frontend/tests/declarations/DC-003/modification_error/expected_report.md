@@ -1,11 +1,16 @@
 ## Stdout
 ```
+// Lowered Vexel module: tests/declarations/DC-003/modification_error/test.vx
+VALUE: #i32 = 100;
+&^main() -> #i32 {
+    VALUE = 200;
+    0
+}
 ```
 
 ## Stderr
 ```
-Error at tests/declarations/DC-003/modification_error/test.vx:9:5: Type mismatch in assignment
 ```
 
 ## Exit Code
-1
+0

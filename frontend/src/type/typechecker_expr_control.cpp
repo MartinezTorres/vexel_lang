@@ -9,6 +9,7 @@
 #include <functional>
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 
 #include "constants.h"
 #include "lexer.h"
@@ -19,6 +20,113 @@ namespace vexel {
 namespace {
 
 void assign_loop_symbol_stmt(StmtPtr stmt, TypePtr type, Bindings* bindings, int instance_id);
+
+void collect_mutated_base_names_stmt(const StmtPtr& stmt, std::unordered_set<std::string>& out);
+
+void collect_target_base_name(const ExprPtr& target, std::unordered_set<std::string>& out) {
+    ExprPtr base = target;
+    while (base &&
+           (base->kind == Expr::Kind::Member || base->kind == Expr::Kind::Index)) {
+        base = base->operand;
+    }
+    if (base && base->kind == Expr::Kind::Identifier && base->name != "_") {
+        out.insert(base->name);
+    }
+}
+
+void collect_mutated_base_names_expr(const ExprPtr& expr, std::unordered_set<std::string>& out) {
+    if (!expr) return;
+    switch (expr->kind) {
+        case Expr::Kind::Assignment:
+            collect_target_base_name(expr->left, out);
+            collect_mutated_base_names_expr(expr->left, out);
+            collect_mutated_base_names_expr(expr->right, out);
+            return;
+        case Expr::Kind::Call:
+            collect_mutated_base_names_expr(expr->operand, out);
+            // Receivers are passed by reference; conservatively invalidate their base symbols.
+            for (const auto& rec : expr->receivers) {
+                collect_target_base_name(rec, out);
+                collect_mutated_base_names_expr(rec, out);
+            }
+            for (const auto& arg : expr->args) {
+                collect_mutated_base_names_expr(arg, out);
+            }
+            return;
+        case Expr::Kind::Binary:
+        case Expr::Kind::Range:
+            collect_mutated_base_names_expr(expr->left, out);
+            collect_mutated_base_names_expr(expr->right, out);
+            return;
+        case Expr::Kind::Unary:
+        case Expr::Kind::Cast:
+        case Expr::Kind::Length:
+        case Expr::Kind::Member:
+            collect_mutated_base_names_expr(expr->operand, out);
+            return;
+        case Expr::Kind::Index:
+            collect_mutated_base_names_expr(expr->operand, out);
+            for (const auto& arg : expr->args) {
+                collect_mutated_base_names_expr(arg, out);
+            }
+            return;
+        case Expr::Kind::ArrayLiteral:
+        case Expr::Kind::TupleLiteral:
+            for (const auto& elem : expr->elements) {
+                collect_mutated_base_names_expr(elem, out);
+            }
+            return;
+        case Expr::Kind::Block:
+            for (const auto& st : expr->statements) {
+                collect_mutated_base_names_stmt(st, out);
+            }
+            collect_mutated_base_names_expr(expr->result_expr, out);
+            return;
+        case Expr::Kind::Conditional:
+            collect_mutated_base_names_expr(expr->condition, out);
+            collect_mutated_base_names_expr(expr->true_expr, out);
+            collect_mutated_base_names_expr(expr->false_expr, out);
+            return;
+        case Expr::Kind::Iteration:
+        case Expr::Kind::Repeat:
+            collect_mutated_base_names_expr(loop_subject(expr), out);
+            collect_mutated_base_names_expr(loop_body(expr), out);
+            return;
+        case Expr::Kind::Identifier:
+        case Expr::Kind::IntLiteral:
+        case Expr::Kind::FloatLiteral:
+        case Expr::Kind::StringLiteral:
+        case Expr::Kind::CharLiteral:
+        case Expr::Kind::Resource:
+        case Expr::Kind::Process:
+            return;
+    }
+}
+
+void collect_mutated_base_names_stmt(const StmtPtr& stmt, std::unordered_set<std::string>& out) {
+    if (!stmt) return;
+    switch (stmt->kind) {
+        case Stmt::Kind::Expr:
+            collect_mutated_base_names_expr(stmt->expr, out);
+            return;
+        case Stmt::Kind::Return:
+            collect_mutated_base_names_expr(stmt->return_expr, out);
+            return;
+        case Stmt::Kind::ConditionalStmt:
+            collect_mutated_base_names_expr(stmt->condition, out);
+            collect_mutated_base_names_stmt(stmt->true_stmt, out);
+            return;
+        case Stmt::Kind::VarDecl:
+            collect_mutated_base_names_expr(stmt->var_init, out);
+            return;
+        case Stmt::Kind::FuncDecl:
+        case Stmt::Kind::TypeDecl:
+        case Stmt::Kind::Import:
+        case Stmt::Kind::Break:
+        case Stmt::Kind::Continue:
+            return;
+    }
+}
 
 void assign_loop_symbol_expr(ExprPtr expr, TypePtr type, Bindings* bindings, int instance_id) {
     if (!expr) return;
@@ -142,42 +250,6 @@ bool is_untyped_integer_primitive(const TypePtr& type) {
            type->integer_bits == 0;
 }
 
-void apply_context_type_recursive(const ExprPtr& expr, const TypePtr& target) {
-    if (!expr || !target) return;
-    if (expr->kind == Expr::Kind::Block) {
-        apply_context_type_recursive(expr->result_expr, target);
-        expr->type = target;
-        return;
-    }
-
-    if ((expr->type && is_untyped_integer_primitive(expr->type)) ||
-        expr->kind == Expr::Kind::IntLiteral) {
-        expr->type = target;
-    }
-
-    switch (expr->kind) {
-        case Expr::Kind::Binary:
-            apply_context_type_recursive(expr->left, target);
-            apply_context_type_recursive(expr->right, target);
-            break;
-        case Expr::Kind::Unary:
-            apply_context_type_recursive(expr->operand, target);
-            break;
-        case Expr::Kind::Conditional:
-            apply_context_type_recursive(expr->true_expr, target);
-            apply_context_type_recursive(expr->false_expr, target);
-            break;
-        case Expr::Kind::Assignment:
-            apply_context_type_recursive(expr->right, target);
-            break;
-        case Expr::Kind::Cast:
-            apply_context_type_recursive(expr->operand, target);
-            break;
-        default:
-            break;
-    }
-}
-
 uint64_t min_unsigned_bits(uint64_t value) {
     if (value == 0) return 1;
     uint64_t bits = 0;
@@ -271,8 +343,47 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
 }
 
 void TypeChecker::register_tuple_type(const std::string& name, const std::vector<TypePtr>& elem_types) {
-    if (!forced_tuple_types.count(name)) {
+    auto is_untyped_int = [](const TypePtr& t) {
+        return t &&
+               t->kind == Type::Kind::Primitive &&
+               (t->primitive == PrimitiveType::Int || t->primitive == PrimitiveType::UInt) &&
+               t->integer_bits == 0;
+    };
+
+    auto it = forced_tuple_types.find(name);
+    if (it == forced_tuple_types.end()) {
         forced_tuple_types[name] = elem_types;
+        return;
+    }
+
+    auto& existing = it->second;
+    if (existing.size() < elem_types.size()) {
+        existing.resize(elem_types.size(), nullptr);
+    }
+    for (size_t i = 0; i < elem_types.size(); ++i) {
+        TypePtr incoming = resolve_type(elem_types[i]);
+        TypePtr current = resolve_type(existing[i]);
+        if (!incoming) continue;
+        if (!current) {
+            existing[i] = incoming;
+            continue;
+        }
+
+        bool current_unresolved = current->kind == Type::Kind::TypeVar || is_untyped_int(current);
+        bool incoming_unresolved = incoming->kind == Type::Kind::TypeVar || is_untyped_int(incoming);
+        if (current_unresolved && !incoming_unresolved) {
+            existing[i] = incoming;
+            continue;
+        }
+        if (incoming_unresolved) {
+            continue;
+        }
+        if (types_equal(current, incoming)) {
+            continue;
+        }
+        if (types_compatible(current, incoming) && !types_compatible(incoming, current)) {
+            existing[i] = incoming;
+        }
     }
 }
 
@@ -319,8 +430,9 @@ TypePtr TypeChecker::check_conditional(ExprPtr expr) {
         if (!is_untyped_integer_primitive(branch_type)) return false;
         if (!target_type || target_type->kind != Type::Kind::Primitive) return false;
         if (target_type->primitive == PrimitiveType::Bool) return false;
+        if (is_untyped_integer_primitive(target_type)) return false;
         if (!literal_assignable_to(target_type, branch_expr)) return false;
-        apply_context_type_recursive(branch_expr, target_type);
+        if (!apply_type_constraint(branch_expr, target_type)) return false;
         branch_type = target_type;
         return true;
     };
@@ -381,7 +493,7 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
         (operand_type->primitive == PrimitiveType::Int || operand_type->primitive == PrimitiveType::UInt) &&
         operand_type->integer_bits == 0 &&
         literal_assignable_to(target_type, expr->operand)) {
-        apply_context_type_recursive(expr->operand, target_type);
+        apply_type_constraint(expr->operand, target_type);
         operand_type = target_type;
     }
 
@@ -409,6 +521,23 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 
 TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     expr->declared_var_type = nullptr;
+    std::function<bool(TypePtr)> type_has_unresolved_parts = [&](TypePtr t) -> bool {
+        if (!t) return true;
+        t = resolve_type(t);
+        if (!t) return true;
+        switch (t->kind) {
+            case Type::Kind::TypeVar:
+            case Type::Kind::TypeOf:
+                return true;
+            case Type::Kind::Primitive:
+                return is_untyped_integer_primitive(t);
+            case Type::Kind::Array:
+                return type_has_unresolved_parts(t->element_type);
+            case Type::Kind::Named:
+                return false;
+        }
+        return true;
+    };
     bool creates_new_variable = bindings && bindings->is_new_variable(current_instance_id, expr.get());
     if (creates_new_variable) {
         if (expr->left->kind != Expr::Kind::Identifier) {
@@ -452,6 +581,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         // Invariant: declaration-site LHS is not a typed value expression.
         if (explicit_decl_type && !types_equal(rhs_inferred_type, explicit_decl_type)) {
             expr->declared_var_type = explicit_decl_type;
+        } else if (!explicit_decl_type && var_type && !type_has_unresolved_parts(var_type)) {
+            expr->declared_var_type = var_type;
         }
         expr->left->type = nullptr;
         expr->creates_new_variable = true;
@@ -521,13 +652,13 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
 
     if (is_untyped_integer_primitive(rhs_type) &&
         literal_assignable_to(lhs_type, expr->right)) {
-        apply_context_type_recursive(expr->right, lhs_type);
+        apply_type_constraint(expr->right, lhs_type);
         rhs_type = lhs_type;
     }
 
     if (!types_compatible(rhs_type, lhs_type)) {
         if (literal_assignable_to(lhs_type, expr->right)) {
-            apply_context_type_recursive(expr->right, lhs_type);
+            apply_type_constraint(expr->right, lhs_type);
             expr->type = lhs_type;
             return lhs_type;
         }
@@ -688,11 +819,23 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
         ? iterable_type->element_type
         : make_fresh_typevar();
     assign_loop_symbol_expr(expr->right, loop_type, bindings, current_instance_id);
+    std::unordered_set<std::string> mutated_names;
+    collect_mutated_base_names_expr(expr->right, mutated_names);
     auto saved_constexpr_values = known_constexpr_values;
     loop_depth++;
     check_expr(expr->right);
     loop_depth--;
     known_constexpr_values = std::move(saved_constexpr_values);
+    if (!mutated_names.empty()) {
+        for (auto it = known_constexpr_values.begin(); it != known_constexpr_values.end();) {
+            const Symbol* sym = it->first;
+            if (sym && mutated_names.count(sym->name)) {
+                it = known_constexpr_values.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
 
     expr->type = nullptr;
     return nullptr;
@@ -704,10 +847,22 @@ TypePtr TypeChecker::check_repeat(ExprPtr expr) {
                          expr->condition ? expr->condition->location : expr->location,
                          "Repeat loop");
     auto saved_constexpr_values = known_constexpr_values;
+    std::unordered_set<std::string> mutated_names;
+    collect_mutated_base_names_expr(expr->right, mutated_names);
     loop_depth++;
     check_expr(expr->right);
     loop_depth--;
     known_constexpr_values = std::move(saved_constexpr_values);
+    if (!mutated_names.empty()) {
+        for (auto it = known_constexpr_values.begin(); it != known_constexpr_values.end();) {
+            const Symbol* sym = it->first;
+            if (sym && mutated_names.count(sym->name)) {
+                it = known_constexpr_values.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
     expr->type = nullptr;
     return nullptr;
 }

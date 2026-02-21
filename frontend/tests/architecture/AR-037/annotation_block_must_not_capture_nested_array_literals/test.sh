@@ -22,7 +22,7 @@ VXEOF
 
 "$DRIVER" -b vexel -o "$OUT_BASE" "$SRC" >"$TMP_DIR/stdout.log" 2>"$TMP_DIR/stderr.log"
 
-if ! rg -q 'matrix[[:space:]]*=[[:space:]]*\[\[input\(\),[[:space:]]*2\],[[:space:]]*\[3,[[:space:]]*4\]\];' "$OUT_VX"; then
+if ! rg -q 'matrix([[:space:]]*:[[:space:]]*#[^=]+)?[[:space:]]*=[[:space:]]*\[\[input\(\),[[:space:]]*2\],[[:space:]]*\[3,[[:space:]]*4\]\];' "$OUT_VX"; then
   echo "nested array literal with identifier-first element must be preserved as array syntax" >&2
   cat "$OUT_VX" >&2
   exit 1

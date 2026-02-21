@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     set = SortedSet([1, 2, 3]);
-    result: #i32 = 0;
+    result = 0;
     SortedSet::@@({
         result = result + _
     });

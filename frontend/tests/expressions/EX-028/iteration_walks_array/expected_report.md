@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/expressions/EX-028/iteration_walks_array/test.vx
 &!print(arg0: #i32);
 &^main() -> #i32 {
-    arr: #i32[5] = [1, 2, 3, 4, 5];
+    arr = [1, 2, 3, 4, 5];
     arr@{
             print(_);
         };

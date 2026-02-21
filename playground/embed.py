@@ -21,6 +21,7 @@ backends_json = json.dumps(backends)
 
 playground_dir = Path(__file__).resolve().parent
 repo_root = playground_dir.parent
+tutorial_manifest_path = repo_root / "examples" / "tutorial" / "manifest.json"
 
 
 def encode_example_file(path: Path) -> dict:
@@ -50,10 +51,16 @@ if example_root.exists():
         example_files.append(encode_example_file(path))
 example_files_json = json.dumps(example_files).replace("</", "<\\/")
 
+tutorial_manifest = []
+if tutorial_manifest_path.exists():
+    tutorial_manifest = json.loads(tutorial_manifest_path.read_text())
+tutorial_manifest_json = json.dumps(tutorial_manifest).replace("</", "<\\/")
+
 html = (
     template.replace("/*__VEXEL_JS__*/", js)
     .replace("__VEXEL_WASM_BASE64__", wasm_b64)
     .replace("__VEXEL_BACKENDS_JSON__", backends_json)
     .replace("__VEXEL_EXAMPLES_JSON__", example_files_json)
+    .replace("__VEXEL_TUTORIAL_JSON__", tutorial_manifest_json)
 )
 Path(out_path).write_text(html)

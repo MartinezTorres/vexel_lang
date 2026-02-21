@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     els = Elements([10, 20, 30]);
-    sum: #i32 = 0;
+    sum = 0;
     Elements::@({
         sum = sum + _
     });

@@ -7,5 +7,5 @@
     START:#i32 = 10;
     END:#i32 = 15;
     r = 10..15;
-    -> r[2];  // Should be 12
+    -> (#i32)r[2];  // Should be 12
 }

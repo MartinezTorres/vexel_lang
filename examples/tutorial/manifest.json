@@ -1,0 +1,80 @@
+[
+  {
+    "id": "quickadd",
+    "title": "Quick Add",
+    "path": "examples/tutorial/quickadd.vx",
+    "summary": "Minimal function and entrypoint."
+  },
+  {
+    "id": "hello",
+    "title": "Hello (putchar)",
+    "path": "examples/tutorial/hello.vx",
+    "summary": "External function import and simple output."
+  },
+  {
+    "id": "globals",
+    "title": "Globals",
+    "path": "examples/tutorial/globals.vx",
+    "summary": "Global declarations and compile-time constants."
+  },
+  {
+    "id": "exports",
+    "title": "Exported Globals",
+    "path": "examples/tutorial/exports.vx",
+    "summary": "ABI-visible globals and shape constraints."
+  },
+  {
+    "id": "typeof",
+    "title": "Typeof",
+    "path": "examples/tutorial/typeof_demo.vx",
+    "summary": "Type expression #[expr] examples."
+  },
+  {
+    "id": "iteration",
+    "title": "Iteration",
+    "path": "examples/tutorial/iteration.vx",
+    "summary": "Loop syntax and iteration forms."
+  },
+  {
+    "id": "structs",
+    "title": "Structs and Methods",
+    "path": "examples/tutorial/structs.vx",
+    "summary": "Named structs, methods, and operators."
+  },
+  {
+    "id": "constexpr",
+    "title": "Constexpr + DCE",
+    "path": "examples/tutorial/constexpr_dce.vx",
+    "summary": "Compile-time execution and dead code elimination."
+  },
+  {
+    "id": "sieve",
+    "title": "Prime Sieve",
+    "path": "examples/tutorial/sieve.vx",
+    "summary": "Compute-heavy compile-time evaluation sample."
+  },
+  {
+    "id": "matrix_sum",
+    "title": "Matrix Sum",
+    "path": "examples/tutorial/matrix_sum.vx",
+    "summary": "Array indexing and accumulation."
+  },
+  {
+    "id": "abi_hints",
+    "title": "Backend Hints",
+    "path": "examples/tutorial/abi_hints.vx",
+    "summary": "Backend-owned annotations (nonreentrant, address, etc.)."
+  },
+  {
+    "id": "reentrant",
+    "title": "Reentrancy",
+    "path": "examples/tutorial/reentrant.vx",
+    "summary": "Reentrancy hints at ABI boundaries."
+  },
+  {
+    "id": "multifile",
+    "title": "Multi-file Module",
+    "path": "examples/tutorial/multifile/main.vx",
+    "summary": "Importing symbols from sibling modules."
+  }
+]

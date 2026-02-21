@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     cnt = Container([1, 2, 3]);
-    sum: #i32 = 0;
+    sum = 0;
     Container::@({
         sum = sum + _
     });

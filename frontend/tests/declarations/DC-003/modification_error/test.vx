@@ -3,7 +3,7 @@
 
 
 // DC-003: Immutable globals cannot be modified
-VALUE = 100;
+VALUE:#i32 = 100;
 
 &^main() -> #i32 {
     VALUE = 200;  // Should error

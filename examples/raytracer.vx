@@ -392,8 +392,8 @@
 // ============================================================================
 
 // Image dimensions - compile-time constants
-WIDTH = 320;
-HEIGHT = 240;
+WIDTH:#i32 = 320;
+HEIGHT:#i32 = 240;
 ASPECT_RATIO = (#f64)WIDTH / (#f64)HEIGHT;
 
 // Camera setup
@@ -465,8 +465,8 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
         x:#u32 = 0;
         (x < (#u32)WIDTH)@{
             // Calculate ray direction
-            u = (#f64)x / (#f64)(WIDTH - (#i32)1);
-            v = (#f64)y / (#f64)(HEIGHT - (#i32)1);
+            u = (#f64)x / (#f64)(WIDTH - 1);
+            v = (#f64)y / (#f64)(HEIGHT - 1);
 
             pixel_pos = VIEWPORT_LOWER_LEFT
                 .add(VIEWPORT_U.mul(u))

@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    first: #i32 = 0;
+    first = 0;
     rng = Range(1, 5);
     Range::@({
         first = _

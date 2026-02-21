@@ -47,6 +47,34 @@ std::string escape_c_string(const std::string& input) {
     return oss.str();
 }
 
+const char* expr_kind_name(vexel::Expr::Kind kind) {
+    switch (kind) {
+        case vexel::Expr::Kind::IntLiteral: return "IntLiteral";
+        case vexel::Expr::Kind::FloatLiteral: return "FloatLiteral";
+        case vexel::Expr::Kind::StringLiteral: return "StringLiteral";
+        case vexel::Expr::Kind::CharLiteral: return "CharLiteral";
+        case vexel::Expr::Kind::Identifier: return "Identifier";
+        case vexel::Expr::Kind::Binary: return "Binary";
+        case vexel::Expr::Kind::Unary: return "Unary";
+        case vexel::Expr::Kind::Call: return "Call";
+        case vexel::Expr::Kind::Index: return "Index";
+        case vexel::Expr::Kind::Member: return "Member";
+        case vexel::Expr::Kind::ArrayLiteral: return "ArrayLiteral";
+        case vexel::Expr::Kind::TupleLiteral: return "TupleLiteral";
+        case vexel::Expr::Kind::Block: return "Block";
+        case vexel::Expr::Kind::Conditional: return "Conditional";
+        case vexel::Expr::Kind::Cast: return "Cast";
+        case vexel::Expr::Kind::Assignment: return "Assignment";
+        case vexel::Expr::Kind::Range: return "Range";
+        case vexel::Expr::Kind::Length: return "Length";
+        case vexel::Expr::Kind::Iteration: return "Iteration";
+        case vexel::Expr::Kind::Repeat: return "Repeat";
+        case vexel::Expr::Kind::Resource: return "Resource";
+        case vexel::Expr::Kind::Process: return "Process";
+    }
+    return "Unknown";
+}
+
 std::optional<std::string> backend_bound_address_from_annotations(const std::vector<vexel::Annotation>& annotations) {
     for (const auto& ann : annotations) {
         if (ann.name != "addr" && ann.name != "address") {
@@ -314,7 +342,19 @@ void CodeGenerator::validate_codegen_invariants_impl(const std::vector<StmtPtr>&
         if (!expr) return;
         bool allow_untyped = expr->kind == Expr::Kind::ArrayLiteral && expr->elements.empty();
         if (value_required && !expr->is_expr_param_ref && !allow_untyped && !expr->type) {
-            throw CompileError("Internal error: missing type before code generation", expr->location);
+            std::string detail = std::string("Internal error: missing type before code generation (expr kind=");
+            detail += expr_kind_name(expr->kind);
+            if (expr->kind == Expr::Kind::Call && expr->operand &&
+                expr->operand->kind == Expr::Kind::Identifier) {
+                detail += ", callee=" + expr->operand->name;
+            } else if (expr->kind == Expr::Kind::Member) {
+                detail += ", member=" + expr->name;
+                if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                    detail += ", base=" + expr->operand->name;
+                }
+            }
+            detail += ")";
+            throw CompileError(detail, expr->location);
         }
 
         switch (expr->kind) {
@@ -1563,8 +1603,28 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
                 finalize();
                 return;
             } else if (!stmt->is_mutable) {
-                throw CompileError("Constant '" + stmt->var_name +
-                                   "' cannot be evaluated at compile time (possible uninitialized access)",
+                if (can_emit_static_initializer_expr(stmt->var_init)) {
+                    std::string init_expr;
+                    {
+                        VoidCallGuard guard(*this, false);
+                        init_expr = gen_expr(stmt->var_init);
+                    }
+                    emit(storage + mutability + vtype + " " + mangle_name(var_name) + " = " + init_expr + ";");
+                    finalize();
+                    return;
+                }
+                std::string detail = "Constant '" + stmt->var_name +
+                                     "' cannot be evaluated at compile time (possible uninitialized access)";
+                if (stmt->var_init) {
+                    detail += " [init_kind=" + std::string(expr_kind_name(stmt->var_init->kind));
+                    if (stmt->var_init->kind == Expr::Kind::Call &&
+                        stmt->var_init->operand &&
+                        stmt->var_init->operand->kind == Expr::Kind::Identifier) {
+                        detail += ", callee=" + stmt->var_init->operand->name;
+                    }
+                    detail += "]";
+                }
+                throw CompileError(detail,
                                    stmt->location);
             }
         }
@@ -1715,6 +1775,47 @@ bool CodeGenerator::lookup_constexpr_value(ExprPtr expr, CTValue& out) const {
     }
     out = it->second;
     return true;
+}
+
+bool CodeGenerator::can_emit_static_initializer_expr(ExprPtr expr) const {
+    if (!expr) return false;
+    switch (expr->kind) {
+        case Expr::Kind::IntLiteral:
+        case Expr::Kind::FloatLiteral:
+        case Expr::Kind::StringLiteral:
+        case Expr::Kind::CharLiteral:
+            return true;
+        case Expr::Kind::Unary:
+        case Expr::Kind::Cast:
+            return can_emit_static_initializer_expr(expr->operand);
+        case Expr::Kind::Binary:
+            return can_emit_static_initializer_expr(expr->left) &&
+                   can_emit_static_initializer_expr(expr->right);
+        case Expr::Kind::ArrayLiteral:
+        case Expr::Kind::TupleLiteral:
+            for (const auto& elem : expr->elements) {
+                if (!can_emit_static_initializer_expr(elem)) return false;
+            }
+            return true;
+        case Expr::Kind::Call: {
+            if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) return false;
+            bool is_ctor = false;
+            if (type_decl_map.find(expr->operand->name) != type_decl_map.end()) {
+                is_ctor = true;
+            } else {
+                const Symbol* callee = binding_for(expr->operand.get());
+                is_ctor = callee && callee->kind == Symbol::Kind::Type;
+            }
+            if (!is_ctor) return false;
+            if (!expr->receivers.empty()) return false;
+            for (const auto& arg : expr->args) {
+                if (!can_emit_static_initializer_expr(arg)) return false;
+            }
+            return true;
+        }
+        default:
+            return false;
+    }
 }
 
 bool CodeGenerator::constexpr_condition(ExprPtr expr, bool& out) const {

@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     ctr = Counter(3);
-    total: #i32 = 0;
+    total = 0;
     Counter::@({
         total = total + _
     });

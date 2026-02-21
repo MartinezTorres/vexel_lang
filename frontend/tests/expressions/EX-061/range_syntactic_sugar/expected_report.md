@@ -2,7 +2,7 @@
 ```
 // Lowered Vexel module: tests/expressions/EX-061/range_syntactic_sugar/test.vx
 &^main() -> #i32 {
-    r = [0, 1, 2];
+    r: #i32[3] = [0, 1, 2];
     -> r[0] + r[1] + r[2];
 }
 ```
