@@ -74,16 +74,19 @@ backend-conformance-test:
 .PHONY: backend-conformance-test docs-check
 docs-check:
 	@index="docs/index.html"; \
+	search_cmd() { \
+		if command -v rg >/dev/null 2>&1; then rg -q "$$1" "$$2"; else grep -E -q "$$1" "$$2"; fi; \
+	}; \
 	if [ ! -f "$$index" ]; then \
 		echo "docs/index.html not found" >&2; \
 		exit 1; \
 	fi; \
-	if rg -q "VEXEL_WASM_BASE64|createVexelModule|wasmBinaryFile=\"vexel.wasm\"|/\\*__VEXEL_JS__\\*/" "$$index"; then \
+	if search_cmd "VEXEL_WASM_BASE64|createVexelModule|wasmBinaryFile=\"vexel.wasm\"|/\\*__VEXEL_JS__\\*/" "$$index"; then \
 		echo "docs/index.html appears to contain generated playground payload" >&2; \
 		exit 1; \
 	fi; \
-	if ! rg -q "playground\\.html" "$$index"; then \
-		echo "docs/index.html must link to docs/playground.html" >&2; \
+	if ! search_cmd "playground\\.html" "$$index"; then \
+		echo "docs/index.html must link to playground.html" >&2; \
 		exit 1; \
 	fi; \
 	echo "ok"
