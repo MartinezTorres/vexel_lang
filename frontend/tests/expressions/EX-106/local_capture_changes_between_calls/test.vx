@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Nested functions capture current local state; repeated calls with same args may differ after local mutation. | Guards against unsound memoization of local captured functions
+
+&^main() -> #i32 {
+    base:#i32 = 1;
+
+    &f(n:#i32) -> #i32 {
+        n + base
+    };
+
+    a:#i32 = f(5);
+    base = 10;
+    b:#i32 = f(5);
+
+    a + b
+}

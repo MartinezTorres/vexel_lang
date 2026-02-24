@@ -96,6 +96,8 @@ private:
 
     std::unordered_set<const Symbol*> constant_eval_stack;
     std::unordered_map<const Symbol*, CTValue> constant_value_cache;
+    std::unordered_map<std::string, CTValue> call_result_cache;
+    std::unordered_set<std::string> active_call_memo_keys;
     std::vector<std::unordered_map<std::string, ExprPtr>> expr_param_stack;
     std::unordered_set<std::string> expanding_expr_params;
     int expr_param_expansion_depth = 0;

@@ -196,17 +196,64 @@ If a new architectural issue is discovered while implementing a step:
       - `make frontend-test` → known pre-existing mismatch at `expressions/EX-032/sorted_no_mutation` (unchanged)
 
 ### Step 4 — CTE performance + correctness for recursive numeric workloads (fib, large compile-time workloads)
+- Status: completed
 - Goal:
   - Remove obvious exponential blowups where call-instance memoization is semantically valid.
   - Preserve exact semantics for path-sensitive compile-time execution.
-- Primary files likely to change:
-  - `frontend/src/transform/evaluator.h`
-  - `frontend/src/transform/evaluator_call.cpp`
-  - `frontend/src/transform/evaluator*.cpp` (call keying / memo invalidation strategy)
-  - Performance tests / regression tests (frontend tests; maybe a benchmark helper script if repo already has pattern)
-  - `playground/playground.template.html` (later, only if exposing timeout/cancel/worker status)
 - Notes:
   - Must align with arbitrary-width integer CT values from Step 3.
+  - RCA (current behavior):
+    - `CTEEngine` reuses a `CompileTimeEvaluator` instance, but each query resets evaluator state (`reset_state()`), and there is no per-query call memoization.
+    - Recursive compile-time functions (e.g. Fibonacci) therefore re-evaluate identical call instances repeatedly inside a single query, producing exponential blowups.
+    - Optimizer scheduler caching (`stable_values_`) works at expression/root granularity across fixpoint iterations, but it does not eliminate repeated recursive subcalls that occur during one `CompileTimeEvaluator::query(...)`.
+    - Memoization is not universally safe:
+      - local/nested functions may capture caller locals (ambient state beyond arguments),
+      - expression parameters (`$`) depend on caller expressions/side effects,
+      - cross-query reuse would need a seed-symbol/environment fingerprint.
+    - Therefore Step 4 should add **per-query** memoization only for a clearly sound subset (top-level/internal, non-capturing-by-construction, non-expression-parameter calls).
+  - Step 4 execution plan (exact files / why):
+    - `frontend/src/transform/evaluator.h`
+      - add per-query call memo state (result cache + in-progress guard) owned by the evaluator and cleared by `reset_state()`.
+    - `frontend/src/transform/evaluator_call.cpp`
+      - implement memo-key construction and memo lookup/store around function body evaluation.
+      - gate memoization to sound calls only (no externals, no local functions, no expression params, memoizable value arguments/receivers).
+      - preserve argument evaluation side effects by memoizing only after argument/receiver evaluation and coercion.
+    - `frontend/src/core/cte_value.h/.cpp` or local helpers in `evaluator_call.cpp`
+      - (only if needed) helper(s) for strict CT value serialization/hashing used by memo keys, including `CTExactInt`.
+    - `frontend/tests/expressions/*`
+      - add recursive CTE folding regression (fib) to prove semantics and exercise memoization path.
+      - add nested/local capture regression to guard against unsound memoization of captured functions.
+    - `TODO.md`
+      - record measured timings and mark Step 4 completed after validation.
+  - Validation plan:
+    - targeted frontend regressions for new tests
+    - `make frontend-test` (expect only known `EX-032` mismatch unless new regressions appear)
+    - `python3 backends/c/tests/run_tests.py`, `make backend-vexel-test`, `make backend-megalinker-test`, `make docs-check`
+    - benchmark compile time on a generated Fibonacci sample (timing report only; no brittle timing assertions)
+  - Implementation notes (actual changes made):
+    - Added per-query call memoization state to `CompileTimeEvaluator` (cleared by `reset_state()`).
+    - Memoization is applied only to a sound subset:
+      - internal (non-external) functions,
+      - no expression parameters,
+      - no ambient local bindings outside the current call frame (conservative capture-safety gate),
+      - memoizable scalar/string receiver/argument values.
+    - Memo keys include exact integer values (`CTExactInt`) and preserve strict value identity for memoized call instances.
+    - Cached results are stored/restored via `clone_ct_value(...)` to avoid aliasing mutable aggregate storage across memo hits.
+    - Added in-progress call-key guard to avoid recursive self-hit misuse (no partial-result reuse).
+  - Regressions/tests run:
+    - New frontend regressions:
+      - `expressions/EX-105/recursive_fib_cte_fold`
+      - `expressions/EX-106/local_capture_changes_between_calls` (guards against unsound memoization of captured nested functions)
+    - `make frontend-test` → known pre-existing mismatch at `expressions/EX-032/sorted_no_mutation` (unchanged)
+    - `python3 backends/c/tests/run_tests.py` ✅ (210)
+    - `make backend-vexel-test` ✅
+    - `make backend-megalinker-test` ✅
+    - `make docs-check` ✅
+  - Timing snapshot (CLI end-to-end, process startup included; generated recursive fib sample compiled with `-b vexel`):
+    - `fib(100)` ~ 2.75 ms
+    - `fib(200)` ~ 2.49 ms
+    - `fib(400)` ~ 2.65 ms
+    - `fib(800)` ~ 3.13 ms
 
 ### Step 5 — Arbitrary-width integer lowering in C backend (full arithmetic) + megalinker backend (full arithmetic)
 - Goal:

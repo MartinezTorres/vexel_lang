@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#compile-time-execution
+// @desc: Recursive pure functions fold at compile time without changing semantics. | Fibonacci recursion folds to a constant
+
+&fib(n:#i32) -> #i32 {
+    n < 2 ? n : fib(n - 1) + fib(n - 2)
+}
+
+&^main() -> #i32 {
+    fib(30)
+}

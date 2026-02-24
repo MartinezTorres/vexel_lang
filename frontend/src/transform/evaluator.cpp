@@ -44,6 +44,8 @@ void CompileTimeEvaluator::reset_state() {
     return_depth = 0;
     constant_eval_stack.clear();
     constant_value_cache.clear();
+    call_result_cache.clear();
+    active_call_memo_keys.clear();
     expr_param_stack.clear();
     expanding_expr_params.clear();
     expr_param_expansion_depth = 0;

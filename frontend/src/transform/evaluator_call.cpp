@@ -2,9 +2,63 @@
 #include "constants.h"
 #include "evaluator_internal.h"
 #include "typechecker.h"
+#include <cstring>
 #include <utility>
 
 namespace vexel {
+
+namespace {
+
+void append_u64_hex(std::string& out, uint64_t v) {
+    static const char* kHex = "0123456789abcdef";
+    out += "0x";
+    for (int shift = 60; shift >= 0; shift -= 4) {
+        out.push_back(kHex[(v >> shift) & 0xFu]);
+    }
+}
+
+bool append_memo_key_value(std::string& out, const CTValue& value) {
+    if (std::holds_alternative<int64_t>(value)) {
+        out += "i:";
+        out += std::to_string(std::get<int64_t>(value));
+        return true;
+    }
+    if (std::holds_alternative<uint64_t>(value)) {
+        out += "u:";
+        out += std::to_string(std::get<uint64_t>(value));
+        return true;
+    }
+    if (std::holds_alternative<CTExactInt>(value)) {
+        const CTExactInt& exact = std::get<CTExactInt>(value);
+        out += exact.is_unsigned ? "U:" : "I:";
+        out += exact.value.to_string();
+        return true;
+    }
+    if (std::holds_alternative<bool>(value)) {
+        out += std::get<bool>(value) ? "b:1" : "b:0";
+        return true;
+    }
+    if (std::holds_alternative<double>(value)) {
+        uint64_t bits = 0;
+        double dv = std::get<double>(value);
+        static_assert(sizeof(bits) == sizeof(dv), "double/u64 size mismatch");
+        std::memcpy(&bits, &dv, sizeof(bits));
+        out += "f:";
+        append_u64_hex(out, bits);
+        return true;
+    }
+    if (std::holds_alternative<std::string>(value)) {
+        const std::string& s = std::get<std::string>(value);
+        out += "s:";
+        out += std::to_string(s.size());
+        out.push_back(':');
+        out += s;
+        return true;
+    }
+    return false;
+}
+
+} // namespace
 
 bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     // Look up function or type
@@ -59,6 +113,20 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     // Evaluation is path-sensitive: if the concrete call instance reaches an impure
     // operation (e.g., external call, mutable global write), try_evaluate fails.
 
+    bool memo_candidate = !sym->is_local;
+    if (memo_candidate) {
+        for (const auto& param : func->params) {
+            if (param.is_expression_param) {
+                memo_candidate = false;
+                break;
+            }
+        }
+    }
+    std::vector<CTValue> memo_receivers;
+    std::vector<CTValue> memo_args;
+    memo_receivers.reserve(expr->receivers.size());
+    memo_args.reserve(expr->args.size());
+
     // Evaluate arguments
     std::unordered_map<std::string, CTValue> saved_constants = constants;
     std::unordered_set<std::string> saved_uninitialized = uninitialized_locals;
@@ -109,8 +177,14 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                     return false;
                 }
                 constants[func->ref_params[i]] = copy_ct_value(coerced);
+                if (memo_candidate) {
+                    memo_receivers.push_back(clone_ct_value(coerced));
+                }
             } else {
                 constants[func->ref_params[i]] = copy_ct_value(rec_val);
+                if (memo_candidate) {
+                    memo_receivers.push_back(clone_ct_value(rec_val));
+                }
             }
             uninitialized_locals.erase(func->ref_params[i]);
         }
@@ -134,11 +208,86 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
                 return false;
             }
             constants[param.name] = copy_ct_value(coerced);
+            if (memo_candidate) {
+                memo_args.push_back(clone_ct_value(coerced));
+            }
         } else {
             constants[param.name] = copy_ct_value(arg_val);
+            if (memo_candidate) {
+                memo_args.push_back(clone_ct_value(arg_val));
+            }
         }
         uninitialized_locals.erase(param.name);
     }
+
+    std::string memo_key;
+    bool memo_key_active = false;
+    bool memo_store_allowed = false;
+    if (memo_candidate) {
+        // Conservative capture-safety rule: only memoize when the current evaluator
+        // frame contains no ambient local bindings beyond this call's own bindings.
+        // This avoids unsound reuse for nested functions that may capture locals.
+        for (const auto& entry : constants) {
+            if (!call_bindings.count(entry.first)) {
+                memo_candidate = false;
+                break;
+            }
+        }
+    }
+    if (memo_candidate) {
+        for (const auto& name : uninitialized_locals) {
+            if (!call_bindings.count(name)) {
+                memo_candidate = false;
+                break;
+            }
+        }
+    }
+    if (memo_candidate) {
+        memo_key.reserve(96 + (memo_receivers.size() + memo_args.size()) * 24);
+        memo_key += "fn:";
+        memo_key += std::to_string(reinterpret_cast<uintptr_t>(sym));
+        memo_key += "|r:";
+        for (const auto& v : memo_receivers) {
+            if (!append_memo_key_value(memo_key, v)) {
+                memo_candidate = false;
+                break;
+            }
+            memo_key.push_back('|');
+        }
+        if (memo_candidate) {
+            memo_key += "|a:";
+            for (const auto& v : memo_args) {
+                if (!append_memo_key_value(memo_key, v)) {
+                    memo_candidate = false;
+                    break;
+                }
+                memo_key.push_back('|');
+            }
+        }
+        if (memo_candidate) {
+            auto cached = call_result_cache.find(memo_key);
+            if (cached != call_result_cache.end()) {
+                result = clone_ct_value(cached->second);
+                cleanup_call_frame();
+                return true;
+            }
+            if (!active_call_memo_keys.count(memo_key)) {
+                active_call_memo_keys.insert(memo_key);
+                memo_key_active = true;
+                memo_store_allowed = true;
+            }
+        }
+    }
+    struct MemoGuard {
+        CompileTimeEvaluator* self = nullptr;
+        std::string* key = nullptr;
+        bool active = false;
+        ~MemoGuard() {
+            if (active && self && key) {
+                self->active_call_memo_keys.erase(*key);
+            }
+        }
+    } memo_guard{this, &memo_key, memo_key_active};
 
     // Evaluate function body
     if (!func->body) {
@@ -233,6 +382,10 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     if (!success) {
         restore_all_state();
         return false;
+    }
+
+    if (memo_store_allowed) {
+        call_result_cache[memo_key] = clone_ct_value(result);
     }
 
     cleanup_call_frame();
