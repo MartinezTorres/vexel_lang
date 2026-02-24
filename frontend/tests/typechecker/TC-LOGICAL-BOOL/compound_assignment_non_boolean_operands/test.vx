@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#type-system-and-conversions
+// @desc: Logical compound assignments (&&=, ||=) require boolean operands. | Logical compound assignment requires #b lhs/rhs
+
+&^main() -> #i32 {
+    x:#i32 = 1;
+    x &&= 1;
+    0
+}

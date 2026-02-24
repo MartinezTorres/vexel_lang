@@ -133,7 +133,10 @@ struct Expr {
     static ExprPtr make_block(std::vector<StmtPtr> stmts, ExprPtr result, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_conditional(ExprPtr cond, ExprPtr t, ExprPtr f, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_cast(TypePtr type, ExprPtr expr, const SourceLocation& loc = SourceLocation());
-    static ExprPtr make_assignment(ExprPtr lhs, ExprPtr rhs, const SourceLocation& loc = SourceLocation());
+    static ExprPtr make_assignment(ExprPtr lhs,
+                                   ExprPtr rhs,
+                                   const SourceLocation& loc = SourceLocation(),
+                                   const std::string& op = "=");
     static ExprPtr make_range(ExprPtr start, ExprPtr end, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_length(ExprPtr expr, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_iteration(ExprPtr iterable, ExprPtr body, bool sorted = false,

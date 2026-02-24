@@ -521,6 +521,8 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 
 TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     expr->declared_var_type = nullptr;
+    const std::string assign_op = expr->op.empty() ? "=" : expr->op;
+    expr->op = assign_op;
     std::function<bool(TypePtr)> type_has_unresolved_parts = [&](TypePtr t) -> bool {
         if (!t) return true;
         t = resolve_type(t);
@@ -540,6 +542,9 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     };
     bool creates_new_variable = bindings && bindings->is_new_variable(current_instance_id, expr.get());
     if (creates_new_variable) {
+        if (assign_op != "=") {
+            throw CompileError("Compound assignment cannot declare a new variable", expr->location);
+        }
         if (expr->left->kind != Expr::Kind::Identifier) {
             throw CompileError("Internal error: invalid declaration assignment", expr->location);
         }
@@ -650,19 +655,142 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         throw CompileError("Arity mismatch in multi-assignment", expr->location);
     }
 
-    if (is_untyped_integer_primitive(rhs_type) &&
-        literal_assignable_to(lhs_type, expr->right)) {
-        apply_type_constraint(expr->right, lhs_type);
-        rhs_type = lhs_type;
-    }
-
-    if (!types_compatible(rhs_type, lhs_type)) {
-        if (literal_assignable_to(lhs_type, expr->right)) {
+    TypePtr compound_value_type = lhs_type;
+    if (assign_op == "=") {
+        if (is_untyped_integer_primitive(rhs_type) &&
+            literal_assignable_to(lhs_type, expr->right)) {
             apply_type_constraint(expr->right, lhs_type);
-            expr->type = lhs_type;
-            return lhs_type;
+            rhs_type = lhs_type;
         }
-        throw CompileError("Type mismatch in assignment", expr->location);
+
+        if (!types_compatible(rhs_type, lhs_type)) {
+            if (literal_assignable_to(lhs_type, expr->right)) {
+                apply_type_constraint(expr->right, lhs_type);
+                expr->type = lhs_type;
+                return lhs_type;
+            }
+            throw CompileError("Type mismatch in assignment", expr->location);
+        }
+    } else {
+        auto is_untyped_integer_type_local = [&](TypePtr type) {
+            return type &&
+                   type->kind == Type::Kind::Primitive &&
+                   (is_signed_int(type->primitive) || is_unsigned_int(type->primitive)) &&
+                   type->integer_bits == 0;
+        };
+        auto is_numeric_primitive_type_local = [&](TypePtr type) {
+            return type &&
+                   type->kind == Type::Kind::Primitive &&
+                   (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) || is_float(type->primitive));
+        };
+        auto normalize_inferred_int_bits_local = [&](uint64_t bits) {
+            if (bits <= 8) return uint64_t(8);
+            if (bits <= 16) return uint64_t(16);
+            if (bits <= 32) return uint64_t(32);
+            return uint64_t(64);
+        };
+        auto min_unsigned_bits_local = [&](uint64_t value) {
+            if (value == 0) return uint64_t(1);
+            uint64_t bits = 0;
+            while (value > 0) {
+                value >>= 1;
+                bits++;
+            }
+            return bits;
+        };
+        auto make_int_type_local = [&](const SourceLocation& loc, uint64_t bits, bool is_unsigned) {
+            return Type::make_primitive(is_unsigned ? PrimitiveType::UInt : PrimitiveType::Int, loc, bits);
+        };
+        auto concretize_untyped_against = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_type, const std::string& op_name) {
+            if (!is_untyped_integer_type_local(side_type)) {
+                return;
+            }
+            if (!target_type || target_type->kind != Type::Kind::Primitive ||
+                target_type->primitive == PrimitiveType::Bool ||
+                is_untyped_integer_type_local(target_type)) {
+                return;
+            }
+            if (!apply_type_constraint(side_expr, target_type)) {
+                throw CompileError("Integer literal is not representable for operator " + op_name,
+                                   side_expr ? side_expr->location : expr->location);
+            }
+            side_type = target_type;
+        };
+        auto materialize_unsigned_untyped = [&](ExprPtr side_expr, TypePtr& side_type, const std::string& op_name) {
+            if (!is_untyped_integer_type_local(side_type)) return;
+            CTEQueryResult query = query_constexpr(side_expr);
+            if (query.status != CTEQueryStatus::Known) {
+                return;
+            }
+
+            uint64_t value = 0;
+            if (std::holds_alternative<uint64_t>(query.value)) {
+                value = std::get<uint64_t>(query.value);
+            } else if (std::holds_alternative<int64_t>(query.value)) {
+                int64_t signed_value = std::get<int64_t>(query.value);
+                if (signed_value < 0) {
+                    throw CompileError("Operator " + op_name + " requires unsigned integer operands",
+                                       side_expr ? side_expr->location : expr->location);
+                }
+                value = static_cast<uint64_t>(signed_value);
+            } else if (std::holds_alternative<bool>(query.value)) {
+                value = std::get<bool>(query.value) ? 1ULL : 0ULL;
+            } else {
+                return;
+            }
+
+            TypePtr inferred = make_int_type_local(side_expr ? side_expr->location : expr->location,
+                                                   normalize_inferred_int_bits_local(min_unsigned_bits_local(value)),
+                                                   true);
+            (void)apply_type_constraint(side_expr, inferred);
+            side_type = inferred;
+        };
+
+        const std::string binary_op = assign_op.substr(0, assign_op.size() - 1);
+        if (binary_op == "&&" || binary_op == "||") {
+            std::string context = (binary_op == "&&") ? "Logical operator &&" : "Logical operator ||";
+            require_boolean_expr(expr->left, lhs_type, expr->left ? expr->left->location : expr->location, context);
+            require_boolean_expr(expr->right, rhs_type, expr->right ? expr->right->location : expr->location, context);
+            compound_value_type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+        } else if (binary_op == "+" || binary_op == "-" || binary_op == "*" || binary_op == "/") {
+            concretize_untyped_against(expr->left, lhs_type, rhs_type, binary_op);
+            concretize_untyped_against(expr->right, rhs_type, lhs_type, binary_op);
+            auto is_numeric_like = [&](TypePtr t) {
+                return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type_local(t);
+            };
+            if (!is_numeric_like(lhs_type) || !is_numeric_like(rhs_type)) {
+                throw CompileError("Operator " + binary_op + " requires numeric operands", expr->location);
+            }
+            compound_value_type = unify_types(lhs_type, rhs_type);
+            if (!compound_value_type) {
+                throw CompileError("Operator " + binary_op + " requires operands from the same numeric family", expr->location);
+            }
+        } else if (binary_op == "%" || binary_op == "&" || binary_op == "|" ||
+                   binary_op == "^" || binary_op == "<<" || binary_op == ">>") {
+            concretize_untyped_against(expr->left, lhs_type, rhs_type, binary_op);
+            concretize_untyped_against(expr->right, rhs_type, lhs_type, binary_op);
+            materialize_unsigned_untyped(expr->left, lhs_type, binary_op);
+            materialize_unsigned_untyped(expr->right, rhs_type, binary_op);
+            require_unsigned_integer(lhs_type, expr->left ? expr->left->location : expr->location,
+                                     "Operator " + binary_op);
+            require_unsigned_integer(rhs_type, expr->right ? expr->right->location : expr->location,
+                                     "Operator " + binary_op);
+            if (binary_op == "<<" || binary_op == ">>") {
+                compound_value_type = lhs_type;
+            } else {
+                compound_value_type = unify_types(lhs_type, rhs_type);
+                if (!compound_value_type) {
+                    throw CompileError("Operator " + binary_op + " requires operands from the same numeric family",
+                                       expr->location);
+                }
+            }
+        } else {
+            throw CompileError("Unsupported compound assignment operator: " + assign_op, expr->location);
+        }
+
+        if (!types_compatible(compound_value_type, lhs_type)) {
+            throw CompileError("Type mismatch in compound assignment", expr->location);
+        }
     }
 
     expr->creates_new_variable = false;
@@ -694,7 +822,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     if (assigned_sym) {
         if (expr->left->kind == Expr::Kind::Identifier) {
             CTValue value;
-            if (try_evaluate_constexpr(expr->right, value)) {
+            ExprPtr fact_expr = (assign_op == "=") ? expr->right : expr;
+            if (try_evaluate_constexpr(fact_expr, value)) {
                 remember_constexpr_value(assigned_sym, value);
             } else {
                 forget_constexpr_value(assigned_sym);

@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#lexical--tokens
-// @desc: All operators are recognized: + - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ] | Recognize all operators
+// @desc: Representative operators are recognized (arithmetic, bitwise, comparisons, logical, assignment, control sigils, delimiters). | Recognize representative operators
 
 
 &^main() -> #i32 {

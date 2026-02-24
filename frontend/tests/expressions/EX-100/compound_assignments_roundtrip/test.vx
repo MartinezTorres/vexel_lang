@@ -1,0 +1,28 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Compound assignments parse and round-trip through lowered Vexel output, including logical &&= and ||=. | Compound assignments are preserved by lowering
+
+&!putchar(c:#u8);
+
+&^main() -> #i32 {
+    putchar(0);
+    a:#i32 = 10;
+    u:#u8 = 3;
+    b:#b = 0;
+
+    a += 2;
+    a -= 1;
+    a *= 4;
+    a /= 2;
+
+    u %= 3;
+    u |= 4;
+    u &= 6;
+    u ^= 2;
+    u <<= 1;
+    u >>= 1;
+
+    b ||= 1;
+    b &&= 1;
+
+    a + (#i32)u + ((#i32)b)
+}

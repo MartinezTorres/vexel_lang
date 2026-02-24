@@ -280,11 +280,41 @@ std::vector<Token> Lexer::tokenize() {
                 }
                 break;
             case '#': tokens.emplace_back(TokenType::Hash, "#", loc); break;
-            case '+': tokens.emplace_back(TokenType::Plus, "+", loc); break;
-            case '*': tokens.emplace_back(TokenType::Star, "*", loc); break;
-            case '/': tokens.emplace_back(TokenType::Slash, "/", loc); break;
-            case '%': tokens.emplace_back(TokenType::Percent, "%", loc); break;
-            case '^': tokens.emplace_back(TokenType::BitXor, "^", loc); break;
+            case '+':
+                if (match('=')) {
+                    tokens.emplace_back(TokenType::PlusAssign, "+=", loc);
+                } else {
+                    tokens.emplace_back(TokenType::Plus, "+", loc);
+                }
+                break;
+            case '*':
+                if (match('=')) {
+                    tokens.emplace_back(TokenType::StarAssign, "*=", loc);
+                } else {
+                    tokens.emplace_back(TokenType::Star, "*", loc);
+                }
+                break;
+            case '/':
+                if (match('=')) {
+                    tokens.emplace_back(TokenType::SlashAssign, "/=", loc);
+                } else {
+                    tokens.emplace_back(TokenType::Slash, "/", loc);
+                }
+                break;
+            case '%':
+                if (match('=')) {
+                    tokens.emplace_back(TokenType::PercentAssign, "%=", loc);
+                } else {
+                    tokens.emplace_back(TokenType::Percent, "%", loc);
+                }
+                break;
+            case '^':
+                if (match('=')) {
+                    tokens.emplace_back(TokenType::BitXorAssign, "^=", loc);
+                } else {
+                    tokens.emplace_back(TokenType::BitXor, "^", loc);
+                }
+                break;
             case '~': tokens.emplace_back(TokenType::BitNot, "~", loc); break;
             case '(': tokens.emplace_back(TokenType::LeftParen, "(", loc); break;
             case ')': tokens.emplace_back(TokenType::RightParen, ")", loc); break;
@@ -298,7 +328,13 @@ std::vector<Token> Lexer::tokenize() {
 
             case '|':
                 if (match('|')) {
-                    tokens.emplace_back(TokenType::LogicalOr, "||", loc);
+                    if (match('=')) {
+                        tokens.emplace_back(TokenType::LogicalOrAssign, "||=", loc);
+                    } else {
+                        tokens.emplace_back(TokenType::LogicalOr, "||", loc);
+                    }
+                } else if (match('=')) {
+                    tokens.emplace_back(TokenType::BitOrAssign, "|=", loc);
                 } else {
                     // Single | is BitOr (also used for length operator)
                     tokens.emplace_back(TokenType::BitOr, "|", loc);
@@ -311,7 +347,13 @@ std::vector<Token> Lexer::tokenize() {
                 } else if (match('^')) {
                     tokens.emplace_back(TokenType::AmpersandCaret, "&^", loc);
                 } else if (match('&')) {
-                    tokens.emplace_back(TokenType::LogicalAnd, "&&", loc);
+                    if (match('=')) {
+                        tokens.emplace_back(TokenType::LogicalAndAssign, "&&=", loc);
+                    } else {
+                        tokens.emplace_back(TokenType::LogicalAnd, "&&", loc);
+                    }
+                } else if (match('=')) {
+                    tokens.emplace_back(TokenType::BitAndAssign, "&=", loc);
                 } else {
                     tokens.emplace_back(TokenType::Ampersand, "&", loc);
                 }
@@ -335,7 +377,11 @@ std::vector<Token> Lexer::tokenize() {
 
             case '<':
                 if (match('<')) {
-                    tokens.emplace_back(TokenType::LeftShift, "<<", loc);
+                    if (match('=')) {
+                        tokens.emplace_back(TokenType::LeftShiftAssign, "<<=", loc);
+                    } else {
+                        tokens.emplace_back(TokenType::LeftShift, "<<", loc);
+                    }
                 } else if (match('=')) {
                     tokens.emplace_back(TokenType::LessEqual, "<=", loc);
                 } else {
@@ -345,7 +391,11 @@ std::vector<Token> Lexer::tokenize() {
 
             case '>':
                 if (match('>')) {
-                    tokens.emplace_back(TokenType::RightShift, ">>", loc);
+                    if (match('=')) {
+                        tokens.emplace_back(TokenType::RightShiftAssign, ">>=", loc);
+                    } else {
+                        tokens.emplace_back(TokenType::RightShift, ">>", loc);
+                    }
                 } else if (match('=')) {
                     tokens.emplace_back(TokenType::GreaterEqual, ">=", loc);
                 } else {
@@ -362,6 +412,8 @@ std::vector<Token> Lexer::tokenize() {
                     } else {
                         tokens.emplace_back(TokenType::Arrow, "->", loc);
                     }
+                } else if (match('=')) {
+                    tokens.emplace_back(TokenType::MinusAssign, "-=", loc);
                 } else {
                     tokens.emplace_back(TokenType::Minus, "-", loc);
                 }

@@ -349,6 +349,8 @@ private:
                     << format_expr(expr->operand, my_prec, level);
                 break;
             case Expr::Kind::Assignment:
+                {
+                    const std::string assign_op = expr->op.empty() ? "=" : expr->op;
                 if (expr->creates_new_variable &&
                     expr->left &&
                     expr->left->kind == Expr::Kind::Identifier) {
@@ -356,13 +358,14 @@ private:
                     if (expr->declared_var_type) {
                         out << ": " << format_type(expr->declared_var_type);
                     }
-                    out << " = " << format_expr(expr->right, my_prec, level);
+                    out << " " << assign_op << " " << format_expr(expr->right, my_prec, level);
                 } else {
                     out << format_expr(expr->left, my_prec, level)
-                        << " = "
+                        << " " << assign_op << " "
                         << format_expr(expr->right, my_prec, level);
                 }
                 break;
+                }
             case Expr::Kind::Range:
                 out << format_expr(expr->left, my_prec, level)
                     << ".."

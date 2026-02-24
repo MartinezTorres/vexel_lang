@@ -213,11 +213,15 @@ ExprPtr Expr::make_cast(TypePtr type, ExprPtr expr, const SourceLocation& loc) {
     return e;
 }
 
-ExprPtr Expr::make_assignment(ExprPtr lhs, ExprPtr rhs, const SourceLocation& loc) {
+ExprPtr Expr::make_assignment(ExprPtr lhs,
+                              ExprPtr rhs,
+                              const SourceLocation& loc,
+                              const std::string& op) {
     auto e = std::make_shared<Expr>();
     e->kind = Kind::Assignment;
     e->left = lhs;
     e->right = rhs;
+    e->op = op;
     e->location = loc;
     return e;
 }

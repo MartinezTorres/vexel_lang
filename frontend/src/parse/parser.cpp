@@ -948,9 +948,32 @@ ExprPtr Parser::parse_expr_allowing_stmt_conditional() {
 ExprPtr Parser::parse_assignment() {
     ExprPtr expr = parse_conditional();
 
-    if (match(TokenType::Assign)) {
+    auto is_assignment_token = [&](TokenType t) {
+        switch (t) {
+            case TokenType::Assign:
+            case TokenType::PlusAssign:
+            case TokenType::MinusAssign:
+            case TokenType::StarAssign:
+            case TokenType::SlashAssign:
+            case TokenType::PercentAssign:
+            case TokenType::BitAndAssign:
+            case TokenType::BitOrAssign:
+            case TokenType::BitXorAssign:
+            case TokenType::LeftShiftAssign:
+            case TokenType::RightShiftAssign:
+            case TokenType::LogicalAndAssign:
+            case TokenType::LogicalOrAssign:
+                return true;
+            default:
+                return false;
+        }
+    };
+
+    if (is_assignment_token(current().type)) {
+        Token op_tok = current();
+        pos++;
         ExprPtr rhs = parse_assignment();
-        return Expr::make_assignment(expr, rhs, expr->location);
+        return Expr::make_assignment(expr, rhs, expr->location, op_tok.lexeme);
     }
 
     return expr;

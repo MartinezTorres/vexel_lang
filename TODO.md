@@ -170,12 +170,19 @@ If a new architectural issue is discovered while implementing a step:
   - This step is optional by feature priority, but if done must target full execution semantics (not a fake stub).
 
 ### Step 7 — Compound assignment operators (single coherent design, include logical &&= / ||=)
+- Status: completed
 - Goal:
   - Implement compound assignments coherently in one pass, including:
     - arithmetic: `+= -= *= /= %=`
     - bitwise: `&= |= ^=`
     - shifts: `<<= >>=`
     - logical: `&&= ||=`
+- RCA (current behavior):
+  - Lexer/parser do not tokenize or parse compound assignments, so all `op=` forms fail lexically/parsing.
+  - AST assignment nodes already carry a generic `op` string field, but assignment creation/printing/codegen currently hardcode plain `=`.
+  - Typechecker assignment logic only validates plain assignment and mutability; no operator-specific compound rules exist.
+  - CTE assignment evaluator only supports plain assignment and always evaluates RHS first; this is incompatible with logical short-circuit (`&&=` / `||=`).
+  - C/megalinker codegen emit plain `lhs = rhs`; C has no native `&&=`/`||=` operators, so backend handling is required.
 - Primary files likely to change:
   - `frontend/src/parse/lexer.h/.cpp` (tokens)
   - `frontend/src/parse/parser.cpp` (parse + desugar strategy)
@@ -187,6 +194,49 @@ If a new architectural issue is discovered while implementing a step:
   - `docs/vexel-rfc.md` (operator grammar + semantics)
 - Notes:
   - `&&=` / `||=` must preserve short-circuit semantics and single lvalue evaluation.
+  - Step 7 execution plan (exact files / why):
+    - `frontend/src/parse/lexer.h`, `frontend/src/parse/lexer.cpp`
+      - add compound-assignment tokens and lexing for all `op=` forms.
+    - `frontend/src/parse/parser.cpp`
+      - extend `parse_assignment()` to accept all compound-assignment tokens with right-associative parsing.
+    - `frontend/src/core/ast.h`, `frontend/src/core/ast.cpp`
+      - preserve assignment operator on AST nodes (plain `=` and compounds) through `Expr::make_assignment`.
+    - `frontend/src/type/typechecker_expr_control.cpp`
+      - add compound-assignment operator validation (numeric/bitwise/shift/logical), reject declaration-style compound assignment.
+      - ensure constexpr fact tracking uses the full assignment expression result for compound ops.
+    - `frontend/src/transform/evaluator_assignment.cpp`
+      - implement compile-time execution for compound assignments, including RHS short-circuit for `&&=`/`||=`.
+    - `backends/vexel/src/vexel_backend.cpp`
+      - print compound assignments in lowered Vexel output.
+    - `backends/c/src/codegen_expr.cpp`, `backends/ext/megalinker/src/codegen_expr.cpp`
+      - emit compound assignments in generated C; special handling for `&&=`/`||=` since C lacks those operators.
+    - Tests:
+      - `frontend/tests/lexer/*` (operator tokenization smoke)
+      - `frontend/tests/expressions/*` (parsing/precedence/chaining)
+      - `frontend/tests/typechecker/*` (logical bool constraints on `&&=`/`||=`)
+      - `backends/c/tests/backend_c/*` (runtime semantics, short-circuit)
+      - optional megalinker compile smoke test if coverage gap is exposed
+    - Docs:
+      - `docs/vexel-rfc.md` (assignment operators list and semantics)
+  - Implementation notes (actual changes made):
+    - Added lexer tokens for all compound assignments, including `&&=` / `||=`.
+    - Parser now parses compound assignments right-associatively and stores the exact assignment operator on AST assignment nodes.
+    - Typechecker validates compound assignments by operator family (arithmetic/bitwise/shifts/logical), rejects declaration-style compound assignments, and tracks constexpr facts using the full compound expression result.
+    - Compile-time evaluator executes compound assignments (including `&&=` / `||=` short-circuit).
+    - Vexel backend round-trips compound assignments in lowered output.
+    - C and megalinker backends emit native C compound ops where available and lower `&&=` / `||=` via explicit short-circuit control flow with an addressed lvalue temp (single lhs evaluation).
+  - Tests/regressions run:
+    - Frontend:
+      - `EX-100/compound_assignments_roundtrip` (parse + lowered output preserves operators)
+      - `EX-101/compound_assignments_cte_semantics` (CTE folds compound semantics to constant)
+      - `TC-LOGICAL-BOOL/compound_assignment_non_boolean_operands` (rejection path)
+    - Backend C:
+      - `python3 backends/c/tests/run_tests.py` (210 tests, incl. new `CX-083`)
+    - Backend smoke/regression:
+      - `make backend-vexel-test`
+      - `make backend-megalinker-test`
+    - Docs check:
+      - `make docs-check`
 
 ### Step 8 — Megalinker temp/reentrant code-shape audit and cleanup (strategy-ready, backend-owned)
 - Goal:

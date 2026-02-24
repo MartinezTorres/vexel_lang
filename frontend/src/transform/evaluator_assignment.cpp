@@ -1,16 +1,13 @@
 #include "evaluator.h"
 #include "evaluator_internal.h"
+#include "cte_value_utils.h"
 #include "typechecker.h"
 #include <functional>
 
 namespace vexel {
 
 bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
-    // Evaluate the right-hand side
-    CTValue rhs_val;
-    if (!try_evaluate(expr->right, rhs_val)) {
-        return false;
-    }
+    const std::string assign_op = expr->op.empty() ? "=" : expr->op;
 
     auto is_local = [&](const std::string& name) {
         return constants.count(name) > 0 || uninitialized_locals.count(name) > 0;
@@ -55,17 +52,6 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         }
     }
 
-    CTValue assign_val = rhs_val;
-    TypePtr assignment_type = expr->type;
-    if (expr->creates_new_variable && expr->declared_var_type) {
-        assignment_type = expr->declared_var_type;
-    } else if (!assignment_type && expr->left && expr->left->type) {
-        assignment_type = expr->left->type;
-    }
-    if (assignment_type &&
-        !coerce_value_to_type(assign_val, assignment_type, assign_val)) {
-        return false;
-    }
     auto clone_composite = [&](const std::shared_ptr<CTComposite>& src) {
         if (!src) return std::shared_ptr<CTComposite>();
         auto dst = std::make_shared<CTComposite>();
@@ -193,6 +179,180 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     }
     if (!slot) {
         error_msg = "Assignment target is not addressable at compile time";
+        return false;
+    }
+
+    auto evaluate_rhs = [&](CTValue& out) -> bool {
+        return try_evaluate(expr->right, out);
+    };
+    auto apply_compound = [&](const CTValue& lhs_in, const CTValue& rhs_in, CTValue& out) -> bool {
+        const std::string binary_op = assign_op.substr(0, assign_op.size() - 1);
+        if (binary_op == "&&" || binary_op == "||") {
+            bool lhs_bool = false;
+            bool rhs_bool = false;
+            if (!cte_scalar_to_bool(lhs_in, lhs_bool) || !cte_scalar_to_bool(rhs_in, rhs_bool)) {
+                error_msg = "Unsupported operand types for logical compound assignment";
+                return false;
+            }
+            out = (binary_op == "&&") ? (lhs_bool && rhs_bool) : (lhs_bool || rhs_bool);
+            return true;
+        }
+
+        auto is_int = [&](const CTValue& v) {
+            return std::holds_alternative<int64_t>(v) || std::holds_alternative<uint64_t>(v);
+        };
+
+        if (binary_op == "|" || binary_op == "&" || binary_op == "^" ||
+            binary_op == "<<" || binary_op == ">>") {
+            if (!is_int(lhs_in) || !is_int(rhs_in)) {
+                error_msg = "Unsupported operand types for bitwise compound assignment";
+                return false;
+            }
+            bool use_unsigned = std::holds_alternative<uint64_t>(lhs_in) ||
+                                std::holds_alternative<uint64_t>(rhs_in);
+            uint64_t l = std::holds_alternative<uint64_t>(lhs_in)
+                ? std::get<uint64_t>(lhs_in)
+                : static_cast<uint64_t>(std::get<int64_t>(lhs_in));
+            uint64_t r = std::holds_alternative<uint64_t>(rhs_in)
+                ? std::get<uint64_t>(rhs_in)
+                : static_cast<uint64_t>(std::get<int64_t>(rhs_in));
+            uint64_t v = 0;
+            if (binary_op == "|") v = l | r;
+            else if (binary_op == "&") v = l & r;
+            else if (binary_op == "^") v = l ^ r;
+            else if (binary_op == "<<") v = l << r;
+            else v = l >> r;
+            out = use_unsigned ? CTValue(v) : CTValue(static_cast<int64_t>(v));
+            return true;
+        }
+
+        if (std::holds_alternative<uint64_t>(lhs_in) || std::holds_alternative<uint64_t>(rhs_in)) {
+            uint64_t l = std::holds_alternative<uint64_t>(lhs_in)
+                ? std::get<uint64_t>(lhs_in)
+                : static_cast<uint64_t>(to_int(lhs_in));
+            uint64_t r = std::holds_alternative<uint64_t>(rhs_in)
+                ? std::get<uint64_t>(rhs_in)
+                : static_cast<uint64_t>(to_int(rhs_in));
+            if (binary_op == "+") out = l + r;
+            else if (binary_op == "-") out = l - r;
+            else if (binary_op == "*") out = l * r;
+            else if (binary_op == "/") {
+                if (r == 0) {
+                    error_msg = "Division by zero in compile-time evaluation";
+                    return false;
+                }
+                out = l / r;
+            } else if (binary_op == "%") {
+                if (r == 0) {
+                    error_msg = "Modulo by zero in compile-time evaluation";
+                    return false;
+                }
+                out = l % r;
+            } else {
+                error_msg = "Unsupported compound assignment operator at compile time: " + assign_op;
+                return false;
+            }
+            return true;
+        }
+
+        if (std::holds_alternative<double>(lhs_in) || std::holds_alternative<double>(rhs_in)) {
+            double l = to_float(lhs_in);
+            double r = to_float(rhs_in);
+            if (binary_op == "+") out = l + r;
+            else if (binary_op == "-") out = l - r;
+            else if (binary_op == "*") out = l * r;
+            else if (binary_op == "/") {
+                if (r == 0.0) {
+                    error_msg = "Division by zero in compile-time evaluation";
+                    return false;
+                }
+                out = l / r;
+            } else {
+                error_msg = "Unsupported compound assignment operator at compile time: " + assign_op;
+                return false;
+            }
+            return true;
+        }
+
+        if (std::holds_alternative<int64_t>(lhs_in) || std::holds_alternative<bool>(lhs_in) ||
+            std::holds_alternative<int64_t>(rhs_in) || std::holds_alternative<bool>(rhs_in)) {
+            int64_t l = to_int(lhs_in);
+            int64_t r = to_int(rhs_in);
+            if (binary_op == "+") out = l + r;
+            else if (binary_op == "-") out = l - r;
+            else if (binary_op == "*") out = l * r;
+            else if (binary_op == "/") {
+                if (r == 0) {
+                    error_msg = "Division by zero in compile-time evaluation";
+                    return false;
+                }
+                out = l / r;
+            } else if (binary_op == "%") {
+                if (r == 0) {
+                    error_msg = "Modulo by zero in compile-time evaluation";
+                    return false;
+                }
+                out = l % r;
+            } else {
+                error_msg = "Unsupported compound assignment operator at compile time: " + assign_op;
+                return false;
+            }
+            return true;
+        }
+
+        error_msg = "Unsupported operand types for compound assignment";
+        return false;
+    };
+
+    CTValue assign_val;
+    if (assign_op == "=") {
+        if (!evaluate_rhs(assign_val)) {
+            return false;
+        }
+    } else if (assign_op == "&&=" || assign_op == "||=") {
+        if (std::holds_alternative<CTUninitialized>(*slot)) {
+            error_msg = "Compound assignment reads uninitialized value";
+            return false;
+        }
+        bool lhs_bool = false;
+        if (!cte_scalar_to_bool(*slot, lhs_bool)) {
+            error_msg = "Unsupported operand types for logical compound assignment";
+            return false;
+        }
+        const bool short_circuit = (assign_op == "&&=") ? !lhs_bool : lhs_bool;
+        if (short_circuit) {
+            assign_val = lhs_bool;
+        } else {
+            CTValue rhs_val;
+            if (!evaluate_rhs(rhs_val)) {
+                return false;
+            }
+            if (!apply_compound(*slot, rhs_val, assign_val)) {
+                return false;
+            }
+        }
+    } else {
+        if (std::holds_alternative<CTUninitialized>(*slot)) {
+            error_msg = "Compound assignment reads uninitialized value";
+            return false;
+        }
+        CTValue rhs_val;
+        if (!evaluate_rhs(rhs_val)) {
+            return false;
+        }
+        if (!apply_compound(*slot, rhs_val, assign_val)) {
+            return false;
+        }
+    }
+
+    TypePtr assignment_type = expr->type;
+    if (expr->creates_new_variable && expr->declared_var_type) {
+        assignment_type = expr->declared_var_type;
+    } else if (!assignment_type && expr->left && expr->left->type) {
+        assignment_type = expr->left->type;
+    }
+    if (assignment_type &&
+        !coerce_value_to_type(assign_val, assignment_type, assign_val)) {
         return false;
     }
 

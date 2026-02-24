@@ -339,11 +339,15 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Logical AND (&&)
 - Logical OR (||)
 - Conditional (?:)
-- Assignment (=)
+- Assignment (`=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`, `&&=`, `||=`)
 - `@` / `@@` (iteration/repeat) bind looser than assignment; parentheses required to combine with other operators
 
 **Assignment**:
 - Single assignment: `x = expr` returns the assigned value
+- Compound assignment: `x op= y` is assignment with the corresponding operator (`x = x op y`) and returns the assigned value
+  - Supported families: arithmetic, bitwise, shifts, logical (`&&=`, `||=`)
+  - `&&=` and `||=` preserve logical short-circuit semantics
+  - The left-hand lvalue is evaluated once
 - Can be used in larger expressions: `y = (x = 5) + 1` assigns 5 to x, 6 to y
 - Evaluation is right-to-left for chained assignments: `a = b = c` evaluates as `a = (b = c)`
 - **Multi-assignment**: `a, b, c = expr` where `expr` returns tuple type
