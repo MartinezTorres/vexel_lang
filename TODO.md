@@ -440,6 +440,7 @@ If a new architectural issue is discovered while implementing a step:
 ### Step 8 — Megalinker temp/reentrant code-shape audit and cleanup (strategy-ready, backend-owned)
 - Goal:
   - Clean temp declarations/reuse and clarify reentrant vs nonreentrant emission without freezing future optimization strategy.
+- Status: completed
 - Primary files likely to change:
   - `backends/ext/megalinker/src/codegen.h`
   - `backends/ext/megalinker/src/codegen.cpp`
@@ -450,6 +451,34 @@ If a new architectural issue is discovered while implementing a step:
   - `examples/tutorial/banked.vx` (if used as regression sample)
 - Notes:
   - Keep backend-specific freedom. C and megalinker code shape is intentionally allowed to drift.
+  - RCA refresh after Step 5:
+    - Arbitrary-width integer lowering introduced new generated helper/type symbols (`vx_ai_*`, `vx_uN_t/vx_iN_t`) that are internal generated symbols but currently ignore `--internal-prefix`, which weakens the multi-unit collision-avoidance contract in megalinker.
+    - Temp reuse is type-erased (`fresh_temp`/`release_temp` only track names), which became unsound once struct-typed temporaries entered the mix; the immediate fix disabled reuse for correctness.
+    - Reentrant/nonreentrant code paths are functionally correct, but helper/runtime emission and temp policy are now mixed concerns inside codegen and should be made more explicit in code comments/contracts.
+  - Step 8 execution plan (current scope, no speculative optimizer work):
+    - `backends/ext/megalinker/src/codegen_extint.cpp`
+      - parameterize extint helper function names and generated extint typedef names with `internal_symbol_prefix`
+      - keep exported ABI symbols unchanged; prefix applies only backend-internal helper/type symbols
+    - `backends/ext/megalinker/src/codegen.h`
+      - add helper-name builders if needed (to avoid stringly hardcoding `vx_ai_*`)
+    - `backends/ext/megalinker/src/codegen_support.cpp` / `codegen.cpp`
+      - update comparator/helper call sites and any extint type-name assumptions to use prefixed names
+      - clarify temp-reuse policy comments (reuse disabled for correctness until typed allocator exists)
+    - `backends/ext/megalinker/tests/test.sh`
+      - extend internal-prefix coverage to assert extint helper names/types honor `--internal-prefix`
+    - Optional follow-up (same step only if low-risk after above): add typed temp reuse metadata (no semantic change). If risk rises, keep reuse disabled and document.
+  - Implementation notes (actual changes made):
+    - Arbitrary-width integer helper/type symbols in megalinker now honor `--internal-prefix`:
+      - extint typedef names use the backend internal prefix (e.g. `mltest_u13_t`)
+      - extint helper function definitions are emitted with the prefixed symbol names (e.g. `mltest_ai_shl`)
+      - call sites remain backend-codegen-simple by using local macro aliases (`vx_ai_* -> <prefix>ai_*`) in generated C units
+    - Temp reuse remains intentionally disabled (type-erased reuse was unsound once struct temporaries were introduced). The code now documents correctness-first behavior explicitly.
+    - No reentrant/nonreentrant semantic changes were made in this step; cleanup was limited to symbol-shape/prefix correctness and temp policy clarity.
+  - Tests/regressions run:
+    - `make backend-megalinker-test` ✅ (extended to cover prefixed extint helper/type symbols)
+    - `python3 backends/c/tests/run_tests.py` ✅
+    - `make backend-vexel-test` ✅
+    - `make docs-check` ✅
 
 - It would be nice that the playground would have e.g. a console so that we could run programs and see the output. (very much optional, I understand this is hard)
   - RCA:
