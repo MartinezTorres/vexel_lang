@@ -12,7 +12,9 @@ Parser::Parser(std::vector<Token> toks)
       panic_mode(false),
       allow_statement_conditionals(false),
       statement_expr_depth(0),
-      statement_expr_allowed_depth(0) {}
+      statement_expr_allowed_depth(0),
+      split_top_level_plain_ampersand_funcs(false),
+      top_level_init_expr_root_depth(-1) {}
 
 const Token& Parser::current() {
     if (pos >= tokens.size()) return tokens.back();
@@ -227,6 +229,24 @@ StmtPtr Parser::parse_var_decl(bool allow_double_bang_local) {
 
     ExprPtr init = nullptr;
     if (match(TokenType::Assign)) {
+        struct TopLevelInitBoundaryGuard {
+            Parser& parser;
+            bool prev_split;
+            int prev_root;
+            explicit TopLevelInitBoundaryGuard(Parser& p, bool enable)
+                : parser(p),
+                  prev_split(p.split_top_level_plain_ampersand_funcs),
+                  prev_root(p.top_level_init_expr_root_depth) {
+                if (enable) {
+                    parser.split_top_level_plain_ampersand_funcs = true;
+                    parser.top_level_init_expr_root_depth = parser.statement_expr_depth + 1;
+                }
+            }
+            ~TopLevelInitBoundaryGuard() {
+                parser.split_top_level_plain_ampersand_funcs = prev_split;
+                parser.top_level_init_expr_root_depth = prev_root;
+            }
+        } boundary_guard(*this, !allow_double_bang_local);
         init = parse_expr();
     }
 
@@ -488,6 +508,112 @@ static bool is_operator_function_token(TokenType type) {
         default:
             return false;
     }
+}
+
+bool Parser::looks_like_plain_func_decl_start(size_t cursor) const {
+    auto token_type = [&](size_t idx) -> TokenType {
+        if (idx >= tokens.size()) return TokenType::EndOfFile;
+        return tokens[idx].type;
+    };
+
+    if (token_type(cursor) != TokenType::Ampersand) {
+        return false;
+    }
+
+    size_t i = cursor + 1;
+
+    // Optional receiver list &(a,b)
+    if (token_type(i) == TokenType::LeftParen) {
+        size_t j = i + 1;
+        bool looks_like_ref = true;
+        if (token_type(j) == TokenType::RightParen) {
+            looks_like_ref = false;
+        } else {
+            while (token_type(j) != TokenType::RightParen && token_type(j) != TokenType::EndOfFile) {
+                if (token_type(j) != TokenType::Identifier) {
+                    looks_like_ref = false;
+                    break;
+                }
+                j++;
+                if (token_type(j) == TokenType::Colon || token_type(j) == TokenType::Dollar) {
+                    looks_like_ref = false;
+                    break;
+                }
+                if (token_type(j) == TokenType::Comma) {
+                    j++;
+                    continue;
+                }
+                break;
+            }
+            if (token_type(j) != TokenType::RightParen) {
+                looks_like_ref = false;
+            }
+        }
+        if (looks_like_ref && token_type(j) == TokenType::RightParen) {
+            i = j + 1;
+        }
+    }
+
+    // Optional method namespace #Type::
+    if (token_type(i) == TokenType::Hash) {
+        if (token_type(i + 1) != TokenType::Identifier ||
+            token_type(i + 2) != TokenType::DoubleColon) {
+            return false;
+        }
+        i += 3;
+    }
+
+    if (!(token_type(i) == TokenType::Identifier || is_operator_function_token(token_type(i)))) {
+        return false;
+    }
+    i++;
+
+    if (token_type(i) != TokenType::LeftParen) {
+        return false;
+    }
+
+    // Value parameter list (...)
+    int paren_depth = 0;
+    while (token_type(i) != TokenType::EndOfFile) {
+        TokenType t = token_type(i);
+        if (t == TokenType::LeftParen) {
+            paren_depth++;
+        } else if (t == TokenType::RightParen) {
+            paren_depth--;
+            if (paren_depth == 0) {
+                i++;
+                break;
+            }
+            if (paren_depth < 0) {
+                return false;
+            }
+        }
+        i++;
+    }
+    if (paren_depth != 0) {
+        return false;
+    }
+
+    // Optional return type after ->
+    if (token_type(i) == TokenType::Arrow) {
+        i++;
+        int type_paren_depth = 0;
+        int bracket_depth = 0;
+        while (token_type(i) != TokenType::EndOfFile) {
+            TokenType t = token_type(i);
+            if (type_paren_depth == 0 && bracket_depth == 0 && t == TokenType::LeftBrace) {
+                break;
+            }
+            if (t == TokenType::LeftParen) type_paren_depth++;
+            else if (t == TokenType::RightParen && type_paren_depth > 0) type_paren_depth--;
+            else if (t == TokenType::LeftBracket) bracket_depth++;
+            else if (t == TokenType::RightBracket && bracket_depth > 0) bracket_depth--;
+            else if (type_paren_depth == 0 && bracket_depth == 0 && t == TokenType::Semicolon) return false;
+            i++;
+        }
+    }
+
+    return token_type(i) == TokenType::LeftBrace;
 }
 
 std::string Parser::parse_function_name() {
@@ -935,6 +1061,11 @@ ExprPtr Parser::parse_bit_and() {
     ExprPtr left = parse_compare();
 
     while (check(TokenType::Ampersand)) {
+        if (split_top_level_plain_ampersand_funcs &&
+            statement_expr_depth == top_level_init_expr_root_depth &&
+            looks_like_plain_func_decl_start(pos)) {
+            break;
+        }
         std::string op = current().lexeme;
         pos++;
         ExprPtr right = parse_compare();

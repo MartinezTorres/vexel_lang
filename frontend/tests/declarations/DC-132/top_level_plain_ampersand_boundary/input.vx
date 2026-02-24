@@ -1,0 +1,15 @@
+// @rfc: docs/vexel-rfc.md#grammar-summary
+// @desc: Plain '&' top-level function declarations are recognized after a semicolon-optional global initializer. | Parser splits global initializer from following &func decl
+
+&add(a:#i32, b:#i32) -> #i32 {
+    a + b
+}
+
+res:#i32 = add(1234, 2)
+&main() {
+}
+
+&^entry() -> #i32 {
+    main();
+    res
+}

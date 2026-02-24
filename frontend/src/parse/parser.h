@@ -12,6 +12,8 @@ class Parser {
     bool allow_statement_conditionals;
     int statement_expr_depth;
     int statement_expr_allowed_depth;
+    bool split_top_level_plain_ampersand_funcs;
+    int top_level_init_expr_root_depth;
 
     enum class AnnotationContext {
         TopLevel,
@@ -45,6 +47,7 @@ private:
     std::string parse_annotation_arg();
 
     bool looks_like_var_decl_with_linkage(bool allow_double_bang_local) const;
+    bool looks_like_plain_func_decl_start(size_t cursor) const;
     StmtPtr parse_var_decl(bool allow_double_bang_local);
 
     StmtPtr parse_top_level();

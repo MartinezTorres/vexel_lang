@@ -89,6 +89,7 @@ If a new architectural issue is discovered while implementing a step:
     - Full `frontend` test suite currently has an unrelated/stale expectation mismatch in `tests/expressions/EX-032/sorted_no_mutation` (pre-existing with current branch state; not part of this step’s behavior change).
 
 ### Step 2 — Parser top-level boundary fix for plain `&` after semicolon-optional global initializers
+- Status: completed
 - Goal:
   - `&add(a,b){a+b} res=add(1234,2) &main(){}` parses as two top-level declarations without requiring `;`.
 - Primary files likely to change:
@@ -98,6 +99,15 @@ If a new architectural issue is discovered while implementing a step:
   - `docs/vexel-rfc.md` (only if grammar wording must clarify semicolon-optional boundary rule)
 - Notes:
   - This is a parser decision fix, not a language semantic change.
+  - Implementation notes (actual changes made):
+    - Added parser lookahead to detect a plain `&` function declaration shape at top level.
+    - Enabled a top-level global-initializer boundary mode so the bitwise-`&` parser stops at the outermost initializer expression when the next token sequence is a plain function declaration.
+    - This preserves semicolon-optional top-level style without changing expression semantics.
+  - Tests/regressions run:
+    - Repro program (`res=...` followed by `&main(){}` without `;`) now compiles.
+    - New frontend regression: `declarations/DC-132/top_level_plain_ampersand_boundary`.
+    - Existing bitwise precedence regression: `expressions/EX-074/bitwise_and_precedence`.
+    - Backend smoke/regression suites rerun (`backends/vexel/tests/test.sh`, `backends/c/tests/run_tests.py`).
 
 ### Step 3 — Arbitrary-size integer literals and arbitrary-width integer values (frontend single source of truth)
 - Goal:
