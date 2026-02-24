@@ -532,6 +532,11 @@ void validate_type_usage(const Module& /*mod*/, const AnalysisFacts& facts, cons
                 }
             }
         } else if (ret_required) {
+            if (!func->is_external && func->body && !func->return_type) {
+                throw CompileError("Return value of function '" + qualified_func_name(sym) +
+                                   "' is used but the function returns nothing",
+                                   func->location);
+            }
             if (!type_is_concrete(&ctx, func->return_type)) {
                 throw CompileError("Return value of function '" + qualified_func_name(sym) +
                                    "' is used but its return type is unresolved",

@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Internal functions with no return value cannot be used as expressions. | Using no-value function result is rejected
+
+&noop() {
+}
+
+&^main() -> #i32 {
+    x:#i32 = noop();
+    x
+}

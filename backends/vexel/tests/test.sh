@@ -33,6 +33,11 @@ cat >"$tmp/typed_local.vx" <<'VX'
 }
 VX
 
+cat >"$tmp/empty_no_value.vx" <<'VX'
+&^main() {
+}
+VX
+
 if ! "$CLI" -b vexel -o "$tmp/out" "$tmp/test.vx" >/dev/null 2>"$tmp/stderr"; then
   echo "backend vexel failed to compile valid input" >&2
   cat "$tmp/stderr" >&2
@@ -73,6 +78,24 @@ if ! rg -q "limit: #i32 = 1000;" "$tmp/typed_local_out.vx"; then
     cat "$tmp/typed_local_out.vx" >&2
     exit 1
   fi
+fi
+
+if ! "$CLI" -b vexel -o "$tmp/empty_no_value_out" "$tmp/empty_no_value.vx" >/dev/null 2>"$tmp/empty_no_value_stderr"; then
+  echo "backend vexel failed on empty no-value function" >&2
+  cat "$tmp/empty_no_value_stderr" >&2
+  exit 1
+fi
+
+if grep -Eq '^[[:space:]]*0[[:space:]]*$' "$tmp/empty_no_value_out.vx"; then
+  echo "empty no-value function was incorrectly folded to numeric zero" >&2
+  cat "$tmp/empty_no_value_out.vx" >&2
+  exit 1
+fi
+
+if ! grep -Eq "&\\^main\\(\\) \\{" "$tmp/empty_no_value_out.vx"; then
+  echo "missing lowered empty no-value main signature" >&2
+  cat "$tmp/empty_no_value_out.vx" >&2
+  exit 1
 fi
 
 echo "ok"

@@ -16,6 +16,7 @@ inline std::string ct_value_kind(const CTValue& value) {
     if (std::holds_alternative<double>(value)) return "float";
     if (std::holds_alternative<bool>(value)) return "bool";
     if (std::holds_alternative<std::string>(value)) return "string";
+    if (std::holds_alternative<CTNoValue>(value)) return "no-value";
     if (std::holds_alternative<CTUninitialized>(value)) return "uninitialized";
     if (std::holds_alternative<std::shared_ptr<CTComposite>>(value)) return "composite";
     if (std::holds_alternative<std::shared_ptr<CTArray>>(value)) return "array";

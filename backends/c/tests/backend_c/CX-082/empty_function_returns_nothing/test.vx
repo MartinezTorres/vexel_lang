@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Functions with no final expression return nothing and map to C void (no implicit zero). | Empty-body main emits void without return 0
+// @expect-exit: 0
+// @command: {VEXEL} -b c -o out test.vx && grep -Fq 'void main(' out.h && ! grep -Eq '\\breturn 0;' out.c
+
+&^main() {
+}

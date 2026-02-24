@@ -457,7 +457,7 @@ bool CompileTimeEvaluator::eval_block(ExprPtr expr, CTValue& result) {
             return false;
         }
     } else {
-        result = static_cast<int64_t>(0);
+        result = CTNoValue{};
     }
 
     cleanup_locals();

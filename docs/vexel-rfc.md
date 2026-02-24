@@ -114,7 +114,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - No implicit narrowing
 - No implicit signed/unsigned conversion (must use explicit cast)
 
-**No void/unit type**: Functions without `->` infer return type. Empty return `->;` and statement conditionals have no type (not expressions).
+**No void/unit type**: Functions without `->` infer return type when their body has a final expression. Empty blocks (no final expression), empty return `->;`, and statement conditionals have no type (not expressions). A function with no `->` and no final expression returns nothing (backend maps this to `void` where applicable).
 
 **Memory model**: No heap allocation. All data is stack-allocated or compile-time constant.
 

@@ -3,6 +3,9 @@
 namespace vexel {
 
 CTValue clone_ct_value(const CTValue& value) {
+    if (std::holds_alternative<CTNoValue>(value)) {
+        return CTNoValue{};
+    }
     if (std::holds_alternative<CTUninitialized>(value)) {
         return CTUninitialized{};
     }

@@ -419,7 +419,9 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
     };
 
     ExprPtr result;
-    if (std::holds_alternative<int64_t>(value)) {
+    if (std::holds_alternative<CTNoValue>(value)) {
+        return nullptr;
+    } else if (std::holds_alternative<int64_t>(value)) {
         result = make_signed_literal(std::get<int64_t>(value), value_loc);
     } else if (std::holds_alternative<uint64_t>(value)) {
         const uint64_t raw_value = std::get<uint64_t>(value);

@@ -34,6 +34,9 @@ bool ctvalue_equal_strict(const CTValue& a, const CTValue& b) {
     if (std::holds_alternative<std::string>(a)) {
         return std::get<std::string>(a) == std::get<std::string>(b);
     }
+    if (std::holds_alternative<CTNoValue>(a)) {
+        return true;
+    }
     if (std::holds_alternative<CTUninitialized>(a)) {
         return true;
     }
@@ -83,6 +86,9 @@ bool ctvalue_equal_scheduler(const CTValue& a, const CTValue& b) {
     }
     if (std::holds_alternative<std::string>(a)) {
         return std::get<std::string>(a) == std::get<std::string>(b);
+    }
+    if (std::holds_alternative<CTNoValue>(a)) {
+        return true;
     }
     if (std::holds_alternative<CTUninitialized>(a)) {
         return true;

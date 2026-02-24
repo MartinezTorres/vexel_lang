@@ -11,6 +11,7 @@ namespace vexel {
 
 struct CTComposite;
 struct CTArray;
+struct CTNoValue {};
 struct CTUninitialized {};
 
 using CTValue = std::variant<int64_t,
@@ -18,6 +19,7 @@ using CTValue = std::variant<int64_t,
                              double,
                              bool,
                              std::string,
+                             CTNoValue,
                              CTUninitialized,
                              std::shared_ptr<CTComposite>,
                              std::shared_ptr<CTArray>>;
