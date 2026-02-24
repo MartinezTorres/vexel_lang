@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#types
 // @desc: C backend lowers arbitrary-width integers (#u72/#i9/#i72) with runtime helper ops, casts, shifts, div/mod, and comparisons.
 // @expect-exit: 0
-// @command: {VEXEL} -b c test.vx && grep -Fq 'typedef struct { unsigned char b[9]; } vx_u72_t;' out.h && grep -Fq 'typedef struct { unsigned char b[2]; } vx_i9_t;' out.h && grep -Fq 'vx_ai_udivmod' out.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && ./out
+// @command: {VEXEL} -b c test.vx && grep -Fq 'typedef struct { unsigned char b[9]; } vx_u72_t;' out.h && grep -Fq 'typedef struct { unsigned char b[2]; } vx_i9_t;' out.h && grep -Fq 'vx_ai_udivmod' out.c && printf '%s\n' '#include <stdint.h>' 'uint8_t vx_seed(void) { return 13; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && ./out
 
 &!seed() -> #u8;
 
