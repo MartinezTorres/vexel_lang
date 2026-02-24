@@ -125,14 +125,8 @@ Token Lexer::read_number() {
             num += advance();
         }
         ensure_no_identifier_tail(peek());
-        try {
-            uint64_t val = std::stoull(num, nullptr, 16);
-            Token t(TokenType::IntLiteral, num, loc);
-            t.value = val;
-            return t;
-        } catch (const std::exception& e) {
-            throw CompileError("Hex integer literal overflow: " + num, loc);
-        }
+        Token t(TokenType::IntLiteral, num, loc);
+        return t;
     }
 
     while (isdigit(peek())) {
@@ -170,15 +164,9 @@ Token Lexer::read_number() {
         }
     }
 
-    // integer
-    try {
-        int64_t val = std::stoll(num);
-        Token t(TokenType::IntLiteral, num, loc);
-        t.value = val;
-        return t;
-    } catch (const std::exception& e) {
-        throw CompileError("Integer literal overflow: " + num, loc);
-    }
+    // Integer literals are parsed exactly later (parser/APInt). Do not overflow here.
+    Token t(TokenType::IntLiteral, num, loc);
+    return t;
 }
 
 Token Lexer::read_identifier() {

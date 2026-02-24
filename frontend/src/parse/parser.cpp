@@ -1197,12 +1197,13 @@ ExprPtr Parser::parse_unary() {
         if (op == "-" &&
             operand &&
             operand->kind == Expr::Kind::IntLiteral &&
-            !operand->literal_is_unsigned) {
-            int64_t val = static_cast<int64_t>(operand->uint_val);
+            !operand->literal_is_unsigned &&
+            operand->has_exact_int_val) {
+            APInt negated = -operand->exact_int_val;
             std::string raw = operand->raw_literal.empty()
-                ? std::string("-") + std::to_string(val)
+                ? std::string("-") + negated.to_string()
                 : std::string("-") + operand->raw_literal;
-            return Expr::make_int(-val, loc, raw);
+            return Expr::make_int_exact(negated, false, loc, raw);
         }
         return Expr::make_unary(op, operand, loc);
     }
@@ -1357,15 +1358,13 @@ ExprPtr Parser::parse_primary() {
     if (check(TokenType::IntLiteral)) {
         Token t = current();
         pos++;
-        if (std::holds_alternative<int64_t>(t.value)) {
-            auto e = Expr::make_int(std::get<int64_t>(t.value), loc, t.lexeme);
-            e->annotations = annotations;
-            return e;
-        } else {
-            auto e = Expr::make_uint(std::get<uint64_t>(t.value), loc, t.lexeme);
-            e->annotations = annotations;
-            return e;
-        }
+        bool is_hex = t.lexeme.size() > 2 &&
+                      t.lexeme[0] == '0' &&
+                      (t.lexeme[1] == 'x' || t.lexeme[1] == 'X');
+        APInt value = APInt::parse_integer_literal(t.lexeme, loc);
+        auto e = Expr::make_int_exact(value, is_hex, loc, t.lexeme);
+        e->annotations = annotations;
+        return e;
     }
 
     if (check(TokenType::FloatLiteral)) {

@@ -7,8 +7,14 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
     CTValue left_val, right_val;
     if (!try_evaluate(expr->left, left_val)) return false;
 
-    auto is_int = [&](const CTValue& v) {
-        return std::holds_alternative<int64_t>(v) || std::holds_alternative<uint64_t>(v);
+    auto is_integer_like = [&](const CTValue& v) {
+        return ctvalue_is_integer(v) || std::holds_alternative<bool>(v);
+    };
+    auto integer_unsigned_hint = [&](const CTValue& v) {
+        if (std::holds_alternative<uint64_t>(v)) return true;
+        if (std::holds_alternative<CTExactInt>(v)) return std::get<CTExactInt>(v).is_unsigned;
+        if (std::holds_alternative<bool>(v)) return true;
+        return false;
     };
 
     if (expr->op == "&&" || expr->op == "||") {
@@ -39,60 +45,58 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
 
     if (!try_evaluate(expr->right, right_val)) return false;
 
-    if (expr->op == "|" || expr->op == "&" || expr->op == "^" ||
-        expr->op == "<<" || expr->op == ">>") {
-        if (!is_int(left_val) || !is_int(right_val)) {
-            error_msg = "Unsupported operand types for bitwise operation";
+    const bool left_has_float = std::holds_alternative<double>(left_val);
+    const bool right_has_float = std::holds_alternative<double>(right_val);
+    if (!left_has_float && !right_has_float &&
+        is_integer_like(left_val) && is_integer_like(right_val)) {
+        APInt l(uint64_t(0));
+        APInt r(uint64_t(0));
+        bool l_unsigned = false;
+        bool r_unsigned = false;
+        if (!ctvalue_to_exact_int(left_val, l, l_unsigned) ||
+            !ctvalue_to_exact_int(right_val, r, r_unsigned)) {
+            error_msg = "Unsupported operand types for binary operation";
             return false;
         }
-        bool use_unsigned = std::holds_alternative<uint64_t>(left_val) ||
-                            std::holds_alternative<uint64_t>(right_val);
-        uint64_t l = std::holds_alternative<uint64_t>(left_val)
-            ? std::get<uint64_t>(left_val)
-            : (uint64_t)std::get<int64_t>(left_val);
-        uint64_t r = std::holds_alternative<uint64_t>(right_val)
-            ? std::get<uint64_t>(right_val)
-            : (uint64_t)std::get<int64_t>(right_val);
+        const bool use_unsigned = integer_unsigned_hint(left_val) || integer_unsigned_hint(right_val);
 
-        uint64_t out = 0;
-        if (expr->op == "|") out = l | r;
-        else if (expr->op == "&") out = l & r;
-        else if (expr->op == "^") out = l ^ r;
-        else if (expr->op == "<<") out = l << r;
-        else if (expr->op == ">>") out = l >> r;
-
-        if (use_unsigned) {
-            result = out;
-        } else {
-            result = (int64_t)out;
+        if (expr->op == "|" || expr->op == "&" || expr->op == "^" ||
+            expr->op == "<<" || expr->op == ">>") {
+            if (expr->op == "|") result = ctvalue_from_exact_int(l | r, use_unsigned);
+            else if (expr->op == "&") result = ctvalue_from_exact_int(l & r, use_unsigned);
+            else if (expr->op == "^") result = ctvalue_from_exact_int(l ^ r, use_unsigned);
+            else {
+                if (r.is_negative()) {
+                    error_msg = "Negative shift count in compile-time evaluation";
+                    return false;
+                }
+                if (!r.fits_u64()) {
+                    error_msg = "Shift count too large in compile-time evaluation";
+                    return false;
+                }
+                const uint64_t shift = r.to_u64();
+                if (expr->op == "<<") result = ctvalue_from_exact_int(l << shift, use_unsigned);
+                else result = ctvalue_from_exact_int(l >> shift, use_unsigned);
+            }
+            return true;
         }
-        return true;
-    }
 
-    if (std::holds_alternative<uint64_t>(left_val) || std::holds_alternative<uint64_t>(right_val)) {
-        uint64_t l = std::holds_alternative<uint64_t>(left_val)
-            ? std::get<uint64_t>(left_val)
-            : (uint64_t)to_int(left_val);
-        uint64_t r = std::holds_alternative<uint64_t>(right_val)
-            ? std::get<uint64_t>(right_val)
-            : (uint64_t)to_int(right_val);
-
-        if (expr->op == "+") result = l + r;
-        else if (expr->op == "-") result = l - r;
-        else if (expr->op == "*") result = l * r;
+        if (expr->op == "+") result = ctvalue_from_exact_int(l + r, use_unsigned);
+        else if (expr->op == "-") result = ctvalue_from_exact_int(l - r, use_unsigned);
+        else if (expr->op == "*") result = ctvalue_from_exact_int(l * r, use_unsigned);
         else if (expr->op == "/") {
-            if (r == 0) {
+            if (r.is_zero()) {
                 error_msg = "Division by zero in compile-time evaluation";
                 return false;
             }
-            result = l / r;
+            result = ctvalue_from_exact_int(l / r, use_unsigned);
         }
         else if (expr->op == "%") {
-            if (r == 0) {
+            if (r.is_zero()) {
                 error_msg = "Modulo by zero in compile-time evaluation";
                 return false;
             }
-            result = l % r;
+            result = ctvalue_from_exact_int(l % r, use_unsigned);
         }
         else if (expr->op == "==") result = (int64_t)(l == r);
         else if (expr->op == "!=") result = (int64_t)(l != r);
@@ -124,39 +128,6 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         return true;
     }
 
-    auto eval_int = [&](int64_t l, int64_t r) -> bool {
-        if (expr->op == "+") result = l + r;
-        else if (expr->op == "-") result = l - r;
-        else if (expr->op == "*") result = l * r;
-        else if (expr->op == "/") {
-            if (r == 0) {
-                error_msg = "Division by zero in compile-time evaluation";
-                return false;
-            }
-            result = l / r;
-        }
-        else if (expr->op == "%") {
-            if (r == 0) {
-                error_msg = "Modulo by zero in compile-time evaluation";
-                return false;
-            }
-            result = l % r;
-        }
-        else if (expr->op == "==") result = (int64_t)(l == r);
-        else if (expr->op == "!=") result = (int64_t)(l != r);
-        else if (expr->op == "<") result = (int64_t)(l < r);
-        else if (expr->op == "<=") result = (int64_t)(l <= r);
-        else if (expr->op == ">") result = (int64_t)(l > r);
-        else if (expr->op == ">=") result = (int64_t)(l >= r);
-        else if (expr->op == "&&") result = (int64_t)(l && r);
-        else if (expr->op == "||") result = (int64_t)(l || r);
-        else {
-            error_msg = "Unsupported binary operator at compile time: " + expr->op;
-            return false;
-        }
-        return true;
-    };
-
     auto eval_float = [&](double l, double r) -> bool {
         if (expr->op == "+") result = l + r;
         else if (expr->op == "-") result = l - r;
@@ -180,19 +151,6 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         }
         return true;
     };
-
-    // Integer operations
-    if (std::holds_alternative<int64_t>(left_val) && std::holds_alternative<int64_t>(right_val)) {
-        int64_t l = std::get<int64_t>(left_val);
-        int64_t r = std::get<int64_t>(right_val);
-        return eval_int(l, r);
-    }
-
-    if (std::holds_alternative<bool>(left_val) || std::holds_alternative<bool>(right_val)) {
-        int64_t l = to_int(left_val);
-        int64_t r = to_int(right_val);
-        return eval_int(l, r);
-    }
 
     // Floating-point operations
     if (std::holds_alternative<double>(left_val) || std::holds_alternative<double>(right_val)) {

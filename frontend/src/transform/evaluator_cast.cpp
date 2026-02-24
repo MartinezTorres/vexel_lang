@@ -1,5 +1,6 @@
 #include "evaluator.h"
 #include "constants.h"
+#include "cte_value_utils.h"
 
 namespace vexel {
 
@@ -36,47 +37,49 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             error_msg = "Array length must be a compile-time constant";
             return false;
         }
-        int64_t length = std::holds_alternative<int64_t>(size_val)
-            ? std::get<int64_t>(size_val)
-            : static_cast<int64_t>(std::get<uint64_t>(size_val));
+        int64_t length = 0;
+        if (!ctvalue_to_i64_exact(size_val, length)) {
+            error_msg = "Array length must be a compile-time integer constant";
+            return false;
+        }
         if (length < 0) {
             error_msg = "Array length cannot be negative";
             return false;
         }
 
-        int64_t bits = type_bits(expr->operand->type->primitive, expr->operand->type->integer_bits);
-        if (bits < 0 || bits / 8 != length) {
+        uint64_t bits = 0;
+        if (expr->operand->type->primitive == PrimitiveType::Int ||
+            expr->operand->type->primitive == PrimitiveType::UInt) {
+            bits = expr->operand->type->integer_bits;
+        } else if (expr->operand->type->primitive == PrimitiveType::Bool) {
+            bits = 1;
+        } else {
+            int64_t type_bits_val = type_bits(expr->operand->type->primitive, expr->operand->type->integer_bits);
+            if (type_bits_val < 0) {
+                error_msg = "Unsupported operand type for byte array cast";
+                return false;
+            }
+            bits = static_cast<uint64_t>(type_bits_val);
+        }
+        if (bits == 0 || bits % 8 != 0 || static_cast<uint64_t>(length) != (bits / 8)) {
             error_msg = "Array length/type size mismatch in cast";
             return false;
         }
-        if (bits > 64) {
-            error_msg = "Compile-time cast to byte array supports integer widths up to 64 bits";
-            return false;
-        }
 
-        uint64_t value_bits = 0;
-        if (std::holds_alternative<uint64_t>(operand_val)) {
-            value_bits = std::get<uint64_t>(operand_val);
-        } else if (std::holds_alternative<int64_t>(operand_val)) {
-            value_bits = static_cast<uint64_t>(std::get<int64_t>(operand_val));
-        } else if (std::holds_alternative<bool>(operand_val)) {
-            value_bits = std::get<bool>(operand_val) ? 1u : 0u;
-        } else {
+        APInt value_bits(uint64_t(0));
+        bool operand_unsigned = false;
+        if (!ctvalue_to_exact_int(operand_val, value_bits, operand_unsigned)) {
             error_msg = "Unsupported operand type for byte array cast";
             return false;
         }
-
-        if (bits < 64) {
-            uint64_t mask = (bits == 64) ? ~0ull : ((1ull << bits) - 1ull);
-            value_bits &= mask;
-        }
+        value_bits = value_bits.wrapped_unsigned(bits);
 
         auto array = std::make_shared<CTArray>();
         array->elements.reserve(static_cast<size_t>(length));
         for (int64_t i = 0; i < length; ++i) {
-            int64_t shift = (length - 1 - i) * 8;
-            uint64_t byte = (value_bits >> shift) & 0xFFu;
-            array->elements.push_back(byte);
+            uint64_t shift = static_cast<uint64_t>((length - 1 - i) * 8);
+            APInt byte = (value_bits >> shift) & APInt(uint64_t(0xFF));
+            array->elements.push_back(ctvalue_from_exact_int(byte, true));
         }
         result = array;
         return true;
@@ -105,9 +108,10 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
                 error_msg = "Array length must be a compile-time constant";
                 return false;
             }
-            length = std::holds_alternative<int64_t>(size_val)
-                ? std::get<int64_t>(size_val)
-                : static_cast<int64_t>(std::get<uint64_t>(size_val));
+            if (!ctvalue_to_i64_exact(size_val, length)) {
+                error_msg = "Array length must be a compile-time integer constant";
+                return false;
+            }
         }
 
         if (length <= 0) {
@@ -118,17 +122,13 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             error_msg = "Unsigned integer cast target is missing width";
             return false;
         }
-        if (target_type->integer_bits > 64) {
-            error_msg = "Compile-time bool-array cast supports unsigned integer widths up to 64 bits";
-            return false;
-        }
         if (length != static_cast<int64_t>(target_type->integer_bits)) {
             error_msg = "Boolean array size mismatch for cast to #" +
                         primitive_name(target_type->primitive, target_type->integer_bits);
             return false;
         }
 
-        uint64_t out = 0;
+        APInt out(uint64_t(0));
         auto to_bit = [&](const CTValue& v, bool& bit) -> bool {
             if (std::holds_alternative<bool>(v)) {
                 bit = std::get<bool>(v);
@@ -140,6 +140,10 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             }
             if (std::holds_alternative<uint64_t>(v)) {
                 bit = std::get<uint64_t>(v) != 0;
+                return true;
+            }
+            if (std::holds_alternative<CTExactInt>(v)) {
+                bit = !std::get<CTExactInt>(v).value.is_zero();
                 return true;
             }
             return false;
@@ -166,11 +170,11 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
                 return false;
             }
             if (bit) {
-                int64_t shift = (length - 1 - i);
-                out |= (uint64_t)(1u) << shift;
+                uint64_t shift = static_cast<uint64_t>(length - 1 - i);
+                out = out | (APInt(uint64_t(1)) << shift);
             }
         }
-        result = out;
+        result = ctvalue_from_exact_int(out, true);
         return true;
     }
 
@@ -186,45 +190,46 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             error_msg = "Signed integer cast target is missing width";
             return false;
         }
-        if (target_type->integer_bits > 64) {
-            error_msg = "Compile-time signed integer casts support widths up to 64 bits";
-            return false;
-        }
-        // Cast to signed integer
-        int64_t casted = to_int(operand_val);
-        if (target_type->integer_bits < 64) {
-            uint64_t raw = static_cast<uint64_t>(casted) & ((uint64_t(1) << target_type->integer_bits) - 1u);
-            const uint64_t sign_bit = uint64_t(1) << (target_type->integer_bits - 1u);
-            if (raw & sign_bit) {
-                raw |= ~((uint64_t(1) << target_type->integer_bits) - 1u);
+        APInt exact(uint64_t(0));
+        bool is_unsigned = false;
+        if (!ctvalue_to_exact_int(operand_val, exact, is_unsigned)) {
+            if (std::holds_alternative<double>(operand_val)) {
+                exact = APInt(static_cast<int64_t>(std::get<double>(operand_val)));
+            } else {
+                error_msg = "Unsupported cast source for signed integer";
+                return false;
             }
-            casted = static_cast<int64_t>(raw);
         }
-        result = casted;
+        result = ctvalue_from_exact_int(exact.wrapped_signed(target_type->integer_bits), false);
         return true;
     } else if (is_unsigned_int(target_type->primitive)) {
         if (target_type->integer_bits == 0) {
             error_msg = "Unsigned integer cast target is missing width";
             return false;
         }
-        if (target_type->integer_bits > 64) {
-            error_msg = "Compile-time unsigned integer casts support widths up to 64 bits";
-            return false;
+        APInt exact(uint64_t(0));
+        bool is_unsigned = false;
+        if (!ctvalue_to_exact_int(operand_val, exact, is_unsigned)) {
+            if (std::holds_alternative<double>(operand_val)) {
+                exact = APInt(static_cast<int64_t>(std::get<double>(operand_val)));
+            } else {
+                error_msg = "Unsupported cast source for unsigned integer";
+                return false;
+            }
         }
-        // Cast to unsigned integer
-        uint64_t casted = static_cast<uint64_t>(to_int(operand_val));
-        if (target_type->integer_bits < 64) {
-            casted &= ((uint64_t(1) << target_type->integer_bits) - 1u);
-        }
-        result = casted;
+        result = ctvalue_from_exact_int(exact.wrapped_unsigned(target_type->integer_bits), true);
         return true;
     } else if (is_float(target_type->primitive)) {
         // Cast to float
         result = to_float(operand_val);
         return true;
     } else if (target_type->primitive == PrimitiveType::Bool) {
-        // Cast to bool
-        result = to_int(operand_val) != 0;
+        bool b = false;
+        if (!cte_scalar_to_bool(operand_val, b)) {
+            error_msg = "Unsupported cast source for bool";
+            return false;
+        }
+        result = b;
         return true;
     }
 

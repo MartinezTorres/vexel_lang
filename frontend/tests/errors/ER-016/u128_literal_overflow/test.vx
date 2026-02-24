@@ -1,0 +1,7 @@
+// @rfc: docs/vexel-rfc.md#errors--diagnostics
+// @desc: Exact literals still enforce representability at concrete integer assignment points. | #u128 assignment rejects a literal larger than 2^128-1
+
+&^main() -> #i32 {
+    x:#u128 = 340282366920938463463374607431768211456;
+    (#i32)x
+}

@@ -874,6 +874,9 @@ bool TypeChecker::types_equal(TypePtr a, TypePtr b) {
             if (a->array_size && b->array_size &&
                 a->array_size->kind == Expr::Kind::IntLiteral &&
                 b->array_size->kind == Expr::Kind::IntLiteral) {
+                if (a->array_size->has_exact_int_val && b->array_size->has_exact_int_val) {
+                    return a->array_size->exact_int_val == b->array_size->exact_int_val;
+                }
                 return a->array_size->uint_val == b->array_size->uint_val;
             }
             return true; // Unknown sizes are considered equal
@@ -906,7 +909,13 @@ bool TypeChecker::types_compatible(TypePtr a, TypePtr b) {
             // Both sizes known - must match exactly
             if (a->array_size->kind == Expr::Kind::IntLiteral &&
                 b->array_size->kind == Expr::Kind::IntLiteral) {
-                if (a->array_size->uint_val != b->array_size->uint_val) {
+                bool size_equal = false;
+                if (a->array_size->has_exact_int_val && b->array_size->has_exact_int_val) {
+                    size_equal = (a->array_size->exact_int_val == b->array_size->exact_int_val);
+                } else {
+                    size_equal = (a->array_size->uint_val == b->array_size->uint_val);
+                }
+                if (!size_equal) {
                     return false;
                 }
             }
@@ -966,7 +975,13 @@ TypePtr TypeChecker::unify_types(TypePtr a, TypePtr b) {
         if (a->array_size && b->array_size) {
             if (a->array_size->kind == Expr::Kind::IntLiteral &&
                 b->array_size->kind == Expr::Kind::IntLiteral) {
-                if (a->array_size->uint_val != b->array_size->uint_val) {
+                bool size_equal = false;
+                if (a->array_size->has_exact_int_val && b->array_size->has_exact_int_val) {
+                    size_equal = (a->array_size->exact_int_val == b->array_size->exact_int_val);
+                } else {
+                    size_equal = (a->array_size->uint_val == b->array_size->uint_val);
+                }
+                if (!size_equal) {
                     return nullptr;
                 }
                 size = a->array_size;
@@ -1094,8 +1109,7 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
         bool known = false;
         bool is_unsigned = false;
         bool from_boolean = false;
-        uint64_t u = 0;
-        int64_t s = 0;
+        APInt value = APInt(uint64_t(0));
     };
 
     auto load_int_const = [&](ExprPtr node) -> IntConstValue {
@@ -1112,10 +1126,12 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
         if (kind == Expr::Kind::IntLiteral) {
             out.known = true;
             out.is_unsigned = node->literal_is_unsigned;
-            if (out.is_unsigned) {
-                out.u = node->uint_val;
+            if (node->has_exact_int_val) {
+                out.value = node->exact_int_val;
+            } else if (out.is_unsigned) {
+                out.value = APInt(node->uint_val);
             } else {
-                out.s = static_cast<int64_t>(node->uint_val);
+                out.value = APInt(static_cast<int64_t>(node->uint_val));
             }
             return out;
         }
@@ -1129,16 +1145,20 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
         if (std::holds_alternative<uint64_t>(value)) {
             out.known = true;
             out.is_unsigned = true;
-            out.u = std::get<uint64_t>(value);
+            out.value = APInt(std::get<uint64_t>(value));
         } else if (std::holds_alternative<int64_t>(value)) {
             out.known = true;
             out.is_unsigned = false;
-            out.s = std::get<int64_t>(value);
+            out.value = APInt(std::get<int64_t>(value));
+        } else if (std::holds_alternative<CTExactInt>(value)) {
+            out.known = true;
+            out.is_unsigned = std::get<CTExactInt>(value).is_unsigned;
+            out.value = std::get<CTExactInt>(value).value;
         } else if (std::holds_alternative<bool>(value)) {
             out.known = true;
             out.is_unsigned = true;
             out.from_boolean = true;
-            out.u = std::get<bool>(value) ? 1ULL : 0ULL;
+            out.value = APInt(uint64_t(std::get<bool>(value) ? 1ULL : 0ULL));
         }
         return out;
     };
@@ -1147,34 +1167,12 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
     auto fits_signed_width = [&](uint64_t bits) {
         if (!value.known) return false;
         if (bits == 0) return false;
-        if (bits >= 65) return true;
-        if (value.is_unsigned) {
-            if (bits >= 64) {
-                return value.u <= static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
-            }
-            uint64_t maxv = (uint64_t(1) << (bits - 1)) - 1;
-            return value.u <= maxv;
-        }
-
-        int64_t v = value.s;
-        if (bits >= 64) return true;
-        int64_t minv = -(int64_t(1) << (bits - 1));
-        int64_t maxv = (int64_t(1) << (bits - 1)) - 1;
-        return v >= minv && v <= maxv;
+        return value.value.fits_signed(bits);
     };
     auto fits_unsigned_width = [&](uint64_t bits) {
         if (!value.known) return false;
         if (bits == 0) return false;
-        if (!value.is_unsigned) {
-            int64_t v = value.s;
-            if (v < 0) return false;
-            if (bits >= 64) return true;
-            uint64_t maxv = (uint64_t(1) << bits) - 1;
-            return static_cast<uint64_t>(v) <= maxv;
-        }
-        if (bits >= 64) return true;
-        uint64_t maxv = (uint64_t(1) << bits) - 1;
-        return value.u <= maxv;
+        return value.value.fits_unsigned(bits);
     };
 
     if (value.known) {

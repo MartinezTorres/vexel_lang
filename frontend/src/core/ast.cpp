@@ -73,6 +73,8 @@ ExprPtr Expr::make_int(int64_t val, const SourceLocation& loc, const std::string
     auto e = std::make_shared<Expr>();
     e->kind = Kind::IntLiteral;
     e->uint_val = (uint64_t)val;
+    e->exact_int_val = APInt(val);
+    e->has_exact_int_val = true;
     e->literal_is_unsigned = false;
     e->location = loc;
     e->raw_literal = raw;
@@ -83,7 +85,32 @@ ExprPtr Expr::make_uint(uint64_t val, const SourceLocation& loc, const std::stri
     auto e = std::make_shared<Expr>();
     e->kind = Kind::IntLiteral;
     e->uint_val = val;
+    e->exact_int_val = APInt(val);
+    e->has_exact_int_val = true;
     e->literal_is_unsigned = true;
+    e->location = loc;
+    e->raw_literal = raw;
+    return e;
+}
+
+ExprPtr Expr::make_int_exact(const APInt& val,
+                             bool is_unsigned,
+                             const SourceLocation& loc,
+                             const std::string& raw) {
+    auto e = std::make_shared<Expr>();
+    e->kind = Kind::IntLiteral;
+    e->literal_is_unsigned = is_unsigned;
+    e->exact_int_val = val;
+    e->has_exact_int_val = true;
+    if (is_unsigned && val.fits_u64()) {
+        e->uint_val = val.to_u64();
+    } else if (!is_unsigned && val.fits_i64()) {
+        e->uint_val = static_cast<uint64_t>(val.to_i64());
+    } else if (val.fits_u64()) {
+        e->uint_val = val.to_u64();
+    } else {
+        e->uint_val = 0;
+    }
     e->location = loc;
     e->raw_literal = raw;
     return e;
@@ -102,6 +129,8 @@ ExprPtr Expr::make_char(uint64_t val, const SourceLocation& loc, const std::stri
     auto e = std::make_shared<Expr>();
     e->kind = Kind::CharLiteral;
     e->uint_val = val;
+    e->exact_int_val = APInt(val);
+    e->has_exact_int_val = true;
     e->location = loc;
     e->raw_literal = raw;
     return e;

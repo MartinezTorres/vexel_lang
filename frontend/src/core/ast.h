@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "apint.h"
 #include <variant>
 
 namespace vexel {
@@ -69,6 +70,8 @@ struct Expr {
 
     // Literals
     uint64_t uint_val;
+    APInt exact_int_val;
+    bool has_exact_int_val = false;
     double float_val;
     std::string string_val;
     std::string raw_literal;
@@ -119,6 +122,10 @@ struct Expr {
 
     static ExprPtr make_int(int64_t val, const SourceLocation& loc = SourceLocation(), const std::string& raw = "");
     static ExprPtr make_uint(uint64_t val, const SourceLocation& loc = SourceLocation(), const std::string& raw = "");
+    static ExprPtr make_int_exact(const APInt& val,
+                                  bool is_unsigned,
+                                  const SourceLocation& loc = SourceLocation(),
+                                  const std::string& raw = "");
     static ExprPtr make_float(double val, const SourceLocation& loc = SourceLocation(), const std::string& raw = "");
     static ExprPtr make_char(uint64_t val, const SourceLocation& loc = SourceLocation(), const std::string& raw = "");
     static ExprPtr make_string(const std::string& val, const SourceLocation& loc = SourceLocation());

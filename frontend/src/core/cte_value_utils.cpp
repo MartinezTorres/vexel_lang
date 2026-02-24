@@ -11,6 +11,10 @@ bool cte_scalar_to_bool(const CTValue& value, bool& out) {
         out = std::get<uint64_t>(value) != 0;
         return true;
     }
+    if (std::holds_alternative<CTExactInt>(value)) {
+        out = !std::get<CTExactInt>(value).value.is_zero();
+        return true;
+    }
     if (std::holds_alternative<bool>(value)) {
         out = std::get<bool>(value);
         return true;

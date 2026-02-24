@@ -507,7 +507,14 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 
         uint64_t count = 0;
         if (operand_type->array_size && operand_type->array_size->kind == Expr::Kind::IntLiteral) {
-            count = operand_type->array_size->uint_val;
+            if (operand_type->array_size->has_exact_int_val) {
+                if (!operand_type->array_size->exact_int_val.fits_u64()) {
+                    throw CompileError("Boolean array size is too large for cast validation", expr->location);
+                }
+                count = operand_type->array_size->exact_int_val.to_u64();
+            } else {
+                count = operand_type->array_size->uint_val;
+            }
         }
         if (count != static_cast<uint64_t>(type_bits(target_type->primitive, target_type->integer_bits))) {
             throw CompileError("Boolean array size mismatch for cast to #" +
@@ -850,6 +857,13 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
 
     auto fold_const = [&](ExprPtr e, int64_t& out) -> bool {
         if (e->kind == Expr::Kind::IntLiteral) {
+            if (e->has_exact_int_val) {
+                if (!e->exact_int_val.fits_i64()) {
+                    return false;
+                }
+                out = e->exact_int_val.to_i64();
+                return true;
+            }
             if (e->literal_is_unsigned &&
                 e->uint_val > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
                 return false;
@@ -871,6 +885,14 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
                 return false;
             }
             out = static_cast<int64_t>(v);
+            return true;
+        }
+        if (std::holds_alternative<CTExactInt>(value)) {
+            const CTExactInt& exact = std::get<CTExactInt>(value);
+            if (!exact.value.fits_i64()) {
+                return false;
+            }
+            out = exact.value.to_i64();
             return true;
         }
         return false;

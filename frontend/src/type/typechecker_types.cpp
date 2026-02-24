@@ -103,17 +103,26 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                 }
 
                 const CTValue& size_val = size_query.value;
-                uint64_t normalized_size = 0;
+                APInt normalized_size(uint64_t(0));
                 if (std::holds_alternative<int64_t>(size_val)) {
                     const int64_t signed_size = std::get<int64_t>(size_val);
                     if (signed_size < 0) {
                         throw CompileError("Array size must be non-negative", loc);
                     }
-                    normalized_size = static_cast<uint64_t>(signed_size);
+                    normalized_size = APInt(static_cast<uint64_t>(signed_size));
                 } else if (std::holds_alternative<uint64_t>(size_val)) {
-                    normalized_size = std::get<uint64_t>(size_val);
+                    normalized_size = APInt(std::get<uint64_t>(size_val));
+                } else if (std::holds_alternative<CTExactInt>(size_val)) {
+                    const CTExactInt& exact = std::get<CTExactInt>(size_val);
+                    if (!exact.is_unsigned && exact.value.is_negative()) {
+                        throw CompileError("Array size must be non-negative", loc);
+                    }
+                    if (exact.value.is_negative()) {
+                        throw CompileError("Array size must be non-negative", loc);
+                    }
+                    normalized_size = exact.value;
                 } else if (std::holds_alternative<bool>(size_val)) {
-                    normalized_size = std::get<bool>(size_val) ? 1ULL : 0ULL;
+                    normalized_size = APInt(uint64_t(std::get<bool>(size_val) ? 1ULL : 0ULL));
                 } else {
                     throw CompileError("Array size must be an integer compile-time constant", loc);
                 }
@@ -121,9 +130,10 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                 // Canonicalize array-size expressions to integer literals so all later
                 // type comparisons/hashing use semantic size identity.
                 SourceLocation size_loc = type->array_size->location;
-                type->array_size = Expr::make_uint(normalized_size,
-                                                   size_loc,
-                                                   std::to_string(normalized_size));
+                type->array_size = Expr::make_int_exact(normalized_size,
+                                                        true,
+                                                        size_loc,
+                                                        normalized_size.to_string());
             }
             return type;
         }

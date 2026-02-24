@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Compile-time casts from wide integers to byte arrays work beyond 64 bits. | #u128 -> #u8[16] cast folds and preserves byte order
+
+&^main() -> #i32 {
+    v:#u128 = ((((#u128)1) << 72) | ((#u128)5));
+    bytes:#u8[16] = (#u8[16])v;
+    (#i32)bytes[6] + (#i32)bytes[15]
+}

@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Local array materialization accepts compile-time exact integer sizes inferred from wide integer values. | #u128 local size works when the value is compile-time known and host-materializable
+
+&^main() -> #i32 {
+    n:#u128 = 5;
+    arr:#u8[n];
+    arr[4] = 7;
+    (#i32)arr[4]
+}

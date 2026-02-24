@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Compile-time arithmetic supports exact integers beyond 64 bits and folds comparisons. | #u128 arithmetic and shifts fold to a constant result
+
+&^main() -> #i32 {
+    a:#u128 = ((#u128)1) << 100;
+    b:#u128 = a + ((#u128)3);
+    (b == ((((#u128)1) << 100) + ((#u128)3))) ? 1 : 0
+}

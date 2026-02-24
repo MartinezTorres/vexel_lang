@@ -15,7 +15,11 @@ bool literal_to_bool(const ExprPtr& expr, bool& out) {
     if (!expr) return false;
     switch (expr->kind) {
         case Expr::Kind::IntLiteral:
-            out = expr->uint_val != 0;
+            if (expr->has_exact_int_val) {
+                out = !expr->exact_int_val.is_zero();
+            } else {
+                out = expr->uint_val != 0;
+            }
             return true;
         case Expr::Kind::FloatLiteral:
             out = expr->float_val != 0.0;
@@ -47,6 +51,10 @@ bool expr_structurally_equal(const ExprPtr& a, const ExprPtr& b) {
     switch (a->kind) {
         case Expr::Kind::IntLiteral:
         case Expr::Kind::CharLiteral:
+            if (a->has_exact_int_val && b->has_exact_int_val) {
+                return a->literal_is_unsigned == b->literal_is_unsigned &&
+                       a->exact_int_val == b->exact_int_val;
+            }
             return a->uint_val == b->uint_val;
         case Expr::Kind::FloatLiteral:
             return a->float_val == b->float_val;
@@ -54,6 +62,23 @@ bool expr_structurally_equal(const ExprPtr& a, const ExprPtr& b) {
             return a->string_val == b->string_val;
         case Expr::Kind::Identifier:
             return a->name == b->name;
+        case Expr::Kind::Unary:
+            return a->op == b->op &&
+                   expr_structurally_equal(a->operand, b->operand);
+        case Expr::Kind::Cast:
+            return a->target_type && b->target_type &&
+                   a->target_type->to_string() == b->target_type->to_string() &&
+                   expr_structurally_equal(a->operand, b->operand);
+        case Expr::Kind::Binary:
+        case Expr::Kind::Range:
+            return a->op == b->op &&
+                   expr_structurally_equal(a->left, b->left) &&
+                   expr_structurally_equal(a->right, b->right);
+        case Expr::Kind::Member:
+            return a->name == b->name &&
+                   expr_structurally_equal(a->operand, b->operand);
+        case Expr::Kind::Length:
+            return expr_structurally_equal(a->operand, b->operand);
         case Expr::Kind::ArrayLiteral:
         case Expr::Kind::TupleLiteral:
             if (a->elements.size() != b->elements.size()) return false;
@@ -417,6 +442,15 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
         }
         return Expr::make_int(signed_value, loc, std::to_string(signed_value));
     };
+    auto make_signed_exact_literal = [&](const APInt& signed_value, const SourceLocation& loc) -> ExprPtr {
+        if (!signed_value.is_negative()) {
+            return Expr::make_int_exact(signed_value, false, loc, signed_value.to_string());
+        }
+        APInt magnitude = -signed_value;
+        ExprPtr magnitude_expr = Expr::make_int_exact(magnitude, true, loc, magnitude.to_string());
+        magnitude_expr->type = Type::make_primitive(PrimitiveType::UInt, loc, 0);
+        return Expr::make_unary("-", magnitude_expr, loc);
+    };
 
     ExprPtr result;
     if (std::holds_alternative<CTNoValue>(value)) {
@@ -442,6 +476,26 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
             result = make_signed_literal(static_cast<int64_t>(raw), value_loc);
         } else {
             result = Expr::make_uint(raw_value, value_loc);
+        }
+    } else if (std::holds_alternative<CTExactInt>(value)) {
+        CTExactInt exact = std::get<CTExactInt>(value);
+        if (scalar_expected &&
+            scalar_expected->kind == Type::Kind::Primitive &&
+            scalar_expected->primitive == PrimitiveType::Int &&
+            scalar_expected->integer_bits > 0) {
+            exact.value = exact.value.wrapped_signed(scalar_expected->integer_bits);
+            exact.is_unsigned = false;
+        } else if (scalar_expected &&
+                   scalar_expected->kind == Type::Kind::Primitive &&
+                   scalar_expected->primitive == PrimitiveType::UInt &&
+                   scalar_expected->integer_bits > 0) {
+            exact.value = exact.value.wrapped_unsigned(scalar_expected->integer_bits);
+            exact.is_unsigned = true;
+        }
+        if (exact.is_unsigned) {
+            result = Expr::make_int_exact(exact.value, true, value_loc, exact.value.to_string());
+        } else {
+            result = make_signed_exact_literal(exact.value, value_loc);
         }
     } else if (std::holds_alternative<bool>(value)) {
         result = Expr::make_uint(std::get<bool>(value) ? 1u : 0u, value_loc);
@@ -554,6 +608,11 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
             result->type = Type::make_primitive(PrimitiveType::Int, value_loc, 64);
         } else if (std::holds_alternative<uint64_t>(value)) {
             result->type = Type::make_primitive(PrimitiveType::UInt, value_loc, 64);
+        } else if (std::holds_alternative<CTExactInt>(value)) {
+            const CTExactInt& exact = std::get<CTExactInt>(value);
+            result->type = Type::make_primitive(exact.is_unsigned ? PrimitiveType::UInt : PrimitiveType::Int,
+                                                value_loc,
+                                                0);
         } else if (std::holds_alternative<bool>(value)) {
             result->type = Type::make_primitive(PrimitiveType::Bool, value_loc);
         } else if (std::holds_alternative<double>(value)) {

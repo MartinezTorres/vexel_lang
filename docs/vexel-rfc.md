@@ -22,7 +22,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Identifiers**: `[A-Za-z_][A-Za-z0-9_]*` (no length limit)
 - **Comments**: `//` to end-of-line
 - **Literals**:
-  - Integers: `123`, `0xFF`. Parsed as unresolved signed/unsigned integer literals; concrete integer types are inferred from surrounding constraints.
+  - Integers: `123`, `0xFF`. Parsed as exact unresolved signed/unsigned integer literals (no host-width overflow during lexing/parsing); concrete integer types are inferred from surrounding constraints.
   - Floats: `1.23`. Default: `#f64`
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
@@ -100,7 +100,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Backend can optimize copy away when safe
 - **Boolean array casts**: `#b[N]` can cast to/from `#uN` when bit sizes match exactly
   - Size mismatch is compile-time error
-  - Portable frontend compile-time cast support is currently bounded to integer widths up to 64 bits
   - Bit 0 is LSB, bit N-1 is MSB
 - **Composite type casts**: Can cast between composites and byte arrays
   - Creates byte representation (portable across backends)
@@ -120,6 +119,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Integer literal typing**:
 - Integer literals start as unresolved integer carriers (`#i?` / `#u?`).
+- Their numeric value is tracked exactly until concretization (no implicit truncation to host integer widths).
 - Concretization happens when a context requires a concrete type (for example typed declarations, casts, concrete operator partners, ABI-boundary checks).
 - Representability checks are strict at concretization time; non-representable literals are compile-time errors.
 - Boolean contexts accept only integer literals representable as `#b` (0 or 1).

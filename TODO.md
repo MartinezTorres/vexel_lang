@@ -110,6 +110,7 @@ If a new architectural issue is discovered while implementing a step:
     - Backend smoke/regression suites rerun (`backends/vexel/tests/test.sh`, `backends/c/tests/run_tests.py`).
 
 ### Step 3 — Arbitrary-size integer literals and arbitrary-width integer values (frontend single source of truth)
+- Status: completed
 - Goal:
   - Literals can exceed 64-bit.
   - Integer widths `#iN/#uN` are fully respected in parsing, typing, and representability.
@@ -126,6 +127,73 @@ If a new architectural issue is discovered while implementing a step:
   - `docs/vexel-rfc.md` (literal semantics, representability, unresolved literal behavior)
 - Notes:
   - This is the largest dependency step; CTE and backend work depend on it.
+  - RCA (current behavior):
+    - Integer literals overflow in the lexer (`stoll` / `stoull`) before contextual typing.
+    - AST integer literal payload is fixed-width (`Expr::uint_val`), so exact literal values above 64 bits cannot survive parsing.
+    - CTE integer values are fixed-width (`CTValue` only `int64_t/uint64_t`), so arithmetic, casts, and range/array-size queries truncate or fail beyond 64 bits.
+    - Typechecker representability checks read fixed-width literal/CTE values and therefore cannot enforce arbitrary-width semantics soundly.
+    - Residualizer reconstructs literals from fixed-width CTE values, so exact large constants cannot round-trip.
+  - Implementation strategy (Step 3 scope, frontend only; backend lowering remains Step 5):
+    - Use a frontend-owned arbitrary-precision integer representation for exact integer math (chosen implementation: wrapper over `boost::multiprecision::cpp_int` to avoid inventing a new bigint engine in this step).
+    - Keep unresolved integer literals exact until constrained by type context; do not reintroduce smallest-fitting fallback.
+    - Preserve strict representability diagnostics at the point where a concrete integer type is required.
+  - Step 3 exact file plan (refresh before coding):
+    - `frontend/src/core/apint.h` (new)
+      - frontend-owned exact integer wrapper and helpers: parse literal text, sign/magnitude ops, representability checks, typed wrap/truncate/sign-extend semantics.
+    - `frontend/src/core/ast.h`, `frontend/src/core/ast.cpp`
+      - store exact integer literal payload on `Expr` (or exact raw + parsed APInt cache) without 64-bit truncation.
+    - `frontend/src/parse/lexer.h`, `frontend/src/parse/lexer.cpp`
+      - stop hard-overflowing integer tokens in lexer; preserve raw literal text, parse exact integer with APInt-aware path.
+    - `frontend/src/parse/parser.cpp`
+      - build integer literal AST nodes from exact literal payload (no `stoll` assumptions).
+    - `frontend/src/core/cte_value.h`, `frontend/src/core/cte_value.cpp`
+      - extend `CTValue` with exact integer variant and clone support.
+    - `frontend/src/core/cte_value_utils.*`
+      - bool conversion for exact integers.
+    - `frontend/src/transform/evaluator.cpp`
+      - exact integer literal evaluation, `to_int`/casts/coercions updated to work with exact integers.
+    - `frontend/src/transform/evaluator_binary.cpp`
+      - exact integer arithmetic/bitwise/shifts/comparisons on arbitrary precision; typed coercion still enforced by frontend type rules.
+    - `frontend/src/transform/evaluator_assignment.cpp`
+      - compound/plain assignment arithmetic paths upgraded to exact integers.
+    - `frontend/src/transform/evaluator_cast.cpp`
+      - exact integer cast/pack/unpack paths (including bounds/bit-width logic).
+    - `frontend/src/type/typechecker_expr.cpp`
+      - literal inference / representability / unsigned-bit ops use exact values.
+    - `frontend/src/type/typechecker_expr_control.cpp`
+      - range bounds, array-size checks, assignment constexpr fact tracking use exact values.
+    - `frontend/src/type/typechecker_types.cpp`
+      - compile-time array size validation reads exact values (then bounds-checks against frontend limits).
+    - `frontend/src/transform/residualizer.cpp`
+      - materialize exact integer CTE values back into AST literals without truncation.
+    - `frontend/src/transform/optimizer.cpp`, `frontend/src/transform/evaluator_internal.h`
+      - CTValue equality/classification helpers updated for exact integers.
+    - Tests/docs:
+      - `frontend/tests/lexer/*`, `frontend/tests/typechecker/*`, `frontend/tests/expressions/*` for >64-bit literals and exact representability.
+      - `docs/vexel-rfc.md` clarify exact literal behavior (no lexer overflow before typing; contextual representability).
+  - Note:
+    - `boost::multiprecision::cpp_int` is available in the current environment (verified locally). If CI portability becomes an issue, revisit with a vendored frontend-only bigint implementation; do not regress semantics.
+  - Implementation notes (actual changes made):
+    - Added frontend-owned exact integer wrapper `APInt` (`boost::multiprecision::cpp_int`) and threaded exact integer payloads through AST literals.
+    - Lexer/parser now preserve integer literal text and parse exact values without host-width overflow.
+    - `CTValue` now supports `CTExactInt`; evaluator, casts, assignments, and residualizer materialization support exact integers.
+    - Compile-time integer coercion/casts now support arbitrary widths (frontend semantics); fixed-width wrap/sign behavior remains enforced at concretization.
+    - Local array materialization and array-size validation now accept compile-time exact integers when the realized size is host-materializable.
+    - Residualizer structural equality was extended for unary/cast/binary/member/length nodes to avoid non-converging fixpoint loops when folding negative constants.
+  - Tests/regressions run for this step:
+    - New frontend regressions:
+      - `expressions/EX-102/exact_integer_cte_arithmetic`
+      - `expressions/EX-103/exact_integer_to_byte_array_cast`
+      - `expressions/EX-104/local_array_size_from_exact_integer`
+      - `errors/ER-016/u128_literal_overflow`
+    - Existing regressions checked:
+      - `errors/ER-012/i32_wrap_positive` (caught residualizer non-convergence regression; fixed)
+    - Backend/frontend regressions:
+      - `python3 backends/c/tests/run_tests.py` ✅ (210)
+      - `make backend-vexel-test` ✅
+      - `make backend-megalinker-test` ✅
+      - `make docs-check` ✅
+      - `make frontend-test` → known pre-existing mismatch at `expressions/EX-032/sorted_no_mutation` (unchanged)
 
 ### Step 4 — CTE performance + correctness for recursive numeric workloads (fib, large compile-time workloads)
 - Goal:

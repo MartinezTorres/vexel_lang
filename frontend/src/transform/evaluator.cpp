@@ -8,6 +8,14 @@
 
 namespace vexel {
 
+namespace {
+
+bool ctvalue_to_i64_checked(const CTValue& value, int64_t& out) {
+    return ctvalue_to_i64_exact(value, out);
+}
+
+} // namespace
+
 CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
     error_msg.clear();
     hard_error = false;
@@ -251,13 +259,7 @@ bool CompileTimeEvaluator::declare_uninitialized_local(const StmtPtr& stmt) {
                     return false;
                 }
                 int64_t size = 0;
-                if (std::holds_alternative<int64_t>(size_val)) {
-                    size = std::get<int64_t>(size_val);
-                } else if (std::holds_alternative<uint64_t>(size_val)) {
-                    size = static_cast<int64_t>(std::get<uint64_t>(size_val));
-                } else if (std::holds_alternative<bool>(size_val)) {
-                    size = std::get<bool>(size_val) ? 1 : 0;
-                } else {
+                if (!ctvalue_to_i64_checked(size_val, size)) {
                     error_msg = "Array local size must be an integer constant";
                     return false;
                 }
@@ -470,10 +472,16 @@ bool CompileTimeEvaluator::eval_literal(ExprPtr expr, CTValue& result) {
             if (expr->type &&
                 expr->type->kind == Type::Kind::Primitive &&
                 expr->type->primitive == PrimitiveType::Bool) {
-                result = (expr->uint_val != 0u);
+                if (expr->has_exact_int_val) {
+                    result = !expr->exact_int_val.is_zero();
+                } else {
+                    result = (expr->uint_val != 0u);
+                }
                 return true;
             }
-            if (expr->literal_is_unsigned) {
+            if (expr->has_exact_int_val) {
+                result = ctvalue_from_exact_int(expr->exact_int_val, expr->literal_is_unsigned);
+            } else if (expr->literal_is_unsigned) {
                 result = (uint64_t)expr->uint_val;
             } else {
                 result = (int64_t)expr->uint_val;
@@ -500,27 +508,33 @@ bool CompileTimeEvaluator::eval_unary(ExprPtr expr, CTValue& result) {
     if (!try_evaluate(expr->operand, operand_val)) return false;
 
     if (expr->op == "~") {
-        if (std::holds_alternative<uint64_t>(operand_val)) {
-            result = ~std::get<uint64_t>(operand_val);
-            return true;
-        }
-        if (std::holds_alternative<int64_t>(operand_val)) {
-            result = (int64_t)~std::get<int64_t>(operand_val);
-            return true;
-        }
-        error_msg = "Unsupported operand type for bitwise not";
-        return false;
-    }
-
-    if (std::holds_alternative<int64_t>(operand_val)) {
-        int64_t v = std::get<int64_t>(operand_val);
-        if (expr->op == "-") result = -v;
-        else if (expr->op == "!") result = !v;
-        else {
-            error_msg = "Unsupported unary operator: " + expr->op;
+        APInt v(uint64_t(0));
+        bool is_unsigned = false;
+        if (!ctvalue_to_exact_int(operand_val, v, is_unsigned)) {
+            error_msg = "Unsupported operand type for bitwise not";
             return false;
         }
+        result = ctvalue_from_exact_int(~v, is_unsigned);
         return true;
+    }
+
+    if (ctvalue_is_integer(operand_val)) {
+        APInt v(uint64_t(0));
+        bool is_unsigned = false;
+        if (!ctvalue_to_exact_int(operand_val, v, is_unsigned)) {
+            error_msg = "Unsupported operand type for unary operation";
+            return false;
+        }
+        if (expr->op == "-") {
+            result = ctvalue_from_exact_int(-v, false);
+            return true;
+        }
+        if (expr->op == "!") {
+            result = v.is_zero();
+            return true;
+        }
+        error_msg = "Unsupported unary operator: " + expr->op;
+        return false;
     }
 
     if (std::holds_alternative<double>(operand_val)) {
@@ -630,6 +644,14 @@ bool CompileTimeEvaluator::eval_identifier(ExprPtr expr, CTValue& result) {
 int64_t CompileTimeEvaluator::to_int(const CTValue& v) {
     if (std::holds_alternative<int64_t>(v)) return std::get<int64_t>(v);
     if (std::holds_alternative<uint64_t>(v)) return (int64_t)std::get<uint64_t>(v);
+    if (std::holds_alternative<CTExactInt>(v)) {
+        const CTExactInt& exact = std::get<CTExactInt>(v);
+        if (!exact.value.fits_i64()) {
+            throw CompileError("Exact integer does not fit in int64_t in compile-time evaluation",
+                               SourceLocation());
+        }
+        return exact.value.to_i64();
+    }
     if (std::holds_alternative<double>(v)) return (int64_t)std::get<double>(v);
     if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? 1 : 0;
     throw CompileError("Cannot convert value to integer in compile-time evaluation (" + ct_value_kind(v) + ")",
@@ -640,6 +662,10 @@ double CompileTimeEvaluator::to_float(const CTValue& v) {
     if (std::holds_alternative<double>(v)) return std::get<double>(v);
     if (std::holds_alternative<int64_t>(v)) return (double)std::get<int64_t>(v);
     if (std::holds_alternative<uint64_t>(v)) return (double)std::get<uint64_t>(v);
+    if (std::holds_alternative<CTExactInt>(v)) {
+        const CTExactInt& exact = std::get<CTExactInt>(v);
+        return exact.value.raw().convert_to<double>();
+    }
     if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? 1.0 : 0.0;
     throw CompileError("Cannot convert value to float in compile-time evaluation (" + ct_value_kind(v) + ")",
                        SourceLocation());
@@ -747,15 +773,7 @@ bool CompileTimeEvaluator::eval_conditional(ExprPtr expr, CTValue& result) {
 
     // Convert condition to boolean
     bool is_true = false;
-    if (std::holds_alternative<int64_t>(cond_val)) {
-        is_true = std::get<int64_t>(cond_val) != 0;
-    } else if (std::holds_alternative<uint64_t>(cond_val)) {
-        is_true = std::get<uint64_t>(cond_val) != 0;
-    } else if (std::holds_alternative<bool>(cond_val)) {
-        is_true = std::get<bool>(cond_val);
-    } else if (std::holds_alternative<double>(cond_val)) {
-        is_true = std::get<double>(cond_val) != 0.0;
-    } else {
+    if (!cte_scalar_to_bool(cond_val, is_true)) {
         error_msg = "Conditional expression condition must be a scalar value";
         return false;
     }
@@ -787,6 +805,7 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 if (target_type->integer_bits == 0) {
                     if (std::holds_alternative<int64_t>(input) ||
                         std::holds_alternative<uint64_t>(input) ||
+                        std::holds_alternative<CTExactInt>(input) ||
                         std::holds_alternative<bool>(input)) {
                         output = copy_ct_value(input);
                         return true;
@@ -794,27 +813,24 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                     error_msg = "Type mismatch in compile-time coercion to unresolved signed integer";
                     return false;
                 }
-                if (target_type->integer_bits > 64) {
-                    error_msg = "Compile-time integer coercion supports signed widths up to 64 bits";
-                    return false;
-                }
-                int64_t casted = to_int(input);
-                if (target_type->integer_bits < 64) {
-                    uint64_t raw = static_cast<uint64_t>(casted) &
-                                   ((uint64_t(1) << target_type->integer_bits) - 1u);
-                    const uint64_t sign_bit = uint64_t(1) << (target_type->integer_bits - 1u);
-                    if (raw & sign_bit) {
-                        raw |= ~((uint64_t(1) << target_type->integer_bits) - 1u);
+                APInt exact(uint64_t(0));
+                bool source_unsigned = false;
+                if (!ctvalue_to_exact_int(input, exact, source_unsigned)) {
+                    if (std::holds_alternative<double>(input)) {
+                        exact = APInt(static_cast<int64_t>(std::get<double>(input)));
+                    } else {
+                        error_msg = "Type mismatch in compile-time coercion to signed integer";
+                        return false;
                     }
-                    casted = static_cast<int64_t>(raw);
                 }
-                output = casted;
+                output = ctvalue_from_exact_int(exact.wrapped_signed(target_type->integer_bits), false);
                 return true;
             }
             case PrimitiveType::UInt: {
                 if (target_type->integer_bits == 0) {
                     if (std::holds_alternative<int64_t>(input) ||
                         std::holds_alternative<uint64_t>(input) ||
+                        std::holds_alternative<CTExactInt>(input) ||
                         std::holds_alternative<bool>(input)) {
                         output = copy_ct_value(input);
                         return true;
@@ -822,15 +838,17 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                     error_msg = "Type mismatch in compile-time coercion to unresolved unsigned integer";
                     return false;
                 }
-                if (target_type->integer_bits > 64) {
-                    error_msg = "Compile-time integer coercion supports unsigned widths up to 64 bits";
-                    return false;
+                APInt exact(uint64_t(0));
+                bool source_unsigned = false;
+                if (!ctvalue_to_exact_int(input, exact, source_unsigned)) {
+                    if (std::holds_alternative<double>(input)) {
+                        exact = APInt(static_cast<int64_t>(std::get<double>(input)));
+                    } else {
+                        error_msg = "Type mismatch in compile-time coercion to unsigned integer";
+                        return false;
+                    }
                 }
-                uint64_t casted = static_cast<uint64_t>(to_int(input));
-                if (target_type->integer_bits < 64) {
-                    casted &= ((uint64_t(1) << target_type->integer_bits) - 1u);
-                }
-                output = casted;
+                output = ctvalue_from_exact_int(exact.wrapped_unsigned(target_type->integer_bits), true);
                 return true;
             }
             case PrimitiveType::F16:
@@ -839,8 +857,15 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 output = to_float(input);
                 return true;
             case PrimitiveType::Bool:
-                output = to_int(input) != 0;
-                return true;
+                {
+                    bool b = false;
+                    if (!cte_scalar_to_bool(input, b)) {
+                        error_msg = "Type mismatch in compile-time coercion to bool";
+                        return false;
+                    }
+                    output = b;
+                    return true;
+                }
             case PrimitiveType::String:
                 if (!std::holds_alternative<std::string>(input)) {
                     error_msg = "Type mismatch in compile-time coercion to string";
@@ -868,11 +893,7 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 return false;
             }
             int64_t expected_size = 0;
-            if (std::holds_alternative<int64_t>(size_val)) {
-                expected_size = std::get<int64_t>(size_val);
-            } else if (std::holds_alternative<uint64_t>(size_val)) {
-                expected_size = static_cast<int64_t>(std::get<uint64_t>(size_val));
-            } else {
+            if (!ctvalue_to_i64_checked(size_val, expected_size)) {
                 error_msg = "Array size must be integer in compile-time coercion";
                 return false;
             }
@@ -1020,23 +1041,21 @@ bool CompileTimeEvaluator::eval_range(ExprPtr expr, CTValue& result) {
     if (!try_evaluate(expr->left, start_val)) return false;
     if (!try_evaluate(expr->right, end_val)) return false;
 
-    if (!std::holds_alternative<int64_t>(start_val) &&
-        !std::holds_alternative<uint64_t>(start_val)) {
+    if (!ctvalue_is_integer(start_val)) {
         error_msg = "Range bounds must be integer constants";
         return false;
     }
-    if (!std::holds_alternative<int64_t>(end_val) &&
-        !std::holds_alternative<uint64_t>(end_val)) {
+    if (!ctvalue_is_integer(end_val)) {
         error_msg = "Range bounds must be integer constants";
         return false;
     }
 
-    int64_t start = std::holds_alternative<int64_t>(start_val)
-        ? std::get<int64_t>(start_val)
-        : static_cast<int64_t>(std::get<uint64_t>(start_val));
-    int64_t end = std::holds_alternative<int64_t>(end_val)
-        ? std::get<int64_t>(end_val)
-        : static_cast<int64_t>(std::get<uint64_t>(end_val));
+    int64_t start = 0;
+    int64_t end = 0;
+    if (!ctvalue_to_i64_checked(start_val, start) || !ctvalue_to_i64_checked(end_val, end)) {
+        error_msg = "Range bounds exceed compile-time iteration range";
+        return false;
+    }
 
     if (start == end) {
         error_msg = "Range cannot produce an empty array";
@@ -1071,19 +1090,16 @@ bool CompileTimeEvaluator::eval_index(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    if (!std::holds_alternative<int64_t>(index_val) &&
-        !std::holds_alternative<uint64_t>(index_val) &&
-        !std::holds_alternative<bool>(index_val)) {
+    if (!ctvalue_is_integer(index_val) && !std::holds_alternative<bool>(index_val)) {
         error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
         return false;
     }
     int64_t idx = 0;
-    if (std::holds_alternative<int64_t>(index_val)) {
-        idx = std::get<int64_t>(index_val);
-    } else if (std::holds_alternative<uint64_t>(index_val)) {
-        idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
-    } else {
+    if (std::holds_alternative<bool>(index_val)) {
         idx = std::get<bool>(index_val) ? 1 : 0;
+    } else if (!ctvalue_to_i64_checked(index_val, idx)) {
+        error_msg = "Index out of compile-time range";
+        return false;
     }
     if (idx < 0) {
         error_msg = "Index cannot be negative";
@@ -1165,6 +1181,13 @@ bool CompileTimeEvaluator::eval_iteration(ExprPtr expr, CTValue& result) {
             std::sort(sorted_elements.begin(), sorted_elements.end(),
                       [](const CTValue& a, const CTValue& b) {
                           return std::get<uint64_t>(a) < std::get<uint64_t>(b);
+                      });
+        } else if (std::holds_alternative<CTExactInt>((*elements)[0])) {
+            std::sort(sorted_elements.begin(), sorted_elements.end(),
+                      [](const CTValue& a, const CTValue& b) {
+                          const CTExactInt& av = std::get<CTExactInt>(a);
+                          const CTExactInt& bv = std::get<CTExactInt>(b);
+                          return av.value < bv.value;
                       });
         } else if (std::holds_alternative<double>((*elements)[0])) {
             std::sort(sorted_elements.begin(), sorted_elements.end(),
@@ -1291,11 +1314,13 @@ bool CompileTimeEvaluator::eval_length(ExprPtr expr, CTValue& result) {
                 error_msg = "Length on null array";
                 return false;
             }
-            result = (int64_t)array->elements.size();
+            uint64_t len = static_cast<uint64_t>(array->elements.size());
+            result = ctvalue_from_exact_int(APInt(len), true);
             return true;
         }
         if (std::holds_alternative<std::string>(val)) {
-            result = (int64_t)std::get<std::string>(val).size();
+            uint64_t len = static_cast<uint64_t>(std::get<std::string>(val).size());
+            result = ctvalue_from_exact_int(APInt(len), true);
             return true;
         }
     }
@@ -1309,7 +1334,12 @@ bool CompileTimeEvaluator::eval_length(ExprPtr expr, CTValue& result) {
                 return true;
             }
             if (std::holds_alternative<uint64_t>(size_val)) {
-                result = (int64_t)std::get<uint64_t>(size_val);
+                result = ctvalue_from_exact_int(APInt(std::get<uint64_t>(size_val)), true);
+                return true;
+            }
+            if (std::holds_alternative<CTExactInt>(size_val)) {
+                const CTExactInt& exact = std::get<CTExactInt>(size_val);
+                result = ctvalue_from_exact_int(exact.value, true);
                 return true;
             }
         }

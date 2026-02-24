@@ -25,6 +25,11 @@ bool ctvalue_equal_strict(const CTValue& a, const CTValue& b) {
     if (std::holds_alternative<uint64_t>(a)) {
         return std::get<uint64_t>(a) == std::get<uint64_t>(b);
     }
+    if (std::holds_alternative<CTExactInt>(a)) {
+        const auto& ea = std::get<CTExactInt>(a);
+        const auto& eb = std::get<CTExactInt>(b);
+        return ea.is_unsigned == eb.is_unsigned && ea.value == eb.value;
+    }
     if (std::holds_alternative<double>(a)) {
         return std::get<double>(a) == std::get<double>(b);
     }
@@ -78,6 +83,11 @@ bool ctvalue_equal_scheduler(const CTValue& a, const CTValue& b) {
     if (std::holds_alternative<uint64_t>(a)) {
         return std::get<uint64_t>(a) == std::get<uint64_t>(b);
     }
+    if (std::holds_alternative<CTExactInt>(a)) {
+        const auto& ea = std::get<CTExactInt>(a);
+        const auto& eb = std::get<CTExactInt>(b);
+        return ea.is_unsigned == eb.is_unsigned && ea.value == eb.value;
+    }
     if (std::holds_alternative<double>(a)) {
         return std::get<double>(a) == std::get<double>(b);
     }
@@ -108,6 +118,7 @@ bool ctvalue_equal_scheduler(const CTValue& a, const CTValue& b) {
 bool is_scalar_ctvalue(const CTValue& value) {
     return std::holds_alternative<int64_t>(value) ||
            std::holds_alternative<uint64_t>(value) ||
+           std::holds_alternative<CTExactInt>(value) ||
            std::holds_alternative<bool>(value) ||
            std::holds_alternative<double>(value);
 }

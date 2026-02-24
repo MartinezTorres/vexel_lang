@@ -358,7 +358,10 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             }
             if (target->array_size &&
                 target->array_size->kind == Expr::Kind::IntLiteral &&
-                expr->elements.size() != target->array_size->uint_val) {
+                (target->array_size->has_exact_int_val
+                     ? (!target->array_size->exact_int_val.fits_u64() ||
+                        expr->elements.size() != target->array_size->exact_int_val.to_u64())
+                     : (expr->elements.size() != target->array_size->uint_val))) {
                 return false;
             }
             for (const auto& elem : expr->elements) {

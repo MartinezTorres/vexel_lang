@@ -13,6 +13,9 @@ struct EvalReturn {
 inline std::string ct_value_kind(const CTValue& value) {
     if (std::holds_alternative<int64_t>(value)) return "int";
     if (std::holds_alternative<uint64_t>(value)) return "uint";
+    if (std::holds_alternative<CTExactInt>(value)) {
+        return std::get<CTExactInt>(value).is_unsigned ? "uint-exact" : "int-exact";
+    }
     if (std::holds_alternative<double>(value)) return "float";
     if (std::holds_alternative<bool>(value)) return "bool";
     if (std::holds_alternative<std::string>(value)) return "string";

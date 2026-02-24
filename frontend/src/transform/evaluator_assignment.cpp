@@ -73,18 +73,16 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     auto parse_index = [&](ExprPtr index_expr, int64_t& idx) -> bool {
         CTValue index_val;
         if (!try_evaluate(index_expr, index_val)) return false;
-        if (!std::holds_alternative<int64_t>(index_val) &&
-            !std::holds_alternative<uint64_t>(index_val) &&
+        if (!ctvalue_is_integer(index_val) &&
             !std::holds_alternative<bool>(index_val)) {
             error_msg = "Index must be an integer/bool constant, got " + ct_value_kind(index_val);
             return false;
         }
-        if (std::holds_alternative<int64_t>(index_val)) {
-            idx = std::get<int64_t>(index_val);
-        } else if (std::holds_alternative<uint64_t>(index_val)) {
-            idx = static_cast<int64_t>(std::get<uint64_t>(index_val));
-        } else {
+        if (std::holds_alternative<bool>(index_val)) {
             idx = std::get<bool>(index_val) ? 1 : 0;
+        } else if (!ctvalue_to_i64_exact(index_val, idx)) {
+            error_msg = "Index out of compile-time range";
+            return false;
         }
         if (idx < 0) {
             error_msg = "Index cannot be negative";
@@ -198,59 +196,45 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             return true;
         }
 
-        auto is_int = [&](const CTValue& v) {
-            return std::holds_alternative<int64_t>(v) || std::holds_alternative<uint64_t>(v);
+        auto is_integer_like = [&](const CTValue& v) {
+            return ctvalue_is_integer(v) || std::holds_alternative<bool>(v);
+        };
+        auto integer_unsigned_hint = [&](const CTValue& v) {
+            if (std::holds_alternative<uint64_t>(v)) return true;
+            if (std::holds_alternative<CTExactInt>(v)) return std::get<CTExactInt>(v).is_unsigned;
+            if (std::holds_alternative<bool>(v)) return true;
+            return false;
         };
 
         if (binary_op == "|" || binary_op == "&" || binary_op == "^" ||
             binary_op == "<<" || binary_op == ">>") {
-            if (!is_int(lhs_in) || !is_int(rhs_in)) {
+            if (!is_integer_like(lhs_in) || !is_integer_like(rhs_in)) {
                 error_msg = "Unsupported operand types for bitwise compound assignment";
                 return false;
             }
-            bool use_unsigned = std::holds_alternative<uint64_t>(lhs_in) ||
-                                std::holds_alternative<uint64_t>(rhs_in);
-            uint64_t l = std::holds_alternative<uint64_t>(lhs_in)
-                ? std::get<uint64_t>(lhs_in)
-                : static_cast<uint64_t>(std::get<int64_t>(lhs_in));
-            uint64_t r = std::holds_alternative<uint64_t>(rhs_in)
-                ? std::get<uint64_t>(rhs_in)
-                : static_cast<uint64_t>(std::get<int64_t>(rhs_in));
-            uint64_t v = 0;
-            if (binary_op == "|") v = l | r;
-            else if (binary_op == "&") v = l & r;
-            else if (binary_op == "^") v = l ^ r;
-            else if (binary_op == "<<") v = l << r;
-            else v = l >> r;
-            out = use_unsigned ? CTValue(v) : CTValue(static_cast<int64_t>(v));
-            return true;
-        }
-
-        if (std::holds_alternative<uint64_t>(lhs_in) || std::holds_alternative<uint64_t>(rhs_in)) {
-            uint64_t l = std::holds_alternative<uint64_t>(lhs_in)
-                ? std::get<uint64_t>(lhs_in)
-                : static_cast<uint64_t>(to_int(lhs_in));
-            uint64_t r = std::holds_alternative<uint64_t>(rhs_in)
-                ? std::get<uint64_t>(rhs_in)
-                : static_cast<uint64_t>(to_int(rhs_in));
-            if (binary_op == "+") out = l + r;
-            else if (binary_op == "-") out = l - r;
-            else if (binary_op == "*") out = l * r;
-            else if (binary_op == "/") {
-                if (r == 0) {
-                    error_msg = "Division by zero in compile-time evaluation";
-                    return false;
-                }
-                out = l / r;
-            } else if (binary_op == "%") {
-                if (r == 0) {
-                    error_msg = "Modulo by zero in compile-time evaluation";
-                    return false;
-                }
-                out = l % r;
-            } else {
-                error_msg = "Unsupported compound assignment operator at compile time: " + assign_op;
+            APInt l(uint64_t(0));
+            APInt r(uint64_t(0));
+            bool lu = false, ru = false;
+            if (!ctvalue_to_exact_int(lhs_in, l, lu) || !ctvalue_to_exact_int(rhs_in, r, ru)) {
+                error_msg = "Unsupported operand types for bitwise compound assignment";
                 return false;
+            }
+            bool use_unsigned = integer_unsigned_hint(lhs_in) || integer_unsigned_hint(rhs_in);
+            if (binary_op == "|") out = ctvalue_from_exact_int(l | r, use_unsigned);
+            else if (binary_op == "&") out = ctvalue_from_exact_int(l & r, use_unsigned);
+            else if (binary_op == "^") out = ctvalue_from_exact_int(l ^ r, use_unsigned);
+            else {
+                if (r.is_negative()) {
+                    error_msg = "Negative shift count in compile-time evaluation";
+                    return false;
+                }
+                if (!r.fits_u64()) {
+                    error_msg = "Shift count too large in compile-time evaluation";
+                    return false;
+                }
+                uint64_t shift = r.to_u64();
+                if (binary_op == "<<") out = ctvalue_from_exact_int(l << shift, use_unsigned);
+                else out = ctvalue_from_exact_int(l >> shift, use_unsigned);
             }
             return true;
         }
@@ -274,25 +258,30 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             return true;
         }
 
-        if (std::holds_alternative<int64_t>(lhs_in) || std::holds_alternative<bool>(lhs_in) ||
-            std::holds_alternative<int64_t>(rhs_in) || std::holds_alternative<bool>(rhs_in)) {
-            int64_t l = to_int(lhs_in);
-            int64_t r = to_int(rhs_in);
-            if (binary_op == "+") out = l + r;
-            else if (binary_op == "-") out = l - r;
-            else if (binary_op == "*") out = l * r;
+        if (is_integer_like(lhs_in) && is_integer_like(rhs_in)) {
+            APInt l(uint64_t(0));
+            APInt r(uint64_t(0));
+            bool lu = false, ru = false;
+            if (!ctvalue_to_exact_int(lhs_in, l, lu) || !ctvalue_to_exact_int(rhs_in, r, ru)) {
+                error_msg = "Unsupported operand types for compound assignment";
+                return false;
+            }
+            bool use_unsigned = integer_unsigned_hint(lhs_in) || integer_unsigned_hint(rhs_in);
+            if (binary_op == "+") out = ctvalue_from_exact_int(l + r, use_unsigned);
+            else if (binary_op == "-") out = ctvalue_from_exact_int(l - r, use_unsigned);
+            else if (binary_op == "*") out = ctvalue_from_exact_int(l * r, use_unsigned);
             else if (binary_op == "/") {
-                if (r == 0) {
+                if (r.is_zero()) {
                     error_msg = "Division by zero in compile-time evaluation";
                     return false;
                 }
-                out = l / r;
+                out = ctvalue_from_exact_int(l / r, use_unsigned);
             } else if (binary_op == "%") {
-                if (r == 0) {
+                if (r.is_zero()) {
                     error_msg = "Modulo by zero in compile-time evaluation";
                     return false;
                 }
-                out = l % r;
+                out = ctvalue_from_exact_int(l % r, use_unsigned);
             } else {
                 error_msg = "Unsupported compound assignment operator at compile time: " + assign_op;
                 return false;

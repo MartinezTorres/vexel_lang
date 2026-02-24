@@ -11,6 +11,10 @@ bool array_sizes_equal(ExprPtr a, ExprPtr b) {
     if (!a && !b) return true;
     if (!a || !b) return false;
     if (a->kind == Expr::Kind::IntLiteral && b->kind == Expr::Kind::IntLiteral) {
+        if (a->has_exact_int_val && b->has_exact_int_val) {
+            return a->literal_is_unsigned == b->literal_is_unsigned &&
+                   a->exact_int_val == b->exact_int_val;
+        }
         return a->uint_val == b->uint_val;
     }
     return a.get() == b.get();
@@ -21,6 +25,11 @@ size_t array_size_hash(ExprPtr size) {
         return 0x9e3779b9ULL;
     }
     if (size->kind == Expr::Kind::IntLiteral) {
+        if (size->has_exact_int_val) {
+            size_t h = std::hash<std::string>{}(size->exact_int_val.to_string());
+            h ^= std::hash<bool>{}(size->literal_is_unsigned) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+        }
         return std::hash<uint64_t>{}(size->uint_val);
     }
     return std::hash<const Expr*>{}(size.get());
@@ -37,7 +46,11 @@ std::string mangle_type_component(TypePtr type) {
         case Type::Kind::Array: {
             std::string component = "array_" + mangle_type_component(type->element_type);
             if (type->array_size && type->array_size->kind == Expr::Kind::IntLiteral) {
-                component += "_n" + std::to_string(type->array_size->uint_val);
+                if (type->array_size->has_exact_int_val) {
+                    component += "_n" + type->array_size->exact_int_val.to_string();
+                } else {
+                    component += "_n" + std::to_string(type->array_size->uint_val);
+                }
             } else if (type->array_size) {
                 component += "_dyn";
             } else {
@@ -60,9 +73,18 @@ TypePtr freeze_signature_type(TypePtr type) {
     if (type->kind == Type::Kind::Array) {
         frozen->element_type = freeze_signature_type(type->element_type);
         if (type->array_size && type->array_size->kind == Expr::Kind::IntLiteral) {
-            frozen->array_size = Expr::make_uint(type->array_size->uint_val,
-                                                 type->array_size->location,
-                                                 std::to_string(type->array_size->uint_val));
+            if (type->array_size->has_exact_int_val) {
+                frozen->array_size = Expr::make_int_exact(type->array_size->exact_int_val,
+                                                          type->array_size->literal_is_unsigned,
+                                                          type->array_size->location,
+                                                          type->array_size->raw_literal.empty()
+                                                              ? type->array_size->exact_int_val.to_string()
+                                                              : type->array_size->raw_literal);
+            } else {
+                frozen->array_size = Expr::make_uint(type->array_size->uint_val,
+                                                     type->array_size->location,
+                                                     std::to_string(type->array_size->uint_val));
+            }
         } else {
             frozen->array_size = type->array_size;
         }
@@ -238,6 +260,8 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     cloned->type = nullptr;
     // Clone literals
     cloned->uint_val = expr->uint_val;
+    cloned->exact_int_val = expr->exact_int_val;
+    cloned->has_exact_int_val = expr->has_exact_int_val;
     cloned->float_val = expr->float_val;
     cloned->string_val = expr->string_val;
     cloned->resource_path = expr->resource_path;
