@@ -258,6 +258,7 @@ If a new architectural issue is discovered while implementing a step:
 ### Step 5 — Arbitrary-width integer lowering in C backend (full arithmetic) + megalinker backend (full arithmetic)
 - Goal:
   - Both backends support arbitrary-width integer types/ops, with fast path for 8/16/32/64 and generic helpers otherwise.
+- Status: completed
 - Primary files likely to change (C backend):
   - `backends/c/src/codegen_support.cpp/.h` (type mapping)
   - `backends/c/src/codegen.cpp`
@@ -271,6 +272,89 @@ If a new architectural issue is discovered while implementing a step:
   - `backends/ext/megalinker/tests/*`
 - Docs:
   - Backend READMEs/help output docs if any limitations are removed.
+- RCA (current behavior):
+  - Frontend now supports exact literals and arbitrary `#iN/#uN`, but both C-generating backends still hard-reject widths outside `8/16/32/64` in `gen_type(...)`.
+  - Expression codegen assumes primitive integers are native C scalars:
+    - literals emit numeric tokens directly,
+    - unary/binary ops emit native C operators,
+    - casts use `((T)x)`,
+    - comparators rely on native `<`/`>`.
+  - Global/local constexpr initializer emission only serializes `int64_t/uint64_t`, so `CTExactInt` values are dropped or miscompiled.
+  - Array-size/range helpers also still assume fixed-width CT values in a few backend-only utility paths (acceptable for host-materialized arrays but must accept `CTExactInt` if it fits backend limits).
+  - Megalinker adds extra constraints (SDCC ABI / no struct pass-return) that interact with any non-native representation.
+- Plan (Step 5A C backend first, then 5B megalinker; same semantics, independent implementations):
+  - Representation:
+    - Keep Vexel type system unchanged (`Type::Primitive` remains primitive).
+    - For non-native integer widths in backend output, emit backend-owned C structs of bytes (little-endian fixed-width two's-complement/unsigned bit pattern).
+    - Use native fast path for widths `8/16/32/64`.
+  - Helper strategy (backend-owned, no frontend ownership leakage):
+    - Emit a small generic byte-array arithmetic helper runtime into generated C (`add/sub/neg/not/bitwise/compare/shifts/mul/divmod/casts`), once per translation unit.
+    - Emit per-width wrapper types (and thin wrappers if useful) on demand.
+    - Preserve backend independence by duplicating/adapting implementation in megalinker backend rather than shared backend/common code.
+  - C backend exact file plan:
+    - `backends/c/src/codegen.h`
+      - add arbitrary-int support registries/state (used widths, helper-emitted flag, helper/type declaration buffers)
+      - add helper methods (`is_native_int_primitive`, `is_extended_int_primitive`, `extint_*` emitters/serializers)
+    - `backends/c/src/codegen_support.cpp`
+      - `gen_type(...)` maps non-native `#iN/#uN` to backend struct type names (instead of rejecting)
+      - array length resolution accepts `CTExactInt` when host-materializable
+      - emit helper/type declarations and prepend to output
+    - `backends/c/src/codegen_expr.cpp`
+      - exact-int literal emission (`Expr::has_exact_int_val`)
+      - constexpr scalar folding includes `CTExactInt`
+      - unary/binary/cast/comparison paths branch to arbitrary-int helper calls for non-native integer operands/results
+    - `backends/c/src/codegen.cpp`
+      - constexpr returns / variable initializers serialize `CTExactInt`
+      - wrap/mask logic for small-width constants uses APInt-safe path where needed
+      - `is_aggregate_type(...)` stays unchanged in C backend (non-native ints can be passed/returned by value as structs in native C)
+    - `backends/c/tests/backend_c/*`
+      - add runtime tests covering non-native widths for arithmetic/bitwise/shifts/divmod/comparisons/casts and constexpr init emission
+    - `docs/vexel-rfc.md`
+      - no semantic change expected; only docs/help if backend limitations list mentions 8/16/32/64-only.
+  - Megalinker backend exact file plan (after C backend is coherent):
+    - `backends/ext/megalinker/src/codegen.h`
+      - mirror megalinker-owned arbitrary-int helper/type registry and emit helpers
+    - `backends/ext/megalinker/src/codegen_support.cpp`
+      - remove width rejection, map non-native ints to megalinker-owned byte-struct types
+      - array length resolution accepts `CTExactInt`
+    - `backends/ext/megalinker/src/codegen_expr.cpp`
+      - same semantic branching for literals/folds/ops/casts/comparisons via megalinker-owned helper calls
+    - `backends/ext/megalinker/src/codegen.cpp`
+      - serialize `CTExactInt` in constexpr returns/initializers
+      - megalinker-only ABI rule: treat non-native integer primitives as aggregate-like for lowering to avoid SDCC struct-by-value limitations
+    - `backends/ext/megalinker/src/megalinker_backend.cpp`
+      - update help/docs/comments if integer-width limitation text is present
+    - `backends/ext/megalinker/tests/test.sh`
+      - add compile/grep regressions for emitted helper types and at least one runtime-free compile case using non-native ints
+  - Validation plan (per backend stage):
+    - C backend stage:
+      - targeted new `backend_c` runtime tests
+      - `python3 backends/c/tests/run_tests.py`
+      - `make backend-vexel-test`, `make docs-check`
+    - Megalinker stage:
+      - `make backend-megalinker-test`
+      - compile smoke on new non-native-width sample
+      - rerun C backend suite to catch shared frontend regressions (none expected, but required by protocol)
+- Implementation notes (actual changes made):
+  - **C backend**
+    - Added backend-owned arbitrary-width integer lowering using byte-struct types (`typedef struct { unsigned char b[N]; } vx_uN_t/vx_iN_t`) with native fast path preserved for `8/16/32/64`.
+    - Added generated helper runtime (`vx_ai_*`) for byte-array arithmetic/comparison/shifts/divmod/casts used by non-native integer codegen.
+    - Updated expression codegen (literals, unary/binary ops, comparisons, casts, conditionals, assignments including compound assignments) to route arbitrary-width integer operations through helper calls.
+    - Updated constexpr folding/literal emission and global/local initializer emission to serialize `CTExactInt`.
+    - Updated range/array-size backend utilities to accept `CTExactInt` when host-materializable.
+    - Fixed two backend bugs uncovered during implementation:
+      - temp-name reuse was type-erased and emitted invalid `tmp = 0` after struct temps; disabled temp recycling for correctness (cleanup tracked in Step 8),
+      - helper aliasing/sign-extension bugs (`<<=`,`>>=` in-place aliasing and signed `i64 -> i72` cast extension).
+  - **Megalinker backend**
+    - Ported the same semantics with an independent backend-owned implementation (duplicate helper/runtime and lowering paths, no frontend ownership bleed).
+    - Non-native integer primitives are treated as aggregate-like in megalinker ABI lowering to avoid SDCC struct-by-value ABI issues.
+    - `generate_single_function(...)` now prepends local helper/type prelude when a function unit uses arbitrary-width integers, so local-only non-native types compile even if not ABI-visible in the shared header.
+    - Updated megalinker test script to validate successful `#u13` lowering instead of legacy width rejection.
+  - Tests/regressions run for this step:
+    - `python3 backends/c/tests/run_tests.py` ✅ (211 tests, incl. new `CX-084`)
+    - `make backend-megalinker-test` ✅
+    - `make backend-vexel-test` ✅
+    - `make docs-check` ✅
 
 ### Step 6 — Playground runtime execution study/implementation (optional feature, full Vexel execution target)
 - Goal:

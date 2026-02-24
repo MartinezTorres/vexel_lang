@@ -1,0 +1,39 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: C backend lowers arbitrary-width integers (#u72/#i9/#i72) with runtime helper ops, casts, shifts, div/mod, and comparisons.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'typedef struct { unsigned char b[9]; } vx_u72_t;' out.h && grep -Fq 'typedef struct { unsigned char b[2]; } vx_i9_t;' out.h && grep -Fq 'vx_ai_udivmod' out.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && ./out
+
+&!seed() -> #u8;
+
+&^main() -> #i32 {
+    ok:#b = 1;
+
+    u:#u72 = (#u72)(seed());
+    v:#u72 = (#u72)700;
+    p:#u72 = (u * v) + (#u72)5;
+    q:#u72 = p / (#u72)3;
+    r:#u72 = p % (#u72)3;
+    ok &&= ((q * (#u72)3) + r) == p;
+
+    x:#u72 = (#u72)1;
+    x <<= (#u8)12;
+    x >>= (#u8)4;
+    ok &&= (x == (#u72)256);
+
+    s:#i9 = (#i9)((#i32)seed() - 20);
+    t:#i9 = s / (#i9)2;
+    ok &&= (t == (#i9)-3);
+    ok &&= (s < (#i9)0);
+
+    f:#f64 = (#f64)seed() + 0.75;
+    uf:#u72 = (#u72)f;
+    ok &&= (uf == (#u72)13);
+
+    sf:#f64 = (#f64)((#i72)((#i32)seed() - 20));
+    ok &&= (sf < -6.5) && (sf > -7.5);
+
+    q8:#u8 = (#u8)q;
+    ok &&= (q8 == (#u8)219);
+
+    ok ? 0 : 1
+}
