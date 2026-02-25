@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     ctr = Counter(3);
     total = 0;
-    Counter::@({
+    ctr@{
         total = total + _
-    });
+    };
     total
 }
 ```

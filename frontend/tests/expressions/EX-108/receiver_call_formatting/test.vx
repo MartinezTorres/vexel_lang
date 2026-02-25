@@ -1,0 +1,17 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Lowered Vexel preserves receiver call syntax for single-receiver methods and multi-receiver calls. | Receiver call formatting includes receivers
+
+#Vec(x:#i32);
+
+&(self)#Vec::len() -> #i32 {
+  self.x
+}
+
+&!seed1() -> #i32;
+&!seed2() -> #i32;
+
+&^main() -> #i32 {
+  a:#Vec = Vec(seed1());
+  b:#Vec = Vec(seed2());
+  a.len() + b.len()
+}

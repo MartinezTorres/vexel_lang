@@ -7,7 +7,7 @@
 }
 &^main() -> #i32 {
     entity = Entity(0);
-    Entity::update();
+    entity.update();
     entity.state
 }
 ```

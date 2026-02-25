@@ -8,9 +8,9 @@
 }
 &^main() -> #i32 {
     seq = Sequence(3);
-    Sequence::@({
+    seq@{
         -> 0;
-    });
+    };
     0
 }
 ```

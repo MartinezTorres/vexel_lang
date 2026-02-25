@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     coll = Collection([1, 2, 3, 4]);
     product = 1;
-    Collection::@({
+    coll@{
         product = product * _
-    });
+    };
     product
 }
 ```

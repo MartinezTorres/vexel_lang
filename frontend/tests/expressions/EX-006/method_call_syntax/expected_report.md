@@ -7,7 +7,7 @@
 }
 &^main() -> #i32 {
     p = Point(3, 4);
-    d = Point::distance_from_origin();
+    d = p.distance_from_origin();
     -> d;
 }
 ```

@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     set = SortedSet([1, 2, 3]);
     result = 0;
-    SortedSet::@@({
+    set@@{
         result = result + _
-    });
+    };
     result
 }
 ```

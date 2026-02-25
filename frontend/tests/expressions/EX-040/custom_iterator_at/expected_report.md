@@ -10,7 +10,7 @@
 }
 &^main() -> #i32 {
     r = Range(0, 5);
-    Range::@(print(_));
+    r@print(_);
     -> 0;
 }
 ```

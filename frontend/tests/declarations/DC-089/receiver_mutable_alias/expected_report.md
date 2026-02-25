@@ -8,7 +8,7 @@
 &^main() -> #i32 {
     x = 5;
     y = 10;
-    increment_both();
+    (x, y).increment_both();
     x + y
 }
 ```

@@ -7,7 +7,7 @@
 }
 &^main() -> #i32 {
     cnt = Counter(0);
-    Counter::increment();
+    cnt.increment();
     cnt.value
 }
 ```

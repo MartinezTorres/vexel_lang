@@ -7,7 +7,7 @@
 }
 &^main() -> #i32 {
     calc = Calculator(0);
-    Calculator::add(10);
+    calc.add(10);
     calc.result
 }
 ```

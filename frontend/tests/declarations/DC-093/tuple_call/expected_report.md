@@ -8,7 +8,7 @@
 &^main() -> #i32 {
     x = 1;
     y = 2;
-    add_assign(10);
+    (x, y).add_assign(10);
     x + y
 }
 ```

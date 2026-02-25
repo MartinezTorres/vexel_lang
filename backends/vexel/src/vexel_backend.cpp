@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
 
 namespace vexel {
 
@@ -40,23 +41,29 @@ private:
 
     static int precedence(const ExprPtr& expr) {
         if (!expr) return 0;
+        auto binary_precedence = [](std::string op) {
+            if (!op.empty() && op.front() == '.') {
+                op.erase(op.begin());
+            }
+            if (op == "||") return 3;
+            if (op == "&&") return 4;
+            if (op == "|") return 5;
+            if (op == "^") return 6;
+            if (op == "&") return 7;
+            if (op == "==" || op == "!=") return 8;
+            if (op == "<" || op == ">" || op == "<=" || op == ">=") return 9;
+            if (op == "<<" || op == ">>") return 10;
+            if (op == "+" || op == "-") return 11;
+            if (op == "*" || op == "/" || op == "%") return 12;
+            return 12;
+        };
         switch (expr->kind) {
             case Expr::Kind::Assignment:
                 return 1;
             case Expr::Kind::Conditional:
                 return 2;
             case Expr::Kind::Binary:
-                if (expr->op == "||") return 3;
-                if (expr->op == "&&") return 4;
-                if (expr->op == "|") return 5;
-                if (expr->op == "^") return 6;
-                if (expr->op == "&") return 7;
-                if (expr->op == "==" || expr->op == "!=") return 8;
-                if (expr->op == "<" || expr->op == ">" || expr->op == "<=" || expr->op == ">=") return 9;
-                if (expr->op == "<<" || expr->op == ">>") return 10;
-                if (expr->op == "+" || expr->op == "-") return 11;
-                if (expr->op == "*" || expr->op == "/" || expr->op == "%") return 12;
-                return 12;
+                return binary_precedence(expr->op);
             case Expr::Kind::Unary:
             case Expr::Kind::Cast:
             case Expr::Kind::Length:
@@ -290,13 +297,86 @@ private:
                 out << expr->op << format_expr(expr->operand, my_prec, level);
                 break;
             case Expr::Kind::Call: {
-                out << format_expr(expr->operand, my_prec, level) << "(";
-                bool first = true;
-                for (const auto& arg : expr->args) {
-                    if (!first) out << ", ";
-                    first = false;
-                    out << format_expr(arg, 0, level);
+                auto append_args = [&](const std::vector<ExprPtr>& args) {
+                    bool first = true;
+                    for (const auto& arg : args) {
+                        if (!first) out << ", ";
+                        first = false;
+                        out << format_expr(arg, 0, level);
+                    }
+                };
+                auto method_suffix_name = [&](const std::string& name) {
+                    size_t pos = name.rfind("::");
+                    return (pos == std::string::npos) ? name : name.substr(pos + 2);
+                };
+                auto is_operator_name = [&](const std::string& name) {
+                    static const std::unordered_set<std::string> kOps = {
+                        "+","-","*","/","%","&","|","^","<<",">>","==","!=","<","<=",">",">=",
+                        "&&","||","@","@@",
+                        ".+",".-",".*","./",".%",".&",".|",".^",".<<",".>>",".==",".!=",".<",".<=",".>",".>=",".&&",".||"
+                    };
+                    return kOps.count(name) > 0;
+                };
+                auto binary_op_precedence = [&](std::string op) {
+                    if (!op.empty() && op.front() == '.') {
+                        op.erase(op.begin());
+                    }
+                    if (op == "||") return 3;
+                    if (op == "&&") return 4;
+                    if (op == "|") return 5;
+                    if (op == "^") return 6;
+                    if (op == "&") return 7;
+                    if (op == "==" || op == "!=") return 8;
+                    if (op == "<" || op == ">" || op == "<=" || op == ">=") return 9;
+                    if (op == "<<" || op == ">>") return 10;
+                    if (op == "+" || op == "-") return 11;
+                    if (op == "*" || op == "/" || op == "%") return 12;
+                    return 12;
+                };
+
+                if (!expr->receivers.empty() && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+                    const std::string display_name = method_suffix_name(expr->operand->name);
+                    if (is_operator_name(display_name)) {
+                        if ((display_name == "@" || display_name == "@@") &&
+                            expr->receivers.size() == 1 && expr->args.size() == 1) {
+                            out << format_expr(expr->receivers[0], my_prec, level)
+                                << display_name
+                                << format_expr(expr->args[0], 0, level);
+                            break;
+                        }
+                        if (expr->receivers.size() == 1 && expr->args.size() == 1) {
+                            int op_prec = binary_op_precedence(display_name);
+                            bool op_need_parens = op_prec < parent_prec;
+                            if (op_need_parens) out << "(";
+                            out << format_expr(expr->receivers[0], op_prec, level)
+                                << " " << display_name << " ";
+                            int rhs_prec = op_prec + 1;
+                            out << format_expr(expr->args[0], rhs_prec, level);
+                            if (op_need_parens) out << ")";
+                            break;
+                        }
+                    }
+
+                    if (expr->receivers.size() == 1) {
+                        out << format_expr(expr->receivers[0], my_prec, level)
+                            << "." << display_name << "(";
+                        append_args(expr->args);
+                        out << ")";
+                        break;
+                    }
+                    out << "(";
+                    for (size_t i = 0; i < expr->receivers.size(); ++i) {
+                        if (i > 0) out << ", ";
+                        out << format_expr(expr->receivers[i], 0, level);
+                    }
+                    out << ")." << display_name << "(";
+                    append_args(expr->args);
+                    out << ")";
+                    break;
                 }
+
+                out << format_expr(expr->operand, my_prec, level) << "(";
+                append_args(expr->args);
                 out << ")";
                 break;
             }

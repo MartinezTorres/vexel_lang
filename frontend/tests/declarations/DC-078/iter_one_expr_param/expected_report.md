@@ -8,9 +8,9 @@
 }
 &^main() -> #i32 {
     series = Series(4);
-    Series::@({
+    series@{
         -> 0;
-    });
+    };
     0
 }
 ```

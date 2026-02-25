@@ -13,9 +13,9 @@
 &!tick() -> #b;
 &^main() -> #i32 {
     b = Box(seed());
-    b = Box::.+(Box(2));
+    b = b .+ Box(2);
     f = Flag(1);
-    f = Flag::.||(Flag(tick()));
+    f = f .|| Flag(tick());
     b.v + ( #i32 ) f.v
 }
 ```

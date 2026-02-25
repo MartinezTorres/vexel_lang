@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     first = 0;
     rng = Range(1, 5);
-    Range::@({
+    rng@{
         first = _
-    });
+    };
     first
 }
 ```

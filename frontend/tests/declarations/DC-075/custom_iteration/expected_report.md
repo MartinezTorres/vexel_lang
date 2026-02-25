@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     cnt = Container([1, 2, 3]);
     sum = 0;
-    Container::@({
+    cnt@{
         sum = sum + _
-    });
+    };
     sum
 }
 ```

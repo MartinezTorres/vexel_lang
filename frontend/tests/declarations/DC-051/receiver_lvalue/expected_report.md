@@ -7,7 +7,7 @@
 }
 &^main() -> #i32 {
     box = Box(10);
-    Box::set(20);
+    box.set(20);
     box.val
 }
 ```
