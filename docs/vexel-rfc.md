@@ -27,7 +27,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
 - **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external function), `&^` (exported function), `^` (exported global), `!` (external global symbol), `!!` (backend-bound global), `#` (type)
-- **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` (user types may overload `+ - * / % == != < <= > >=` via operator methods)
+- **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` plus dotted per-element binary variants (for example `.+`, `.*`, `.==`, `.&&`, `.<<`). User types may overload scalar and dotted operator names via operator methods.
   - Note: `|` serves as both unary (length/absolute) and binary (bitwise OR) operator
 - **Statement termination**: `;` or any whitespace when unambiguous (see Section 8 for ambiguous parsing rules)
 - **Annotations**: Optional prefixes `[[name]]` or `[[name(arg1, arg2)]]` may precede declarations, statements, and expressions. Annotations are opaque to language semantics; the frontend preserves them for backends/tooling.
@@ -213,11 +213,13 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Methods and functions have separate namespaces: `&Vec::push` and `&push` don't conflict
 
 **Operator methods**: `&(lhs)#TypeName::+(rhs[:Type])[-> Type] block`
-- Overloads a core operator for instances of `TypeName`; the operator name must be one of `+ - * / % == != < <= > >=`
+- Overloads a core operator for instances of `TypeName`; the operator name may be a scalar operator (e.g. `+`, `==`) or a dotted per-element operator (e.g. `.+`, `.==`, `.&&`, `.<<`)
 - Operator methods behave like regular methods: the left operand is the receiver and may be any expression; mutating operators may materialize a temporary for non-lvalues
 - When the left operand has type `TypeName`, the compiler resolves `lhs <op> rhs` as a call to `TypeName::<op>` before attempting built-in operator rules
 - Operator methods may not declare expression parameters and must accept exactly one receiver; value parameters model the remaining operands (binary operators expect one value parameter)
 - Return types follow normal rules: arithmetic operators typically return `TypeName`, comparison operators return `#b`
+- Dotted logical operators (e.g. `.&&`, `.||`) are distinct operators; when overloaded they behave like ordinary method calls (both operands evaluate before the call; no short-circuit)
+- Dotted operators do not imply built-in broadcasting semantics by themselves; broadcasting is a separate higher-level semantics feature
 - Absent an overload, built-in semantics apply (primitives retain their native arithmetic and comparison rules)
 
 **Iteration methods**: `&(receiver)#TypeName::@($loop) block` and `&(receiver)#TypeName::@@($loop) block`
@@ -357,6 +359,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Parsing rules**:
 - && binds tighter than ||
+- Dotted per-element operators mirror the precedence/associativity of their scalar counterparts (for example `.*` binds like `*`, `.+` binds like `+`)
 - Ambiguous expressions require parentheses
 - Nested conditionals must be explicitly parenthesized
 - Parser errors on ambiguity rather than guessing intent

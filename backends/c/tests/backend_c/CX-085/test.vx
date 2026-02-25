@@ -1,0 +1,19 @@
+// @rfc: docs/vexel-rfc.md#functions--methods
+// @desc: C backend handles dotted per-element operator overloads after frontend lowers them to normal method calls.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out -lm && ./out
+
+#Vec2(x:#i32, y:#i32);
+
+&(a)#Vec2::.+(b:#Vec2) -> #Vec2 {
+  Vec2(a.x + b.x, a.y + b.y)
+}
+
+&(a)#Vec2::.*(b:#Vec2) -> #Vec2 {
+  Vec2(a.x * b.x, a.y * b.y)
+}
+
+&^main() -> #i32 {
+  r:#Vec2 = (Vec2(2, 3) .* Vec2(4, 5)) .+ Vec2(1, 1);
+  (r.x + r.y) == 25 ? 0 : 1
+}

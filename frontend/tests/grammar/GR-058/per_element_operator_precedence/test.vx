@@ -1,0 +1,17 @@
+// @rfc: docs/vexel-rfc.md#expressions--operators
+// @desc: Dotted per-element operators parse as distinct binary operators and mirror scalar precedence (.* before .+) | Per-element operator precedence mirrors scalar operators
+
+#V(x:#i32, y:#i32);
+
+&(a)#V::.+(b:#V) -> #V {
+  V(a.x + b.x, a.y + b.y)
+}
+
+&(a)#V::.*(b:#V) -> #V {
+  V(a.x * b.x, a.y * b.y)
+}
+
+&^main() -> #i32 {
+  r:#V = V(1, 2) .+ V(3, 4) .* V(2, 2);
+  r.x == 7 ? 0 : 1
+}

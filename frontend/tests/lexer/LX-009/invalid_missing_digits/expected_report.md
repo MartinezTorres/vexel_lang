@@ -4,9 +4,8 @@
 
 ## Stderr
 ```
-Error at tests/lexer/LX-009/invalid_missing_digits/test.vx:7:5: Parse failed with 2 error(s):
-  Error at tests/lexer/LX-009/invalid_missing_digits/test.vx:7:5: Expected member name
-  Error at tests/lexer/LX-009/invalid_missing_digits/test.vx:7:5: Expected member name
+Error at tests/lexer/LX-009/invalid_missing_digits/test.vx:6:16: Parse failed with 1 error(s):
+  Error at tests/lexer/LX-009/invalid_missing_digits/test.vx:6:16: Unexpected token in expression: .
 
 ```
 

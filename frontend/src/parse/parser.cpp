@@ -87,6 +87,23 @@ bool Parser::match(TokenType type) {
     return false;
 }
 
+bool Parser::check_dotted_operator(TokenType inner_type) const {
+    if (pos + 1 >= tokens.size()) return false;
+    return tokens[pos].type == TokenType::Dot && tokens[pos + 1].type == inner_type;
+}
+
+bool Parser::match_dotted_operator(TokenType inner_type, std::string& out_op) {
+    if (!check_dotted_operator(inner_type)) return false;
+    out_op = "." + tokens[pos + 1].lexeme;
+    pos += 2;
+    return true;
+}
+
+bool Parser::check_member_dot() const {
+    if (pos + 1 >= tokens.size()) return false;
+    return tokens[pos].type == TokenType::Dot && tokens[pos + 1].type == TokenType::Identifier;
+}
+
 Token Parser::consume(TokenType type, const std::string& msg) {
     if (!check(type)) {
         record_error(msg, current().location);
@@ -510,6 +527,32 @@ static bool is_operator_function_token(TokenType type) {
     }
 }
 
+static bool is_per_element_operator_inner_token(TokenType type) {
+    switch (type) {
+        case TokenType::Plus:
+        case TokenType::Minus:
+        case TokenType::Star:
+        case TokenType::Slash:
+        case TokenType::Percent:
+        case TokenType::Ampersand:
+        case TokenType::BitOr:
+        case TokenType::BitXor:
+        case TokenType::LeftShift:
+        case TokenType::RightShift:
+        case TokenType::Equal:
+        case TokenType::NotEqual:
+        case TokenType::Less:
+        case TokenType::LessEqual:
+        case TokenType::Greater:
+        case TokenType::GreaterEqual:
+        case TokenType::LogicalAnd:
+        case TokenType::LogicalOr:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool Parser::looks_like_plain_func_decl_start(size_t cursor) const {
     auto token_type = [&](size_t idx) -> TokenType {
         if (idx >= tokens.size()) return TokenType::EndOfFile;
@@ -563,10 +606,13 @@ bool Parser::looks_like_plain_func_decl_start(size_t cursor) const {
         i += 3;
     }
 
-    if (!(token_type(i) == TokenType::Identifier || is_operator_function_token(token_type(i)))) {
+    if (token_type(i) == TokenType::Dot && is_per_element_operator_inner_token(token_type(i + 1))) {
+        i += 2;
+    } else if (token_type(i) == TokenType::Identifier || is_operator_function_token(token_type(i))) {
+        i++;
+    } else {
         return false;
     }
-    i++;
 
     if (token_type(i) != TokenType::LeftParen) {
         return false;
@@ -619,6 +665,12 @@ bool Parser::looks_like_plain_func_decl_start(size_t cursor) const {
 std::string Parser::parse_function_name() {
     if (check(TokenType::Identifier)) {
         return consume(TokenType::Identifier, "Expected function name").lexeme;
+    }
+
+    if (check(TokenType::Dot) && is_per_element_operator_inner_token(peek().type)) {
+        std::string op = "." + peek().lexeme;
+        pos += 2;
+        return op;
     }
 
     Token tok = current();
@@ -1031,9 +1083,12 @@ ExprPtr Parser::parse_conditional() {
 ExprPtr Parser::parse_logic_or() {
     ExprPtr left = parse_logic_and();
 
-    while (check(TokenType::LogicalOr)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::LogicalOr) || check_dotted_operator(TokenType::LogicalOr)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::LogicalOr, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_logic_and();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1044,9 +1099,12 @@ ExprPtr Parser::parse_logic_or() {
 ExprPtr Parser::parse_logic_and() {
     ExprPtr left = parse_bit_or();
 
-    while (check(TokenType::LogicalAnd)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::LogicalAnd) || check_dotted_operator(TokenType::LogicalAnd)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::LogicalAnd, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_bit_or();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1057,9 +1115,12 @@ ExprPtr Parser::parse_logic_and() {
 ExprPtr Parser::parse_bit_or() {
     ExprPtr left = parse_bit_xor();
 
-    while (check(TokenType::BitOr)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::BitOr) || check_dotted_operator(TokenType::BitOr)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::BitOr, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_bit_xor();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1070,9 +1131,12 @@ ExprPtr Parser::parse_bit_or() {
 ExprPtr Parser::parse_bit_xor() {
     ExprPtr left = parse_bit_and();
 
-    while (check(TokenType::BitXor)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::BitXor) || check_dotted_operator(TokenType::BitXor)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::BitXor, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_bit_and();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1083,14 +1147,17 @@ ExprPtr Parser::parse_bit_xor() {
 ExprPtr Parser::parse_bit_and() {
     ExprPtr left = parse_compare();
 
-    while (check(TokenType::Ampersand)) {
+    while (check(TokenType::Ampersand) || check_dotted_operator(TokenType::Ampersand)) {
         if (split_top_level_plain_ampersand_funcs &&
             statement_expr_depth == top_level_init_expr_root_depth &&
             looks_like_plain_func_decl_start(pos)) {
             break;
         }
-        std::string op = current().lexeme;
-        pos++;
+        std::string op;
+        if (!match_dotted_operator(TokenType::Ampersand, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_compare();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1101,17 +1168,30 @@ ExprPtr Parser::parse_bit_and() {
 ExprPtr Parser::parse_compare() {
     ExprPtr left = parse_shift();
 
-    if (check(TokenType::Equal) || check(TokenType::NotEqual) ||
-        check(TokenType::Less) || check(TokenType::LessEqual) ||
-        check(TokenType::Greater) || check(TokenType::GreaterEqual)) {
-        std::string op = current().lexeme;
+    auto check_compare_op = [&]() {
+        return check(TokenType::Equal) || check(TokenType::NotEqual) ||
+               check(TokenType::Less) || check(TokenType::LessEqual) ||
+               check(TokenType::Greater) || check(TokenType::GreaterEqual) ||
+               check_dotted_operator(TokenType::Equal) || check_dotted_operator(TokenType::NotEqual) ||
+               check_dotted_operator(TokenType::Less) || check_dotted_operator(TokenType::LessEqual) ||
+               check_dotted_operator(TokenType::Greater) || check_dotted_operator(TokenType::GreaterEqual);
+    };
+
+    if (check_compare_op()) {
+        std::string op;
         SourceLocation op_loc = current().location;
-        pos++;
+        if (!match_dotted_operator(TokenType::Equal, op) &&
+            !match_dotted_operator(TokenType::NotEqual, op) &&
+            !match_dotted_operator(TokenType::LessEqual, op) &&
+            !match_dotted_operator(TokenType::GreaterEqual, op) &&
+            !match_dotted_operator(TokenType::Less, op) &&
+            !match_dotted_operator(TokenType::Greater, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_shift();
 
-        if (check(TokenType::Equal) || check(TokenType::NotEqual) ||
-            check(TokenType::Less) || check(TokenType::LessEqual) ||
-            check(TokenType::Greater) || check(TokenType::GreaterEqual)) {
+        if (check_compare_op()) {
             throw CompileError("Ambiguous chained comparison: use explicit parentheses like (a < b) < c", op_loc);
         }
 
@@ -1124,9 +1204,14 @@ ExprPtr Parser::parse_compare() {
 ExprPtr Parser::parse_shift() {
     ExprPtr left = parse_range();
 
-    while (check(TokenType::LeftShift) || check(TokenType::RightShift)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::LeftShift) || check(TokenType::RightShift) ||
+           check_dotted_operator(TokenType::LeftShift) || check_dotted_operator(TokenType::RightShift)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::LeftShift, op) &&
+            !match_dotted_operator(TokenType::RightShift, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_range();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1164,9 +1249,14 @@ ExprPtr Parser::parse_range() {
 ExprPtr Parser::parse_sum() {
     ExprPtr left = parse_prod();
 
-    while (check(TokenType::Plus) || check(TokenType::Minus)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::Plus) || check(TokenType::Minus) ||
+           check_dotted_operator(TokenType::Plus) || check_dotted_operator(TokenType::Minus)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::Plus, op) &&
+            !match_dotted_operator(TokenType::Minus, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_prod();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1177,9 +1267,16 @@ ExprPtr Parser::parse_sum() {
 ExprPtr Parser::parse_prod() {
     ExprPtr left = parse_unary();
 
-    while (check(TokenType::Star) || check(TokenType::Slash) || check(TokenType::Percent)) {
-        std::string op = current().lexeme;
-        pos++;
+    while (check(TokenType::Star) || check(TokenType::Slash) || check(TokenType::Percent) ||
+           check_dotted_operator(TokenType::Star) || check_dotted_operator(TokenType::Slash) ||
+           check_dotted_operator(TokenType::Percent)) {
+        std::string op;
+        if (!match_dotted_operator(TokenType::Star, op) &&
+            !match_dotted_operator(TokenType::Slash, op) &&
+            !match_dotted_operator(TokenType::Percent, op)) {
+            op = current().lexeme;
+            pos++;
+        }
         ExprPtr right = parse_unary();
         left = Expr::make_binary(op, left, right, left->location);
     }
@@ -1234,7 +1331,8 @@ ExprPtr Parser::parse_unary() {
             if (is_multi_receiver && check(TokenType::RightParen)) {
                 size_t paren_pos = pos;
                 pos++; // skip ')'
-                if (match(TokenType::Dot)) {
+                if (check_member_dot()) {
+                    pos++; // consume '.'
                     std::string method = consume(TokenType::Identifier, "Expected method name").lexeme;
                     consume(TokenType::LeftParen, "Expected '('");
                     std::vector<ExprPtr> args;
@@ -1314,7 +1412,8 @@ ExprPtr Parser::parse_postfix_suffix(ExprPtr expr) {
             ExprPtr index = parse_expr();
             consume(TokenType::RightBracket, "Expected ']'");
             expr = Expr::make_index(expr, index, expr->location);
-        } else if (match(TokenType::Dot)) {
+        } else if (check_member_dot()) {
+            pos++; // consume '.'
             std::string member = consume(TokenType::Identifier, "Expected member name").lexeme;
 
             // Check if this is a method call

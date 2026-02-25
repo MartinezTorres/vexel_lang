@@ -33,6 +33,9 @@ private:
     const Token& peek(int offset = 1);
     bool check(TokenType type);
     bool match(TokenType type);
+    bool check_dotted_operator(TokenType inner_type) const;
+    bool match_dotted_operator(TokenType inner_type, std::string& out_op);
+    bool check_member_dot() const;
     Token consume(TokenType type, const std::string& msg);
     void skip_semis();
     bool is_annotation_start();

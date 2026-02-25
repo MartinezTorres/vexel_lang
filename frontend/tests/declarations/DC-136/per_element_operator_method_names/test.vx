@@ -1,0 +1,17 @@
+// @rfc: docs/vexel-rfc.md#functions--methods
+// @desc: Operator methods accept dotted per-element operator names (e.g. .&& and .==) and resolve through normal method overloading | Dotted operator method names parse and resolve
+
+#Flag(v:#b);
+
+&(a)#Flag::.&&(b:#Flag) -> #Flag {
+  Flag(a.v && b.v)
+}
+
+&(a)#Flag::.==(b:#Flag) -> #b {
+  a.v == b.v
+}
+
+&^main() -> #i32 {
+  x:#Flag = Flag(1) .&& Flag(0);
+  (x .== Flag(0)) ? 0 : 1
+}
