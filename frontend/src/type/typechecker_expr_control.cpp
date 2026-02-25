@@ -528,7 +528,7 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
 
 TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     expr->declared_var_type = nullptr;
-    const std::string assign_op = expr->op.empty() ? "=" : expr->op;
+    std::string assign_op = expr->op.empty() ? "=" : expr->op;
     expr->op = assign_op;
     std::function<bool(TypePtr)> type_has_unresolved_parts = [&](TypePtr t) -> bool {
         if (!t) return true;
@@ -548,6 +548,54 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         return true;
     };
     bool creates_new_variable = bindings && bindings->is_new_variable(current_instance_id, expr.get());
+
+    auto is_dotted_compound_assignment = [&](const std::string& op) {
+        return op.size() >= 3 && op.front() == '.' && op.back() == '=';
+    };
+    auto expr_has_side_effects = [&](ExprPtr root) {
+        std::function<bool(ExprPtr)> rec = [&](ExprPtr node) -> bool {
+            if (!node) return false;
+            switch (node->kind) {
+                case Expr::Kind::Identifier:
+                case Expr::Kind::IntLiteral:
+                case Expr::Kind::FloatLiteral:
+                case Expr::Kind::StringLiteral:
+                case Expr::Kind::CharLiteral:
+                    return false;
+                case Expr::Kind::Binary:
+                    return rec(node->left) || rec(node->right);
+                case Expr::Kind::Unary:
+                case Expr::Kind::Cast:
+                case Expr::Kind::Member:
+                case Expr::Kind::Length:
+                    return rec(node->operand);
+                case Expr::Kind::Index:
+                    if (rec(node->operand)) return true;
+                    for (const auto& arg : node->args) {
+                        if (rec(arg)) return true;
+                    }
+                    return false;
+                default:
+                    return true;
+            }
+        };
+        return rec(root);
+    };
+
+    if (is_dotted_compound_assignment(assign_op)) {
+        if (creates_new_variable) {
+            throw CompileError("Per-element compound assignment cannot declare a new variable", expr->location);
+        }
+        if (expr_has_side_effects(expr->left)) {
+            throw CompileError("Per-element compound assignment requires a side-effect-free assignment target", expr->location);
+        }
+        std::string binary_op = assign_op.substr(0, assign_op.size() - 1);
+        ExprPtr dotted_binary = Expr::make_binary(binary_op, expr->left, expr->right, expr->location);
+        expr->op = "=";
+        expr->right = dotted_binary;
+        assign_op = "=";
+    }
+
     if (creates_new_variable) {
         if (assign_op != "=") {
             throw CompileError("Compound assignment cannot declare a new variable", expr->location);

@@ -1020,12 +1020,30 @@ ExprPtr Parser::parse_assignment() {
                 return false;
         }
     };
+    auto match_dotted_assignment = [&](std::string& out_op) {
+        return match_dotted_operator(TokenType::PlusAssign, out_op) ||
+               match_dotted_operator(TokenType::MinusAssign, out_op) ||
+               match_dotted_operator(TokenType::StarAssign, out_op) ||
+               match_dotted_operator(TokenType::SlashAssign, out_op) ||
+               match_dotted_operator(TokenType::PercentAssign, out_op) ||
+               match_dotted_operator(TokenType::BitAndAssign, out_op) ||
+               match_dotted_operator(TokenType::BitOrAssign, out_op) ||
+               match_dotted_operator(TokenType::BitXorAssign, out_op) ||
+               match_dotted_operator(TokenType::LeftShiftAssign, out_op) ||
+               match_dotted_operator(TokenType::RightShiftAssign, out_op) ||
+               match_dotted_operator(TokenType::LogicalAndAssign, out_op) ||
+               match_dotted_operator(TokenType::LogicalOrAssign, out_op);
+    };
 
-    if (is_assignment_token(current().type)) {
-        Token op_tok = current();
-        pos++;
+    std::string op_lexeme;
+    if (is_assignment_token(current().type) || match_dotted_assignment(op_lexeme)) {
+        if (op_lexeme.empty()) {
+            Token op_tok = current();
+            pos++;
+            op_lexeme = op_tok.lexeme;
+        }
         ExprPtr rhs = parse_assignment();
-        return Expr::make_assignment(expr, rhs, expr->location, op_tok.lexeme);
+        return Expr::make_assignment(expr, rhs, expr->location, op_lexeme);
     }
 
     return expr;

@@ -1,0 +1,26 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element compound assignments parse and lower through overload calls (`.+=`, `.||=`), with non-short-circuit logical dotted compounds. | Per-element compound assignments are accepted and lowered
+
+#Box(v:#i32);
+#Flag(v:#b);
+
+&(lhs)#Box::.+(rhs:#Box) -> #Box {
+  Box(lhs.v + rhs.v)
+}
+
+&(lhs)#Flag::.||(rhs:#Flag) -> #Flag {
+  Flag(lhs.v || rhs.v)
+}
+
+&!seed() -> #i32;
+&!tick() -> #b;
+
+&^main() -> #i32 {
+  b:#Box = Box(seed());
+  b .+= Box(2);
+
+  f:#Flag = Flag(1);
+  f .||= Flag(tick());
+
+  b.v + (#i32)f.v
+}

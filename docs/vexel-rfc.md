@@ -27,7 +27,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
 - **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external function), `&^` (exported function), `^` (exported global), `!` (external global symbol), `!!` (backend-bound global), `#` (type)
-- **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` plus dotted per-element binary variants (for example `.+`, `.*`, `.==`, `.&&`, `.<<`). User types may overload scalar and dotted operator names via operator methods.
+- **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` plus dotted per-element binary and compound-assignment variants (for example `.+`, `.*`, `.==`, `.&&`, `.<<`, `.+=`, `.||=`). User types may overload scalar and dotted operator names via operator methods.
   - Note: `|` serves as both unary (length/absolute) and binary (bitwise OR) operator
 - **Statement termination**: `;` or any whitespace when unambiguous (see Section 8 for ambiguous parsing rules)
 - **Annotations**: Optional prefixes `[[name]]` or `[[name(arg1, arg2)]]` may precede declarations, statements, and expressions. Annotations are opaque to language semantics; the frontend preserves them for backends/tooling.
@@ -350,6 +350,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Supported families: arithmetic, bitwise, shifts, logical (`&&=`, `||=`)
   - `&&=` and `||=` preserve logical short-circuit semantics
   - The left-hand lvalue is evaluated once
+- Dotted per-element compound assignment: `x .op= y` lowers as `x = x .op y` and returns the assigned value
+  - Supported dotted families mirror the scalar compound-assignment families (`.+=`, `.-=`, `.*=`, `.||=`, ...), subject to the availability of the corresponding dotted operator semantics/overload
+  - Dotted logical compounds (`.&&=`, `.||=`) are **non-short-circuit** (element-wise semantics)
+  - Current lowering requires a side-effect-free lvalue target for dotted compound assignment
 - Can be used in larger expressions: `y = (x = 5) + 1` assigns 5 to x, 6 to y
 - Evaluation is right-to-left for chained assignments: `a = b = c` evaluates as `a = (b = c)`
 - **Multi-assignment**: `a, b, c = expr` where `expr` returns tuple type

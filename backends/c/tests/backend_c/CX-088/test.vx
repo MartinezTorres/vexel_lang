@@ -1,0 +1,29 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element compound assignments lower through overload calls; dotted logical compounds are non-short-circuit (`.||=` still evaluates rhs). | C backend executes dotted compound assignments via overload lowering
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' 'static int32_t g_calls = 0;' '_Bool vx_tick(void) { g_calls += 1; return 0; }' 'int32_t vx_seed(void) { return 1; }' 'int32_t vx_counter(void) { return g_calls; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+#Box(v:#i32);
+#Flag(v:#b);
+
+&(lhs)#Box::.+(rhs:#Box) -> #Box {
+  Box(lhs.v + rhs.v)
+}
+
+&(lhs)#Flag::.||(rhs:#Flag) -> #Flag {
+  Flag(lhs.v || rhs.v)
+}
+
+&!seed() -> #i32;
+&!tick() -> #b;
+&!counter() -> #i32;
+
+&^main() -> #i32 {
+  b:#Box = Box(seed());
+  b .+= Box(2);
+
+  f:#Flag = Flag(1);
+  f .||= Flag(tick());
+
+  (b.v + (#i32)f.v + counter()) == 5 ? 0 : 1
+}

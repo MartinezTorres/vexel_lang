@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element compound assignments reject side-effecting lvalues in v1 because lowering desugars through `lhs = lhs .op rhs` and preserves semantics only for side-effect-free targets. | Per-element compound assignment requires side-effect-free target
+
+#Box(v:#i32);
+
+&(lhs)#Box::.+(rhs:#Box) -> #Box {
+  Box(lhs.v + rhs.v)
+}
+
+&!idx() -> #u8;
+
+&^main() -> #i32 {
+  xs:#Box[2] = [Box(1), Box(2)];
+  xs[idx()] .+= Box(1);
+  0
+}
