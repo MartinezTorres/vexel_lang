@@ -51,7 +51,185 @@ bool is_numeric_primitive_type(const TypePtr& type) {
            (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) || is_float(type->primitive));
 }
 
+bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
+    if (!expr) return true;
+    switch (expr->kind) {
+        case Expr::Kind::Identifier:
+        case Expr::Kind::IntLiteral:
+        case Expr::Kind::FloatLiteral:
+        case Expr::Kind::StringLiteral:
+        case Expr::Kind::CharLiteral:
+        case Expr::Kind::Resource:
+            return true;
+        case Expr::Kind::Binary:
+            return is_side_effect_free_for_array_lift(expr->left) &&
+                   is_side_effect_free_for_array_lift(expr->right);
+        case Expr::Kind::Unary:
+        case Expr::Kind::Cast:
+        case Expr::Kind::Member:
+        case Expr::Kind::Length:
+            return is_side_effect_free_for_array_lift(expr->operand);
+        case Expr::Kind::Index:
+            if (!is_side_effect_free_for_array_lift(expr->operand)) return false;
+            for (const auto& arg : expr->args) {
+                if (!is_side_effect_free_for_array_lift(arg)) return false;
+            }
+            return true;
+        case Expr::Kind::ArrayLiteral:
+        case Expr::Kind::TupleLiteral:
+            for (const auto& elem : expr->elements) {
+                if (!is_side_effect_free_for_array_lift(elem)) return false;
+            }
+            return true;
+        case Expr::Kind::Conditional:
+            return is_side_effect_free_for_array_lift(expr->condition) &&
+                   is_side_effect_free_for_array_lift(expr->true_expr) &&
+                   is_side_effect_free_for_array_lift(expr->false_expr);
+        default:
+            return false;
+    }
+}
+
+bool exact_array_size_u64(const TypePtr& type, uint64_t& out) {
+    if (!type || type->kind != Type::Kind::Array || !type->array_size) {
+        return false;
+    }
+    ExprPtr size_expr = type->array_size;
+    if (size_expr->kind != Expr::Kind::IntLiteral) {
+        return false;
+    }
+    if (size_expr->has_exact_int_val) {
+        if (!size_expr->exact_int_val.fits_u64()) {
+            return false;
+        }
+        out = size_expr->exact_int_val.to_u64();
+        return true;
+    }
+    out = size_expr->uint_val;
+    return true;
+}
+
 } // namespace
+
+bool TypeChecker::is_bundled_std_math_symbol(const Symbol* sym) const {
+    if (!sym || !program || sym->module_id < 0) return false;
+    const ModuleInfo* mod = program->module(sym->module_id);
+    if (!mod || mod->origin != ModuleOrigin::BundledStd) return false;
+    const std::string& path = mod->path;
+    return path == "std/math.vx" ||
+           (path.size() >= 11 && path.compare(path.size() - 11, 11, "std/math.vx") == 0);
+}
+
+bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
+    if (!expr || !sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
+        return false;
+    }
+    if (!is_bundled_std_math_symbol(sym)) {
+        return false;
+    }
+    if (!expr->receivers.empty()) {
+        return false;
+    }
+
+    std::vector<TypePtr> arg_types;
+    arg_types.reserve(expr->args.size());
+    size_t array_arg_count = 0;
+    for (const auto& arg : expr->args) {
+        TypePtr t = arg ? resolve_type(arg->type) : nullptr;
+        arg_types.push_back(t);
+        if (t && t->kind == Type::Kind::Array) {
+            array_arg_count++;
+        }
+    }
+    if (array_arg_count == 0) {
+        return false;
+    }
+
+    const size_t arity = expr->args.size();
+    if (arity != 1 && arity != 2) {
+        throw CompileError("Bundled std::math array lifting currently supports unary and binary functions only",
+                           expr->location);
+    }
+
+    if (arity == 2) {
+        const bool left_array = arg_types[0] && arg_types[0]->kind == Type::Kind::Array;
+        const bool right_array = arg_types[1] && arg_types[1]->kind == Type::Kind::Array;
+        if (left_array != right_array) {
+            throw CompileError("Bundled std::math array calls (phase 1) require exact-shape array/array arguments; "
+                               "scalar/array mixing is not supported yet",
+                               expr->location);
+        }
+    } else if (!(arg_types[0] && arg_types[0]->kind == Type::Kind::Array)) {
+        return false;
+    }
+
+    for (size_t i = 0; i < expr->args.size(); ++i) {
+        if (arg_types[i] && arg_types[i]->kind == Type::Kind::Array &&
+            !is_side_effect_free_for_array_lift(expr->args[i])) {
+            throw CompileError("Bundled std::math array lifting currently requires side-effect-free array arguments",
+                               expr->args[i]->location);
+        }
+    }
+
+    if (arity == 2 && !types_equal(arg_types[0], arg_types[1])) {
+        throw CompileError("Bundled std::math array calls (phase 1) require exact-shape array/array arguments",
+                           expr->location);
+    }
+
+    std::function<ExprPtr(const std::vector<ExprPtr>&, const std::vector<TypePtr>&)> build;
+    build = [&](const std::vector<ExprPtr>& level_args, const std::vector<TypePtr>& level_types) -> ExprPtr {
+        bool all_arrays = true;
+        for (const auto& t : level_types) {
+            if (!t || t->kind != Type::Kind::Array) {
+                all_arrays = false;
+                break;
+            }
+        }
+        if (!all_arrays) {
+            ExprPtr callee = Expr::make_identifier(expr->operand ? expr->operand->name : "", expr->location);
+            ExprPtr call = Expr::make_call(callee, level_args, expr->location);
+            call->receivers.clear();
+            return call;
+        }
+
+        uint64_t count = 0;
+        if (!exact_array_size_u64(level_types[0], count)) {
+            throw CompileError("Bundled std::math array lifting requires concrete array sizes",
+                               expr->location);
+        }
+        for (size_t i = 1; i < level_types.size(); ++i) {
+            uint64_t size_i = 0;
+            if (!exact_array_size_u64(level_types[i], size_i) || size_i != count) {
+                throw CompileError("Bundled std::math array calls (phase 1) require exact-shape array/array arguments",
+                                   expr->location);
+            }
+        }
+
+        std::vector<ExprPtr> elements;
+        elements.reserve(static_cast<size_t>(count));
+        for (uint64_t i = 0; i < count; ++i) {
+            std::vector<ExprPtr> child_args;
+            std::vector<TypePtr> child_types;
+            child_args.reserve(level_args.size());
+            child_types.reserve(level_types.size());
+            for (size_t arg_i = 0; arg_i < level_args.size(); ++arg_i) {
+                // Reuse the original operand subtree here: cloning local identifiers
+                // loses binding identity (Bindings is node-keyed). The phase-1
+                // side-effect-free restriction keeps repeated indexing sound.
+                ExprPtr idx = Expr::make_int_exact(APInt(i), true, expr->location);
+                ExprPtr indexed = Expr::make_index(level_args[arg_i], idx, expr->location);
+                child_args.push_back(indexed);
+                child_types.push_back(level_types[arg_i]->element_type);
+            }
+            elements.push_back(build(child_args, child_types));
+        }
+        return Expr::make_array(elements, expr->location);
+    };
+
+    ExprPtr rewritten = build(expr->args, arg_types);
+    *expr = *rewritten;
+    return true;
+}
 
 TypePtr TypeChecker::check_expr(ExprPtr expr) {
     if (!expr) return nullptr;
@@ -422,6 +600,10 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
     if (!has_symbol) {
         expr->type = make_fresh_typevar();
         return expr->type;
+    }
+
+    if (try_rewrite_std_math_array_call(expr, sym)) {
+        return check_expr(expr);
     }
 
     auto invalidate_receiver_constexpr = [&]() {

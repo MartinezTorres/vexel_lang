@@ -1,0 +1,17 @@
+::std::math;
+
+&!seed0() -> #f64;
+&!seed1() -> #f64;
+&!seed2() -> #f64;
+&!seed3() -> #f64;
+
+&^main() -> #i32 {
+  xs:#f64[2] = [seed0(), seed1()];
+  ys:#f64[2] = [seed2(), seed3()];
+
+  roots:#f64[2] = std::math::sqrt(xs);
+  mods:#f64[2] = std::math::fmod(ys, [2.0, 4.0]);
+  flags:#b[2] = std::math::isfinite(roots);
+
+  ((((#i32)roots[0]) + ((#i32)roots[1]) + ((#i32)mods[0]) + ((#i32)mods[1])) + ((#i32)flags[0]) + ((#i32)flags[1])) == 10 ? 0 : 1
+}

@@ -210,6 +210,8 @@ private:
     TypeFamily get_type_family(TypePtr type);
     bool types_in_same_family(TypePtr a, TypePtr b);
     bool is_generic_function(StmtPtr func);
+    bool is_bundled_std_math_symbol(const Symbol* sym) const;
+    bool try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym);
 
     // Path helpers moved to path_utils.
 
