@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element array operators reject side-effecting scalar operands when broadcasting because the scalar would be re-evaluated for each element. | Per-element array operators reject side-effecting broadcast scalars
+
+&!seed() -> #i32;
+
+&^main() -> #i32 {
+  xs:#i32[2] = [1, 2];
+  ys:#i32[2] = xs .+ seed();
+  0
+}

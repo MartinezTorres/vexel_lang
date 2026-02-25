@@ -1,0 +1,11 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element array operators reject side-effecting operands because lowering expands to repeated indexed scalar expressions. | Per-element array operators require side-effect-free operands
+
+&mk() -> #i32[2] {
+  [1, 2]
+}
+
+&^main() -> #i32 {
+  xs:#i32[2] = mk() .+ [3, 4];
+  0
+}

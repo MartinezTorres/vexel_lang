@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element array operators reject non-broadcast-compatible shapes. | Per-element array operators reject incompatible shapes
+
+&^main() -> #i32 {
+  a:#i32[2] = [1, 2];
+  b:#i32[3] = [3, 4, 5];
+  c:#i32[2] = a .+ b;
+  0
+}

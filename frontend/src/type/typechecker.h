@@ -212,6 +212,7 @@ private:
     bool is_generic_function(StmtPtr func);
     bool is_bundled_std_math_symbol(const Symbol* sym) const;
     bool try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym);
+    bool try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_type, TypePtr right_type);
 
     // Path helpers moved to path_utils.
 

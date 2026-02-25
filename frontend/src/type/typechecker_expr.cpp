@@ -272,6 +272,75 @@ bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
     return true;
 }
 
+bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_type, TypePtr right_type) {
+    if (!expr || expr->kind != Expr::Kind::Binary || expr->op.size() < 2 || expr->op[0] != '.') {
+        return false;
+    }
+    if (!expr->left || !expr->right) {
+        return false;
+    }
+
+    TypePtr lhs = resolve_type(left_type);
+    TypePtr rhs = resolve_type(right_type);
+    const bool left_array = lhs && lhs->kind == Type::Kind::Array;
+    const bool right_array = rhs && rhs->kind == Type::Kind::Array;
+    if (!left_array && !right_array) {
+        return false;
+    }
+
+    if (!is_side_effect_free_for_array_lift(expr->left) || !is_side_effect_free_for_array_lift(expr->right)) {
+        throw CompileError("Per-element array operators currently require side-effect-free operands", expr->location);
+    }
+
+    std::vector<std::vector<uint64_t>> arg_shapes(2);
+    if (left_array && !collect_array_shape(lhs, arg_shapes[0])) {
+        throw CompileError("Per-element array operators require concrete array sizes", expr->location);
+    }
+    if (right_array && !collect_array_shape(rhs, arg_shapes[1])) {
+        throw CompileError("Per-element array operators require concrete array sizes", expr->location);
+    }
+
+    std::vector<uint64_t> result_shape;
+    if (!compute_broadcast_shape(arg_shapes, result_shape)) {
+        throw CompileError("Per-element array operators require broadcast-compatible shapes", expr->location);
+    }
+
+    auto peel_array_element_type = [&](TypePtr t) -> TypePtr {
+        TypePtr cur = resolve_type(t);
+        while (cur && cur->kind == Type::Kind::Array) {
+            cur = resolve_type(cur->element_type);
+        }
+        return cur;
+    };
+
+    TypePtr scalar_left_type = peel_array_element_type(lhs ? lhs : left_type);
+    const bool preserve_dotted_leaf_op = scalar_left_type && scalar_left_type->kind == Type::Kind::Named;
+    const std::string leaf_op = preserve_dotted_leaf_op ? expr->op : expr->op.substr(1);
+
+    std::function<ExprPtr(size_t, std::vector<uint64_t>&)> build;
+    build = [&](size_t depth, std::vector<uint64_t>& result_indices) -> ExprPtr {
+        if (depth == result_shape.size()) {
+            ExprPtr l_scalar = apply_broadcast_indices(expr->left, arg_shapes[0], result_shape, result_indices, expr->location);
+            ExprPtr r_scalar = apply_broadcast_indices(expr->right, arg_shapes[1], result_shape, result_indices, expr->location);
+            return Expr::make_binary(leaf_op, l_scalar, r_scalar, expr->location);
+        }
+        uint64_t count = result_shape[depth];
+        std::vector<ExprPtr> elements;
+        elements.reserve(static_cast<size_t>(count));
+        for (uint64_t i = 0; i < count; ++i) {
+            result_indices.push_back(i);
+            elements.push_back(build(depth + 1, result_indices));
+            result_indices.pop_back();
+        }
+        return Expr::make_array(elements, expr->location);
+    };
+
+    std::vector<uint64_t> result_indices;
+    ExprPtr rewritten = build(0, result_indices);
+    *expr = *rewritten;
+    return true;
+}
+
 TypePtr TypeChecker::check_expr(ExprPtr expr) {
     if (!expr) return nullptr;
 
@@ -384,6 +453,11 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     TypePtr left_type = check_expr(expr->left);
     TypePtr right_type = check_expr(expr->right);
+
+    if (try_rewrite_dotted_array_binary(expr, left_type, right_type)) {
+        return check_expr(expr);
+    }
+
     auto is_numeric_like = [&](TypePtr t) {
         return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
     };

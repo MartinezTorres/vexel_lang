@@ -364,6 +364,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 **Parsing rules**:
 - && binds tighter than ||
 - Dotted per-element operators mirror the precedence/associativity of their scalar counterparts (for example `.*` binds like `*`, `.+` binds like `+`)
+- Dotted per-element operators over arrays use strict broadcasting (trailing-dimension alignment, singleton expansion, scalar lifting)
+  - Incompatible shapes are compile-time errors (no implicit transpose/reshape/flatten)
+  - Current frontend lowering requires side-effect-free operands for dotted array operators (element-wise expansion duplicates indexed scalar expressions)
 - Ambiguous expressions require parentheses
 - Nested conditionals must be explicitly parenthesized
 - Parser errors on ambiguity rather than guessing intent
