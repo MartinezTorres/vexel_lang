@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#name-resolution--modules
 // @desc: C backend maps bundled std::math externs to libc math symbols instead of mangled extern names.
 // @expect-exit: 0
-// @command: {VEXEL} -b c test.vx && grep -Fq 'double sqrt(' out.h && grep -Fq 'float sqrtf(' out.h && ! grep -Fq 'vx_sqrt(' out.h && ! grep -Fq 'vx_sqrtf(' out.h && printf '%s\n' '#include <math.h>' 'double vx_seed(void) { return 9.0; }' 'float vx_seedf(void) { return 9.0f; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && ./out
+// @command: {VEXEL} -b c test.vx && grep -Fq 'double sqrt(' out.h && grep -Fq 'float sqrtf(' out.h && ! grep -Fq 'vx_sqrt(' out.h && ! grep -Fq 'vx_sqrtf(' out.h && ! grep -Fq '_Bool isnan(' out.h && ! grep -Fq '_Bool isfinite(' out.h && printf '%s\n' '#include <math.h>' 'double vx_seed(void) { return 9.0; }' 'float vx_seedf(void) { return 9.0f; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && ./out
 
 ::std::math;
 &!seed() -> #f64;
@@ -11,5 +11,8 @@
   a:#f64 = std::math::sqrt(seed());
   b:#f32 = std::math::sqrtf(seedf());
   c:#f32 = std::math::powf((#f32)2.0, (#f32)3.0);
-  (((#i32)a) + ((#i32)b) + ((#i32)c)) == 14 ? 0 : 1
+  d:#b = std::math::isfinite(a);
+  e:#b = std::math::isnan(std::math::sqrt(-1.0));
+  f:#b = std::math::isfinitef(b);
+  ((((#i32)a) + ((#i32)b) + ((#i32)c) + ((#i32)d) + ((#i32)e) + ((#i32)f)) == 17) ? 0 : 1
 }

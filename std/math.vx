@@ -29,6 +29,9 @@ pif32:#f32 = (#f32)3.14159265358979323846264338327950288;
 &!pow(x:#f64, y:#f64) -> #f64;
 &!atan2(y:#f64, x:#f64) -> #f64;
 &!fmod(x:#f64, y:#f64) -> #f64;
+&!isnan(x:#f64) -> #b;
+&!isinf(x:#f64) -> #b;
+&!isfinite(x:#f64) -> #b;
 
 // f32 unary (C-style suffixed names because Vexel currently has no function overloading)
 &!sinf(x:#f32) -> #f32;
@@ -52,3 +55,6 @@ pif32:#f32 = (#f32)3.14159265358979323846264338327950288;
 &!powf(x:#f32, y:#f32) -> #f32;
 &!atan2f(y:#f32, x:#f32) -> #f32;
 &!fmodf(x:#f32, y:#f32) -> #f32;
+&!isnanf(x:#f32) -> #b;
+&!isinff(x:#f32) -> #b;
+&!isfinitef(x:#f32) -> #b;

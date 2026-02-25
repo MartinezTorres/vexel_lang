@@ -7,5 +7,11 @@
   a:#f64 = std::math::sqrt(9.0);
   b:#f64 = std::math::cos(0.0);
   c:#f32 = std::math::sinf((#f32)0.0);
-  (#i32)a + (#i32)b + (#i32)c
+  d:#b = std::math::isnan(std::math::sqrt(-1.0));
+  e:#b = std::math::isinf(std::math::log(0.0));
+  f:#b = std::math::isfinite(1.0);
+  g:#b = std::math::isnanf((#f32)std::math::sqrtf((#f32)-1.0));
+  h:#b = std::math::isinff((#f32)std::math::logf((#f32)0.0));
+  i:#b = std::math::isfinitef((#f32)1.0);
+  (#i32)a + (#i32)b + (#i32)c + (#i32)d + (#i32)e + (#i32)f + (#i32)g + (#i32)h + (#i32)i
 }

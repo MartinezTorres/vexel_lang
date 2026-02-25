@@ -11,6 +11,8 @@ The override unit is the module path (no symbol-level merge).
 
 Current status:
 - `std/math.vx` has a phase-1 scalar math surface backed by C `<math.h>` names.
+  - Includes scalar math functions (`sqrt`, `sin`, `pow`, ...) and classification
+    helpers (`isnan`, `isinf`, `isfinite`) for `#f64`, plus `f32` suffixed forms.
   - `#f64` functions use the unsuffixed C names (`sin`, `sqrt`, `pow`, ...).
   - `#f32` functions use C-style suffixed names (`sinf`, `sqrtf`, `powf`, ...)
     because Vexel does not currently support function overloading.

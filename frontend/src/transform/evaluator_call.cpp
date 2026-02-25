@@ -162,6 +162,17 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
             out = static_cast<double>(fn(a, b));
             return true;
         };
+        auto unary_pred_f64 = [&](bool (*fn)(double)) -> bool {
+            if (args.size() != 1) return false;
+            out = fn(to_float(args[0]));
+            return true;
+        };
+        auto unary_pred_f32 = [&](bool (*fn)(float)) -> bool {
+            if (args.size() != 1) return false;
+            float x = static_cast<float>(to_float(args[0]));
+            out = fn(x);
+            return true;
+        };
 
         if (name == "sin") return unary_f64(static_cast<double (*)(double)>(std::sin));
         if (name == "cos") return unary_f64(static_cast<double (*)(double)>(std::cos));
@@ -182,6 +193,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         if (name == "pow") return binary_f64(static_cast<double (*)(double, double)>(std::pow));
         if (name == "atan2") return binary_f64(static_cast<double (*)(double, double)>(std::atan2));
         if (name == "fmod") return binary_f64(static_cast<double (*)(double, double)>(std::fmod));
+        if (name == "isnan") return unary_pred_f64([](double x) { return std::isnan(x); });
+        if (name == "isinf") return unary_pred_f64([](double x) { return std::isinf(x); });
+        if (name == "isfinite") return unary_pred_f64([](double x) { return std::isfinite(x); });
 
         if (name == "sinf") return unary_f32([](float x) { return std::sin(x); });
         if (name == "cosf") return unary_f32([](float x) { return std::cos(x); });
@@ -202,6 +216,9 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         if (name == "powf") return binary_f32([](float x, float y) { return std::pow(x, y); });
         if (name == "atan2f") return binary_f32([](float y, float x) { return std::atan2(y, x); });
         if (name == "fmodf") return binary_f32([](float x, float y) { return std::fmod(x, y); });
+        if (name == "isnanf") return unary_pred_f32([](float x) { return std::isnan(x); });
+        if (name == "isinff") return unary_pred_f32([](float x) { return std::isinf(x); });
+        if (name == "isfinitef") return unary_pred_f32([](float x) { return std::isfinite(x); });
         return false;
     };
 
