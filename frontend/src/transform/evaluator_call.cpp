@@ -107,17 +107,16 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     auto try_eval_std_math_external = [&](CTValue& out) -> bool {
         if (!func->is_external || !sym) return false;
         if (!expr->receivers.empty()) return false;
-        std::string name;
-        if (sym->name.rfind("std::math::", 0) == 0) {
-            name = sym->name.substr(11);
-        } else {
-            const std::string& file = func->location.filename;
-            bool from_std_math =
-                file == "std/math.vx" ||
-                (file.size() >= 11 && file.compare(file.size() - 11, 11, "std/math.vx") == 0);
-            if (!from_std_math) return false;
-            name = func->func_name;
-        }
+        const Program* program = type_checker ? type_checker->get_program() : nullptr;
+        if (!program || sym->module_id < 0) return false;
+        const ModuleInfo* mod_info = program->module(sym->module_id);
+        if (!mod_info || mod_info->origin != ModuleOrigin::BundledStd) return false;
+        const std::string path = mod_info->path;
+        bool from_std_math =
+            path == "std/math.vx" ||
+            (path.size() >= 11 && path.compare(path.size() - 11, 11, "std/math.vx") == 0);
+        if (!from_std_math) return false;
+        std::string name = func->func_name;
         for (const auto& p : func->params) {
             if (p.is_expression_param) return false;
         }

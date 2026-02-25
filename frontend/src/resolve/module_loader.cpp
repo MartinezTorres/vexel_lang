@@ -32,6 +32,10 @@ ModuleId ModuleLoader::load_module(const std::string& path, Program& program) {
     ModuleInfo info;
     info.id = static_cast<ModuleId>(program.modules.size());
     info.path = normalized;
+    std::string bundled_std_rel;
+    if (is_bundled_std_path(normalized, &bundled_std_rel)) {
+        info.origin = ModuleOrigin::BundledStd;
+    }
     info.module = parse_module_file(normalized);
     program.modules.push_back(std::move(info));
     program.path_to_id[normalized] = program.modules.back().id;

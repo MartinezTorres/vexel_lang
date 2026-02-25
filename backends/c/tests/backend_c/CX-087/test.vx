@@ -1,0 +1,12 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Local std::math overrides must not be mapped to libc symbols; only bundled std::math gets builtin backend mapping.
+// @expect-exit: 0
+// @command: mkdir -p std && printf '%s\n' '&!sqrt(x:#f64) -> #f64;' > std/math.vx && {VEXEL} -b c test.vx && grep -Fq 'double vx_sqrt(' out.h && ! grep -Fq 'double sqrt(' out.h && grep -Fq 'vx_sqrt(' out.c
+
+::std::math;
+&!seed() -> #f64;
+
+&^main() -> #i32 {
+  x:#f64 = std::math::sqrt(seed());
+  (#i32)x
+}

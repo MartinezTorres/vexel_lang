@@ -1,0 +1,6 @@
+::std::math;
+
+&^main() -> #i32 {
+  x:#f64 = std::math::sqrt(9.0);
+  (#i32)x
+}

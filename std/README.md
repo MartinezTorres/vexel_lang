@@ -14,9 +14,12 @@ Current status:
   - `#f64` functions use the unsuffixed C names (`sin`, `sqrt`, `pow`, ...).
   - `#f32` functions use C-style suffixed names (`sinf`, `sqrtf`, `powf`, ...)
     because Vexel does not currently support function overloading.
-  - The frontend can fold supported `std::math` calls at compile time when
-    arguments are constexpr.
+  - Compiler-recognized math behavior applies only to the bundled fallback
+    module in this directory (not to project-local `std/math.vx` overrides).
+  - The frontend can fold supported bundled `std::math` calls at compile time
+    when arguments are constexpr.
   - C-generating backends map bundled `std::math` externs to libc symbols
-    instead of emitting mangled external names.
+    instead of emitting mangled external names; local overrides emit normal
+    external symbols.
 - `std/bits.vx` remains a placeholder namespace for future explicit bit
   reinterpretation APIs (`std::bits::*`).

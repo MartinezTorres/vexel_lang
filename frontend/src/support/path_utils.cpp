@@ -113,4 +113,28 @@ bool try_get_builtin_std_root(std::string& out_path) {
     return false;
 }
 
+bool is_bundled_std_path(const std::string& path, std::string* std_relative_path) {
+    std::string builtin_std_root;
+    if (!try_get_builtin_std_root(builtin_std_root)) {
+        return false;
+    }
+    std::filesystem::path root = std::filesystem::absolute(std::filesystem::path(builtin_std_root)).lexically_normal();
+    std::filesystem::path p = std::filesystem::absolute(std::filesystem::path(path)).lexically_normal();
+    std::filesystem::path rel = p.lexically_relative(root);
+    if (rel.empty()) {
+        return false;
+    }
+    std::string rel_str = rel.generic_string();
+    if (rel_str.empty()) {
+        return false;
+    }
+    if (rel_str == "." || rel_str.rfind("../", 0) == 0 || rel_str == "..") {
+        return false;
+    }
+    if (std_relative_path) {
+        *std_relative_path = rel_str;
+    }
+    return true;
+}
+
 } // namespace vexel

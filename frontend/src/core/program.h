@@ -11,9 +11,15 @@ namespace vexel {
 using ModuleId = int;
 using ModuleInstanceId = int;
 
+enum class ModuleOrigin {
+    Project,
+    BundledStd,
+};
+
 struct ModuleInfo {
     ModuleId id = -1;
     std::string path;
+    ModuleOrigin origin = ModuleOrigin::Project;
     Module module;
 };
 
