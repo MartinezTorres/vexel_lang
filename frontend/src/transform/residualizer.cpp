@@ -185,14 +185,18 @@ StmtPtr Residualizer::rewrite_stmt(StmtPtr stmt, bool top_level) {
             return stmt;
 
         case Stmt::Kind::Expr:
+            {
+            const Expr* original_expr = stmt->expr.get();
             if (stmt->expr) {
                 stmt->expr = rewrite_expr(stmt->expr);
             }
-            if (!top_level && should_drop_expr_stmt(stmt->expr)) {
+            if (!top_level &&
+                (should_drop_expr_stmt(stmt->expr) || constexpr_no_value(stmt->expr, original_expr))) {
                 changed_ = true;
                 return nullptr;
             }
             return stmt;
+            }
 
         case Stmt::Kind::Return:
             if (stmt->return_expr) {
@@ -654,6 +658,18 @@ std::optional<bool> Residualizer::constexpr_condition(const ExprPtr& cond, const
         return literal;
     }
     return std::nullopt;
+}
+
+bool Residualizer::constexpr_no_value(const ExprPtr& expr, const Expr* original) const {
+    auto is_no_value_fact = [&](const Expr* key_expr) -> bool {
+        if (!key_expr) return false;
+        auto it = facts_.constexpr_values.find(expr_fact_key(current_instance_id_, key_expr));
+        if (it == facts_.constexpr_values.end()) return false;
+        return std::holds_alternative<CTNoValue>(it->second);
+    };
+
+    if (is_no_value_fact(original)) return true;
+    return is_no_value_fact(expr.get());
 }
 
 bool Residualizer::can_fold_expr(const ExprPtr& expr) const {

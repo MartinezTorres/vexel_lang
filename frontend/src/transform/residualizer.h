@@ -39,6 +39,7 @@ private:
     bool can_fold_expr(const ExprPtr& expr) const;
     ExprPtr ctvalue_to_expr(const CTValue& value, const ExprPtr& origin, TypePtr expected_type) const;
     std::optional<bool> constexpr_condition(const ExprPtr& cond, const Expr* original) const;
+    bool constexpr_no_value(const ExprPtr& expr, const Expr* original) const;
     void rebuild_type_field_order(const Module& mod);
 };
 
