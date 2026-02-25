@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Bundled std::math binary calls support strict broadcasting (scalar lifting and singleton-dimension expansion) after frontend lowering. | C backend executes std::math broadcasted array calls
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out -lm && ./out
+
+::std::math;
+
+&^main() -> #i32 {
+  xs:#f64[2] = [2.0, 3.0];
+  m:#f64[2][2] = [[5.0, 7.0], [8.0, 9.0]];
+  row:#f64[2] = [2.0, 4.0];
+
+  p:#f64[2] = std::math::pow(xs, 2.0);
+  r:#f64[2][2] = std::math::fmod(m, row);
+  q:#b[2] = std::math::isfinite(p);
+
+  (((((((#i32)p[0]) + ((#i32)p[1])) + ((#i32)r[0][0])) + ((#i32)r[0][1])) + ((#i32)r[1][0])) + ((#i32)r[1][1])) + ((#i32)q[0]) + ((#i32)q[1]) == 20 ? 0 : 1
+}

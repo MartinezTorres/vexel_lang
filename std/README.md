@@ -20,13 +20,13 @@ Current status:
     module in this directory (not to project-local `std/math.vx` overrides).
   - The frontend can fold supported bundled `std::math` calls at compile time
     when arguments are constexpr.
-  - Phase-1 array lifting is supported for bundled `std::math` calls:
+  - Array lifting is supported for bundled `std::math` calls:
     - unary functions accept array arguments and lift element-wise
-    - binary functions accept exact-shape array/array arguments and lift
-      element-wise
-    - scalar/array mixing is intentionally rejected in phase 1 (broadcasting is
-      a separate follow-on feature)
-    - current implementation requires side-effect-free array arguments because
+    - binary functions use strict broadcasting (trailing-dimension alignment,
+      singleton-dimension expansion, scalar lifting)
+    - incompatible shapes are compile-time errors (no implicit transpose,
+      reshape, or flatten)
+    - current implementation requires side-effect-free arguments because
       lifting expands to repeated indexed scalar calls without temporary
       materialization
   - C-generating backends map bundled `std::math` externs to libc symbols

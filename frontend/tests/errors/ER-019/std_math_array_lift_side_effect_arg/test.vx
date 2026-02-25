@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#name-resolution--modules
-// @desc: Bundled std::math phase-1 array lifting rejects side-effecting array arguments because lowering expands to repeated indexed scalar calls without temporary materialization. | std::math array lifting requires side-effect-free array arguments
+// @desc: Bundled std::math array lifting rejects side-effecting arguments because lowering expands to repeated indexed scalar calls without temporary materialization. | std::math array lifting requires side-effect-free arguments
 
 ::std::math;
 

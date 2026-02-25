@@ -1,10 +1,11 @@
 // @rfc: docs/vexel-rfc.md#name-resolution--modules
-// @desc: Bundled std::math phase-1 array lifting rejects scalar/array mixing until broadcasting semantics are implemented. | std::math phase-1 array lifting rejects scalar/array mixing
+// @desc: Bundled std::math array lifting rejects non-broadcast-compatible shapes. | std::math array lifting rejects incompatible broadcast shapes
 
 ::std::math;
 
 &^main() -> #i32 {
   xs:#f64[2] = [1.0, 4.0];
-  ys:#f64[2] = std::math::pow(xs, 2.0);
+  ys:#f64[3] = [2.0, 3.0, 4.0];
+  zs:#f64[2] = std::math::pow(xs, ys);
   0
 }

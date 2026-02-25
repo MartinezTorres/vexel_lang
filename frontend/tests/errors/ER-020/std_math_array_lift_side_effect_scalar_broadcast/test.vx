@@ -1,0 +1,12 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Bundled std::math array lifting rejects side-effecting scalar arguments when broadcasting because the scalar would be re-evaluated for each element. | std::math array lifting rejects side-effecting broadcast scalars
+
+::std::math;
+
+&!seed() -> #f64;
+
+&^main() -> #i32 {
+  xs:#f64[2] = [1.0, 4.0];
+  ys:#f64[2] = std::math::pow(xs, seed());
+  0
+}
