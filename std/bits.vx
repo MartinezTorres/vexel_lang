@@ -1,0 +1,4 @@
+// Bundled std::bits placeholder.
+// Future bit reinterpretation APIs should live here behind explicit library calls.
+
+bits_tag:#i32 = 7;

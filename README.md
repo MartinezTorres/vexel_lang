@@ -21,6 +21,7 @@ gcc out.c -o simple -lm
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
 - `docs/` - language RFC (`docs/vexel-rfc.md`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
+- `std/` - bundled standard-library module fallback (`::std::*` imports; project-local `std/` overrides per module path).
 - `examples/` - sample programs plus `examples/lib/` helper modules.
 
 ## Documentation Policy

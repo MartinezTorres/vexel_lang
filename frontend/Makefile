@@ -7,6 +7,9 @@ rwildcard = $(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2
 
 SRC_DIRS := $(shell find src -type d -print)
 CXXFLAGS += $(addprefix -I,$(SRC_DIRS))
+ifdef VEXEL_ROOT_DIR
+CXXFLAGS += -DVEXEL_BUILTIN_STD_REPO_ROOT=\"$(VEXEL_ROOT_DIR)\"
+endif
 
 SOURCES := $(sort $(call rwildcard,src/,*.cpp))
 OBJECTS := $(patsubst src/%.cpp,$(BUILD_DIR)/frontend/%.o,$(SOURCES))

@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: ::std::* imports resolve from bundled std/ when no project-local override exists | Bundled std fallback resolves imports
+
+::std::math;
+::std::bits;
+
+&^main() -> #i32 {
+  std::math::math_tag + std::bits::bits_tag
+}

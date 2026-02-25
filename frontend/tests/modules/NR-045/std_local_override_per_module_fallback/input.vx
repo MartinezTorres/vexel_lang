@@ -1,0 +1,6 @@
+::std::math;
+::std::bits;
+
+&^main() -> #i32 {
+  std::math::math_tag + std::bits::bits_tag
+}

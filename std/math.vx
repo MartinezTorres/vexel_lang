@@ -1,0 +1,9 @@
+// Bundled std::math placeholder.
+// This file intentionally stays minimal until the std RFC + std::math surface is finalized.
+
+math_tag:#i32 = 1000;
+pi64:#f64 = 3.141592653589793;
+
+&identity_f64(x:#f64) -> #f64 {
+  x
+}

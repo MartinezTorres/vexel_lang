@@ -375,7 +375,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Single namespace per module (functions, variables, and types share namespace)
 - Import: `::A::B;`
 - Resource expressions: `::A::B::file.ext` used in expression context load the referenced resource at compile time
-  - Files resolve using the same search order as modules (project root, then relative to the importing file)
+  - Files resolve using the same search order as modules (project root, then relative to the importing file; `std/*` uses the standard-library search rule below)
   - A file evaluates to a `#s` (immutable string) whose bytes exactly match the file contents (binary-safe)
   - A directory evaluates to an array of tuples `(__0:#s, __1:#s)` (one per regular file, lexicographic order, non-recursive); `.__0` is the file name and `.__1` the file contents. Empty or missing directories yield an empty tuple array.
   - Process imports: `::"command" -> name;` execute `command` at compile time (via the host shell) and bind its captured stdout as an immutable `#s` named `name`
@@ -383,6 +383,12 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Example: `font:#s = ::assets::font.bin;` embeds `assets/font.bin` as a string, while `sprites = ::assets::tiles;` embeds the contents of each file within `assets/tiles/`
 - Symbols are internal by default; export explicitly with `&^` (functions) or `^` (globals)
 - Resolution: `::a::b;` maps to `a/b.vx` (case-sensitive, relative to project root)
+- Standard library module path: `::std::...;`
+  - `std` modules are resolved per module path:
+    1. project-local `std/<module>.vx` (override)
+    2. bundled compiler `std/<module>.vx` (fallback)
+  - No symbol-level merging; overrides replace the whole module path
+  - `::std::*` does not search relative to the importing file
 - Scoped imports instantiate their module once per lexical scope; instances do not share mutable state
 - Re-importing the same module in the same scope is permitted only when every top-level definition is identical (functions/types textually equal; constants equal after compile-time evaluation); otherwise it is a compile error
 - Imports can be scoped to blocks

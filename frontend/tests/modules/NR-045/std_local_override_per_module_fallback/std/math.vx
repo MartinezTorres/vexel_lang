@@ -1,0 +1,3 @@
+// Project-local std::math override for test coverage.
+
+math_tag:#i32 = 2000;
