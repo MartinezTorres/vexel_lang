@@ -239,6 +239,7 @@ private:
     bool use_nonreentrant_frame_abi(bool is_exported) const;
     std::string nonreentrant_arg_slot_name(const std::string& c_name, size_t index) const;
     std::string nonreentrant_ret_slot_name(const std::string& c_name) const;
+    std::string external_link_name(const std::string& qualified_name, const std::string& fallback_c_name) const;
     std::string ensure_comparator(TypePtr type);
     int64_t resolve_array_length(TypePtr type, const SourceLocation& loc);
     void emit_return_stmt(const std::string& expr);

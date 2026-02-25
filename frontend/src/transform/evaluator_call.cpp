@@ -2,6 +2,7 @@
 #include "constants.h"
 #include "evaluator_internal.h"
 #include "typechecker.h"
+#include <cmath>
 #include <cstring>
 #include <utility>
 
@@ -103,8 +104,113 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         return false;
     }
 
-    // Check if function is pure enough for compile-time evaluation
+    auto try_eval_std_math_external = [&](CTValue& out) -> bool {
+        if (!func->is_external || !sym) return false;
+        if (!expr->receivers.empty()) return false;
+        std::string name;
+        if (sym->name.rfind("std::math::", 0) == 0) {
+            name = sym->name.substr(11);
+        } else {
+            const std::string& file = func->location.filename;
+            bool from_std_math =
+                file == "std/math.vx" ||
+                (file.size() >= 11 && file.compare(file.size() - 11, 11, "std/math.vx") == 0);
+            if (!from_std_math) return false;
+            name = func->func_name;
+        }
+        for (const auto& p : func->params) {
+            if (p.is_expression_param) return false;
+        }
+
+        std::vector<CTValue> args;
+        args.reserve(expr->args.size());
+        for (size_t i = 0; i < expr->args.size(); ++i) {
+            CTValue v;
+            if (!try_evaluate(expr->args[i], v)) {
+                return false;
+            }
+            if (i < func->params.size() && func->params[i].type) {
+                CTValue coerced;
+                if (!coerce_value_to_type(v, func->params[i].type, coerced)) {
+                    return false;
+                }
+                args.push_back(copy_ct_value(coerced));
+            } else {
+                args.push_back(copy_ct_value(v));
+            }
+        }
+
+        auto unary_f64 = [&](double (*fn)(double)) -> bool {
+            if (args.size() != 1) return false;
+            out = fn(to_float(args[0]));
+            return true;
+        };
+        auto binary_f64 = [&](double (*fn)(double, double)) -> bool {
+            if (args.size() != 2) return false;
+            out = fn(to_float(args[0]), to_float(args[1]));
+            return true;
+        };
+        auto unary_f32 = [&](float (*fn)(float)) -> bool {
+            if (args.size() != 1) return false;
+            float x = static_cast<float>(to_float(args[0]));
+            out = static_cast<double>(fn(x));
+            return true;
+        };
+        auto binary_f32 = [&](float (*fn)(float, float)) -> bool {
+            if (args.size() != 2) return false;
+            float a = static_cast<float>(to_float(args[0]));
+            float b = static_cast<float>(to_float(args[1]));
+            out = static_cast<double>(fn(a, b));
+            return true;
+        };
+
+        if (name == "sin") return unary_f64(static_cast<double (*)(double)>(std::sin));
+        if (name == "cos") return unary_f64(static_cast<double (*)(double)>(std::cos));
+        if (name == "tan") return unary_f64(static_cast<double (*)(double)>(std::tan));
+        if (name == "asin") return unary_f64(static_cast<double (*)(double)>(std::asin));
+        if (name == "acos") return unary_f64(static_cast<double (*)(double)>(std::acos));
+        if (name == "atan") return unary_f64(static_cast<double (*)(double)>(std::atan));
+        if (name == "exp") return unary_f64(static_cast<double (*)(double)>(std::exp));
+        if (name == "log") return unary_f64(static_cast<double (*)(double)>(std::log));
+        if (name == "log2") return unary_f64(static_cast<double (*)(double)>(std::log2));
+        if (name == "log10") return unary_f64(static_cast<double (*)(double)>(std::log10));
+        if (name == "floor") return unary_f64(static_cast<double (*)(double)>(std::floor));
+        if (name == "ceil") return unary_f64(static_cast<double (*)(double)>(std::ceil));
+        if (name == "trunc") return unary_f64(static_cast<double (*)(double)>(std::trunc));
+        if (name == "round") return unary_f64(static_cast<double (*)(double)>(std::round));
+        if (name == "fabs") return unary_f64(static_cast<double (*)(double)>(std::fabs));
+        if (name == "sqrt") return unary_f64(static_cast<double (*)(double)>(std::sqrt));
+        if (name == "pow") return binary_f64(static_cast<double (*)(double, double)>(std::pow));
+        if (name == "atan2") return binary_f64(static_cast<double (*)(double, double)>(std::atan2));
+        if (name == "fmod") return binary_f64(static_cast<double (*)(double, double)>(std::fmod));
+
+        if (name == "sinf") return unary_f32([](float x) { return std::sin(x); });
+        if (name == "cosf") return unary_f32([](float x) { return std::cos(x); });
+        if (name == "tanf") return unary_f32([](float x) { return std::tan(x); });
+        if (name == "asinf") return unary_f32([](float x) { return std::asin(x); });
+        if (name == "acosf") return unary_f32([](float x) { return std::acos(x); });
+        if (name == "atanf") return unary_f32([](float x) { return std::atan(x); });
+        if (name == "expf") return unary_f32([](float x) { return std::exp(x); });
+        if (name == "logf") return unary_f32([](float x) { return std::log(x); });
+        if (name == "log2f") return unary_f32([](float x) { return std::log2(x); });
+        if (name == "log10f") return unary_f32([](float x) { return std::log10(x); });
+        if (name == "floorf") return unary_f32([](float x) { return std::floor(x); });
+        if (name == "ceilf") return unary_f32([](float x) { return std::ceil(x); });
+        if (name == "truncf") return unary_f32([](float x) { return std::trunc(x); });
+        if (name == "roundf") return unary_f32([](float x) { return std::round(x); });
+        if (name == "fabsf") return unary_f32([](float x) { return std::fabs(x); });
+        if (name == "sqrtf") return unary_f32([](float x) { return std::sqrt(x); });
+        if (name == "powf") return binary_f32([](float x, float y) { return std::pow(x, y); });
+        if (name == "atan2f") return binary_f32([](float y, float x) { return std::atan2(y, x); });
+        if (name == "fmodf") return binary_f32([](float x, float y) { return std::fmod(x, y); });
+        return false;
+    };
+
+    // Check if this is pure enough for compile-time evaluation.
     if (func->is_external) {
+        if (try_eval_std_math_external(result)) {
+            return true;
+        }
         error_msg = "External functions cannot be evaluated at compile time";
         return false;
     }

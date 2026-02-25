@@ -10,5 +10,13 @@ Resolution rule:
 The override unit is the module path (no symbol-level merge).
 
 Current status:
-- `std/math.vx` and `std/bits.vx` are placeholders that define a stable module
-  namespace for future RFC/spec work and compiler-recognized functionality.
+- `std/math.vx` has a phase-1 scalar math surface backed by C `<math.h>` names.
+  - `#f64` functions use the unsuffixed C names (`sin`, `sqrt`, `pow`, ...).
+  - `#f32` functions use C-style suffixed names (`sinf`, `sqrtf`, `powf`, ...)
+    because Vexel does not currently support function overloading.
+  - The frontend can fold supported `std::math` calls at compile time when
+    arguments are constexpr.
+  - C-generating backends map bundled `std::math` externs to libc symbols
+    instead of emitting mangled external names.
+- `std/bits.vx` remains a placeholder namespace for future explicit bit
+  reinterpretation APIs (`std::bits::*`).
