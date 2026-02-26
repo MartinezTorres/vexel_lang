@@ -507,8 +507,7 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             expr->type = left_type;
             return expr->type;
         }
-        if ((expr->op == "+" || expr->op == "-") &&
-            fixed_zero_frac_supported_any_width(left_type)) {
+        if (expr->op == "+" || expr->op == "-") {
             expr->type = left_type;
             return expr->type;
         }
@@ -517,9 +516,8 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             expr->type = left_type;
             return expr->type;
         }
-        if ((expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
-             expr->op == "<=" || expr->op == ">" || expr->op == ">=") &&
-            fixed_zero_frac_supported_any_width(left_type)) {
+        if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+            expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
             expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
             return expr->type;
         }
@@ -721,9 +719,9 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     if (expr->op == "-") {
         if (is_fixed_primitive_type(operand_type)) {
             if (!(fixed_native_storage_width_supported(operand_type) ||
-                  fixed_zero_frac_supported_any_width(operand_type))) {
+                  type_bits(operand_type->primitive, operand_type->integer_bits, operand_type->fractional_bits) > 0)) {
                 throw CompileError(
-                    "Fixed-point unary operators currently support native storage widths (8/16/32/64) or zero-fraction fixed-point operands",
+                    "Fixed-point unary operators currently support fixed-point operands with positive storage width",
                     expr->location);
             }
             expr->type = operand_type;

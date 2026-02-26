@@ -147,13 +147,16 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         const bool is_bitwise_shift_op =
             (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
              expr->op == "<<" || expr->op == ">>");
-        const bool is_zero_frac_arithcmp_op =
-            (expr->op == "+" || expr->op == "-" || expr->op == "*" ||
-             expr->op == "/" || expr->op == "%" ||
+        const bool is_any_frac_addsubcmp_op =
+            (expr->op == "+" || expr->op == "-" ||
              expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
              expr->op == "<=" || expr->op == ">" || expr->op == ">=");
-        if (!is_bitwise_shift_op && !(fixed_frac == 0 && is_zero_frac_arithcmp_op)) {
-            // Let the native fixed-point path below handle non-zero-fraction arithmetic/comparisons.
+        const bool is_zero_frac_muldivmod_op =
+            (expr->op == "*" || expr->op == "/" || expr->op == "%");
+        if (!is_bitwise_shift_op &&
+            !is_any_frac_addsubcmp_op &&
+            !(fixed_frac == 0 && is_zero_frac_muldivmod_op)) {
+            // Let the native fixed-point path below handle remaining native-only arithmetic.
         } else {
         APInt l(uint64_t(0));
         APInt r(uint64_t(0));
@@ -169,7 +172,7 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
         };
         l = wrap_raw(l);
         r = wrap_raw(r);
-        if (fixed_frac == 0 && (expr->op == "+" || expr->op == "-")) {
+        if (expr->op == "+" || expr->op == "-") {
             result = ctvalue_from_exact_int(expr->op == "+" ? wrap_raw(l + r) : wrap_raw(l - r), !fixed_signed);
             return true;
         }
@@ -185,9 +188,8 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             else result = ctvalue_from_exact_int(wrap_raw(l % r), !fixed_signed);
             return true;
         }
-        if (fixed_frac == 0 &&
-            (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
-             expr->op == "<=" || expr->op == ">" || expr->op == ">=")) {
+        if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+            expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
             if (expr->op == "==") result = (int64_t)(l == r);
             else if (expr->op == "!=") result = (int64_t)(l != r);
             else if (expr->op == "<") result = (int64_t)(l < r);

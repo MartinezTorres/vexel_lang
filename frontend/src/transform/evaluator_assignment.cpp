@@ -289,11 +289,14 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             const bool is_bitwise_shift_op =
                 (binary_op == "&" || binary_op == "|" || binary_op == "^" ||
                  binary_op == "<<" || binary_op == ">>");
-            const bool is_zero_frac_arith_op =
-                (binary_op == "+" || binary_op == "-" ||
-                 binary_op == "*" || binary_op == "/" || binary_op == "%");
-            if (!is_bitwise_shift_op && !(fixed_frac == 0 && is_zero_frac_arith_op)) {
-                // Let the native fixed-point path below handle non-zero-fraction arithmetic.
+            const bool is_any_frac_addsub_op =
+                (binary_op == "+" || binary_op == "-");
+            const bool is_zero_frac_muldivmod_op =
+                (binary_op == "*" || binary_op == "/" || binary_op == "%");
+            if (!is_bitwise_shift_op &&
+                !is_any_frac_addsub_op &&
+                !(fixed_frac == 0 && is_zero_frac_muldivmod_op)) {
+                // Let the native fixed-point path below handle remaining native-only arithmetic.
             } else {
             APInt l(uint64_t(0));
             APInt r(uint64_t(0));
@@ -308,7 +311,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             };
             l = wrap_raw(l);
             r = wrap_raw(r);
-            if (fixed_frac == 0 && (binary_op == "+" || binary_op == "-")) {
+            if (binary_op == "+" || binary_op == "-") {
                 out = ctvalue_from_exact_int(binary_op == "+" ? wrap_raw(l + r) : wrap_raw(l - r),
                                              !fixed_signed);
                 return true;

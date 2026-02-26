@@ -837,8 +837,10 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                     "Fixed-point compound bitwise/shift assignments require unsigned fixed-point operands with zero fractional bits",
                     expr->location);
             }
-        } else if ((assign_op == "+=" || assign_op == "-=" ||
-                    assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
+        } else if ((assign_op == "+=" || assign_op == "-=") &&
+                   type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits) > 0) {
+            // Supported for any fixed-point width via raw same-type integer-like lowering.
+        } else if ((assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
                    fixed_zero_frac_supported_any_width(lhs_type)) {
             // Supported via integer-like lowering for zero-fraction fixed-point widths.
         } else if (assign_op != "=") {
@@ -968,8 +970,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                         expr->location);
                 }
                 compound_value_type = lhs_type;
-            } else if ((binary_op == "+" || binary_op == "-") &&
-                       fixed_zero_frac_supported_any_width(lhs_type)) {
+            } else if (binary_op == "+" || binary_op == "-") {
                 compound_value_type = lhs_type;
             } else if ((binary_op == "*" || binary_op == "/" || binary_op == "%") &&
                        fixed_zero_frac_supported_any_width(lhs_type)) {

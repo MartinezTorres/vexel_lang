@@ -41,10 +41,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Parametric unsigned integers: `#uN` where `N` is any positive integer width
 - Fixed-point syntax (foundation): `#iI.F`, `#uI.F` where `I + F > 0` (signed form counts the sign bit inside `I`)
   - Current implementation status: syntax/type parsing and ABI storage-width mapping are present
-  - Supported frontend semantics so far: same-type pass-through assignment (`=` only); native-width (`I+F` in 8/16/32/64) fixed-point unary `-`, `+`, `-`, comparisons, `+=`, `-=`, and native-width explicit casts among fixed/integer/bool/float primitives; plus non-native zero-fraction fixed-point (`#iN.0` / `#uN.0`) unary `-`, `+`, `-`, `*`, `/`, `%`, comparisons, compound forms `+=`, `-=`, `*=`, `/=`, `%=` and explicit casts among fixed/integer/bool/float primitives (and `#u8[...]` byte-array casts) (backends may still limit widths)
+  - Supported frontend semantics so far: same-type pass-through assignment (`=` only); fixed-point unary `-`, `+`, `-`, comparisons, `+=`, `-=` for matching fixed-point operand types with positive storage width; native-width (`I+F` in 8/16/32/64) explicit casts among fixed/integer/bool/float primitives; plus non-native zero-fraction fixed-point (`#iN.0` / `#uN.0`) `*`, `/`, `%`, compound forms `*=`, `/=`, `%=` and explicit casts among fixed/integer/bool/float primitives (and `#u8[...]` byte-array casts) (backends may still limit widths)
   - Additional fixed-point arithmetic support (current subset): `*`, `/`, `%`, `*=`, `/=`, `%=` for native storage widths up to 32 bits (`8/16/32`)
   - Fixed-point bitwise/shift support (current subset): for unsigned zero-fraction fixed-point types (`#uN.0`), supports `~`, `&`, `|`, `^`, `<<`, `>>`, and compound forms `&=`, `|=`, `^=`, `<<=`, `>>=` (backends may still limit widths)
-  - Remaining fixed-point gaps: bitwise/shift for `F != 0`, bitwise/shift for signed fixed-point, and 64-bit fixed-point `* / %`
+  - Remaining fixed-point gaps: bitwise/shift for `F != 0`, bitwise/shift for signed fixed-point, non-native non-zero-fraction `* / %` (and related compound forms), non-native non-zero-fraction general explicit casts, and 64-bit fixed-point `* / %`
 - Floating point: `#f16`, `#f32`, `#f64`
 - Backends may support only a subset of integer widths (for example, some targets may accept only 8/16/32/64)
 - Boolean: `#b` (values 0 or 1 only, no true/false literals)
