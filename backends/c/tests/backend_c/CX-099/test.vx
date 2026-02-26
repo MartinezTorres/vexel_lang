@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point division with large negative fractional width must preserve runtime divide-by-zero behavior (no constant-zero shortcut).
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq '== 0' out.c && grep -Fq ' / ' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^safe_div(a:#u100.-92, b:#u100.-92) -> #u100.-92 {
+  a / b
+}
+
+&^main() -> #i32 { 0 }
