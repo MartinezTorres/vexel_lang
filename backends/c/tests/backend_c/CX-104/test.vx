@@ -1,0 +1,14 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native zero-fraction fixed-point explicit casts lower through extint helpers, including byte-array casts.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_cast(' out.c && grep -Fq 'vx_ai_to_double_u(' out.c && grep -Fq 'vx_ai_from_double_u(' out.c && grep -Fq '.b[' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^cast_up(a:#u72.0) -> #u80.0 { (#u80.0)a }
+&^cast_i(a:#i72.0) -> #i32 { (#i32)a }
+&^cast_f(a:#u72.0) -> #f64 { (#f64)a }
+&^from_f(a:#f64) -> #u72.0 { (#u72.0)a }
+&^tail_byte(a:#u72.0) -> #u8 {
+  bytes:#u8[9] = (#u8[9])a;
+  bytes[8]
+}
+&^main() -> #i32 { 0 }

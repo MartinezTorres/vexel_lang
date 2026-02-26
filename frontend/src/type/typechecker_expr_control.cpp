@@ -579,6 +579,11 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
                 is_float(t->primitive) ||
                 t->primitive == PrimitiveType::Bool);
     };
+    auto fixed_cast_storage_supported = [&](TypePtr t) {
+        if (!is_fixed_primitive(t)) return true;
+        return fixed_native_storage_width_supported(t) ||
+               fixed_zero_frac_supported_any_width(t);
+    };
 
     if (is_fixed_primitive(operand_type) || is_fixed_primitive(target_type)) {
         if (is_byte_array_cast()) {
@@ -589,13 +594,11 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
             throw CompileError("Fixed-point casts currently support only primitive numeric/bool casts (and [#u8] byte casts)",
                                expr->location);
         }
-        if (is_fixed_primitive(operand_type) && !fixed_native_storage_width_supported(operand_type)) {
-            throw CompileError("Fixed-point casts currently support only native storage widths (8/16/32/64)",
-                               expr->location);
-        }
-        if (is_fixed_primitive(target_type) && !fixed_native_storage_width_supported(target_type)) {
-            throw CompileError("Fixed-point casts currently support only native storage widths (8/16/32/64)",
-                               expr->location);
+        if (!fixed_cast_storage_supported(operand_type) ||
+            !fixed_cast_storage_supported(target_type)) {
+            throw CompileError(
+                "Fixed-point casts currently support only native storage widths (8/16/32/64) or zero-fraction fixed-point widths",
+                expr->location);
         }
         if ((is_signed_int(target_type->primitive) || is_unsigned_int(target_type->primitive)) &&
             target_type->integer_bits == 0) {
