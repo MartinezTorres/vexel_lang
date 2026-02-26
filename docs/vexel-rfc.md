@@ -41,7 +41,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Parametric unsigned integers: `#uN` where `N` is any positive integer width
 - Fixed-point syntax (foundation): `#iI.F`, `#uI.F` where `I + F > 0` (signed form counts the sign bit inside `I`)
   - Current implementation status: syntax/type parsing and ABI storage-width mapping are present
-  - Supported frontend semantics so far: same-type pass-through assignment (`=` only); native-width (`I+F` in 8/16/32/64) fixed-point unary `-`, `+`, `-`, comparisons, `+=`, `-=`, and native-width explicit casts among fixed/integer/bool/float primitives; plus non-native zero-fraction fixed-point (`#iN.0` / `#uN.0`) unary `-`, `+`, `-`, comparisons, `+=`, `-=`
+  - Supported frontend semantics so far: same-type pass-through assignment (`=` only); native-width (`I+F` in 8/16/32/64) fixed-point unary `-`, `+`, `-`, comparisons, `+=`, `-=`, and native-width explicit casts among fixed/integer/bool/float primitives; plus non-native zero-fraction fixed-point (`#iN.0` / `#uN.0`) unary `-`, `+`, `-`, `*`, `/`, `%`, comparisons, and compound forms `+=`, `-=`, `*=`, `/=`, `%=` (backends may still limit widths)
   - Additional fixed-point arithmetic support (current subset): `*`, `/`, `%`, `*=`, `/=`, `%=` for native storage widths up to 32 bits (`8/16/32`)
   - Fixed-point bitwise/shift support (current subset): for unsigned zero-fraction fixed-point types (`#uN.0`), supports `~`, `&`, `|`, `^`, `<<`, `>>`, and compound forms `&=`, `|=`, `^=`, `<<=`, `>>=` (backends may still limit widths)
   - Remaining fixed-point gaps: bitwise/shift for `F != 0`, bitwise/shift for signed fixed-point, and 64-bit fixed-point `* / %`

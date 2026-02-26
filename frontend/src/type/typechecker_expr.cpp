@@ -512,6 +512,11 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             expr->type = left_type;
             return expr->type;
         }
+        if ((expr->op == "*" || expr->op == "/" || expr->op == "%") &&
+            fixed_zero_frac_supported_any_width(left_type)) {
+            expr->type = left_type;
+            return expr->type;
+        }
         if ((expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
              expr->op == "<=" || expr->op == ">" || expr->op == ">=") &&
             fixed_zero_frac_supported_any_width(left_type)) {

@@ -1,0 +1,28 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native zero-fraction fixed-point mul/div/mod and compound forms lower through extended-integer helpers.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_mul(' out.c && grep -Fq 'vx_ai_udivmod(' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^acc72_u(a:#u72.0, b:#u72.0, c:#u72.0) -> #u72.0 {
+  x:#u72.0 = a;
+  x = x * b;
+  x = x / c;
+  x = x % b;
+  x *= b;
+  x /= c;
+  x %= b;
+  x
+}
+
+&^acc72_s(a:#i72.0, b:#i72.0, c:#i72.0) -> #i72.0 {
+  x:#i72.0 = a;
+  x = x * b;
+  x = x / c;
+  x = x % b;
+  x *= b;
+  x /= c;
+  x %= b;
+  x
+}
+
+&^main() -> #i32 { 0 }

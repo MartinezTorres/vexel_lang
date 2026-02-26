@@ -277,7 +277,8 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
         if (is_fixed_primitive_type(fixed_type) &&
             (binary_op == "&" || binary_op == "|" || binary_op == "^" ||
              binary_op == "<<" || binary_op == ">>" ||
-             binary_op == "+" || binary_op == "-")) {
+             binary_op == "+" || binary_op == "-" ||
+             binary_op == "*" || binary_op == "/" || binary_op == "%")) {
             uint64_t fixed_bits = 0;
             bool fixed_signed = false;
             int64_t fixed_frac = 0;
@@ -285,6 +286,15 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 error_msg = "Unsupported fixed-point type in compile-time evaluation";
                 return false;
             }
+            const bool is_bitwise_shift_op =
+                (binary_op == "&" || binary_op == "|" || binary_op == "^" ||
+                 binary_op == "<<" || binary_op == ">>");
+            const bool is_zero_frac_arith_op =
+                (binary_op == "+" || binary_op == "-" ||
+                 binary_op == "*" || binary_op == "/" || binary_op == "%");
+            if (!is_bitwise_shift_op && !(fixed_frac == 0 && is_zero_frac_arith_op)) {
+                // Let the native fixed-point path below handle non-zero-fraction arithmetic.
+            } else {
             APInt l(uint64_t(0));
             APInt r(uint64_t(0));
             bool lu = false, ru = false;
@@ -301,6 +311,22 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             if (fixed_frac == 0 && (binary_op == "+" || binary_op == "-")) {
                 out = ctvalue_from_exact_int(binary_op == "+" ? wrap_raw(l + r) : wrap_raw(l - r),
                                              !fixed_signed);
+                return true;
+            }
+            if (fixed_frac == 0 && (binary_op == "*" || binary_op == "/" || binary_op == "%")) {
+                if ((binary_op == "/" || binary_op == "%") && r.is_zero()) {
+                    error_msg = (binary_op == "/")
+                        ? "Division by zero in compile-time evaluation"
+                        : "Modulo by zero in compile-time evaluation";
+                    return false;
+                }
+                if (binary_op == "*") {
+                    out = ctvalue_from_exact_int(wrap_raw(l * r), !fixed_signed);
+                } else if (binary_op == "/") {
+                    out = ctvalue_from_exact_int(wrap_raw(l / r), !fixed_signed);
+                } else {
+                    out = ctvalue_from_exact_int(wrap_raw(l % r), !fixed_signed);
+                }
                 return true;
             }
             if (fixed_signed || fixed_frac != 0) {
@@ -335,6 +361,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 out = ctvalue_from_exact_int(wrap_raw(l >> shift), true);
             }
             return true;
+            }
         }
         uint64_t fixed_bits = 0;
         bool fixed_signed = false;
