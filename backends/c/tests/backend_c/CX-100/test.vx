@@ -1,0 +1,42 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point zero-fraction unsigned bitwise/shift operators and compound forms lower to raw unsigned integer operations.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' 'uint8_t vx_seed(void) { return 170; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+&!seed() -> #u8.0;
+
+&^main() -> #i32 {
+  a:#u8.0 = seed();
+  b:#u8.0 = (#u8.0)204;
+
+  andv:#u8.0 = a & b;
+  orv:#u8.0 = a | b;
+  xorv:#u8.0 = a ^ b;
+  notv:#u8.0 = ~a;
+  lsh:#u8.0 = a << (#u8.0)1;
+  rsh:#u8.0 = a >> (#u8.0)1;
+
+  c_and:#u8.0 = a;
+  c_and &= b;
+  c_or:#u8.0 = a;
+  c_or |= b;
+  c_xor:#u8.0 = a;
+  c_xor ^= b;
+  c_sh:#u8.0 = a;
+  c_sh <<= (#u8.0)1;
+  c_sh >>= (#u8.0)2;
+
+  ok:#b =
+    (andv == (#u8.0)136) &&
+    (orv == (#u8.0)238) &&
+    (xorv == (#u8.0)102) &&
+    (notv == (#u8.0)85) &&
+    (lsh == (#u8.0)84) &&
+    (rsh == (#u8.0)85) &&
+    (c_and == (#u8.0)136) &&
+    (c_or == (#u8.0)238) &&
+    (c_xor == (#u8.0)102) &&
+    (c_sh == (#u8.0)21);
+
+  ok ? 0 : 1
+}

@@ -14,6 +14,25 @@ bool ctvalue_to_i64_checked(const CTValue& value, int64_t& out) {
     return ctvalue_to_i64_exact(value, out);
 }
 
+bool is_fixed_primitive_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
+}
+
+bool fixed_native_meta(const TypePtr& type,
+                       uint64_t& total_bits,
+                       bool& is_signed_raw,
+                       int64_t& fractional_bits) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    if (!(bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64)) return false;
+    total_bits = static_cast<uint64_t>(bits_i64);
+    is_signed_raw = (type->primitive == PrimitiveType::FixedInt);
+    fractional_bits = type->fractional_bits;
+    return true;
+}
+
 } // namespace
 
 CTEQueryResult CompileTimeEvaluator::query(ExprPtr expr) {
@@ -508,6 +527,41 @@ bool CompileTimeEvaluator::eval_literal(ExprPtr expr, CTValue& result) {
 bool CompileTimeEvaluator::eval_unary(ExprPtr expr, CTValue& result) {
     CTValue operand_val;
     if (!try_evaluate(expr->operand, operand_val)) return false;
+
+    uint64_t fixed_bits = 0;
+    bool fixed_signed = false;
+    int64_t fixed_frac = 0;
+    if (expr && expr->type &&
+        fixed_native_meta(expr->type, fixed_bits, fixed_signed, fixed_frac)) {
+        APInt raw(uint64_t(0));
+        bool raw_unsigned_hint = false;
+        if (!ctvalue_to_exact_int(operand_val, raw, raw_unsigned_hint)) {
+            error_msg = "Unsupported operand type for fixed-point unary operation";
+            return false;
+        }
+        auto wrap_raw = [&](const APInt& v) {
+            return fixed_signed ? v.wrapped_signed(fixed_bits)
+                                : v.wrapped_unsigned(fixed_bits);
+        };
+        raw = wrap_raw(raw);
+        if (expr->op == "-") {
+            result = ctvalue_from_exact_int(wrap_raw(-raw), !fixed_signed);
+            return true;
+        }
+        if (expr->op == "~") {
+            if (fixed_signed || fixed_frac != 0) {
+                error_msg =
+                    "Fixed-point compile-time bitwise not requires an unsigned fixed-point operand with zero fractional bits";
+                return false;
+            }
+            result = ctvalue_from_exact_int(wrap_raw(~raw), true);
+            return true;
+        }
+        if (expr->op == "!") {
+            result = raw.is_zero();
+            return true;
+        }
+    }
 
     if (expr->op == "~") {
         APInt v(uint64_t(0));
