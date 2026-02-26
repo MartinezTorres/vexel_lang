@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Boolean-array to arbitrary-width unsigned integer casts use extint bit packing helpers in the C backend.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_zero(' out.c && grep -Fq 'vx_ai_set_bit(' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&!seed() -> #b;
+
+&^pack72() -> #u72 {
+  bits:#b[72];
+  i:#u8 = 0;
+  (i < (#u8)72)@{
+    bits[(#i32)i] = seed();
+    i += (#u8)1;
+  };
+  (#u72)bits
+}
+
+&^main() -> #i32 { 0 }
