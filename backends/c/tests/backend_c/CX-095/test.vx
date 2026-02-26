@@ -1,0 +1,20 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point native-width += and -= lower through raw integer storage in C backend.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'uint16_t vx_acc_u(' out.h && grep -Fq 'int16_t vx_acc_s(' out.h && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^acc_u(a:#u8.8, b:#u8.8) -> #u8.8 {
+  x:#u8.8 = a;
+  x += b;
+  x -= a;
+  x
+}
+
+&^acc_s(a:#i10.6, b:#i10.6) -> #i10.6 {
+  x:#i10.6 = a;
+  x += b;
+  x -= a;
+  x
+}
+
+&^main() -> #i32 { 0 }

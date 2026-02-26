@@ -733,11 +733,21 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     TypePtr lhs_type = check_expr(expr->left);
     TypePtr rhs_type = check_expr(expr->right);
     if (is_fixed_primitive(lhs_type) || is_fixed_primitive(rhs_type)) {
-        if (assign_op != "=") {
-            throw CompileError("Fixed-point compound assignments are not implemented yet", expr->location);
-        }
         if (!fixed_assignment_passthrough_ok(lhs_type, rhs_type)) {
-            throw CompileError("Fixed-point assignments currently support only same-type pass-through",
+            if (assign_op == "=") {
+                throw CompileError("Fixed-point assignments currently support only same-type pass-through",
+                                   expr->location);
+            }
+            throw CompileError("Fixed-point compound assignments currently require matching fixed-point operand types",
+                               expr->location);
+        }
+        int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
+        if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
+            throw CompileError("Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
+                               expr->location);
+        }
+        if (assign_op != "=" && assign_op != "+=" && assign_op != "-=") {
+            throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
                                expr->location);
         }
     }
@@ -838,7 +848,23 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         };
 
         const std::string binary_op = assign_op.substr(0, assign_op.size() - 1);
-        if (binary_op == "&&" || binary_op == "||") {
+        if (is_fixed_primitive(lhs_type) || is_fixed_primitive(rhs_type)) {
+            if (!(is_fixed_primitive(lhs_type) && is_fixed_primitive(rhs_type) && types_equal(lhs_type, rhs_type))) {
+                throw CompileError("Fixed-point compound assignments currently require matching fixed-point operand types",
+                                   expr->location);
+            }
+            int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
+            if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
+                throw CompileError("Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
+                                   expr->location);
+            }
+            if (binary_op == "+" || binary_op == "-") {
+                compound_value_type = lhs_type;
+            } else {
+                throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
+                                   expr->location);
+            }
+        } else if (binary_op == "&&" || binary_op == "||") {
             std::string context = (binary_op == "&&") ? "Logical operator &&" : "Logical operator ||";
             require_boolean_expr(expr->left, lhs_type, expr->left ? expr->left->location : expr->location, context);
             require_boolean_expr(expr->right, rhs_type, expr->right ? expr->right->location : expr->location, context);
