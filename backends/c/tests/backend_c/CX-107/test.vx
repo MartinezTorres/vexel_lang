@@ -1,0 +1,38 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native non-zero-fraction fixed-point add/sub/comparisons and +=/-= execute correctly through extint-backed ABI values.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include "out.h"' 'vx_i72_t vx_sa(void) { vx_i72_t v = {{0}}; v.b[0] = 3; return v; }' 'vx_i72_t vx_sb(void) { vx_i72_t v = {{0}}; v.b[0] = 5; return v; }' 'vx_u72_t vx_ua(void) { vx_u72_t v = {{0}}; v.b[0] = 7; return v; }' 'vx_u72_t vx_ub(void) { vx_u72_t v = {{0}}; v.b[0] = 11; return v; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+&!sa() -> #i40.32;
+&!sb() -> #i40.32;
+&!ua() -> #u40.32;
+&!ub() -> #u40.32;
+
+&^main() -> #i32 {
+  a:#i40.32 = sa();
+  b:#i40.32 = sb();
+  u:#u40.32 = ua();
+  v:#u40.32 = ub();
+
+  sum:#i40.32 = a + b;
+  diff:#i40.32 = sum - b;
+  neg:#i40.32 = -a;
+
+  us:#u40.32 = u;
+  us += v;
+  us -= u;
+
+  ss:#i40.32 = a;
+  ss += b;
+  ss -= a;
+
+  ok:#b =
+    (diff == a) &&
+    (sum > b) &&
+    (neg < a) &&
+    (us == v) &&
+    (ss == b) &&
+    ((a < b) && (b >= a));
+
+  ok ? 0 : 1
+}
