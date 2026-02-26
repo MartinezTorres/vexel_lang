@@ -59,6 +59,12 @@ bool is_fixed_primitive_type(const TypePtr& type) {
            (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
 }
 
+bool fixed_native_storage_width_supported(const TypePtr& type) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    return bits == 8 || bits == 16 || bits == 32 || bits == 64;
+}
+
 bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
     if (!expr) return true;
     switch (expr->kind) {
@@ -467,7 +473,25 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
     }
 
     if (is_fixed_primitive_type(left_type) || is_fixed_primitive_type(right_type)) {
-        throw CompileError("Fixed-point operators are not implemented yet", expr->location);
+        if (!is_fixed_primitive_type(left_type) || !is_fixed_primitive_type(right_type) ||
+            !types_equal(left_type, right_type)) {
+            throw CompileError("Fixed-point operators currently require matching fixed-point operand types",
+                               expr->location);
+        }
+        if (!fixed_native_storage_width_supported(left_type)) {
+            throw CompileError("Fixed-point operators currently support only native storage widths (8/16/32/64)",
+                               expr->location);
+        }
+        if (expr->op == "+" || expr->op == "-") {
+            expr->type = left_type;
+            return expr->type;
+        }
+        if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+            expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
+            expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+            return expr->type;
+        }
+        throw CompileError("Fixed-point operator '" + expr->op + "' is not implemented yet", expr->location);
     }
 
     auto is_numeric_like = [&](TypePtr t) {
@@ -641,7 +665,12 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
 
     if (expr->op == "-") {
         if (is_fixed_primitive_type(operand_type)) {
-            throw CompileError("Fixed-point unary operators are not implemented yet", expr->location);
+            if (!fixed_native_storage_width_supported(operand_type)) {
+                throw CompileError("Fixed-point unary operators currently support only native storage widths (8/16/32/64)",
+                                   expr->location);
+            }
+            expr->type = operand_type;
+            return operand_type;
         }
         if (!is_numeric_like(operand_type)) {
             throw CompileError("Unary - requires numeric operand", expr->location);

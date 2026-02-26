@@ -1,0 +1,29 @@
+## Stdout
+```
+// Lowered Vexel module: tests/expressions/EX-113/fixed_native_arith_subset/test.vx
+&^add_u(a: #u8.8, b: #u8.8) -> #u8.8 {
+    a + b
+}
+&^sub_s(a: #i10.6, b: #i10.6) -> #i10.6 {
+    a - b
+}
+&^neg_u(a: #u8.8) -> #u8.8 {
+    -a
+}
+&^lt_s(a: #i10.6, b: #i10.6) -> #b {
+    a < b
+}
+&^eq_u(a: #u8.8, b: #u8.8) -> #b {
+    a == b
+}
+&^main() -> #i32 {
+    0
+}
+```
+
+## Stderr
+```
+```
+
+## Exit Code
+0
