@@ -1,0 +1,22 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native zero-fraction fixed-point unary/add/sub/comparison and +=/-= lower through extended-integer helpers.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'typedef struct { unsigned char b[9]; } vx_u72_t;' out.h && grep -Fq 'typedef struct { unsigned char b[9]; } vx_i72_t;' out.h && grep -Fq 'vx_ai_add(' out.c && grep -Fq 'vx_ai_sub(' out.c && grep -Fq 'vx_ai_neg(' out.c && (grep -Fq 'vx_ai_scmp(' out.c || grep -Fq 'vx_ai_ucmp(' out.c) && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^arith72(a:#i72.0, b:#i72.0) -> #i72.0 {
+  -a + b - a
+}
+
+&^cmp72(a:#i72.0, b:#i72.0) -> #b {
+  (a + b) >= (a - b)
+}
+
+&^acc72(a:#u72.0, b:#u72.0) -> #u72.0 {
+  x:#u72.0 = a;
+  x = b;
+  x += a;
+  x -= b;
+  x
+}
+
+&^main() -> #i32 { 0 }

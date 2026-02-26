@@ -132,17 +132,15 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
 
     if (expr && expr->type && is_fixed_primitive_type(expr->type) &&
         (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
-         expr->op == "<<" || expr->op == ">>")) {
+         expr->op == "<<" || expr->op == ">>" ||
+         expr->op == "+" || expr->op == "-" ||
+         expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+         expr->op == "<=" || expr->op == ">" || expr->op == ">=")) {
         uint64_t fixed_bits = 0;
         bool fixed_signed = false;
         int64_t fixed_frac = 0;
         if (!fixed_any_meta(expr->type, fixed_bits, fixed_signed, fixed_frac)) {
             error_msg = "Unsupported fixed-point type in compile-time evaluation";
-            return false;
-        }
-        if (fixed_signed || fixed_frac != 0) {
-            error_msg =
-                "Fixed-point compile-time bitwise/shift operators require unsigned fixed-point operands with zero fractional bits";
             return false;
         }
         APInt l(uint64_t(0));
@@ -153,9 +151,32 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             error_msg = "Unsupported operand types for fixed-point binary operation";
             return false;
         }
-        auto wrap_raw = [&](const APInt& raw) { return raw.wrapped_unsigned(fixed_bits); };
+        auto wrap_raw = [&](const APInt& raw) {
+            return fixed_signed ? raw.wrapped_signed(fixed_bits)
+                                : raw.wrapped_unsigned(fixed_bits);
+        };
         l = wrap_raw(l);
         r = wrap_raw(r);
+        if (fixed_frac == 0 && (expr->op == "+" || expr->op == "-")) {
+            result = ctvalue_from_exact_int(expr->op == "+" ? wrap_raw(l + r) : wrap_raw(l - r), !fixed_signed);
+            return true;
+        }
+        if (fixed_frac == 0 &&
+            (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+             expr->op == "<=" || expr->op == ">" || expr->op == ">=")) {
+            if (expr->op == "==") result = (int64_t)(l == r);
+            else if (expr->op == "!=") result = (int64_t)(l != r);
+            else if (expr->op == "<") result = (int64_t)(l < r);
+            else if (expr->op == "<=") result = (int64_t)(l <= r);
+            else if (expr->op == ">") result = (int64_t)(l > r);
+            else result = (int64_t)(l >= r);
+            return true;
+        }
+        if (fixed_signed || fixed_frac != 0) {
+            error_msg =
+                "Fixed-point compile-time bitwise/shift operators require unsigned fixed-point operands with zero fractional bits";
+            return false;
+        }
         if (expr->op == "&") {
             result = ctvalue_from_exact_int(wrap_raw(l & r), true);
             return true;

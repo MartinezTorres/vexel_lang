@@ -78,6 +78,12 @@ bool fixed_bitwise_shift_supported(const TypePtr& type) {
     return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
 }
 
+bool fixed_zero_frac_supported_any_width(const TypePtr& type) {
+    if (!is_fixed_primitive_type(type)) return false;
+    if (type->fractional_bits != 0) return false;
+    return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
+}
+
 bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
     if (!expr) return true;
     switch (expr->kind) {
@@ -501,6 +507,17 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             expr->type = left_type;
             return expr->type;
         }
+        if ((expr->op == "+" || expr->op == "-") &&
+            fixed_zero_frac_supported_any_width(left_type)) {
+            expr->type = left_type;
+            return expr->type;
+        }
+        if ((expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
+             expr->op == "<=" || expr->op == ">" || expr->op == ">=") &&
+            fixed_zero_frac_supported_any_width(left_type)) {
+            expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+            return expr->type;
+        }
         if (!fixed_native_storage_width_supported(left_type)) {
             throw CompileError("Fixed-point operators currently support only native storage widths (8/16/32/64)",
                                expr->location);
@@ -698,9 +715,11 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
 
     if (expr->op == "-") {
         if (is_fixed_primitive_type(operand_type)) {
-            if (!fixed_native_storage_width_supported(operand_type)) {
-                throw CompileError("Fixed-point unary operators currently support only native storage widths (8/16/32/64)",
-                                   expr->location);
+            if (!(fixed_native_storage_width_supported(operand_type) ||
+                  fixed_zero_frac_supported_any_width(operand_type))) {
+                throw CompileError(
+                    "Fixed-point unary operators currently support native storage widths (8/16/32/64) or zero-fraction fixed-point operands",
+                    expr->location);
             }
             expr->type = operand_type;
             return operand_type;
