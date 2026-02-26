@@ -13,7 +13,7 @@ uint64_t effective_type_bits(const TypePtr& type) {
     if (is_signed_int(type->primitive) || is_unsigned_int(type->primitive)) {
         return type->integer_bits;
     }
-    int64_t bits = type_bits(type->primitive, type->integer_bits);
+    int64_t bits = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
     return bits > 0 ? static_cast<uint64_t>(bits) : 0;
 }
 
@@ -48,7 +48,15 @@ bool is_untyped_integer_type(const TypePtr& type) {
 bool is_numeric_primitive_type(const TypePtr& type) {
     return type &&
            type->kind == Type::Kind::Primitive &&
-           (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) || is_float(type->primitive));
+           (is_signed_int(type->primitive) || is_unsigned_int(type->primitive) ||
+            is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive) ||
+            is_float(type->primitive));
+}
+
+bool is_fixed_primitive_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
 }
 
 bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
@@ -458,6 +466,10 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
         return check_expr(expr);
     }
 
+    if (is_fixed_primitive_type(left_type) || is_fixed_primitive_type(right_type)) {
+        throw CompileError("Fixed-point operators are not implemented yet", expr->location);
+    }
+
     auto is_numeric_like = [&](TypePtr t) {
         return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
     };
@@ -628,6 +640,9 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     };
 
     if (expr->op == "-") {
+        if (is_fixed_primitive_type(operand_type)) {
+            throw CompileError("Fixed-point unary operators are not implemented yet", expr->location);
+        }
         if (!is_numeric_like(operand_type)) {
             throw CompileError("Unary - requires numeric operand", expr->location);
         }
@@ -1167,8 +1182,10 @@ bool TypeChecker::types_equal(TypePtr a, TypePtr b) {
     switch (a->kind) {
         case Type::Kind::Primitive:
             if (a->primitive != b->primitive) return false;
-            if (is_signed_int(a->primitive) || is_unsigned_int(a->primitive)) {
-                return a->integer_bits == b->integer_bits;
+            if (is_signed_int(a->primitive) || is_unsigned_int(a->primitive) ||
+                is_signed_fixed(a->primitive) || is_unsigned_fixed(a->primitive)) {
+                return a->integer_bits == b->integer_bits &&
+                       a->fractional_bits == b->fractional_bits;
             }
             return true;
         case Type::Kind::Array:
@@ -1491,6 +1508,9 @@ bool TypeChecker::literal_assignable_to(TypePtr target, ExprPtr expr) {
             case PrimitiveType::UInt:
                 if (value.from_boolean) return false;
                 return fits_unsigned_width(target->integer_bits);
+            case PrimitiveType::FixedInt:
+            case PrimitiveType::FixedUInt:
+                return false;
             case PrimitiveType::F16:
             case PrimitiveType::F32:
             case PrimitiveType::F64:

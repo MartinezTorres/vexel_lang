@@ -35,6 +35,7 @@ struct Type {
     // For Primitive
     PrimitiveType primitive;
     uint64_t integer_bits = 0;
+    int64_t fractional_bits = 0;
     // For Array
     TypePtr element_type;
     ExprPtr array_size;
@@ -47,7 +48,8 @@ struct Type {
 
     static TypePtr make_primitive(PrimitiveType p,
                                   const SourceLocation& loc = SourceLocation(),
-                                  uint64_t int_bits = 0);
+                                  uint64_t int_bits = 0,
+                                  int64_t frac_bits = 0);
     static TypePtr make_array(TypePtr elem, ExprPtr size, const SourceLocation& loc = SourceLocation());
     static TypePtr make_named(const std::string& name, const SourceLocation& loc = SourceLocation());
     static TypePtr make_typevar(const std::string& name, const SourceLocation& loc = SourceLocation());

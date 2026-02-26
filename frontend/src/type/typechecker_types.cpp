@@ -9,6 +9,61 @@ namespace vexel {
 
 TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const SourceLocation& loc) {
     // Parse primitive types
+    auto parse_fixed_family = [&](char prefix, PrimitiveType kind) -> TypePtr {
+        if (type_str.size() < 4 || type_str[0] != prefix) return nullptr;
+        size_t dot = type_str.find('.');
+        if (dot == std::string::npos || dot <= 1 || dot + 1 >= type_str.size()) {
+            return nullptr;
+        }
+        for (size_t i = 1; i < dot; ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(type_str[i]))) {
+                return nullptr;
+            }
+        }
+        bool negative_frac = false;
+        size_t frac_start = dot + 1;
+        if (type_str[frac_start] == '-') {
+            negative_frac = true;
+            ++frac_start;
+        }
+        if (frac_start >= type_str.size()) return nullptr;
+        for (size_t i = frac_start; i < type_str.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(type_str[i]))) {
+                return nullptr;
+            }
+        }
+
+        uint64_t integer_bits = 0;
+        int64_t fractional_bits = 0;
+        try {
+            integer_bits = std::stoull(type_str.substr(1, dot - 1));
+            unsigned long long parsed_frac = std::stoull(type_str.substr(frac_start));
+            if (negative_frac) {
+                if (parsed_frac > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+                    throw std::out_of_range("fractional width too negative");
+                }
+                fractional_bits = -static_cast<int64_t>(parsed_frac);
+            } else {
+                if (parsed_frac > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+                    throw std::out_of_range("fractional width too large");
+                }
+                fractional_bits = static_cast<int64_t>(parsed_frac);
+            }
+        } catch (const std::exception&) {
+            throw CompileError("Invalid fixed-point width in type '#" + type_str + "'", loc);
+        }
+        if (integer_bits == 0) {
+            throw CompileError("Fixed-point integer width must be greater than zero in type '#" + type_str + "'", loc);
+        }
+        if (integer_bits > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+            throw CompileError("Fixed-point total width is too large in type '#" + type_str + "'", loc);
+        }
+        int64_t total = static_cast<int64_t>(integer_bits) + fractional_bits;
+        if (total <= 0) {
+            throw CompileError("Fixed-point type '#" + type_str + "' must satisfy I + F > 0", loc);
+        }
+        return Type::make_primitive(kind, loc, integer_bits, fractional_bits);
+    };
     auto parse_int_family = [&](char prefix, PrimitiveType kind) -> TypePtr {
         if (type_str.size() < 2 || type_str[0] != prefix) return nullptr;
         for (size_t i = 1; i < type_str.size(); ++i) {
@@ -28,6 +83,8 @@ TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const S
         return Type::make_primitive(kind, loc, bits);
     };
 
+    if (auto fixed_int = parse_fixed_family('i', PrimitiveType::FixedInt)) return fixed_int;
+    if (auto fixed_uint = parse_fixed_family('u', PrimitiveType::FixedUInt)) return fixed_uint;
     if (auto int_type = parse_int_family('i', PrimitiveType::Int)) return int_type;
     if (auto uint_type = parse_int_family('u', PrimitiveType::UInt)) return uint_type;
     if (type_str == "f16") return Type::make_primitive(PrimitiveType::F16, loc);
@@ -51,6 +108,8 @@ TypeChecker::TypeFamily TypeChecker::get_type_family(TypePtr type) {
 
     if (is_signed_int(type->primitive)) return TypeFamily::Signed;
     if (is_unsigned_int(type->primitive)) return TypeFamily::Unsigned;
+    if (is_signed_fixed(type->primitive)) return TypeFamily::Other;
+    if (is_unsigned_fixed(type->primitive)) return TypeFamily::Other;
     if (is_float(type->primitive)) return TypeFamily::Float;
     return TypeFamily::Other;
 }

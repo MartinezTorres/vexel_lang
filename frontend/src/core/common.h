@@ -64,6 +64,8 @@ struct Diagnostic {
 enum class PrimitiveType {
     Int,
     UInt,
+    FixedInt,
+    FixedUInt,
     F16,
     F32,
     F64,
@@ -71,12 +73,30 @@ enum class PrimitiveType {
     String
 };
 
-inline std::string primitive_name(PrimitiveType t, uint64_t integer_bits = 0) {
+inline bool is_signed_fixed(PrimitiveType t) {
+    return t == PrimitiveType::FixedInt;
+}
+
+inline bool is_unsigned_fixed(PrimitiveType t) {
+    return t == PrimitiveType::FixedUInt;
+}
+
+inline bool is_fixed(PrimitiveType t) {
+    return is_signed_fixed(t) || is_unsigned_fixed(t);
+}
+
+inline std::string primitive_name(PrimitiveType t,
+                                  uint64_t integer_bits = 0,
+                                  int64_t fractional_bits = 0) {
     switch(t) {
         case PrimitiveType::Int:
             return integer_bits > 0 ? "i" + std::to_string(integer_bits) : "i";
         case PrimitiveType::UInt:
             return integer_bits > 0 ? "u" + std::to_string(integer_bits) : "u";
+        case PrimitiveType::FixedInt:
+            return "i" + std::to_string(integer_bits) + "." + std::to_string(fractional_bits);
+        case PrimitiveType::FixedUInt:
+            return "u" + std::to_string(integer_bits) + "." + std::to_string(fractional_bits);
         case PrimitiveType::F16: return "f16";
         case PrimitiveType::F32: return "f32";
         case PrimitiveType::F64: return "f64";
@@ -98,11 +118,16 @@ inline bool is_float(PrimitiveType t) {
     return t == PrimitiveType::F16 || t == PrimitiveType::F32 || t == PrimitiveType::F64;
 }
 
-inline int64_t type_bits(PrimitiveType t, uint64_t integer_bits = 0) {
+inline int64_t type_bits(PrimitiveType t,
+                         uint64_t integer_bits = 0,
+                         int64_t fractional_bits = 0) {
     switch(t) {
         case PrimitiveType::Int:
         case PrimitiveType::UInt:
             return static_cast<int64_t>(integer_bits);
+        case PrimitiveType::FixedInt:
+        case PrimitiveType::FixedUInt:
+            return static_cast<int64_t>(integer_bits) + fractional_bits;
         case PrimitiveType::Bool: return 1;
         case PrimitiveType::F16: return 16;
         case PrimitiveType::F32: return 32;

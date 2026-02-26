@@ -250,6 +250,12 @@ bool is_untyped_integer_primitive(const TypePtr& type) {
            type->integer_bits == 0;
 }
 
+bool is_fixed_primitive(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
+}
+
 uint64_t min_unsigned_bits(uint64_t value) {
     if (value == 0) return 1;
     uint64_t bits = 0;
@@ -488,6 +494,9 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
     TypePtr operand_type = check_expr(expr->operand);
     TypePtr target_type = validate_type(expr->target_type, expr->location);
     expr->target_type = target_type;
+    if (is_fixed_primitive(operand_type) || is_fixed_primitive(target_type)) {
+        throw CompileError("Fixed-point casts are not implemented yet", expr->location);
+    }
     if (operand_type &&
         operand_type->kind == Type::Kind::Primitive &&
         (operand_type->primitive == PrimitiveType::Int || operand_type->primitive == PrimitiveType::UInt) &&
@@ -516,9 +525,14 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
                 count = operand_type->array_size->uint_val;
             }
         }
-        if (count != static_cast<uint64_t>(type_bits(target_type->primitive, target_type->integer_bits))) {
+        if (count != static_cast<uint64_t>(type_bits(target_type->primitive,
+                                                     target_type->integer_bits,
+                                                     target_type->fractional_bits))) {
             throw CompileError("Boolean array size mismatch for cast to #" +
-                               primitive_name(target_type->primitive, target_type->integer_bits), expr->location);
+                               primitive_name(target_type->primitive,
+                                              target_type->integer_bits,
+                                              target_type->fractional_bits),
+                               expr->location);
         }
     }
 
@@ -623,6 +637,9 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         }
 
         TypePtr rhs_type = check_expr(expr->right);
+        if (is_fixed_primitive(expr->left->type) || is_fixed_primitive(rhs_type)) {
+            throw CompileError("Fixed-point assignments are not implemented yet", expr->location);
+        }
         TypePtr rhs_inferred_type = rhs_type;
         TypePtr var_type = expr->left->type ? expr->left->type : rhs_type;
         if (expr->left->type) {
@@ -705,6 +722,9 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
 
     TypePtr lhs_type = check_expr(expr->left);
     TypePtr rhs_type = check_expr(expr->right);
+    if (is_fixed_primitive(lhs_type) || is_fixed_primitive(rhs_type)) {
+        throw CompileError("Fixed-point assignments are not implemented yet", expr->location);
+    }
 
     if (expr->left->kind == Expr::Kind::TupleLiteral && expr->right->kind != Expr::Kind::TupleLiteral) {
         throw CompileError("Arity mismatch in multi-assignment", expr->location);

@@ -853,6 +853,10 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 output = ctvalue_from_exact_int(exact.wrapped_unsigned(target_type->integer_bits), true);
                 return true;
             }
+            case PrimitiveType::FixedInt:
+            case PrimitiveType::FixedUInt:
+                error_msg = "Fixed-point compile-time coercion is not implemented yet";
+                return false;
             case PrimitiveType::F16:
             case PrimitiveType::F32:
             case PrimitiveType::F64:

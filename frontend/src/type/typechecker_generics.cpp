@@ -40,7 +40,7 @@ std::string mangle_type_component(TypePtr type) {
 
     switch (type->kind) {
         case Type::Kind::Primitive:
-            return primitive_name(type->primitive, type->integer_bits);
+            return primitive_name(type->primitive, type->integer_bits, type->fractional_bits);
         case Type::Kind::Named:
             return type->type_name;
         case Type::Kind::Array: {
@@ -103,8 +103,10 @@ bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
     switch (a->kind) {
         case Type::Kind::Primitive:
             if (a->primitive != b->primitive) return false;
-            if (is_signed_int(a->primitive) || is_unsigned_int(a->primitive)) {
-                return a->integer_bits == b->integer_bits;
+            if (is_signed_int(a->primitive) || is_unsigned_int(a->primitive) ||
+                is_signed_fixed(a->primitive) || is_unsigned_fixed(a->primitive)) {
+                return a->integer_bits == b->integer_bits &&
+                       a->fractional_bits == b->fractional_bits;
             }
             return true;
         case Type::Kind::Array:
@@ -127,8 +129,10 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
     switch (t->kind) {
         case Type::Kind::Primitive:
             hash ^= static_cast<size_t>(t->primitive) << 8;
-            if (is_signed_int(t->primitive) || is_unsigned_int(t->primitive)) {
+            if (is_signed_int(t->primitive) || is_unsigned_int(t->primitive) ||
+                is_signed_fixed(t->primitive) || is_unsigned_fixed(t->primitive)) {
                 hash ^= std::hash<uint64_t>{}(t->integer_bits) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                hash ^= std::hash<int64_t>{}(t->fractional_bits) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
             }
             break;
         case Type::Kind::Array:

@@ -91,7 +91,7 @@ private:
         if (!type) return "#T";
         switch (type->kind) {
             case Type::Kind::Primitive:
-                return "#" + primitive_name(type->primitive, type->integer_bits);
+                return "#" + primitive_name(type->primitive, type->integer_bits, type->fractional_bits);
             case Type::Kind::Named:
                 return "#" + type->type_name;
             case Type::Kind::TypeVar:

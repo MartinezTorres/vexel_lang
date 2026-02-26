@@ -54,7 +54,9 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         } else if (expr->operand->type->primitive == PrimitiveType::Bool) {
             bits = 1;
         } else {
-            int64_t type_bits_val = type_bits(expr->operand->type->primitive, expr->operand->type->integer_bits);
+            int64_t type_bits_val = type_bits(expr->operand->type->primitive,
+                                             expr->operand->type->integer_bits,
+                                             expr->operand->type->fractional_bits);
             if (type_bits_val < 0) {
                 error_msg = "Unsupported operand type for byte array cast";
                 return false;
@@ -124,7 +126,9 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         }
         if (length != static_cast<int64_t>(target_type->integer_bits)) {
             error_msg = "Boolean array size mismatch for cast to #" +
-                        primitive_name(target_type->primitive, target_type->integer_bits);
+                        primitive_name(target_type->primitive,
+                                       target_type->integer_bits,
+                                       target_type->fractional_bits);
             return false;
         }
 
@@ -160,7 +164,9 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         }
         if (static_cast<int64_t>(array->elements.size()) != length) {
             error_msg = "Boolean array size mismatch for cast to #" +
-                        primitive_name(target_type->primitive, target_type->integer_bits);
+                        primitive_name(target_type->primitive,
+                                       target_type->integer_bits,
+                                       target_type->fractional_bits);
             return false;
         }
         for (int64_t i = 0; i < length; ++i) {

@@ -1678,6 +1678,71 @@ TypePtr Parser::parse_type() {
             }
             return Type::make_primitive(primitive_kind, loc, bits);
         };
+        auto try_parse_fixed_suffix = [&](const TypePtr& base) -> TypePtr {
+            if (!base || base->kind != Type::Kind::Primitive) {
+                return base;
+            }
+            if (!(base->primitive == PrimitiveType::Int || base->primitive == PrimitiveType::UInt)) {
+                return base;
+            }
+            if (!match(TokenType::Dot)) {
+                return base;
+            }
+
+            bool negative = false;
+            if (match(TokenType::Minus)) {
+                negative = true;
+            }
+
+            Token frac_tok = consume(TokenType::IntLiteral, "Expected fixed-point fractional width after '.'");
+            int64_t frac_bits = 0;
+            try {
+                unsigned long long parsed = std::stoull(frac_tok.lexeme);
+                if (negative) {
+                    if (parsed > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max()) + 1ULL) {
+                        throw std::out_of_range("fractional width underflow");
+                    }
+                    if (parsed == static_cast<unsigned long long>(std::numeric_limits<int64_t>::max()) + 1ULL) {
+                        frac_bits = std::numeric_limits<int64_t>::min();
+                    } else {
+                        frac_bits = -static_cast<int64_t>(parsed);
+                    }
+                } else {
+                    if (parsed > static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+                        throw std::out_of_range("fractional width overflow");
+                    }
+                    frac_bits = static_cast<int64_t>(parsed);
+                }
+            } catch (const std::exception&) {
+                throw CompileError("Invalid fixed-point fractional width in type '#" + name + "." +
+                                       (negative ? "-" : "") + frac_tok.lexeme + "'",
+                                   loc);
+            }
+
+            if (frac_bits == std::numeric_limits<int64_t>::min()) {
+                throw CompileError("Fixed-point fractional width is too negative in type '#" + name + "." +
+                                       (negative ? "-" : "") + frac_tok.lexeme + "'",
+                                   loc);
+            }
+
+            int64_t total_bits = 0;
+            if (base->integer_bits > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+                throw CompileError("Fixed-point total width is too large in type '#" + name + "." +
+                                       (negative ? "-" : "") + frac_tok.lexeme + "'",
+                                   loc);
+            }
+            total_bits = static_cast<int64_t>(base->integer_bits) + frac_bits;
+            if (total_bits <= 0) {
+                throw CompileError("Fixed-point type '#" + name + "." + (negative ? "-" : "") + frac_tok.lexeme +
+                                       "' must satisfy I + F > 0",
+                                   loc);
+            }
+
+            PrimitiveType fixed_kind = (base->primitive == PrimitiveType::Int)
+                                           ? PrimitiveType::FixedInt
+                                           : PrimitiveType::FixedUInt;
+            return Type::make_primitive(fixed_kind, loc, base->integer_bits, frac_bits);
+        };
 
         if (name == "b") {
             type = Type::make_primitive(PrimitiveType::Bool, loc);
@@ -1690,9 +1755,9 @@ TypePtr Parser::parse_type() {
         } else if (name == "f64") {
             type = Type::make_primitive(PrimitiveType::F64, loc);
         } else if (auto i_type = parse_integer_primitive('i', PrimitiveType::Int)) {
-            type = i_type;
+            type = try_parse_fixed_suffix(i_type);
         } else if (auto u_type = parse_integer_primitive('u', PrimitiveType::UInt)) {
-            type = u_type;
+            type = try_parse_fixed_suffix(u_type);
         } else {
             type = Type::make_named(name, loc);
         }
