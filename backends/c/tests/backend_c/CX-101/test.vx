@@ -1,0 +1,17 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native zero-fraction fixed-point bitwise/shift operations lower through extended-integer helpers.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'typedef struct { unsigned char b[9]; } vx_u72_t;' out.h && grep -Fq 'vx_ai_and(' out.c && grep -Fq 'vx_ai_or(' out.c && grep -Fq 'vx_ai_xor(' out.c && grep -Fq 'vx_ai_shl(' out.c && grep -Fq 'vx_ai_shr_u(' out.c && grep -Fq 'vx_ai_not(' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^bitmix72(a:#u72.0, b:#u72.0, s:#u72.0) -> #u72.0 {
+  x:#u72.0 = a;
+  x = b;
+  x &= a;
+  x |= b;
+  x ^= a;
+  x <<= s;
+  x >>= s;
+  (~a) & x
+}
+
+&^main() -> #i32 { 0 }

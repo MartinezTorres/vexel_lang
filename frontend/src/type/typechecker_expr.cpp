@@ -73,9 +73,9 @@ bool fixed_muldiv_storage_width_supported(const TypePtr& type) {
 
 bool fixed_bitwise_shift_supported(const TypePtr& type) {
     if (!is_fixed_primitive_type(type)) return false;
-    if (!fixed_native_storage_width_supported(type)) return false;
     if (type->primitive != PrimitiveType::FixedUInt) return false;
-    return type->fractional_bits == 0;
+    if (type->fractional_bits != 0) return false;
+    return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
 }
 
 bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
@@ -491,6 +491,16 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             throw CompileError("Fixed-point operators currently require matching fixed-point operand types",
                                expr->location);
         }
+        if (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
+            expr->op == "<<" || expr->op == ">>") {
+            if (!fixed_bitwise_shift_supported(left_type)) {
+                throw CompileError(
+                    "Fixed-point bitwise/shift operators require unsigned fixed-point operands with zero fractional bits",
+                    expr->location);
+            }
+            expr->type = left_type;
+            return expr->type;
+        }
         if (!fixed_native_storage_width_supported(left_type)) {
             throw CompileError("Fixed-point operators currently support only native storage widths (8/16/32/64)",
                                expr->location);
@@ -512,16 +522,6 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
         if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
             expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
             expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
-            return expr->type;
-        }
-        if (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
-            expr->op == "<<" || expr->op == ">>") {
-            if (!fixed_bitwise_shift_supported(left_type)) {
-                throw CompileError(
-                    "Fixed-point bitwise/shift operators require unsigned fixed-point operands with zero fractional bits",
-                    expr->location);
-            }
-            expr->type = left_type;
             return expr->type;
         }
         throw CompileError("Fixed-point operator '" + expr->op + "' is not implemented yet", expr->location);

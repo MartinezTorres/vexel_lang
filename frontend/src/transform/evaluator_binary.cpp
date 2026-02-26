@@ -17,7 +17,20 @@ bool fixed_native_meta(const TypePtr& type,
                        int64_t& fractional_bits) {
     if (!is_fixed_primitive_type(type)) return false;
     int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
-    if (!(bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64)) return false;
+    if (bits_i64 <= 0) return false;
+    total_bits = static_cast<uint64_t>(bits_i64);
+    is_signed_raw = (type->primitive == PrimitiveType::FixedInt);
+    fractional_bits = type->fractional_bits;
+    return bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64;
+}
+
+bool fixed_any_meta(const TypePtr& type,
+                    uint64_t& total_bits,
+                    bool& is_signed_raw,
+                    int64_t& fractional_bits) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    if (bits_i64 <= 0) return false;
     total_bits = static_cast<uint64_t>(bits_i64);
     is_signed_raw = (type->primitive == PrimitiveType::FixedInt);
     fractional_bits = type->fractional_bits;
@@ -30,14 +43,6 @@ bool fixed_muldiv_meta_supported(const TypePtr& type,
                                  int64_t& fractional_bits) {
     if (!fixed_native_meta(type, total_bits, is_signed_raw, fractional_bits)) return false;
     return total_bits == 8 || total_bits == 16 || total_bits == 32;
-}
-
-bool fixed_bitwise_shift_meta_supported(const TypePtr& type,
-                                        uint64_t& total_bits,
-                                        bool& is_signed_raw,
-                                        int64_t& fractional_bits) {
-    if (!fixed_native_meta(type, total_bits, is_signed_raw, fractional_bits)) return false;
-    return !is_signed_raw && fractional_bits == 0;
 }
 
 APInt trunc_div_pow2(const APInt& value, uint64_t shift) {
@@ -125,6 +130,61 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
 
     if (!try_evaluate(expr->right, right_val)) return false;
 
+    if (expr && expr->type && is_fixed_primitive_type(expr->type) &&
+        (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
+         expr->op == "<<" || expr->op == ">>")) {
+        uint64_t fixed_bits = 0;
+        bool fixed_signed = false;
+        int64_t fixed_frac = 0;
+        if (!fixed_any_meta(expr->type, fixed_bits, fixed_signed, fixed_frac)) {
+            error_msg = "Unsupported fixed-point type in compile-time evaluation";
+            return false;
+        }
+        if (fixed_signed || fixed_frac != 0) {
+            error_msg =
+                "Fixed-point compile-time bitwise/shift operators require unsigned fixed-point operands with zero fractional bits";
+            return false;
+        }
+        APInt l(uint64_t(0));
+        APInt r(uint64_t(0));
+        bool lu = false;
+        bool ru = false;
+        if (!ctvalue_to_exact_int(left_val, l, lu) || !ctvalue_to_exact_int(right_val, r, ru)) {
+            error_msg = "Unsupported operand types for fixed-point binary operation";
+            return false;
+        }
+        auto wrap_raw = [&](const APInt& raw) { return raw.wrapped_unsigned(fixed_bits); };
+        l = wrap_raw(l);
+        r = wrap_raw(r);
+        if (expr->op == "&") {
+            result = ctvalue_from_exact_int(wrap_raw(l & r), true);
+            return true;
+        }
+        if (expr->op == "|") {
+            result = ctvalue_from_exact_int(wrap_raw(l | r), true);
+            return true;
+        }
+        if (expr->op == "^") {
+            result = ctvalue_from_exact_int(wrap_raw(l ^ r), true);
+            return true;
+        }
+        if (r.is_negative()) {
+            error_msg = "Negative shift count in compile-time evaluation";
+            return false;
+        }
+        if (!r.fits_u64()) {
+            error_msg = "Shift count too large in compile-time evaluation";
+            return false;
+        }
+        uint64_t shift = r.to_u64();
+        if (expr->op == "<<") {
+            result = ctvalue_from_exact_int(wrap_raw(l << shift), true);
+        } else {
+            result = ctvalue_from_exact_int(wrap_raw(l >> shift), true);
+        }
+        return true;
+    }
+
     uint64_t fixed_bits = 0;
     bool fixed_signed = false;
     int64_t fixed_frac = 0;
@@ -160,47 +220,6 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             else if (expr->op == "<=") result = (int64_t)(l <= r);
             else if (expr->op == ">") result = (int64_t)(l > r);
             else result = (int64_t)(l >= r);
-            return true;
-        }
-        if (expr->op == "&" || expr->op == "|" || expr->op == "^" ||
-            expr->op == "<<" || expr->op == ">>") {
-            uint64_t bw_bits = 0;
-            bool bw_signed = false;
-            int64_t bw_frac = 0;
-            if (!fixed_bitwise_shift_meta_supported(expr->type, bw_bits, bw_signed, bw_frac)) {
-                error_msg =
-                    "Fixed-point compile-time bitwise/shift operators require unsigned fixed-point operands with zero fractional bits";
-                return false;
-            }
-            (void)bw_bits;
-            (void)bw_signed;
-            (void)bw_frac;
-            if (expr->op == "&") {
-                result = ctvalue_from_exact_int(wrap_raw(l & r), true);
-                return true;
-            }
-            if (expr->op == "|") {
-                result = ctvalue_from_exact_int(wrap_raw(l | r), true);
-                return true;
-            }
-            if (expr->op == "^") {
-                result = ctvalue_from_exact_int(wrap_raw(l ^ r), true);
-                return true;
-            }
-            if (r.is_negative()) {
-                error_msg = "Negative shift count in compile-time evaluation";
-                return false;
-            }
-            if (!r.fits_u64()) {
-                error_msg = "Shift count too large in compile-time evaluation";
-                return false;
-            }
-            uint64_t shift = r.to_u64();
-            if (expr->op == "<<") {
-                result = ctvalue_from_exact_int(wrap_raw(l << shift), true);
-            } else {
-                result = ctvalue_from_exact_int(wrap_raw(l >> shift), true);
-            }
             return true;
         }
         if ((expr->op == "*" || expr->op == "/" || expr->op == "%")) {

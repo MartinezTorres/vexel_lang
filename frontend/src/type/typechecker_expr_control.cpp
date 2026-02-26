@@ -270,9 +270,9 @@ bool fixed_muldiv_storage_width_supported(const TypePtr& type) {
 
 bool fixed_bitwise_shift_supported(const TypePtr& type) {
     if (!is_fixed_primitive(type)) return false;
-    if (!fixed_native_storage_width_supported(type)) return false;
     if (type->primitive != PrimitiveType::FixedUInt) return false;
-    return type->fractional_bits == 0;
+    if (type->fractional_bits != 0) return false;
+    return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
 }
 
 uint64_t min_unsigned_bits(uint64_t value) {
@@ -814,11 +814,6 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Fixed-point compound assignments currently require matching fixed-point operand types",
                                expr->location);
         }
-        int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
-        if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
-            throw CompileError("Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
-                               expr->location);
-        }
         if (assign_op != "=" && assign_op != "+=" && assign_op != "-=" &&
             assign_op != "*=" && assign_op != "/=" && assign_op != "%=" &&
             assign_op != "&=" && assign_op != "|=" && assign_op != "^=" &&
@@ -826,18 +821,26 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
                                expr->location);
         }
+        if (assign_op == "&=" || assign_op == "|=" || assign_op == "^=" ||
+            assign_op == "<<=" || assign_op == ">>=") {
+            if (!fixed_bitwise_shift_supported(lhs_type)) {
+                throw CompileError(
+                    "Fixed-point compound bitwise/shift assignments require unsigned fixed-point operands with zero fractional bits",
+                    expr->location);
+            }
+        } else if (assign_op != "=") {
+            int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
+            if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
+                throw CompileError(
+                    "Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
+                    expr->location);
+            }
+        }
         if ((assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
             !fixed_muldiv_storage_width_supported(lhs_type)) {
             throw CompileError(
                 "Fixed-point compound assignment '" + assign_op +
                     "' currently supports only native storage widths up to 32 bits (8/16/32)",
-                expr->location);
-        }
-        if ((assign_op == "&=" || assign_op == "|=" || assign_op == "^=" ||
-             assign_op == "<<=" || assign_op == ">>=") &&
-            !fixed_bitwise_shift_supported(lhs_type)) {
-            throw CompileError(
-                "Fixed-point compound bitwise/shift assignments require unsigned fixed-point operands with zero fractional bits",
                 expr->location);
         }
     }
@@ -943,23 +946,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                 throw CompileError("Fixed-point compound assignments currently require matching fixed-point operand types",
                                    expr->location);
             }
-            int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
-            if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
-                throw CompileError("Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
-                                   expr->location);
-            }
-            if (binary_op == "+" || binary_op == "-") {
-                compound_value_type = lhs_type;
-            } else if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
-                if (!fixed_muldiv_storage_width_supported(lhs_type)) {
-                    throw CompileError(
-                        "Fixed-point compound assignment '" + assign_op +
-                            "' currently supports only native storage widths up to 32 bits (8/16/32)",
-                        expr->location);
-                }
-                compound_value_type = lhs_type;
-            } else if (binary_op == "&" || binary_op == "|" || binary_op == "^" ||
-                       binary_op == "<<" || binary_op == ">>") {
+            if (binary_op == "&" || binary_op == "|" || binary_op == "^" ||
+                binary_op == "<<" || binary_op == ">>") {
                 if (!fixed_bitwise_shift_supported(lhs_type)) {
                     throw CompileError(
                         "Fixed-point compound bitwise/shift assignments require unsigned fixed-point operands with zero fractional bits",
@@ -967,8 +955,26 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                 }
                 compound_value_type = lhs_type;
             } else {
-                throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
-                                   expr->location);
+                int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
+                if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
+                    throw CompileError(
+                        "Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
+                        expr->location);
+                }
+                if (binary_op == "+" || binary_op == "-") {
+                    compound_value_type = lhs_type;
+                } else if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
+                    if (!fixed_muldiv_storage_width_supported(lhs_type)) {
+                        throw CompileError(
+                            "Fixed-point compound assignment '" + assign_op +
+                                "' currently supports only native storage widths up to 32 bits (8/16/32)",
+                            expr->location);
+                    }
+                    compound_value_type = lhs_type;
+                } else {
+                    throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
+                                       expr->location);
+                }
             }
         } else if (binary_op == "&&" || binary_op == "||") {
             std::string context = (binary_op == "&&") ? "Logical operator &&" : "Logical operator ||";
