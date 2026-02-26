@@ -584,14 +584,21 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
             throw CompileError("Fixed-point casts currently support only native storage widths (8/16/32/64)",
                                expr->location);
         }
-        if ((is_float(operand_type->primitive) && is_fixed_primitive(target_type)) ||
-            (is_fixed_primitive(operand_type) && is_float(target_type->primitive))) {
-            throw CompileError("Fixed-point casts with floating-point operands are not implemented yet",
-                               expr->location);
-        }
         if ((is_signed_int(target_type->primitive) || is_unsigned_int(target_type->primitive)) &&
             target_type->integer_bits == 0) {
             throw CompileError("Fixed-point casts require concrete integer widths", expr->location);
+        }
+        if (((is_float(operand_type->primitive) && is_fixed_primitive(target_type)) ||
+             (is_fixed_primitive(operand_type) && is_float(target_type->primitive)))) {
+            auto frac_in_int_range = [&](TypePtr t) {
+                if (!is_fixed_primitive(t)) return true;
+                return t->fractional_bits >= std::numeric_limits<int>::min() &&
+                       t->fractional_bits <= std::numeric_limits<int>::max();
+            };
+            if (!frac_in_int_range(operand_type) || !frac_in_int_range(target_type)) {
+                throw CompileError("Fixed-point casts with floating-point operands require fractional width in host-int range",
+                                   expr->location);
+            }
         }
     }
 

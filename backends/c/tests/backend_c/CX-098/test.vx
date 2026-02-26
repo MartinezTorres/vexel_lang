@@ -1,0 +1,20 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Native-width fixed-point explicit casts to/from floating-point lower with numeric scaling semantics (in-range values).
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out -lm && ./out
+
+&^main() -> #i32 {
+  a:#u8.8 = (#u8.8)1.5;
+  b:#f64 = (#f64)a;
+  c:#i8.8 = (#i8.8)-1.5;
+  d:#f64 = (#f64)c;
+  e:#i16.0 = (#i16.0)c;
+  f:#u10.-2 = (#u10.-2)12.0;
+  g:#f32 = (#f32)f;
+  ok:#b =
+    (b > 1.49 && b < 1.51) &&
+    (d > -1.51 && d < -1.49) &&
+    (e == (#i16.0)-1) &&
+    (g > 11.99 && g < 12.01);
+  ok ? 0 : 1
+}

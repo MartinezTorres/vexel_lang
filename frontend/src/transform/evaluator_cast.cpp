@@ -1,6 +1,8 @@
 #include "evaluator.h"
 #include "constants.h"
 #include "cte_value_utils.h"
+#include <cmath>
+#include <limits>
 
 namespace vexel {
 
@@ -284,8 +286,30 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
                     return false;
                 }
                 raw = scale_by_pow2_trunc_zero(raw, dst_frac);
+            } else if (is_float(source_type->primitive)) {
+                double scaled = std::ldexp(to_float(operand_val), static_cast<int>(dst_frac));
+                if (!std::isfinite(scaled)) {
+                    error_msg = "Fixed-point compile-time cast from floating-point requires a finite value";
+                    return false;
+                }
+                double truncd = std::trunc(scaled);
+                if (truncd >= 0.0) {
+                    long double max_u64 = static_cast<long double>(std::numeric_limits<uint64_t>::max());
+                    if (static_cast<long double>(truncd) > max_u64) {
+                        error_msg = "Fixed-point compile-time cast from floating-point exceeds supported range";
+                        return false;
+                    }
+                    raw = APInt(static_cast<uint64_t>(truncd));
+                } else {
+                    long double min_i64 = static_cast<long double>(std::numeric_limits<int64_t>::min());
+                    if (static_cast<long double>(truncd) < min_i64) {
+                        error_msg = "Fixed-point compile-time cast from floating-point exceeds supported range";
+                        return false;
+                    }
+                    raw = APInt(static_cast<int64_t>(truncd));
+                }
             } else {
-                error_msg = "Fixed-point compile-time casts with floating-point operands are not implemented yet";
+                error_msg = "Unsupported fixed-point cast source";
                 return false;
             }
 
@@ -301,6 +325,11 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
             if (!to_exact_int_scalar(operand_val, raw, raw_unsigned)) {
                 error_msg = "Unsupported fixed-point cast source";
                 return false;
+            }
+            if (is_float(target_type->primitive)) {
+                double raw_d = raw.raw().convert_to<double>();
+                result = std::ldexp(raw_d, -static_cast<int>(src_frac));
+                return true;
             }
             APInt numeric = scale_by_pow2_trunc_zero(raw, -src_frac);
 
@@ -324,7 +353,7 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
                 result = !numeric.is_zero();
                 return true;
             }
-            error_msg = "Fixed-point compile-time casts with floating-point operands are not implemented yet";
+            error_msg = "Unsupported fixed-point cast target";
             return false;
         }
     }

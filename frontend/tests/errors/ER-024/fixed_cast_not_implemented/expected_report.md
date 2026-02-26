@@ -4,7 +4,7 @@
 
 ## Stderr
 ```
-Error at tests/errors/ER-024/fixed_cast_not_implemented/test.vx:3:12: Fixed-point casts with floating-point operands are not implemented yet
+Error at tests/errors/ER-024/fixed_cast_not_implemented/test.vx:3:14: Fixed-point casts currently support only native storage widths (8/16/32/64)
 ```
 
 ## Exit Code
