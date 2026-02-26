@@ -1,14 +1,16 @@
 // @rfc: docs/vexel-rfc.md#types
-// @desc: C backend maps fixed-point storage types to raw integer storage widths for ABI-visible functions (foundation pass).
+// @desc: C backend maps fixed-point storage types to raw integer storage widths for ABI-visible functions (foundation pass) and supports same-type pass-through assignments.
 // @expect-exit: 0
-// @command: {VEXEL} -b c test.vx && grep -Fq 'uint16_t vx_wrap_u(' out.h && grep -Fq 'uint16_t vx_v' out.h && grep -Fq 'int16_t vx_wrap_s(' out.h && gcc -std=c11 -O2 -c out.c -o out.o
+// @command: {VEXEL} -b c test.vx && grep -Fq 'uint16_t vx_wrap_u(' out.h && grep -Fq 'int16_t vx_wrap_s(' out.h && gcc -std=c11 -O2 -c out.c -o out.o
 
 &^wrap_u(v:#u8.8) -> #u8.8 {
-  v
+  tmp:#u8.8 = v;
+  tmp
 }
 
 &^wrap_s(v:#i10.6) -> #i10.6 {
-  v
+  tmp:#i10.6 = v;
+  tmp
 }
 
 &^main() -> #i32 {

@@ -544,6 +544,13 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     expr->declared_var_type = nullptr;
     std::string assign_op = expr->op.empty() ? "=" : expr->op;
     expr->op = assign_op;
+    auto fixed_assignment_passthrough_ok = [&](TypePtr lhs, TypePtr rhs) -> bool {
+        lhs = resolve_type(lhs);
+        rhs = resolve_type(rhs);
+        return is_fixed_primitive(lhs) &&
+               is_fixed_primitive(rhs) &&
+               types_equal(lhs, rhs);
+    };
     std::function<bool(TypePtr)> type_has_unresolved_parts = [&](TypePtr t) -> bool {
         if (!t) return true;
         t = resolve_type(t);
@@ -637,11 +644,14 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         }
 
         TypePtr rhs_type = check_expr(expr->right);
-        if (is_fixed_primitive(expr->left->type) || is_fixed_primitive(rhs_type)) {
-            throw CompileError("Fixed-point assignments are not implemented yet", expr->location);
-        }
         TypePtr rhs_inferred_type = rhs_type;
         TypePtr var_type = expr->left->type ? expr->left->type : rhs_type;
+        if (is_fixed_primitive(var_type) || is_fixed_primitive(rhs_type)) {
+            if (!fixed_assignment_passthrough_ok(var_type, rhs_type)) {
+                throw CompileError("Fixed-point assignments currently support only same-type pass-through",
+                                   expr->location);
+            }
+        }
         if (expr->left->type) {
             enforce_declared_initializer_type(var_type, expr->right, rhs_type, expr->location);
             rhs_inferred_type = rhs_type;
@@ -723,7 +733,13 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     TypePtr lhs_type = check_expr(expr->left);
     TypePtr rhs_type = check_expr(expr->right);
     if (is_fixed_primitive(lhs_type) || is_fixed_primitive(rhs_type)) {
-        throw CompileError("Fixed-point assignments are not implemented yet", expr->location);
+        if (assign_op != "=") {
+            throw CompileError("Fixed-point compound assignments are not implemented yet", expr->location);
+        }
+        if (!fixed_assignment_passthrough_ok(lhs_type, rhs_type)) {
+            throw CompileError("Fixed-point assignments currently support only same-type pass-through",
+                               expr->location);
+        }
     }
 
     if (expr->left->kind == Expr::Kind::TupleLiteral && expr->right->kind != Expr::Kind::TupleLiteral) {
