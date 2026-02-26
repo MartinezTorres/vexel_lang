@@ -1,0 +1,9 @@
+::std::math;
+
+&!seed() -> #f64;
+
+&^main() -> #i32 {
+  xs:#f64[2] = [seed(), 4.0];
+  ys:#f64[2] = std::math::sqrt(xs);
+  ((#i32)ys[0]) + ((#i32)ys[1])
+}
