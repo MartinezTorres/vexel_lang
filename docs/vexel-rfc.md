@@ -41,8 +41,8 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Parametric unsigned integers: `#uN` where `N` is any positive integer width
 - Fixed-point syntax (foundation): `#iI.F`, `#uI.F` where `I + F > 0` (signed form counts the sign bit inside `I`)
   - Current implementation status: syntax/type parsing and ABI storage-width mapping are present
-  - Supported frontend semantics so far: same-type pass-through assignment (`=` only) and native-width (`I+F` in 8/16/32/64) same-type unary `-`, `+`, `-`, and comparisons
-  - Fixed-point casts, multiplication/division/modulo, bitwise/shift operators, and compound assignments are not implemented yet
+  - Supported frontend semantics so far: same-type pass-through assignment (`=` only), native-width (`I+F` in 8/16/32/64) same-type unary `-`, `+`, `-`, comparisons, `+=`, `-=`, and native-width explicit casts among fixed/integer/bool primitives (floating-point fixed casts still pending)
+  - Fixed-point multiplication/division/modulo, bitwise/shift operators, and remaining compound assignments are not implemented yet
 - Floating point: `#f16`, `#f32`, `#f64`
 - Backends may support only a subset of integer widths (for example, some targets may accept only 8/16/32/64)
 - Boolean: `#b` (values 0 or 1 only, no true/false literals)

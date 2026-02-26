@@ -1,0 +1,23 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point native-width explicit casts (fixed<->int/bool and fixed<->fixed) lower with numeric scaling semantics.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' 'uint16_t vx_seed_u(void) { return 12; }' 'int16_t vx_seed_s(void) { return -384; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+&!seed_u() -> #u16.0;
+&!seed_s() -> #i8.8;
+
+&^main() -> #i32 {
+  u0:#u16.0 = seed_u();
+  s0:#i8.8 = seed_s();
+  u8:#u8.8 = (#u8.8)u0;
+  stepped:#u10.-2 = (#u10.-2)((#u8.0)u0);
+  retag:#i10.6 = (#i10.6)s0;
+  ok:#b =
+    ((#u16.0)u8 == u0) &&
+    ((#u8.0)stepped == (#u8.0)u0) &&
+    (((#b)u8) == 1) &&
+    (((#b)((#u8.8)0)) == 0) &&
+    ((#i16.0)s0 == (#i16.0)-1) &&
+    (((#i8.8)retag) == s0);
+  ok ? 0 : 1
+}

@@ -854,9 +854,28 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 return true;
             }
             case PrimitiveType::FixedInt:
-            case PrimitiveType::FixedUInt:
-                error_msg = "Fixed-point compile-time coercion is not implemented yet";
-                return false;
+            case PrimitiveType::FixedUInt: {
+                int64_t total_bits_i64 = type_bits(target_type->primitive,
+                                                  target_type->integer_bits,
+                                                  target_type->fractional_bits);
+                if (!(total_bits_i64 == 8 || total_bits_i64 == 16 ||
+                      total_bits_i64 == 32 || total_bits_i64 == 64)) {
+                    error_msg = "Fixed-point compile-time coercion currently supports only native storage widths (8/16/32/64)";
+                    return false;
+                }
+                APInt exact(uint64_t(0));
+                bool source_unsigned = false;
+                if (!ctvalue_to_exact_int(input, exact, source_unsigned)) {
+                    error_msg = "Fixed-point compile-time coercion expects a raw integer-compatible value";
+                    return false;
+                }
+                bool signed_raw = target_type->primitive == PrimitiveType::FixedInt;
+                output = ctvalue_from_exact_int(signed_raw
+                                                    ? exact.wrapped_signed(static_cast<uint64_t>(total_bits_i64))
+                                                    : exact.wrapped_unsigned(static_cast<uint64_t>(total_bits_i64)),
+                                                !signed_raw);
+                return true;
+            }
             case PrimitiveType::F16:
             case PrimitiveType::F32:
             case PrimitiveType::F64:

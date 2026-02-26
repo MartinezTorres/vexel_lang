@@ -4,6 +4,48 @@
 
 namespace vexel {
 
+namespace {
+
+bool is_fixed_primitive_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
+}
+
+bool fixed_native_meta(const TypePtr& type,
+                       uint64_t& total_bits,
+                       bool& is_signed_raw,
+                       int64_t& fractional_bits) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    if (!(bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64)) {
+        return false;
+    }
+    total_bits = static_cast<uint64_t>(bits_i64);
+    is_signed_raw = type->primitive == PrimitiveType::FixedInt;
+    fractional_bits = type->fractional_bits;
+    return true;
+}
+
+APInt trunc_div_pow2(const APInt& value, uint64_t shift) {
+    if (shift == 0) return value;
+    if (value.is_negative()) {
+        APInt mag = -value;
+        return -(mag >> shift);
+    }
+    return value >> shift;
+}
+
+APInt scale_by_pow2_trunc_zero(const APInt& value, int64_t shift) {
+    if (shift == 0) return value;
+    if (shift > 0) {
+        return value << static_cast<uint64_t>(shift);
+    }
+    return trunc_div_pow2(value, static_cast<uint64_t>(-shift));
+}
+
+} // namespace
+
 bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
     // Evaluate the operand
     CTValue operand_val;
@@ -188,6 +230,103 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
     if (target_type->kind != Type::Kind::Primitive) {
         error_msg = "Can only cast to primitive types at compile time";
         return false;
+    }
+
+    TypePtr source_type = expr->operand ? expr->operand->type : nullptr;
+    const bool source_is_fixed = is_fixed_primitive_type(source_type);
+    const bool target_is_fixed = is_fixed_primitive_type(target_type);
+    if (source_is_fixed || target_is_fixed) {
+        if (!source_type || source_type->kind != Type::Kind::Primitive) {
+            error_msg = "Fixed-point compile-time casts require primitive operands";
+            return false;
+        }
+
+        uint64_t src_fixed_bits = 0;
+        bool src_fixed_signed = false;
+        int64_t src_frac = 0;
+        if (source_is_fixed &&
+            !fixed_native_meta(source_type, src_fixed_bits, src_fixed_signed, src_frac)) {
+            error_msg = "Fixed-point compile-time casts currently support only native storage widths (8/16/32/64)";
+            return false;
+        }
+        (void)src_fixed_bits;
+        (void)src_fixed_signed;
+        uint64_t dst_fixed_bits = 0;
+        bool dst_fixed_signed = false;
+        int64_t dst_frac = 0;
+        if (target_is_fixed &&
+            !fixed_native_meta(target_type, dst_fixed_bits, dst_fixed_signed, dst_frac)) {
+            error_msg = "Fixed-point compile-time casts currently support only native storage widths (8/16/32/64)";
+            return false;
+        }
+
+        auto to_exact_int_scalar = [&](const CTValue& v, APInt& out, bool& is_unsigned) -> bool {
+            if (ctvalue_to_exact_int(v, out, is_unsigned)) {
+                return true;
+            }
+            return false;
+        };
+
+        if (target_is_fixed) {
+            APInt raw(uint64_t(0));
+            bool src_unsigned = false;
+            if (source_is_fixed) {
+                if (!to_exact_int_scalar(operand_val, raw, src_unsigned)) {
+                    error_msg = "Unsupported fixed-point cast source";
+                    return false;
+                }
+                raw = scale_by_pow2_trunc_zero(raw, dst_frac - src_frac);
+            } else if (is_signed_int(source_type->primitive) ||
+                       is_unsigned_int(source_type->primitive) ||
+                       source_type->primitive == PrimitiveType::Bool) {
+                if (!to_exact_int_scalar(operand_val, raw, src_unsigned)) {
+                    error_msg = "Unsupported fixed-point cast source";
+                    return false;
+                }
+                raw = scale_by_pow2_trunc_zero(raw, dst_frac);
+            } else {
+                error_msg = "Fixed-point compile-time casts with floating-point operands are not implemented yet";
+                return false;
+            }
+
+            raw = dst_fixed_signed ? raw.wrapped_signed(dst_fixed_bits)
+                                   : raw.wrapped_unsigned(dst_fixed_bits);
+            result = ctvalue_from_exact_int(raw, !dst_fixed_signed);
+            return true;
+        }
+
+        if (source_is_fixed) {
+            APInt raw(uint64_t(0));
+            bool raw_unsigned = false;
+            if (!to_exact_int_scalar(operand_val, raw, raw_unsigned)) {
+                error_msg = "Unsupported fixed-point cast source";
+                return false;
+            }
+            APInt numeric = scale_by_pow2_trunc_zero(raw, -src_frac);
+
+            if (is_signed_int(target_type->primitive)) {
+                if (target_type->integer_bits == 0) {
+                    error_msg = "Signed integer cast target is missing width";
+                    return false;
+                }
+                result = ctvalue_from_exact_int(numeric.wrapped_signed(target_type->integer_bits), false);
+                return true;
+            }
+            if (is_unsigned_int(target_type->primitive)) {
+                if (target_type->integer_bits == 0) {
+                    error_msg = "Unsigned integer cast target is missing width";
+                    return false;
+                }
+                result = ctvalue_from_exact_int(numeric.wrapped_unsigned(target_type->integer_bits), true);
+                return true;
+            }
+            if (target_type->primitive == PrimitiveType::Bool) {
+                result = !numeric.is_zero();
+                return true;
+            }
+            error_msg = "Fixed-point compile-time casts with floating-point operands are not implemented yet";
+            return false;
+        }
     }
 
     // Perform the cast based on target primitive type
