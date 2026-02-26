@@ -65,6 +65,12 @@ bool fixed_native_storage_width_supported(const TypePtr& type) {
     return bits == 8 || bits == 16 || bits == 32 || bits == 64;
 }
 
+bool fixed_muldiv_storage_width_supported(const TypePtr& type) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    return bits == 8 || bits == 16 || bits == 32;
+}
+
 bool is_side_effect_free_for_array_lift(const ExprPtr& expr) {
     if (!expr) return true;
     switch (expr->kind) {
@@ -483,6 +489,16 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
                                expr->location);
         }
         if (expr->op == "+" || expr->op == "-") {
+            expr->type = left_type;
+            return expr->type;
+        }
+        if (expr->op == "*" || expr->op == "/" || expr->op == "%") {
+            if (!fixed_muldiv_storage_width_supported(left_type)) {
+                throw CompileError(
+                    "Fixed-point operator '" + expr->op +
+                        "' currently supports only native storage widths up to 32 bits (8/16/32)",
+                    expr->location);
+            }
             expr->type = left_type;
             return expr->type;
         }

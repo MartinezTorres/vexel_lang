@@ -1,0 +1,38 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point native-width (<=32-bit storage) *, /, %, and compound forms lower with fixed-point scaling semantics.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out && ./out
+
+&^main() -> #i32 {
+  a:#u8.8 = (#u8.8)6;
+  b:#u8.8 = (#u8.8)2;
+  c:#u8.8 = (#u8.8)3;
+  u_mul:#u8.8 = a * b;
+  u_div:#u8.8 = a / c;
+  u_rem:#u8.8 = a % b;
+  ux:#u8.8 = a;
+  ux *= b;
+  ux /= c;
+  ux %= b;
+
+  s_neg_three:#i8.8 = -((#i8.8)3);
+  s_two:#i8.8 = (#i8.8)2;
+  s_mul:#i8.8 = s_neg_three * s_two;
+  s_div:#i8.8 = s_neg_three / s_two;
+  s_rem:#i8.8 = s_neg_three % s_two;
+  sx:#i8.8 = s_neg_three;
+  sx *= s_two;
+  sx /= s_two;
+  sx %= s_two;
+
+  ok:#b =
+    ((#u16.0)u_mul == (#u16.0)12) &&
+    ((#u16.0)u_div == (#u16.0)2) &&
+    ((#u16.0)u_rem == (#u16.0)0) &&
+    ((#u16.0)ux == (#u16.0)0) &&
+    ((#i16.0)s_mul == (#i16.0)-6) &&
+    ((#i16.0)s_div == (#i16.0)-1) &&
+    ((#i16.0)s_rem == (#i16.0)-1) &&
+    ((#i16.0)sx == (#i16.0)-1);
+  ok ? 0 : 1
+}

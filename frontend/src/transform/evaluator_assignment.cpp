@@ -6,6 +6,78 @@
 
 namespace vexel {
 
+namespace {
+
+bool is_fixed_primitive_type(const TypePtr& type) {
+    return type &&
+           type->kind == Type::Kind::Primitive &&
+           (is_signed_fixed(type->primitive) || is_unsigned_fixed(type->primitive));
+}
+
+bool fixed_native_meta(const TypePtr& type,
+                       uint64_t& total_bits,
+                       bool& is_signed_raw,
+                       int64_t& fractional_bits) {
+    if (!is_fixed_primitive_type(type)) return false;
+    int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    if (!(bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64)) return false;
+    total_bits = static_cast<uint64_t>(bits_i64);
+    is_signed_raw = (type->primitive == PrimitiveType::FixedInt);
+    fractional_bits = type->fractional_bits;
+    return true;
+}
+
+bool fixed_muldiv_meta_supported(const TypePtr& type,
+                                 uint64_t& total_bits,
+                                 bool& is_signed_raw,
+                                 int64_t& fractional_bits) {
+    if (!fixed_native_meta(type, total_bits, is_signed_raw, fractional_bits)) return false;
+    return total_bits == 8 || total_bits == 16 || total_bits == 32;
+}
+
+APInt trunc_div_pow2(const APInt& value, uint64_t shift) {
+    if (shift == 0) return value;
+    if (value.is_negative()) {
+        APInt mag = -value;
+        return -(mag >> shift);
+    }
+    return value >> shift;
+}
+
+APInt scale_by_pow2_trunc_zero(const APInt& value, int64_t shift) {
+    if (shift == 0) return value;
+    if (shift > 0) return value << static_cast<uint64_t>(shift);
+    return trunc_div_pow2(value, static_cast<uint64_t>(-shift));
+}
+
+bool fixed_raw_div(const APInt& lhs,
+                   const APInt& rhs,
+                   int64_t frac_bits,
+                   APInt& out) {
+    if (rhs.is_zero()) return false;
+    if (frac_bits >= 0) {
+        out = (lhs << static_cast<uint64_t>(frac_bits)) / rhs;
+    } else {
+        APInt denom = rhs << static_cast<uint64_t>(-frac_bits);
+        if (denom.is_zero()) return false;
+        out = lhs / denom;
+    }
+    return true;
+}
+
+bool fixed_raw_mod(const APInt& lhs,
+                   const APInt& rhs,
+                   int64_t frac_bits,
+                   APInt& out) {
+    (void)frac_bits;
+    if (rhs.is_zero()) return false;
+    APInt q = lhs / rhs; // trunc-to-zero integer quotient on same-scale raw values
+    out = lhs - (q * rhs);
+    return true;
+}
+
+} // namespace
+
 bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     const std::string assign_op = expr->op.empty() ? "=" : expr->op;
 
@@ -185,6 +257,64 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
     };
     auto apply_compound = [&](const CTValue& lhs_in, const CTValue& rhs_in, CTValue& out) -> bool {
         const std::string binary_op = assign_op.substr(0, assign_op.size() - 1);
+        TypePtr fixed_type = expr && expr->left ? expr->left->type : nullptr;
+        if (!is_fixed_primitive_type(fixed_type) && expr && expr->type && is_fixed_primitive_type(expr->type)) {
+            fixed_type = expr->type;
+        }
+        uint64_t fixed_bits = 0;
+        bool fixed_signed = false;
+        int64_t fixed_frac = 0;
+        if (is_fixed_primitive_type(fixed_type) &&
+            fixed_native_meta(fixed_type, fixed_bits, fixed_signed, fixed_frac)) {
+            APInt l(uint64_t(0));
+            APInt r(uint64_t(0));
+            bool lu = false, ru = false;
+            if (!ctvalue_to_exact_int(lhs_in, l, lu) || !ctvalue_to_exact_int(rhs_in, r, ru)) {
+                error_msg = "Unsupported operand types for fixed-point compound assignment";
+                return false;
+            }
+            auto wrap_raw = [&](const APInt& raw) {
+                return fixed_signed ? raw.wrapped_signed(fixed_bits)
+                                    : raw.wrapped_unsigned(fixed_bits);
+            };
+            if (binary_op == "+") {
+                out = ctvalue_from_exact_int(wrap_raw(l + r), !fixed_signed);
+                return true;
+            }
+            if (binary_op == "-") {
+                out = ctvalue_from_exact_int(wrap_raw(l - r), !fixed_signed);
+                return true;
+            }
+            if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
+                uint64_t muldiv_bits = 0;
+                bool muldiv_signed = false;
+                int64_t muldiv_frac = 0;
+                if (!fixed_muldiv_meta_supported(fixed_type, muldiv_bits, muldiv_signed, muldiv_frac)) {
+                    error_msg = "Fixed-point compound assignment '" + assign_op +
+                                "' currently supports only native storage widths up to 32 bits (8/16/32)";
+                    return false;
+                }
+                APInt raw(uint64_t(0));
+                if (binary_op == "*") {
+                    raw = scale_by_pow2_trunc_zero(l * r, -muldiv_frac);
+                } else if (binary_op == "/") {
+                    if (!fixed_raw_div(l, r, muldiv_frac, raw)) {
+                        error_msg = "Division by zero in compile-time evaluation";
+                        return false;
+                    }
+                } else {
+                    if (!fixed_raw_mod(l, r, muldiv_frac, raw)) {
+                        error_msg = "Modulo by zero in compile-time evaluation";
+                        return false;
+                    }
+                }
+                out = ctvalue_from_exact_int(muldiv_signed ? raw.wrapped_signed(muldiv_bits)
+                                                           : raw.wrapped_unsigned(muldiv_bits),
+                                             !muldiv_signed);
+                return true;
+            }
+        }
+
         if (binary_op == "&&" || binary_op == "||") {
             bool lhs_bool = false;
             bool rhs_bool = false;

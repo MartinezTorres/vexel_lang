@@ -262,6 +262,12 @@ bool fixed_native_storage_width_supported(const TypePtr& type) {
     return bits == 8 || bits == 16 || bits == 32 || bits == 64;
 }
 
+bool fixed_muldiv_storage_width_supported(const TypePtr& type) {
+    if (!is_fixed_primitive(type)) return false;
+    int64_t bits = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
+    return bits == 8 || bits == 16 || bits == 32;
+}
+
 uint64_t min_unsigned_bits(uint64_t value) {
     if (value == 0) return 1;
     uint64_t bits = 0;
@@ -799,9 +805,17 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
                                expr->location);
         }
-        if (assign_op != "=" && assign_op != "+=" && assign_op != "-=") {
+        if (assign_op != "=" && assign_op != "+=" && assign_op != "-=" &&
+            assign_op != "*=" && assign_op != "/=" && assign_op != "%=") {
             throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
                                expr->location);
+        }
+        if ((assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
+            !fixed_muldiv_storage_width_supported(lhs_type)) {
+            throw CompileError(
+                "Fixed-point compound assignment '" + assign_op +
+                    "' currently supports only native storage widths up to 32 bits (8/16/32)",
+                expr->location);
         }
     }
 
@@ -912,6 +926,14 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                                    expr->location);
             }
             if (binary_op == "+" || binary_op == "-") {
+                compound_value_type = lhs_type;
+            } else if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
+                if (!fixed_muldiv_storage_width_supported(lhs_type)) {
+                    throw CompileError(
+                        "Fixed-point compound assignment '" + assign_op +
+                            "' currently supports only native storage widths up to 32 bits (8/16/32)",
+                        expr->location);
+                }
                 compound_value_type = lhs_type;
             } else {
                 throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
