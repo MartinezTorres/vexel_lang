@@ -912,9 +912,13 @@ bool CompileTimeEvaluator::coerce_value_to_type(const CTValue& input,
                 int64_t total_bits_i64 = type_bits(target_type->primitive,
                                                   target_type->integer_bits,
                                                   target_type->fractional_bits);
-                if (!(total_bits_i64 == 8 || total_bits_i64 == 16 ||
-                      total_bits_i64 == 32 || total_bits_i64 == 64)) {
-                    error_msg = "Fixed-point compile-time coercion currently supports only native storage widths (8/16/32/64)";
+                const bool native_width = (total_bits_i64 == 8 || total_bits_i64 == 16 ||
+                                           total_bits_i64 == 32 || total_bits_i64 == 64);
+                const bool zero_fraction_any_width =
+                    (target_type->fractional_bits == 0 && total_bits_i64 > 0);
+                if (!(native_width || zero_fraction_any_width)) {
+                    error_msg =
+                        "Fixed-point compile-time coercion currently supports only native storage widths (8/16/32/64) or zero-fraction fixed-point widths";
                     return false;
                 }
                 APInt exact(uint64_t(0));
