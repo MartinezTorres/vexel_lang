@@ -1,0 +1,31 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element compound assignments compose with array broadcasting and preserve named-type dotted overload dispatch after frontend lowering. | C backend executes per-element compound array broadcasting
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' 'static int32_t g_calls = 0;' '_Bool vx_tick(void) { g_calls += 1; return 0; }' 'int32_t vx_seed(void) { return 5; }' 'int32_t vx_counter(void) { return g_calls; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+#Box(v:#i32);
+
+&(lhs)#Box::.+(rhs:#Box) -> #Box {
+  Box(lhs.v + rhs.v)
+}
+
+&!seed() -> #i32;
+&!tick() -> #b;
+&!counter() -> #i32;
+
+&^main() -> #i32 {
+  base:#i32 = seed();
+  pulse:#b = tick();
+  one:#b = 1 == 1;
+
+  xs:#i32[2] = [1, 2];
+  flags:#b[2] = [0 == 1, pulse];
+  boxes:#Box[2] = [Box(base), Box(base + 1)];
+  off:#Box = Box(10);
+
+  xs .+= base;
+  flags .||= one;
+  boxes .+= off;
+
+  (((((((#i32)xs[0]) + ((#i32)xs[1])) + ((#i32)flags[0]) + ((#i32)flags[1])) + boxes[1].v) + counter()) == 32 ? 0 : 1)
+}

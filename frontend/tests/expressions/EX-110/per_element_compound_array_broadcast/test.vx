@@ -1,0 +1,28 @@
+// @rfc: docs/vexel-rfc.md#operators--precedence
+// @desc: Dotted per-element compound assignments over arrays lower through broadcasting (`.+=`, `.||=`), including named-type dotted overloads at scalar leaves. | Per-element compound assignments broadcast over arrays
+
+#Box(v:#i32);
+
+&(lhs)#Box::.+(rhs:#Box) -> #Box {
+  Box(lhs.v + rhs.v)
+}
+
+&!seed() -> #i32;
+&!tick() -> #b;
+
+&^main() -> #i32 {
+  base:#i32 = seed();
+  pulse:#b = tick();
+  one:#b = 1 == 1;
+
+  xs:#i32[2] = [1, 2];
+  flags:#b[2] = [0 == 1, pulse];
+  boxes:#Box[2] = [Box(base), Box(base + 1)];
+  off:#Box = Box(10);
+
+  xs .+= base;
+  flags .||= one;
+  boxes .+= off;
+
+  (((((#i32)xs[0]) + ((#i32)xs[1])) + ((#i32)flags[0]) + ((#i32)flags[1])) + boxes[1].v)
+}
