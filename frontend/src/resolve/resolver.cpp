@@ -562,6 +562,21 @@ void Resolver::resolve_type(TypePtr type) {
                 resolve_expr(type->array_size);
             }
             break;
+        case Type::Kind::Vector:
+            resolve_type(type->element_type);
+            if (type->array_size) {
+                resolve_expr(type->array_size);
+            }
+            break;
+        case Type::Kind::Matrix:
+            resolve_type(type->element_type);
+            if (type->array_size) {
+                resolve_expr(type->array_size);
+            }
+            if (type->matrix_cols) {
+                resolve_expr(type->matrix_cols);
+            }
+            break;
         case Type::Kind::Named: {
             Symbol* sym = current_scope ? current_scope->lookup(type->type_name) : nullptr;
             if (sym && sym->kind == Symbol::Kind::Type) {

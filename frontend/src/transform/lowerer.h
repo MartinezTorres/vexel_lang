@@ -18,6 +18,7 @@ public:
 private:
     TypeChecker* checker;
 
+    TypePtr lower_type(TypePtr type);
     void lower_stmt(StmtPtr stmt);
     ExprPtr lower_expr(ExprPtr expr);
 };

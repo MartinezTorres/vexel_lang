@@ -129,6 +129,10 @@ std::string CodeGenerator::gen_type(TypePtr type) {
             // Simplified: size would need compile-time evaluation
             return elem + "*";
         }
+        case Type::Kind::Vector:
+        case Type::Kind::Matrix:
+            throw CompileError("Internal error: vector/matrix type reached C backend after frontend lowering",
+                               type->location);
 
         case Type::Kind::Named:
             if (type_map.count(type->type_name)) {
@@ -428,6 +432,10 @@ std::string CodeGenerator::ensure_comparator(TypePtr type) {
             fn << "    return 0;\n";
             break;
         }
+        case Type::Kind::Vector:
+        case Type::Kind::Matrix:
+            throw CompileError("Internal error: vector/matrix type reached C backend comparator generation after frontend lowering",
+                               type->location);
         case Type::Kind::Named: {
             if (!analyzed_program || !analyzed_program->lookup_type_symbol) {
                 throw CompileError("Internal error: comparator generation without type lookup",

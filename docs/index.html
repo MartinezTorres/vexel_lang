@@ -325,6 +325,8 @@
         <a href="playground.html?file=examples/tutorial/typeof_demo.vx&backend=c">typeof</a>,
         <a href="playground.html?file=examples/tutorial/iteration.vx&backend=c">iteration</a>,
         <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
+        <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">vector_matrix</a>,
+        <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">math_arrays</a>,
         <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">constexpr_dce</a>,
         <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">sieve</a>,
         <a href="playground.html?file=examples/tutorial/matrix_sum.vx&backend=c">matrix_sum</a>,
@@ -408,7 +410,42 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>5) Compile-time execution and dead-code elimination</h3>
+        <h3>5) Native vectors, matrices, and algebra</h3>
+        <p>
+          Vectors and matrices are explicit frontend types. They use array literals for construction,
+          lower to arrays before backend handoff, and provide native algebraic operators.
+        </p>
+        <pre><code>&amp;^main() -&gt; #i32 {
+  a:#v(#i32, 3) = [1, 2, 3];
+  b:#v(#i32, 3) = [4, 5, 6];
+  dot:#i32 = a * b;
+
+  m:#m(#i32, 2, 2) = [[1, 2], [3, 4]];
+  v:#v(#i32, 2) = [2, 3];
+  r:#v(#i32, 2) = m * v;
+
+  dot + r[0] + r[1]
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>6) Bundled std::math and array lifting</h3>
+        <p>
+          The bundled fallback <code>::std::math;</code> surface is compiler-recognized for compile-time folding.
+          Unary and binary math calls can also lift over arrays with strict broadcasting.
+        </p>
+        <pre><code>::std::math;
+
+&amp;^main() -&gt; #i32 {
+  xs:#f64[2] = [4.0, 9.0];
+  roots:#f64[2] = std::math::sqrt(xs);
+  powers:#f64[2] = std::math::pow(roots, 2.0);
+  ((#i32)powers[0]) + ((#i32)powers[1])
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>7) Compile-time execution and dead-code elimination</h3>
         <p>
           Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
         </p>
@@ -422,7 +459,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>6) Multi-file modules</h3>
+        <h3>8) Multi-file modules</h3>
         <p>Use module imports and keep related logic in separate files.</p>
         <div class="code-title">main.vx</div>
         <pre><code>::math;
@@ -437,7 +474,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>7) Backend hints (annotation pass-through)</h3>
+        <h3>9) Backend hints (annotation pass-through)</h3>
         <p>
           Frontend parses annotations but does not globally whitelist them. Backend-specific hints are consumed by the selected backend.
         </p>
@@ -450,7 +487,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>8) Compile and inspect outputs</h3>
+        <h3>10) Compile and inspect outputs</h3>
         <p>The unified driver always requires a backend.</p>
         <pre><code>./build/vexel -b c -o out path/to/main.vx
 ./build/vexel -b megalinker -o out path/to/main.vx

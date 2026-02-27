@@ -29,6 +29,11 @@ This document is the authoritative working log for execution. The workflow must 
    - fix all mismatches found
    - run full test suite again
 10. **This file stays live.** Status and decisions are updated continuously as work proceeds.
+11. **Autonomous continuation is mandatory.** Do not stop at local green checkpoints (passing tests, a clean commit, or a finished sub-pass). After each commit:
+   - reopen this file immediately
+   - pick the next unchecked item
+   - continue execution without waiting for user confirmation
+   - only stop for a true unresolved semantic conflict, a hard environment blocker, or explicit user interruption
 
 ## Status Tracker (single source of truth)
 
@@ -43,12 +48,12 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
   - [x] signed fixed-point bitwise/shift semantics (or explicit final-language rule + enforcement)
   - [x] 64-bit fixed-point `* / %` semantics/backend support
 - [x] Feature 3: std module system (`std/` fallback + local override resolution)
-- [~] Feature 4: compiler-recognized `std::math`
+- [x] Feature 4: compiler-recognized `std::math`
   - [x] scalar surface + CTE fold + backend libc mapping
   - [x] array lifting + broadcasting behavior
-  - [ ] final semantic lock + documentation consistency sweep
-- [ ] Feature 5: native vector/matrix language support (independent feature)
-- [ ] Final pass: full code+docs audit and mismatch remediation
+  - [x] final semantic lock + documentation consistency sweep
+- [x] Feature 5: native vector/matrix language support (independent feature)
+- [~] Final pass: full code+docs audit and mismatch remediation
 
 ## Working Log Entries
 
@@ -76,6 +81,45 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
   - Added backend regression coverage (C: `CX-110`, `CX-111`; megalinker test-script cases).
   - Updated fixed-point error fixtures to match the final-language rules and removed obsolete unsigned/zero-fraction-only expectations.
   - Full suite passed after the pass (`make test`, `make frontend-test`, `python3 backends/c/tests/run_tests.py`, `bash backends/ext/megalinker/tests/test.sh`).
+
+- Completed Feature 5 (native vector/matrix language support) with frontend-owned semantics and frontend lowering:
+  - added `#v(#T, N)` / `#m(#T, R, C)` type syntax
+  - kept backend ownership clean by lowering vectors/matrices to fixed-size arrays before backend handoff
+  - implemented native operator semantics:
+    - element-wise `+` / `-`
+    - unary `+` / `-`
+    - dot product, matrix-vector, vector-matrix, matrix-matrix multiplication
+    - scalar scaling and vector/matrix-by-scalar division
+    - equality and lexicographic ordering comparisons
+  - implemented casts between vectors/matrices and same-shape arrays
+  - added regression coverage:
+    - `frontend/tests/grammar/GR-060/vector_matrix_type_syntax`
+    - `frontend/tests/expressions/EX-132/vector_matrix_operator_lowering`
+    - `frontend/tests/errors/ER-033/vector_matrix_shape_mismatch`
+    - `backends/c/tests/backend_c/CX-112`
+  - fixed a lowering/type-constraint bug revealed by vector-scalar division of lowered temporaries: index constraints must not re-force already-concrete array-like operands to a mismatched pre-lowered shape
+  - documented vectors/matrices in the RFC, tutorial landing page, and tutorial examples
+
+- Completed Feature 4 final semantic/doc lock:
+  - RFC now documents bundled `std/math.vx` override semantics, constexpr folding, and array-shaped lifting/broadcasting rules
+  - tutorial/examples now include `examples/tutorial/math_arrays.vx`
+  - bundled `std::math` docs now match current behavior
+
+- Final audit pass status:
+  - code/docs/tests/examples audit completed for frontend, C backend, tutorial manifest, and landing-page links
+  - verified:
+    - `make test`
+    - `python3 backends/c/tests/run_tests.py`
+    - `bash backends/ext/megalinker/tests/test.sh`
+    - tutorial manifest paths and `docs/index.html` playground links
+    - top-level and tutorial examples compile with `-b c`
+    - tutorial manifest entries compile with `-b megalinker`
+  - open blocker:
+    - `make web` fails in this environment because the current Emscripten toolchain does not provide an Emscripten-compatible Boost.Multiprecision header stack for `frontend/src/core/apint.h`
+    - naive host-header inclusion was tested and rejected: it produces incompatible Boost/libc++ interactions under Emscripten
+    - clean path forward is not a Makefile tweak; it requires either:
+      1. an Emscripten-compatible Boost header/toolchain setup, or
+      2. removing the frontend APInt dependency on Boost for the web build (larger architectural change)
 
 ## Progress notes (local, temporary context)
 

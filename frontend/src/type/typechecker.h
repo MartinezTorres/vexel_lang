@@ -129,6 +129,7 @@ public:
     Program* get_program() const { return program; }
     TypePtr resolve_type(TypePtr type);
     std::optional<bool> constexpr_condition(ExprPtr expr);
+    TypePtr recheck_lowered_expr(ExprPtr expr);
 
     // Generic monomorphization
     std::string get_or_create_instantiation(const std::string& func_name,

@@ -1,0 +1,9 @@
+::std::math;
+
+&^main() -> #i32 {
+  xs:#f64[2] = [4.0, 9.0];
+  roots:#f64[2] = std::math::sqrt(xs);
+  powers:#f64[2] = std::math::pow(roots, 2.0);
+
+  ((#i32)powers[0]) + ((#i32)powers[1])
+}

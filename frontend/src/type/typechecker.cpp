@@ -33,6 +33,8 @@ bool type_is_concrete_for_signature(const TypePtr& type) {
         case Type::Kind::TypeOf:
             return false;
         case Type::Kind::Array:
+        case Type::Kind::Vector:
+        case Type::Kind::Matrix:
             return type_is_concrete_for_signature(type->element_type);
         case Type::Kind::Named:
             return true;
@@ -58,6 +60,10 @@ TypeChecker::TypeChecker(const std::string& proj_root,
       project_root(proj_root),
       allow_process(allow_process_exprs),
       cte_engine(std::make_unique<CTEEngine>(this)) {}
+
+TypePtr TypeChecker::recheck_lowered_expr(ExprPtr expr) {
+    return check_expr(expr);
+}
 
 TypeChecker::~TypeChecker() = default;
 
@@ -486,7 +492,9 @@ void TypeChecker::enforce_declared_initializer_type(TypePtr declared_type,
                                                     const SourceLocation& loc) {
     if (!declared_type || !init_expr) return;
 
-    if (declared_type->kind == Type::Kind::Array &&
+    if ((declared_type->kind == Type::Kind::Array ||
+         declared_type->kind == Type::Kind::Vector ||
+         declared_type->kind == Type::Kind::Matrix) &&
         init_expr->kind == Expr::Kind::ArrayLiteral) {
         if (!apply_type_constraint(init_expr, declared_type)) {
             throw CompileError("Type mismatch in variable initialization", loc);

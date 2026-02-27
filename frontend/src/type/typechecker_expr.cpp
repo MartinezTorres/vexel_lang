@@ -140,18 +140,93 @@ bool exact_array_size_u64(const TypePtr& type, uint64_t& out) {
     return true;
 }
 
-bool collect_array_shape(const TypePtr& type, std::vector<uint64_t>& shape_out) {
-    shape_out.clear();
-    TypePtr current = type;
-    while (current && current->kind == Type::Kind::Array) {
-        uint64_t size = 0;
-        if (!exact_array_size_u64(current, size)) {
+bool exact_dim_expr_u64(const ExprPtr& size_expr, uint64_t& out) {
+    if (!size_expr || size_expr->kind != Expr::Kind::IntLiteral) {
+        return false;
+    }
+    if (size_expr->has_exact_int_val) {
+        if (!size_expr->exact_int_val.fits_u64()) {
             return false;
         }
-        shape_out.push_back(size);
-        current = current->element_type;
+        out = size_expr->exact_int_val.to_u64();
+        return true;
+    }
+    out = size_expr->uint_val;
+    return true;
+}
+
+bool collect_array_like_shape(const TypePtr& type, std::vector<uint64_t>& shape_out) {
+    shape_out.clear();
+    TypePtr current = type;
+    while (current) {
+        if (current->kind == Type::Kind::Array) {
+            uint64_t size = 0;
+            if (!exact_array_size_u64(current, size)) {
+                return false;
+            }
+            shape_out.push_back(size);
+            current = current->element_type;
+            continue;
+        }
+        if (current->kind == Type::Kind::Vector) {
+            uint64_t size = 0;
+            if (!exact_dim_expr_u64(current->array_size, size)) {
+                return false;
+            }
+            shape_out.push_back(size);
+            current = current->element_type;
+            continue;
+        }
+        if (current->kind == Type::Kind::Matrix) {
+            uint64_t rows = 0;
+            uint64_t cols = 0;
+            if (!exact_dim_expr_u64(current->array_size, rows) ||
+                !exact_dim_expr_u64(current->matrix_cols, cols)) {
+                return false;
+            }
+            shape_out.push_back(rows);
+            shape_out.push_back(cols);
+            current = current->element_type;
+            continue;
+        }
+        break;
     }
     return true;
+}
+
+bool is_array_like_type(const TypePtr& type) {
+    return type &&
+           (type->kind == Type::Kind::Array ||
+            type->kind == Type::Kind::Vector ||
+            type->kind == Type::Kind::Matrix);
+}
+
+TypePtr array_like_scalar_type(const TypePtr& type) {
+    TypePtr current = type;
+    while (current) {
+        if (current->kind == Type::Kind::Array ||
+            current->kind == Type::Kind::Vector ||
+            current->kind == Type::Kind::Matrix) {
+            current = current->element_type;
+            continue;
+        }
+        return current;
+    }
+    return nullptr;
+}
+
+TypePtr rebuild_array_like_with_element(const TypePtr& prototype, const TypePtr& elem_type) {
+    if (!prototype) return nullptr;
+    switch (prototype->kind) {
+        case Type::Kind::Vector:
+            return Type::make_vector(elem_type, prototype->array_size, prototype->location);
+        case Type::Kind::Matrix:
+            return Type::make_matrix(elem_type, prototype->array_size, prototype->matrix_cols, prototype->location);
+        case Type::Kind::Array:
+            return Type::make_array(elem_type, prototype->array_size, prototype->location);
+        default:
+            return elem_type;
+    }
 }
 
 bool compute_broadcast_shape(const std::vector<std::vector<uint64_t>>& arg_shapes,
@@ -234,8 +309,8 @@ bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
         TypePtr t = arg ? resolve_type(arg->type) : nullptr;
         arg_types.push_back(t);
         std::vector<uint64_t> shape;
-        if (t && t->kind == Type::Kind::Array) {
-            if (!collect_array_shape(t, shape)) {
+        if (is_array_like_type(t)) {
+            if (!collect_array_like_shape(t, shape)) {
                 throw CompileError("Bundled std::math array lifting requires concrete array sizes", expr->location);
             }
             array_arg_count++;
@@ -252,7 +327,7 @@ bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
                            expr->location);
     }
 
-    if (arity == 1 && !(arg_types[0] && arg_types[0]->kind == Type::Kind::Array)) {
+    if (arity == 1 && !is_array_like_type(arg_types[0])) {
         return false;
     }
 
@@ -299,6 +374,16 @@ bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
 
     std::vector<uint64_t> result_indices;
     ExprPtr rewritten = build(0, result_indices);
+    for (const auto& arg_type : arg_types) {
+        if (!is_vector_or_matrix_type(arg_type)) continue;
+        std::vector<uint64_t> shape;
+        if (!collect_array_like_shape(arg_type, shape)) continue;
+        if (shape != result_shape) continue;
+        TypePtr scalar_ret = sym->declaration->return_type ? resolve_type(sym->declaration->return_type) : nullptr;
+        if (!scalar_ret) break;
+        rewritten = Expr::make_cast(rebuild_array_like_with_element(arg_type, scalar_ret), rewritten, expr->location);
+        break;
+    }
     *expr = *rewritten;
     return true;
 }
@@ -313,8 +398,8 @@ bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_typ
 
     TypePtr lhs = resolve_type(left_type);
     TypePtr rhs = resolve_type(right_type);
-    const bool left_array = lhs && lhs->kind == Type::Kind::Array;
-    const bool right_array = rhs && rhs->kind == Type::Kind::Array;
+    const bool left_array = is_array_like_type(lhs);
+    const bool right_array = is_array_like_type(rhs);
     if (!left_array && !right_array) {
         return false;
     }
@@ -324,10 +409,10 @@ bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_typ
     }
 
     std::vector<std::vector<uint64_t>> arg_shapes(2);
-    if (left_array && !collect_array_shape(lhs, arg_shapes[0])) {
+    if (left_array && !collect_array_like_shape(lhs, arg_shapes[0])) {
         throw CompileError("Per-element array operators require concrete array sizes", expr->location);
     }
-    if (right_array && !collect_array_shape(rhs, arg_shapes[1])) {
+    if (right_array && !collect_array_like_shape(rhs, arg_shapes[1])) {
         throw CompileError("Per-element array operators require concrete array sizes", expr->location);
     }
 
@@ -338,7 +423,9 @@ bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_typ
 
     auto peel_array_element_type = [&](TypePtr t) -> TypePtr {
         TypePtr cur = resolve_type(t);
-        while (cur && cur->kind == Type::Kind::Array) {
+        while (cur && (cur->kind == Type::Kind::Array ||
+                       cur->kind == Type::Kind::Vector ||
+                       cur->kind == Type::Kind::Matrix)) {
             cur = resolve_type(cur->element_type);
         }
         return cur;
@@ -368,6 +455,19 @@ bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_typ
 
     std::vector<uint64_t> result_indices;
     ExprPtr rewritten = build(0, result_indices);
+    TypePtr rewritten_type = check_expr(rewritten);
+    for (TypePtr candidate : {lhs, rhs}) {
+        if (!is_vector_or_matrix_type(candidate)) continue;
+        std::vector<uint64_t> shape;
+        if (!collect_array_like_shape(candidate, shape)) continue;
+        if (shape != result_shape) continue;
+        TypePtr elem = array_like_scalar_type(rewritten_type);
+        if (!elem) {
+            elem = array_like_scalar_type(candidate);
+        }
+        rewritten = Expr::make_cast(rebuild_array_like_with_element(candidate, elem), rewritten, expr->location);
+        break;
+    }
     *expr = *rewritten;
     return true;
 }
@@ -390,6 +490,9 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
                 // raw node pointers, so allocator reuse can surface stale
                 // bindings for newly created identifiers at the same address.
                 sym = nullptr;
+            }
+            if (!sym) {
+                sym = expr->resolved_symbol;
             }
             if (!sym) {
                 sym = lookup_global(expr->name);
@@ -489,6 +592,179 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
         return check_expr(expr);
     }
 
+    auto is_scalar_type = [&](TypePtr t) {
+        return !is_array_like_type(t) && (!t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t));
+    };
+    auto concretize_untyped_against = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_type, const std::string& op_name) {
+        if (!is_untyped_integer_type(side_type)) {
+            return;
+        }
+        if (!target_type || target_type->kind != Type::Kind::Primitive ||
+            target_type->primitive == PrimitiveType::Bool ||
+            is_untyped_integer_type(target_type)) {
+            return;
+        }
+        if (!apply_type_constraint(side_expr, target_type)) {
+            throw CompileError("Integer literal is not representable for operator " + op_name,
+                               side_expr ? side_expr->location : expr->location);
+        }
+        side_type = target_type;
+    };
+
+    if (is_vector_or_matrix_type(left_type) || is_vector_or_matrix_type(right_type)) {
+        TypePtr lhs = resolve_type(left_type);
+        TypePtr rhs = resolve_type(right_type);
+        std::vector<uint64_t> lhs_shape;
+        std::vector<uint64_t> rhs_shape;
+        if (is_array_like_type(lhs) && !collect_array_like_shape(lhs, lhs_shape)) {
+            throw CompileError("Vector/matrix operations require concrete compile-time dimensions", expr->location);
+        }
+        if (is_array_like_type(rhs) && !collect_array_like_shape(rhs, rhs_shape)) {
+            throw CompileError("Vector/matrix operations require concrete compile-time dimensions", expr->location);
+        }
+
+        TypePtr lhs_scalar = array_like_scalar_type(lhs ? lhs : left_type);
+        TypePtr rhs_scalar = array_like_scalar_type(rhs ? rhs : right_type);
+
+        auto concretize_scalar_against = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_scalar) {
+            if (!is_scalar_type(side_type)) return;
+            if (!target_scalar) return;
+            concretize_untyped_against(side_expr, side_type, target_scalar, expr->op);
+        };
+        if (is_array_like_type(lhs) && is_scalar_type(right_type)) {
+            concretize_scalar_against(expr->right, right_type, lhs_scalar);
+            rhs = resolve_type(right_type);
+            rhs_scalar = array_like_scalar_type(rhs ? rhs : right_type);
+        }
+        if (is_array_like_type(rhs) && is_scalar_type(left_type)) {
+            concretize_scalar_against(expr->left, left_type, rhs_scalar);
+            lhs = resolve_type(left_type);
+            lhs_scalar = array_like_scalar_type(lhs ? lhs : left_type);
+        }
+
+        auto same_array_like_kind = [&](TypePtr a, TypePtr b) {
+            return a && b && a->kind == b->kind;
+        };
+        auto compatible_scalars = [&](TypePtr a, TypePtr b) -> TypePtr {
+            if (!a || !b) return nullptr;
+            return unify_types(a, b);
+        };
+
+        if (expr->op == "+" || expr->op == "-") {
+            if (!same_array_like_kind(lhs, rhs) || lhs_shape != rhs_shape) {
+                throw CompileError("Vector/matrix operator '" + expr->op + "' requires matching shapes", expr->location);
+            }
+            TypePtr elem = compatible_scalars(lhs_scalar, rhs_scalar);
+            if (!elem || !is_numeric_primitive_type(elem)) {
+                throw CompileError("Vector/matrix operator '" + expr->op + "' requires numeric element types from the same family",
+                                   expr->location);
+            }
+            expr->type = rebuild_array_like_with_element(lhs, elem);
+            return expr->type;
+        }
+
+        if (expr->op == "*") {
+            const bool lhs_shape_type = is_vector_or_matrix_type(lhs);
+            const bool rhs_shape_type = is_vector_or_matrix_type(rhs);
+            if (lhs_shape_type && rhs_shape_type) {
+                TypePtr elem = compatible_scalars(lhs_scalar, rhs_scalar);
+                if (!elem || !is_numeric_primitive_type(elem)) {
+                    throw CompileError("Vector/matrix multiplication requires numeric element types from the same family",
+                                       expr->location);
+                }
+                if (lhs->kind == Type::Kind::Vector && rhs->kind == Type::Kind::Vector) {
+                    if (lhs_shape != rhs_shape) {
+                        throw CompileError("Vector dot product requires equal lengths", expr->location);
+                    }
+                    expr->type = elem;
+                    return expr->type;
+                }
+                if (lhs->kind == Type::Kind::Matrix && rhs->kind == Type::Kind::Vector) {
+                    if (lhs_shape.size() != 2 || rhs_shape.size() != 1 || lhs_shape[1] != rhs_shape[0]) {
+                        throw CompileError("Matrix-vector multiplication requires matrix columns to match vector length",
+                                           expr->location);
+                    }
+                    expr->type = Type::make_vector(elem, lhs->array_size, expr->location);
+                    return expr->type;
+                }
+                if (lhs->kind == Type::Kind::Vector && rhs->kind == Type::Kind::Matrix) {
+                    if (lhs_shape.size() != 1 || rhs_shape.size() != 2 || lhs_shape[0] != rhs_shape[0]) {
+                        throw CompileError("Vector-matrix multiplication requires vector length to match matrix rows",
+                                           expr->location);
+                    }
+                    expr->type = Type::make_vector(elem, rhs->matrix_cols, expr->location);
+                    return expr->type;
+                }
+                if (lhs->kind == Type::Kind::Matrix && rhs->kind == Type::Kind::Matrix) {
+                    if (lhs_shape.size() != 2 || rhs_shape.size() != 2 || lhs_shape[1] != rhs_shape[0]) {
+                        throw CompileError("Matrix multiplication requires left columns to match right rows",
+                                           expr->location);
+                    }
+                    expr->type = Type::make_matrix(elem, lhs->array_size, rhs->matrix_cols, expr->location);
+                    return expr->type;
+                }
+                throw CompileError("Vector/matrix multiplication is not defined for the provided shapes",
+                                   expr->location);
+            }
+            if (lhs_shape_type && is_scalar_type(rhs)) {
+                TypePtr elem = compatible_scalars(lhs_scalar, rhs_scalar);
+                if (!elem || !is_numeric_primitive_type(elem)) {
+                    throw CompileError("Vector/matrix scaling requires numeric scalar values from the same family",
+                                       expr->location);
+                }
+                expr->type = rebuild_array_like_with_element(lhs, elem);
+                return expr->type;
+            }
+            if (rhs_shape_type && is_scalar_type(lhs)) {
+                TypePtr elem = compatible_scalars(lhs_scalar, rhs_scalar);
+                if (!elem || !is_numeric_primitive_type(elem)) {
+                    throw CompileError("Vector/matrix scaling requires numeric scalar values from the same family",
+                                       expr->location);
+                }
+                expr->type = rebuild_array_like_with_element(rhs, elem);
+                return expr->type;
+            }
+            throw CompileError("Vector/matrix multiplication is not defined for the provided operands", expr->location);
+        }
+
+        if (expr->op == "/") {
+            if (is_vector_or_matrix_type(lhs) && is_scalar_type(rhs)) {
+                TypePtr elem = compatible_scalars(lhs_scalar, rhs_scalar);
+                if (!elem || !is_numeric_primitive_type(elem)) {
+                    throw CompileError("Vector/matrix division requires numeric scalar values from the same family",
+                                       expr->location);
+                }
+                expr->type = rebuild_array_like_with_element(lhs, elem);
+                return expr->type;
+            }
+            throw CompileError("Vector/matrix division is only defined by a scalar divisor", expr->location);
+        }
+
+        if (expr->op == "==" || expr->op == "!=") {
+            if (!same_array_like_kind(lhs, rhs) || lhs_shape != rhs_shape) {
+                throw CompileError("Vector/matrix equality requires matching shapes", expr->location);
+            }
+            if (!compatible_scalars(lhs_scalar, rhs_scalar)) {
+                throw CompileError("Vector/matrix equality requires compatible element types", expr->location);
+            }
+            expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+            return expr->type;
+        }
+
+        if (expr->op == "<" || expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
+            if (!same_array_like_kind(lhs, rhs) || lhs_shape != rhs_shape) {
+                throw CompileError("Vector/matrix ordering requires matching shapes", expr->location);
+            }
+            if (!compatible_scalars(lhs_scalar, rhs_scalar)) {
+                throw CompileError("Vector/matrix ordering requires compatible element types", expr->location);
+            }
+            expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+            return expr->type;
+        }
+
+        throw CompileError("Operator '" + expr->op + "' is not defined for vector/matrix operands", expr->location);
+    }
+
     if (is_fixed_primitive_type(left_type) || is_fixed_primitive_type(right_type)) {
         if (!is_fixed_primitive_type(left_type) || !is_fixed_primitive_type(right_type) ||
             !types_equal(left_type, right_type)) {
@@ -548,21 +824,6 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
 
     auto is_numeric_like = [&](TypePtr t) {
         return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
-    };
-    auto concretize_untyped_against = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_type, const std::string& op_name) {
-        if (!is_untyped_integer_type(side_type)) {
-            return;
-        }
-        if (!target_type || target_type->kind != Type::Kind::Primitive ||
-            target_type->primitive == PrimitiveType::Bool ||
-            is_untyped_integer_type(target_type)) {
-            return;
-        }
-        if (!apply_type_constraint(side_expr, target_type)) {
-            throw CompileError("Integer literal is not representable for operator " + op_name,
-                               side_expr ? side_expr->location : expr->location);
-        }
-        side_type = target_type;
     };
 
     if (expr->op == "&&" || expr->op == "||") {
@@ -714,6 +975,16 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     auto is_numeric_like = [&](TypePtr t) {
         return !t || t->kind == Type::Kind::TypeVar || is_numeric_primitive_type(t);
     };
+
+    if (is_vector_or_matrix_type(operand_type)) {
+        TypePtr elem = array_like_scalar_type(operand_type);
+        if ((expr->op == "+" || expr->op == "-") && elem && is_numeric_primitive_type(elem)) {
+            expr->type = operand_type;
+            return expr->type;
+        }
+        throw CompileError("Unary operator '" + expr->op + "' is not defined for vector/matrix operands",
+                           expr->location);
+    }
 
     if (expr->op == "-") {
         if (is_fixed_primitive_type(operand_type)) {
@@ -1078,6 +1349,16 @@ TypePtr TypeChecker::check_index(ExprPtr expr) {
         return expr->type;
     }
 
+    if (arr_type && arr_type->kind == Type::Kind::Vector) {
+        expr->type = arr_type->element_type;
+        return expr->type;
+    }
+
+    if (arr_type && arr_type->kind == Type::Kind::Matrix) {
+        expr->type = Type::make_vector(arr_type->element_type, arr_type->matrix_cols, expr->location);
+        return expr->type;
+    }
+
     if (arr_type && arr_type->kind == Type::Kind::Primitive &&
         arr_type->primitive == PrimitiveType::String) {
         expr->type = make_int_type(expr->location, 8, true);
@@ -1292,6 +1573,36 @@ bool TypeChecker::types_equal(TypePtr a, TypePtr b) {
                 return a->array_size->uint_val == b->array_size->uint_val;
             }
             return true; // Unknown sizes are considered equal
+        case Type::Kind::Vector:
+            if (!types_equal(a->element_type, b->element_type)) {
+                return false;
+            }
+            if (a->array_size && b->array_size &&
+                a->array_size->kind == Expr::Kind::IntLiteral &&
+                b->array_size->kind == Expr::Kind::IntLiteral) {
+                if (a->array_size->has_exact_int_val && b->array_size->has_exact_int_val) {
+                    return a->array_size->exact_int_val == b->array_size->exact_int_val;
+                }
+                return a->array_size->uint_val == b->array_size->uint_val;
+            }
+            return true;
+        case Type::Kind::Matrix:
+            if (!types_equal(a->element_type, b->element_type)) {
+                return false;
+            }
+            if (!types_equal(Type::make_vector(a->element_type, a->array_size, a->location),
+                             Type::make_vector(b->element_type, b->array_size, b->location))) {
+                return false;
+            }
+            if (a->matrix_cols && b->matrix_cols &&
+                a->matrix_cols->kind == Expr::Kind::IntLiteral &&
+                b->matrix_cols->kind == Expr::Kind::IntLiteral) {
+                if (a->matrix_cols->has_exact_int_val && b->matrix_cols->has_exact_int_val) {
+                    return a->matrix_cols->exact_int_val == b->matrix_cols->exact_int_val;
+                }
+                return a->matrix_cols->uint_val == b->matrix_cols->uint_val;
+            }
+            return true;
         case Type::Kind::Named:
             return a->type_name == b->type_name;
         case Type::Kind::TypeVar:
@@ -1334,6 +1645,11 @@ bool TypeChecker::types_compatible(TypePtr a, TypePtr b) {
         }
 
         return true;
+    }
+
+    if ((a->kind == Type::Kind::Vector && b->kind == Type::Kind::Vector) ||
+        (a->kind == Type::Kind::Matrix && b->kind == Type::Kind::Matrix)) {
+        return types_equal(a, b);
     }
 
     // Enhanced type promotion for primitives
@@ -1411,6 +1727,26 @@ TypePtr TypeChecker::unify_types(TypePtr a, TypePtr b) {
         return Type::make_array(unified_elem, size, a->location);
     }
 
+    if (a->kind == Type::Kind::Vector && b->kind == Type::Kind::Vector) {
+        TypePtr unified_elem = unify_types(a->element_type, b->element_type);
+        if (!unified_elem) return nullptr;
+        if (!types_equal(Type::make_array(a->element_type, a->array_size, a->location),
+                         Type::make_array(b->element_type, b->array_size, b->location))) {
+            return nullptr;
+        }
+        return Type::make_vector(unified_elem, a->array_size, a->location);
+    }
+
+    if (a->kind == Type::Kind::Matrix && b->kind == Type::Kind::Matrix) {
+        TypePtr unified_elem = unify_types(a->element_type, b->element_type);
+        if (!unified_elem) return nullptr;
+        if (!types_equal(Type::make_matrix(a->element_type, a->array_size, a->matrix_cols, a->location),
+                         Type::make_matrix(b->element_type, b->array_size, b->matrix_cols, b->location))) {
+            return nullptr;
+        }
+        return Type::make_matrix(unified_elem, a->array_size, a->matrix_cols, a->location);
+    }
+
     // Enhanced type unification respecting type families
     if (a->kind == Type::Kind::Primitive && b->kind == Type::Kind::Primitive) {
         if (is_untyped_integer_type(a) && is_untyped_integer_type(b)) {
@@ -1458,6 +1794,14 @@ TypePtr TypeChecker::resolve_type(TypePtr type) {
         }
     }
     if (type->kind == Type::Kind::Array && type->element_type) {
+        TypePtr elem = resolve_type(type->element_type);
+        if (elem != type->element_type) {
+            TypePtr cloned = std::make_shared<Type>(*type);
+            cloned->element_type = elem;
+            return cloned;
+        }
+    }
+    if ((type->kind == Type::Kind::Vector || type->kind == Type::Kind::Matrix) && type->element_type) {
         TypePtr elem = resolve_type(type->element_type);
         if (elem != type->element_type) {
             TypePtr cloned = std::make_shared<Type>(*type);

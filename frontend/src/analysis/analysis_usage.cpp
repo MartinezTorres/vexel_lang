@@ -42,6 +42,12 @@ void Analyzer::analyze_usage(const Module& /*mod*/, AnalysisFacts& facts) {
             case Type::Kind::Array:
                 mark_type(type->element_type);
                 break;
+            case Type::Kind::Vector:
+                mark_type(type->element_type);
+                break;
+            case Type::Kind::Matrix:
+                mark_type(type->element_type);
+                break;
             case Type::Kind::Primitive:
             case Type::Kind::TypeVar:
             case Type::Kind::TypeOf:

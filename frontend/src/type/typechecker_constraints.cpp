@@ -91,6 +91,8 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             case Type::Kind::Primitive:
                 return is_untyped_integer_primitive_type(t);
             case Type::Kind::Array:
+            case Type::Kind::Vector:
+            case Type::Kind::Matrix:
                 return type_is_unresolved(t->element_type);
             case Type::Kind::Named:
                 return false;
@@ -313,10 +315,22 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
         case Expr::Kind::Index: {
             if (expr->operand) {
                 TypePtr arr_type = resolve_type(expr->operand->type);
-                if (arr_type && arr_type->kind == Type::Kind::Array) {
-                    if (!refine_slot(arr_type->element_type, target)) return false;
-                    if (!apply_type_constraint(expr->operand, arr_type)) return false;
-                    return refine_expr_type(expr, arr_type->element_type);
+                if (arr_type &&
+                    (arr_type->kind == Type::Kind::Array ||
+                     arr_type->kind == Type::Kind::Vector ||
+                     arr_type->kind == Type::Kind::Matrix)) {
+                    TypePtr elem_target = arr_type->element_type;
+                    if (arr_type->kind == Type::Kind::Matrix) {
+                        elem_target = Type::make_vector(arr_type->element_type, arr_type->matrix_cols, arr_type->location);
+                    }
+                    if (!refine_slot(elem_target, target)) return false;
+                    TypePtr operand_type = resolve_type(expr->operand->type);
+                    if (!operand_type ||
+                        operand_type->kind == Type::Kind::TypeVar ||
+                        operand_type->kind == Type::Kind::TypeOf) {
+                        if (!apply_type_constraint(expr->operand, arr_type)) return false;
+                    }
+                    return refine_expr_type(expr, elem_target);
                 }
             }
             return refine_expr_type(expr, target);
@@ -352,25 +366,32 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             }
             return refine_expr_type(expr, target);
 
-        case Expr::Kind::ArrayLiteral:
-            if (target->kind != Type::Kind::Array) {
+        case Expr::Kind::ArrayLiteral: {
+            if (target->kind != Type::Kind::Array &&
+                target->kind != Type::Kind::Vector &&
+                target->kind != Type::Kind::Matrix) {
                 return refine_expr_type(expr, target);
             }
-            if (target->array_size &&
-                target->array_size->kind == Expr::Kind::IntLiteral &&
-                (target->array_size->has_exact_int_val
-                     ? (!target->array_size->exact_int_val.fits_u64() ||
-                        expr->elements.size() != target->array_size->exact_int_val.to_u64())
-                     : (expr->elements.size() != target->array_size->uint_val))) {
+            TypePtr lowered_target = lower_shape_type_to_array(target);
+            if (!lowered_target || lowered_target->kind != Type::Kind::Array) {
+                return false;
+            }
+            if (lowered_target->array_size &&
+                lowered_target->array_size->kind == Expr::Kind::IntLiteral &&
+                (lowered_target->array_size->has_exact_int_val
+                     ? (!lowered_target->array_size->exact_int_val.fits_u64() ||
+                        expr->elements.size() != lowered_target->array_size->exact_int_val.to_u64())
+                     : (expr->elements.size() != lowered_target->array_size->uint_val))) {
                 return false;
             }
             for (const auto& elem : expr->elements) {
-                if (!apply_type_constraint(elem, target->element_type)) {
+                if (!apply_type_constraint(elem, lowered_target->element_type)) {
                     return false;
                 }
             }
             expr->type = target;
             return true;
+        }
 
         case Expr::Kind::Call: {
             if (!refine_expr_type(expr, target)) return false;

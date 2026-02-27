@@ -27,7 +27,7 @@ enum class VarLinkageKind {
 };
 
 struct Type {
-    enum class Kind { Primitive, Array, Named, TypeVar, TypeOf };
+    enum class Kind { Primitive, Array, Named, TypeVar, TypeOf, Vector, Matrix };
     Kind kind;
     SourceLocation location;
     Symbol* resolved_symbol = nullptr;
@@ -39,6 +39,8 @@ struct Type {
     // For Array
     TypePtr element_type;
     ExprPtr array_size;
+    // For Matrix
+    ExprPtr matrix_cols;
     // For Named
     std::string type_name;
     // For TypeVar
@@ -51,12 +53,22 @@ struct Type {
                                   uint64_t int_bits = 0,
                                   int64_t frac_bits = 0);
     static TypePtr make_array(TypePtr elem, ExprPtr size, const SourceLocation& loc = SourceLocation());
+    static TypePtr make_vector(TypePtr elem, ExprPtr size, const SourceLocation& loc = SourceLocation());
+    static TypePtr make_matrix(TypePtr elem,
+                               ExprPtr rows,
+                               ExprPtr cols,
+                               const SourceLocation& loc = SourceLocation());
     static TypePtr make_named(const std::string& name, const SourceLocation& loc = SourceLocation());
     static TypePtr make_typevar(const std::string& name, const SourceLocation& loc = SourceLocation());
     static TypePtr make_typeof(ExprPtr expr, const SourceLocation& loc = SourceLocation());
 
     std::string to_string() const;
 };
+
+bool is_vector_type(const TypePtr& type);
+bool is_matrix_type(const TypePtr& type);
+bool is_vector_or_matrix_type(const TypePtr& type);
+TypePtr lower_shape_type_to_array(TypePtr type);
 
 struct Expr {
     enum class Kind {

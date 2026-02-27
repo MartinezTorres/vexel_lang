@@ -42,6 +42,18 @@
     "summary": "Named structs, methods, and operators."
   },
   {
+    "id": "vector_matrix",
+    "title": "Vectors and Matrices",
+    "path": "examples/tutorial/vector_matrix.vx",
+    "summary": "Native vector/matrix types and algebra."
+  },
+  {
+    "id": "math_arrays",
+    "title": "std::math Arrays",
+    "path": "examples/tutorial/math_arrays.vx",
+    "summary": "Bundled std::math folding and array lifting."
+  },
+  {
     "id": "constexpr",
     "title": "Constexpr + DCE",
     "path": "examples/tutorial/constexpr_dce.vx",

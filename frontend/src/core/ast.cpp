@@ -26,6 +26,25 @@ TypePtr Type::make_array(TypePtr elem, ExprPtr size, const SourceLocation& loc) 
     return t;
 }
 
+TypePtr Type::make_vector(TypePtr elem, ExprPtr size, const SourceLocation& loc) {
+    auto t = std::make_shared<Type>();
+    t->kind = Kind::Vector;
+    t->element_type = elem;
+    t->array_size = size;
+    t->location = loc;
+    return t;
+}
+
+TypePtr Type::make_matrix(TypePtr elem, ExprPtr rows, ExprPtr cols, const SourceLocation& loc) {
+    auto t = std::make_shared<Type>();
+    t->kind = Kind::Matrix;
+    t->element_type = elem;
+    t->array_size = rows;
+    t->matrix_cols = cols;
+    t->location = loc;
+    return t;
+}
+
 TypePtr Type::make_named(const std::string& name, const SourceLocation& loc) {
     auto t = std::make_shared<Type>();
     t->kind = Kind::Named;
@@ -68,8 +87,49 @@ std::string Type::to_string() const {
         case Kind::TypeOf:
             os << "[...]";
             break;
+        case Kind::Vector:
+            os << "v(" << (element_type ? element_type->to_string() : "?") << ",...)";
+            break;
+        case Kind::Matrix:
+            os << "m(" << (element_type ? element_type->to_string() : "?") << ",...,...)";
+            break;
     }
     return os.str();
+}
+
+bool is_vector_type(const TypePtr& type) {
+    return type && type->kind == Type::Kind::Vector;
+}
+
+bool is_matrix_type(const TypePtr& type) {
+    return type && type->kind == Type::Kind::Matrix;
+}
+
+bool is_vector_or_matrix_type(const TypePtr& type) {
+    return is_vector_type(type) || is_matrix_type(type);
+}
+
+TypePtr lower_shape_type_to_array(TypePtr type) {
+    if (!type) return nullptr;
+
+    switch (type->kind) {
+        case Type::Kind::Vector: {
+            TypePtr elem = lower_shape_type_to_array(type->element_type);
+            return Type::make_array(elem, type->array_size, type->location);
+        }
+        case Type::Kind::Matrix: {
+            TypePtr elem = lower_shape_type_to_array(type->element_type);
+            TypePtr row = Type::make_array(elem, type->matrix_cols, type->location);
+            return Type::make_array(row, type->array_size, type->location);
+        }
+        case Type::Kind::Array: {
+            TypePtr elem = lower_shape_type_to_array(type->element_type);
+            if (elem == type->element_type) return type;
+            return Type::make_array(elem, type->array_size, type->location);
+        }
+        default:
+            return type;
+    }
 }
 
 // Expr factory methods

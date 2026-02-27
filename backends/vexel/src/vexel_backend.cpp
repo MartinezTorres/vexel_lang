@@ -105,6 +105,10 @@ private:
                 }
                 return format_type(type->element_type) + "[" + size + "]";
             }
+            case Type::Kind::Vector:
+            case Type::Kind::Matrix:
+                throw CompileError("Internal error: vector/matrix type reached vexel backend after frontend lowering",
+                                   type->location);
         }
         return "#T";
     }
