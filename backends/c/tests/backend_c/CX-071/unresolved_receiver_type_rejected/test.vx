@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#backend-contract
 // @desc: Exported receiver parameters must have concrete types before backend emission; no implicit i32 fallback. | Unresolved receiver types are rejected
 // @expect-exit: 1
-// @expect-stderr: requires a concrete type
+// @expect-stderr: Generic functions cannot be exported or external
 // @command: {VEXEL} -b c test.vx
 
 

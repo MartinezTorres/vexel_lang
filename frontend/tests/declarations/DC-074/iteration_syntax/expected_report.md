@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     first = 0;
     rng = #Range(1, 5);
-    rng@{
+    rng.@_G_Range({
         first = _
-    };
+    });
     first
 }
 ```

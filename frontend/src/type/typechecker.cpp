@@ -94,12 +94,36 @@ void TypeChecker::set_current_instance(int instance_id) {
     forget_all_constexpr_values();
 }
 
-Symbol* TypeChecker::lookup_global(const std::string& name) const {
+Symbol* TypeChecker::lookup_internal_global(const std::string& name) const {
     if (resolver) {
-        return resolver->lookup_in_instance(current_instance_id, name);
+        return resolver->lookup_internal_in_instance(current_instance_id, name);
     }
     if (!global_scope) return nullptr;
-    return global_scope->lookup(name);
+    return global_scope->lookup_internal(name);
+}
+
+Symbol* TypeChecker::lookup_value_global(const std::string& name) const {
+    if (resolver) {
+        return resolver->lookup_value_in_instance(current_instance_id, name);
+    }
+    if (!global_scope) return nullptr;
+    return global_scope->lookup_value(name);
+}
+
+Symbol* TypeChecker::lookup_type_global(const std::string& name) const {
+    if (resolver) {
+        return resolver->lookup_type_in_instance(current_instance_id, name);
+    }
+    if (!global_scope) return nullptr;
+    return global_scope->lookup_type(name);
+}
+
+std::vector<Symbol*> TypeChecker::lookup_functions_global(const std::string& name) const {
+    if (resolver) {
+        return resolver->lookup_functions_in_instance(current_instance_id, name);
+    }
+    if (!global_scope) return {};
+    return global_scope->lookup_functions(name);
 }
 
 Symbol* TypeChecker::lookup_binding(const void* node) const {
@@ -329,11 +353,13 @@ void TypeChecker::check_func_decl(StmtPtr stmt) {
             if (!stmt->type_namespace.empty() && i == 0) {
                 rsym->type = Type::make_named(stmt->type_namespace, stmt->location);
                 if (bindings) {
-                    Symbol* type_sym = lookup_global(stmt->type_namespace);
+                    Symbol* type_sym = lookup_type_global(stmt->type_namespace);
                     if (type_sym) {
                         bindings->bind(current_instance_id, rsym->type.get(), type_sym);
                     }
                 }
+            } else if (stmt->ref_param_types[i]) {
+                rsym->type = stmt->ref_param_types[i];
             } else if (!rsym->type) {
                 rsym->type = make_fresh_typevar();
             }
@@ -672,7 +698,7 @@ void TypeChecker::validate_invariants(const Module& mod) {
                     if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
                         call_sym = lookup_binding(expr->operand.get());
                         if (!call_sym) {
-                            call_sym = lookup_global(expr->operand->name);
+                            call_sym = lookup_internal_global(expr->operand->name);
                         }
                     }
                     for (size_t i = 0; i < expr->args.size(); ++i) {

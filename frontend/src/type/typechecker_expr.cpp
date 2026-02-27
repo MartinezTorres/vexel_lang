@@ -3,6 +3,7 @@
 #include <functional>
 #include <limits>
 #include "constants.h"
+#include "resolver.h"
 
 namespace vexel {
 
@@ -495,7 +496,7 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
                 sym = expr->resolved_symbol;
             }
             if (!sym) {
-                sym = lookup_global(expr->name);
+                sym = lookup_value_global(expr->name);
                 if (sym && bindings) {
                     bindings->bind(current_instance_id, expr.get(), sym);
                 }
@@ -925,7 +926,11 @@ TypePtr TypeChecker::try_operator_overload(ExprPtr expr, const std::string& op, 
     }
 
     std::string func_name = left_type->type_name + "::" + op;
-    Symbol* sym = lookup_global(func_name);
+    std::vector<Symbol*> overloads = lookup_functions_global(func_name);
+    if (overloads.size() != 1) {
+        return nullptr;
+    }
+    Symbol* sym = overloads.front();
     if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
         return nullptr;
     }
@@ -1054,34 +1059,150 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
     bool has_symbol = false;
 
     if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-        func_name = expr->operand->name;
+        const std::string original_name = expr->operand->name;
+        func_name = original_name;
 
         if (expr->receivers.size() == 1) {
             TypePtr receiver_type = receiver_types.empty() ? nullptr : receiver_types[0];
-            if (receiver_type && receiver_type->kind == Type::Kind::Named) {
-                if (expr->operand->name.find("::") == std::string::npos) {
-                    func_name = receiver_type->type_name + "::" + expr->operand->name;
-                    expr->operand->name = func_name;
-                } else {
-                    func_name = expr->operand->name;
-                }
+            if (receiver_type && receiver_type->kind == Type::Kind::Named && original_name.find("::") == std::string::npos) {
+                func_name = receiver_type->type_name + "::" + original_name;
             }
         }
 
-        sym = lookup_binding(expr->operand.get());
-        if (sym && sym->name != func_name) {
-            sym = nullptr;
+        Symbol* bound_sym = lookup_binding(expr->operand.get());
+        if (bound_sym &&
+            ((bound_sym->kind == Symbol::Kind::Function && bound_sym->name == expr->operand->name) ||
+             (bound_sym->kind == Symbol::Kind::Type && bound_sym->surface_name == func_name))) {
+            sym = bound_sym;
         }
-        if (!sym || expr->operand->name != func_name) {
-            sym = lookup_global(func_name);
+
+        if (expr->is_constructor_call) {
+            if (!sym) {
+                sym = lookup_type_global(func_name);
+            }
+            if (!sym) {
+                throw CompileError("Undefined constructor type: " + func_name, expr->location);
+            }
+            expr->operand->name = sym->surface_name;
+            has_symbol = true;
+        } else {
+            std::vector<Symbol*> candidates;
+            if (sym && sym->kind == Symbol::Kind::Function) {
+                candidates.push_back(sym);
+            }
+            if (candidates.empty()) {
+                candidates = lookup_functions_global(func_name);
+            }
+            if (candidates.empty()) {
+                Symbol* type_sym = lookup_type_global(func_name);
+                if (type_sym) {
+                    sym = type_sym;
+                    has_symbol = true;
+                } else {
+                    throw CompileError("Undefined function: " + func_name, expr->location);
+                }
+            } else if (candidates.size() == 1) {
+                sym = candidates.front();
+                expr->operand->name = sym->name;
+                has_symbol = true;
+            } else {
+                std::vector<bool> arg_checked(expr->args.size(), false);
+                auto candidate_matches = [&](Symbol* candidate, int& specificity, bool& exact_match) -> bool {
+                    if (!candidate || candidate->kind != Symbol::Kind::Function || !candidate->declaration) {
+                        return false;
+                    }
+                    StmtPtr decl = candidate->declaration;
+                    if (decl->ref_params.size() != expr->receivers.size()) {
+                        return false;
+                    }
+                    if (decl->params.size() != expr->args.size()) {
+                        return false;
+                    }
+                    specificity = 0;
+                    exact_match = true;
+                    for (size_t i = 0; i < receiver_types.size(); ++i) {
+                        TypePtr param_type = nullptr;
+                        if (i == 0 && !decl->type_namespace.empty()) {
+                            param_type = Type::make_named(decl->type_namespace, expr->location);
+                        } else if (i < decl->ref_param_types.size()) {
+                            param_type = decl->ref_param_types[i];
+                        }
+                        if (!param_type || param_type->kind == Type::Kind::TypeVar) {
+                            exact_match = false;
+                            continue;
+                        }
+                        specificity += 2;
+                        if (!types_compatible(receiver_types[i], param_type)) {
+                            return false;
+                        }
+                        if (!types_equal(receiver_types[i], param_type)) {
+                            exact_match = false;
+                        }
+                    }
+                    for (size_t i = 0; i < expr->args.size(); ++i) {
+                        const Parameter& param = decl->params[i];
+                        if (param.is_expression_param) {
+                            exact_match = false;
+                            continue;
+                        }
+                        ExprPtr arg_expr = expr->args[i];
+                        if (!arg_checked[i]) {
+                            check_expr(arg_expr);
+                            arg_checked[i] = true;
+                        }
+                        if (!param.type || param.type->kind == Type::Kind::TypeVar) {
+                            exact_match = false;
+                            continue;
+                        }
+                        specificity += 1;
+                        if (!types_compatible(arg_expr->type, param.type) &&
+                            !literal_assignable_to(param.type, arg_expr)) {
+                            return false;
+                        }
+                        if (!types_equal(arg_expr->type, param.type)) {
+                            exact_match = false;
+                        }
+                    }
+                    return true;
+                };
+
+                Symbol* best = nullptr;
+                int best_specificity = std::numeric_limits<int>::min();
+                bool best_exact = false;
+                bool ambiguous = false;
+                for (Symbol* candidate : candidates) {
+                    int specificity = 0;
+                    bool exact = false;
+                    if (!candidate_matches(candidate, specificity, exact)) {
+                        continue;
+                    }
+                    if (!best ||
+                        exact > best_exact ||
+                        (exact == best_exact && specificity > best_specificity)) {
+                        best = candidate;
+                        best_specificity = specificity;
+                        best_exact = exact;
+                        ambiguous = false;
+                        continue;
+                    }
+                    if (exact == best_exact && specificity == best_specificity) {
+                        ambiguous = true;
+                    }
+                }
+                if (!best) {
+                    throw CompileError("No matching overload for function: " + func_name, expr->location);
+                }
+                if (ambiguous) {
+                    throw CompileError("Ambiguous overload for function: " + func_name, expr->location);
+                }
+                sym = best;
+                expr->operand->name = sym->name;
+                has_symbol = true;
+            }
         }
-        if (!sym) {
-            throw CompileError("Undefined function: " + func_name, expr->location);
-        }
-        if (bindings) {
+        if (has_symbol && bindings) {
             bindings->bind(current_instance_id, expr->operand.get(), sym);
         }
-        has_symbol = true;
     }
 
     for (size_t i = 0; i < expr->args.size(); i++) {
@@ -1110,7 +1231,7 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             if (!node || node->kind != Expr::Kind::Identifier) return nullptr;
             Symbol* target = lookup_binding(node.get());
             if (!target) {
-                target = lookup_global(node->name);
+                target = lookup_value_global(node->name);
                 if (target && bindings) {
                     bindings->bind(current_instance_id, node.get(), target);
                 }
@@ -1168,6 +1289,10 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
     }
 
     if (sym->kind == Symbol::Kind::Function && sym->declaration) {
+        bool is_generic_func = !sym->declaration->is_instantiation &&
+                               is_generic_function(sym->declaration);
+        sym->declaration->is_generic = is_generic_func;
+
         size_t expected_receivers = sym->declaration->ref_params.size();
         size_t provided_receivers = expr->receivers.size();
         if (expected_receivers != provided_receivers) {
@@ -1190,8 +1315,26 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
             for (size_t i = 0; i < sym->declaration->ref_params.size() && i < receiver_types.size(); ++i) {
                 TypePtr recv_type = receiver_types[i];
-                TypePtr& param_type = sym->declaration->ref_param_types[i];
+                TypePtr declared_receiver = nullptr;
+                if (!sym->declaration->type_namespace.empty() && i == 0) {
+                    declared_receiver = Type::make_named(sym->declaration->type_namespace, expr->location);
+                } else {
+                    declared_receiver = sym->declaration->ref_param_types[i];
+                }
 
+                if (is_generic_func) {
+                    if (declared_receiver &&
+                        declared_receiver->kind != Type::Kind::TypeVar &&
+                        !types_compatible(recv_type, declared_receiver)) {
+                        throw CompileError(
+                            "Receiver '" + sym->declaration->ref_params[i] + "' expects type " +
+                            declared_receiver->to_string(),
+                            expr->location);
+                    }
+                    continue;
+                }
+
+                TypePtr& param_type = sym->declaration->ref_param_types[i];
                 if (!param_type || param_type->kind == Type::Kind::TypeVar) {
                     if (param_type && param_type->kind == Type::Kind::TypeVar && recv_type) {
                         bind_typevar(param_type, recv_type);
@@ -1205,8 +1348,6 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
         }
 
-        bool is_generic_func = sym->declaration->is_generic;
-
         // Validate argument count (skip expression parameters)
         size_t expected_args = sym->declaration->params.size();
         if (expr->args.size() != expected_args) {
@@ -1216,7 +1357,11 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         }
 
         if (is_generic_func) {
-            std::vector<TypePtr> arg_types;
+            std::vector<TypePtr> call_types;
+            call_types.reserve(receiver_types.size() + expr->args.size());
+            for (const auto& receiver_type : receiver_types) {
+                call_types.push_back(receiver_type);
+            }
             for (size_t i = 0; i < expr->args.size() && i < sym->declaration->params.size(); i++) {
                 ExprPtr arg_expr = expr->args[i];
                 TypePtr param_type = sym->declaration->params[i].type;
@@ -1242,22 +1387,28 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                 }
 
                 if (!sym->declaration->params[i].is_expression_param) {
-                    arg_types.push_back(arg_expr->type);
+                    call_types.push_back(arg_expr->type);
                 }
             }
 
-            std::string mangled_name = get_or_create_instantiation(func_name, arg_types, sym->declaration);
+            int instantiation_owner = sym->is_local ? current_instance_id : sym->instance_id;
+            std::string mangled_name = get_or_create_instantiation(sym->name,
+                                                                   call_types,
+                                                                   sym->declaration,
+                                                                   instantiation_owner);
             expr->operand->name = mangled_name;
             if (bindings) {
-                Symbol* inst_sym = lookup_global(mangled_name);
+                Symbol* inst_sym = resolver
+                    ? resolver->lookup_internal_in_instance(instantiation_owner, mangled_name)
+                    : (global_scope ? global_scope->lookup_internal(mangled_name) : nullptr);
                 if (inst_sym) {
                     bindings->bind(current_instance_id, expr->operand.get(), inst_sym);
                 }
             }
 
             TypeSignature sig;
-            sig.param_types = arg_types;
-            std::string lookup_key = func_name + "_inst" + std::to_string(current_instance_id);
+            sig.param_types = call_types;
+            std::string lookup_key = sym->name + "_inst" + std::to_string(instantiation_owner);
             auto func_it = instantiations.find(lookup_key);
             if (func_it != instantiations.end()) {
                 auto inst_it = func_it->second.find(sig);
@@ -1440,7 +1591,7 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
             type_sym = bindings->lookup(current_instance_id, obj_type.get());
         }
         if (!type_sym) {
-            type_sym = lookup_global(obj_type->type_name);
+            type_sym = lookup_type_global(obj_type->type_name);
         }
         if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
             // Find the field in the type declaration

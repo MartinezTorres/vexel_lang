@@ -10,12 +10,17 @@ Resolution rule:
 The override unit is the module path (no symbol-level merge).
 
 Current status:
+- `std/print.vx` provides an ordinary overloaded `print(...)` surface.
+  - Supported directly: `#s`, `#b`, signed/unsigned integers through `#i64`/`#u64`.
+  - Arrays recurse through a generic iterable fallback.
+  - Vectors and matrices print through the same path after frontend lowering to arrays.
+  - This is library code; there is no compiler builtin `print`.
 - `std/math.vx` has a phase-1 scalar math surface backed by C `<math.h>` names.
   - Includes scalar math functions (`sqrt`, `sin`, `pow`, ...) and classification
     helpers (`isnan`, `isinf`, `isfinite`) for `#f64`, plus `f32` suffixed forms.
   - `#f64` functions use the unsuffixed C names (`sin`, `sqrt`, `pow`, ...).
   - `#f32` functions use C-style suffixed names (`sinf`, `sqrtf`, `powf`, ...)
-    because Vexel does not currently support function overloading.
+    because ABI-visible external overloads are not currently supported.
   - Compiler-recognized math behavior applies only to the bundled fallback
     module in this directory (not to project-local `std/math.vx` overrides).
   - The frontend can fold supported bundled `std::math` calls at compile time

@@ -1,0 +1,64 @@
+// Bundled std::print surface.
+// This is ordinary library code built on top of function overloading.
+
+&!putchar(c:#u8);
+
+&print(value:#s) {
+  i:#i32 = 0;
+  (i < |value|)@{
+    putchar(value[i]);
+    i = i + 1;
+  };
+}
+
+&print(value:#b) {
+  value ? print("true");
+  value == (#b)0 ? print("false");
+}
+
+&print_unsigned(value:#u64) {
+  value < (#u64)10 ? {
+    putchar((#u8)((#i32)(#u8)48 + (#i32)value));
+    ->;
+  };
+  print_unsigned(value / (#u64)10);
+  putchar((#u8)((#i32)(#u8)48 + (#i32)(value % (#u64)10)));
+}
+
+&print_signed(value:#i64) {
+  value < (#i64)0 ? {
+    putchar((#u8)45);
+    print_unsigned((#u64)(-(value + (#i64)1)) + (#u64)1);
+    ->;
+  };
+  print_unsigned((#u64)value);
+}
+
+&print(value:#u8) { print_unsigned((#u64)value); }
+&print(value:#u16) { print_unsigned((#u64)value); }
+&print(value:#u32) { print_unsigned((#u64)value); }
+&print(value:#u64) { print_unsigned(value); }
+
+&print(value:#i8) { print_signed((#i64)value); }
+&print(value:#i16) { print_signed((#i64)value); }
+&print(value:#i32) { print_signed((#i64)value); }
+&print(value:#i64) { print_signed(value); }
+
+&print_separator() {
+  print(", ");
+}
+
+&print(items) {
+  putchar((#u8)91);
+  first:#b = (#b)1;
+  items@{
+    first == (#b)0 ? print_separator();
+    print(_);
+    first = (#b)0;
+  };
+  putchar((#u8)93);
+}
+
+&print_newline() {
+  putchar((#u8)10);
+}

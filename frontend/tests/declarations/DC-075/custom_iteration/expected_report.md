@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     cnt = #Container([1, 2, 3]);
     sum = 0;
-    cnt@{
+    cnt.@_G_Container({
         sum = sum + _
-    };
+    });
     sum
 }
 ```

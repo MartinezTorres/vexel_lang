@@ -10,7 +10,7 @@
 }
 &^main() -> #i32 {
     r = #ReverseRange(0, 5);
-    r@@print(_);
+    r.@@_G_ReverseRange(print(_));
     -> 0;
 }
 ```

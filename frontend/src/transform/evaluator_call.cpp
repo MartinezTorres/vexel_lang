@@ -80,7 +80,18 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         }
     }
     if (!sym && type_checker && type_checker->get_scope()) {
-        sym = type_checker->get_scope()->lookup(func_name);
+        Scope* scope = type_checker->get_scope();
+        if (expr->is_constructor_call) {
+            sym = scope->lookup_type(func_name);
+        } else {
+            sym = scope->lookup_internal(func_name);
+            if (!sym) {
+                std::vector<Symbol*> overloads = scope->lookup_functions(func_name);
+                if (overloads.size() == 1) {
+                    sym = overloads.front();
+                }
+            }
+        }
     }
 
     if (!sym) {

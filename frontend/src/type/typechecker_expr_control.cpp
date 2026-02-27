@@ -320,7 +320,11 @@ bool TypeChecker::try_custom_iteration(ExprPtr expr, TypePtr iterable_type) {
     std::string method_token = expr->is_sorted_iteration ? "@@" : "@";
     std::string method_name = iterable_type->type_name + "::" + method_token;
 
-    Symbol* sym = lookup_global(method_name);
+    std::vector<Symbol*> overloads = lookup_functions_global(method_name);
+    if (overloads.size() != 1) {
+        return false;
+    }
+    Symbol* sym = overloads.front();
     if (!sym || sym->kind != Symbol::Kind::Function || !sym->declaration) {
         return false;
     }
@@ -786,7 +790,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
     if (expr->left->kind == Expr::Kind::Identifier) {
         Symbol* sym = lookup_binding(expr->left.get());
         if (!sym) {
-            sym = lookup_global(expr->left->name);
+            sym = lookup_value_global(expr->left->name);
             if (sym && bindings) {
                 bindings->bind(current_instance_id, expr->left.get(), sym);
             }
@@ -1065,7 +1069,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
         if (!node || node->kind != Expr::Kind::Identifier) return nullptr;
         Symbol* sym = lookup_binding(node.get());
         if (!sym) {
-            sym = lookup_global(node->name);
+            sym = lookup_value_global(node->name);
             if (sym && bindings) {
                 bindings->bind(current_instance_id, node.get(), sym);
             }

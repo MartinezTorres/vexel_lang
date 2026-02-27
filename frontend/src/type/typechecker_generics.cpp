@@ -199,17 +199,18 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
     return hash;
 }
 std::string TypeChecker::get_or_create_instantiation(const std::string& func_name,
-                                                     const std::vector<TypePtr>& arg_types,
-                                                     StmtPtr generic_func) {
+                                                     const std::vector<TypePtr>& call_types,
+                                                     StmtPtr generic_func,
+                                                     int owner_instance_id) {
     // Create type signature
     TypeSignature sig;
-    sig.param_types.reserve(arg_types.size());
-    for (const auto& arg_type : arg_types) {
-        sig.param_types.push_back(freeze_signature_type(resolve_type(arg_type)));
+    sig.param_types.reserve(call_types.size());
+    for (const auto& call_type : call_types) {
+        sig.param_types.push_back(freeze_signature_type(resolve_type(call_type)));
     }
 
     // Keep instantiations per module instance.
-    int instance_id = current_instance_id;
+    int instance_id = owner_instance_id;
     std::string lookup_key = func_name + "_inst" + std::to_string(instance_id);
     std::string mangled = mangle_generic_name(func_name, sig.param_types);
 
@@ -224,7 +225,7 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
 
     // Fallback: if an equivalent generated symbol already exists in scope,
     // reuse it and rehydrate the cache entry.
-    if (Symbol* existing = lookup_global(mangled)) {
+    if (Symbol* existing = lookup_internal_global(mangled)) {
         if (existing->kind == Symbol::Kind::Function && existing->declaration) {
             GenericInstantiation inst;
             inst.mangled_name = mangled;
@@ -250,7 +251,13 @@ std::string TypeChecker::get_or_create_instantiation(const std::string& func_nam
     }
 
     // Type check the instantiation immediately to infer return type
+    int saved_instance = current_instance_id;
+    auto saved_constexpr_values = known_constexpr_values;
+    current_instance_id = instance_id;
+    forget_all_constexpr_values();
     check_func_decl(cloned);
+    current_instance_id = saved_instance;
+    known_constexpr_values = std::move(saved_constexpr_values);
 
     // Store instantiation
     GenericInstantiation inst;
@@ -464,8 +471,16 @@ void TypeChecker::substitute_types(StmtPtr func, const std::vector<TypePtr>& con
 
     std::unordered_map<std::string, TypePtr> substitutions;
 
-    for (size_t i = 0; i < func->params.size() && i < concrete_types.size(); i++) {
-        TypePtr concrete = concrete_types[i];
+    size_t concrete_index = 0;
+    for (size_t i = 0; i < func->ref_param_types.size() && concrete_index < concrete_types.size(); ++i, ++concrete_index) {
+        TypePtr concrete = concrete_types[concrete_index];
+        if (!concrete) continue;
+        collect_typevar_bindings(func->ref_param_types[i], concrete, substitutions);
+        func->ref_param_types[i] = concrete;
+    }
+
+    for (size_t i = 0; i < func->params.size() && concrete_index < concrete_types.size(); i++, ++concrete_index) {
+        TypePtr concrete = concrete_types[concrete_index];
         if (!concrete) continue;
         collect_typevar_bindings(func->params[i].type, concrete, substitutions);
         func->params[i].type = concrete;

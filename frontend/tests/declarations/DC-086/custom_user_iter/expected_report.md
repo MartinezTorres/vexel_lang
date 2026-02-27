@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     ut = #UserType([100, 200]);
     total = 0;
-    ut@{
+    ut.@_G_UserType({
         total = total + _
-    };
+    });
     total
 }
 ```

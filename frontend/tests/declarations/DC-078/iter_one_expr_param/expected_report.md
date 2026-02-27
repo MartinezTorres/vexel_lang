@@ -8,9 +8,9 @@
 }
 &^main() -> #i32 {
     series = #Series(4);
-    series@{
+    series.@_G_Series({
         -> 0;
-    };
+    });
     0
 }
 ```

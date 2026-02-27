@@ -133,8 +133,9 @@ public:
 
     // Generic monomorphization
     std::string get_or_create_instantiation(const std::string& func_name,
-                                            const std::vector<TypePtr>& arg_types,
-                                            StmtPtr generic_func);
+                                            const std::vector<TypePtr>& call_types,
+                                            StmtPtr generic_func,
+                                            int owner_instance_id);
     std::vector<StmtPtr>& get_pending_instantiations() { return pending_instantiations; }
     const std::unordered_map<std::string, std::vector<TypePtr>>& get_forced_tuple_types() const { return forced_tuple_types; }
     void register_tuple_type(const std::string& name, const std::vector<TypePtr>& elem_types);
@@ -147,7 +148,10 @@ private:
     //   block expressions without a result are untyped.
     // - TypeVars are permitted to remain unresolved, but only when their values are
     //   never used in a concrete context (enforced later by type-use validation).
-    Symbol* lookup_global(const std::string& name) const;
+    Symbol* lookup_internal_global(const std::string& name) const;
+    Symbol* lookup_value_global(const std::string& name) const;
+    Symbol* lookup_type_global(const std::string& name) const;
+    std::vector<Symbol*> lookup_functions_global(const std::string& name) const;
     Symbol* lookup_binding(const void* node) const;
     unsigned long long stmt_key(const Stmt* stmt) const;
     unsigned long long expr_key(int instance_id, const Expr* expr) const;

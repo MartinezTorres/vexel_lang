@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     obj = #Iterable(3);
     sum = 0;
-    obj@{
+    obj.@_G_Iterable({
         sum = sum + _
-    };
+    });
     sum
 }
 ```

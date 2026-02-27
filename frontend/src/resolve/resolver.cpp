@@ -31,6 +31,11 @@ std::string qualified_import_prefix(const std::vector<std::string>& import_path)
     }
     return out;
 }
+
+std::string overload_internal_name(const std::string& surface_name, size_t ordinal, bool disambiguate_first) {
+    if (ordinal == 0 && !disambiguate_first) return surface_name;
+    return surface_name + "__ov" + std::to_string(ordinal);
+}
 }
 
 Resolver::Resolver(Program& program_in, Bindings& bindings_in, const std::string& root)
@@ -49,10 +54,28 @@ Scope* Resolver::instance_scope(int instance_id) const {
     return it->second;
 }
 
-Symbol* Resolver::lookup_in_instance(int instance_id, const std::string& name) const {
+Symbol* Resolver::lookup_internal_in_instance(int instance_id, const std::string& name) const {
     Scope* scope = instance_scope(instance_id);
     if (!scope) return nullptr;
-    return scope->lookup(name);
+    return scope->lookup_internal(name);
+}
+
+Symbol* Resolver::lookup_value_in_instance(int instance_id, const std::string& name) const {
+    Scope* scope = instance_scope(instance_id);
+    if (!scope) return nullptr;
+    return scope->lookup_value(name);
+}
+
+Symbol* Resolver::lookup_type_in_instance(int instance_id, const std::string& name) const {
+    Scope* scope = instance_scope(instance_id);
+    if (!scope) return nullptr;
+    return scope->lookup_type(name);
+}
+
+std::vector<Symbol*> Resolver::lookup_functions_in_instance(int instance_id, const std::string& name) const {
+    Scope* scope = instance_scope(instance_id);
+    if (!scope) return {};
+    return scope->lookup_functions(name);
 }
 
 void Resolver::resolve() {
@@ -68,22 +91,24 @@ void Resolver::resolve_generated_function(StmtPtr func, int instance_id) {
     if (!func || func->kind != Stmt::Kind::FuncDecl) return;
 
     ModuleInstance& inst = program.instances[static_cast<size_t>(instance_id)];
-    std::string func_name = qualified_name_for_func(func);
+    std::string surface_name = qualified_name_for_func(func);
+    std::string internal_name = surface_name;
 
-    if (inst.symbols.count(func_name)) {
-        throw CompileError("Name already defined: " + func_name, func->location);
+    if (inst.symbols.count(internal_name)) {
+        throw CompileError("Name already defined: " + internal_name, func->location);
     }
 
-    Symbol* sym = create_symbol(Symbol::Kind::Function, func_name, func, false, false);
+    Symbol* sym = create_symbol(Symbol::Kind::Function, internal_name, func, false, false, surface_name);
     sym->is_external = func->is_external;
     sym->is_exported = func->is_exported;
     sym->module_id = inst.module_id;
     sym->instance_id = inst.id;
 
-    inst.symbols[func_name] = sym;
+    inst.symbols[internal_name] = sym;
+    inst.function_overloads[surface_name].push_back(sym);
     Scope* scope = instance_scope(instance_id);
     if (scope) {
-        scope->define(func_name, sym);
+        scope->define_function(surface_name, sym);
     }
     bindings.bind(instance_id, func.get(), sym);
 
@@ -117,10 +142,30 @@ void Resolver::pop_scope() {
     }
 }
 
-void Resolver::verify_no_shadowing(const std::string& name, const SourceLocation& loc) {
+void Resolver::verify_no_shadowing(const std::string& name, Symbol::Kind kind, const SourceLocation& loc) {
     if (name == "_") return;
-    if (current_scope && current_scope->lookup(name)) {
-        throw CompileError("Name shadows existing definition: " + name, loc);
+    if (!current_scope) return;
+    switch (kind) {
+        case Symbol::Kind::Type:
+            if (current_scope->lookup_type(name)) {
+                throw CompileError("Name shadows existing definition: " + name, loc);
+            }
+            break;
+        case Symbol::Kind::Function:
+        case Symbol::Kind::Variable:
+        case Symbol::Kind::Constant:
+            if (current_scope->lookup_value(name)) {
+                throw CompileError("Name shadows existing definition: " + name, loc);
+            }
+            if (kind == Symbol::Kind::Function) {
+                std::vector<Symbol*> overloads = current_scope->lookup_functions(name);
+                if (!overloads.empty() && !current_scope->exists_function_in_current(name)) {
+                    throw CompileError("Name shadows existing definition: " + name, loc);
+                }
+            } else if (!current_scope->lookup_functions(name).empty()) {
+                throw CompileError("Name shadows existing definition: " + name, loc);
+            }
+            break;
     }
 }
 
@@ -147,8 +192,16 @@ void Resolver::resolve_instance(int instance_id) {
     push_scope(instance.scope_id);
     instance_scopes[instance.id] = current_scope;
 
-    for (const auto& pair : instance.symbols) {
-        current_scope->define(pair.first, pair.second);
+    for (const auto& pair : instance.value_symbols) {
+        current_scope->define_value(pair.first, pair.second);
+    }
+    for (const auto& pair : instance.type_symbols) {
+        current_scope->define_type(pair.first, pair.second);
+    }
+    for (const auto& pair : instance.function_overloads) {
+        for (Symbol* sym : pair.second) {
+            current_scope->define_function(pair.first, sym);
+        }
     }
 
     for (size_t i = 0; i < current_module->top_level.size(); ++i) {
@@ -174,53 +227,86 @@ void Resolver::resolve_instance(int instance_id) {
 void Resolver::predeclare_instance_symbols(ModuleInstance& instance) {
     ModuleInfo* mod_info = program.module(instance.module_id);
     if (!mod_info) return;
+    std::unordered_map<std::string, size_t> function_counts;
+    for (const auto& stmt : mod_info->module.top_level) {
+        if (!stmt || stmt->kind != Stmt::Kind::FuncDecl) continue;
+        function_counts[qualified_name_for_func(stmt)] += 1;
+    }
+    std::unordered_map<std::string, size_t> function_ordinals;
     for (const auto& stmt : mod_info->module.top_level) {
         if (!stmt) continue;
         if (stmt->kind == Stmt::Kind::FuncDecl) {
-            std::string func_name = qualified_name_for_func(stmt);
-            if (instance.symbols.count(func_name)) {
-                throw CompileError("Name already defined: " + func_name, stmt->location);
+            std::string surface_name = qualified_name_for_func(stmt);
+            size_t ordinal = function_ordinals[surface_name]++;
+            if (function_counts[surface_name] > 1 && (stmt->is_external || stmt->is_exported)) {
+                throw CompileError("ABI-visible function overloads are not supported: " + surface_name,
+                                   stmt->location);
             }
-            Symbol* sym = create_symbol(Symbol::Kind::Function, func_name, stmt, false, false);
+            bool disambiguate_first = ordinal == 0 && instance.symbols.count(surface_name);
+            std::string internal_name = overload_internal_name(surface_name, ordinal, disambiguate_first);
+            if (instance.symbols.count(internal_name)) {
+                throw CompileError("Name already defined: " + internal_name, stmt->location);
+            }
+            Symbol* sym = create_symbol(Symbol::Kind::Function,
+                                        internal_name,
+                                        stmt,
+                                        false,
+                                        false,
+                                        surface_name);
             sym->is_external = stmt->is_external;
             sym->is_exported = stmt->is_exported;
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
-            instance.symbols[func_name] = sym;
+            instance.symbols[internal_name] = sym;
+            instance.function_overloads[surface_name].push_back(sym);
             bindings.bind(instance.id, stmt.get(), sym);
         } else if (stmt->kind == Stmt::Kind::TypeDecl) {
-            if (instance.symbols.count(stmt->type_decl_name)) {
+            if (instance.type_symbols.count(stmt->type_decl_name)) {
                 throw CompileError("Name already defined: " + stmt->type_decl_name, stmt->location);
             }
-            Symbol* sym = create_symbol(Symbol::Kind::Type, stmt->type_decl_name, stmt, false, false);
+            Symbol* sym = create_symbol(Symbol::Kind::Type,
+                                        stmt->type_decl_name,
+                                        stmt,
+                                        false,
+                                        false,
+                                        stmt->type_decl_name);
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
             instance.symbols[stmt->type_decl_name] = sym;
+            instance.type_symbols[stmt->type_decl_name] = sym;
             bindings.bind(instance.id, stmt.get(), sym);
         } else if (stmt->kind == Stmt::Kind::VarDecl) {
-            if (instance.symbols.count(stmt->var_name)) {
+            if (instance.value_symbols.count(stmt->var_name) || instance.function_overloads.count(stmt->var_name)) {
                 throw CompileError("Name already defined: " + stmt->var_name, stmt->location);
             }
             Symbol* sym = create_symbol(stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant,
                                         stmt->var_name,
                                         stmt,
                                         stmt->is_mutable,
-                                        false);
+                                        false,
+                                        stmt->var_name);
             sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
             sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
             sym->is_exported = stmt->is_exported;
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
             instance.symbols[stmt->var_name] = sym;
+            instance.value_symbols[stmt->var_name] = sym;
             bindings.bind(instance.id, stmt.get(), sym);
         }
     }
 }
 
-Symbol* Resolver::create_symbol(Symbol::Kind kind, const std::string& name, StmtPtr decl, bool is_mutable, bool is_local) {
+Symbol* Resolver::create_symbol(Symbol::Kind kind,
+                                const std::string& name,
+                                StmtPtr decl,
+                                bool is_mutable,
+                                bool is_local,
+                                const std::string& surface_name) {
     auto sym = std::make_unique<Symbol>();
     sym->kind = kind;
     sym->name = name;
+    sym->surface_name = surface_name.empty() ? name : surface_name;
     sym->is_mutable = is_mutable;
     sym->declaration = decl;
     sym->is_local = is_local;
@@ -290,13 +376,26 @@ void Resolver::resolve_func_decl(StmtPtr stmt, bool define_symbol) {
     std::string func_name = qualified_name_for_func(stmt);
 
     if (define_symbol) {
-        verify_no_shadowing(func_name, stmt->location);
-        Symbol* sym = create_symbol(Symbol::Kind::Function, func_name, stmt, false, false);
+        verify_no_shadowing(func_name, Symbol::Kind::Function, stmt->location);
+        size_t ordinal = current_scope->exists_function_in_current(func_name)
+                             ? current_scope->function_overloads[func_name].size()
+                             : 0;
+        bool disambiguate_first = ordinal == 0 && current_scope->exists_internal_in_current(func_name);
+        std::string internal_name = overload_internal_name(func_name, ordinal, disambiguate_first);
+        if ((stmt->is_external || stmt->is_exported) && current_scope->exists_function_in_current(func_name)) {
+            throw CompileError("ABI-visible function overloads are not supported: " + func_name, stmt->location);
+        }
+        Symbol* sym = create_symbol(Symbol::Kind::Function,
+                                    internal_name,
+                                    stmt,
+                                    false,
+                                    false,
+                                    func_name);
         sym->is_external = stmt->is_external;
         sym->is_exported = stmt->is_exported;
         sym->module_id = current_module_id;
         sym->instance_id = current_instance_id;
-        current_scope->define(func_name, sym);
+        current_scope->define_function(func_name, sym);
         bindings.bind(current_instance_id, stmt.get(), sym);
     }
 
@@ -319,24 +418,26 @@ void Resolver::resolve_func_decl(StmtPtr stmt, bool define_symbol) {
     push_scope();
 
     for (const auto& ref_param : stmt->ref_params) {
-        if (current_scope->exists_in_current(ref_param)) {
+        if (current_scope->exists_value_in_current(ref_param) ||
+            current_scope->exists_function_in_current(ref_param)) {
             throw CompileError("Name already defined: " + ref_param, stmt->location);
         }
         Symbol* sym = create_symbol(Symbol::Kind::Variable, ref_param, stmt, true, true);
         sym->module_id = current_module_id;
         sym->instance_id = current_instance_id;
-        current_scope->define(ref_param, sym);
+        current_scope->define_value(ref_param, sym);
         bindings.bind(current_instance_id, &ref_param, sym);
     }
 
     for (auto& param : stmt->params) {
-        if (current_scope->exists_in_current(param.name)) {
+        if (current_scope->exists_value_in_current(param.name) ||
+            current_scope->exists_function_in_current(param.name)) {
             throw CompileError("Name already defined: " + param.name, param.location);
         }
         Symbol* sym = create_symbol(Symbol::Kind::Variable, param.name, stmt, false, true);
         sym->module_id = current_module_id;
         sym->instance_id = current_instance_id;
-        current_scope->define(param.name, sym);
+        current_scope->define_value(param.name, sym);
         bindings.bind(current_instance_id, &param, sym);
     }
 
@@ -349,16 +450,16 @@ void Resolver::resolve_type_decl(StmtPtr stmt) {
     if (!stmt || stmt->kind != Stmt::Kind::TypeDecl) return;
 
     if (current_scope) {
-        Symbol* existing = current_scope->lookup(stmt->type_decl_name);
+        Symbol* existing = current_scope->lookup_type(stmt->type_decl_name);
         if (existing && !existing->is_local) {
             bindings.bind(current_instance_id, stmt.get(), existing);
         } else {
-            verify_no_shadowing(stmt->type_decl_name, stmt->location);
+            verify_no_shadowing(stmt->type_decl_name, Symbol::Kind::Type, stmt->location);
             Symbol* sym = create_symbol(Symbol::Kind::Type, stmt->type_decl_name, stmt, false,
                                         current_scope->parent != nullptr);
             sym->module_id = current_module_id;
             sym->instance_id = current_instance_id;
-            current_scope->define(stmt->type_decl_name, sym);
+            current_scope->define_type(stmt->type_decl_name, sym);
             bindings.bind(current_instance_id, stmt.get(), sym);
         }
     }
@@ -384,12 +485,14 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
     if (!current_scope) return;
 
     Symbol* sym = nullptr;
-    Symbol* existing = current_scope->lookup(stmt->var_name);
+    Symbol* existing = current_scope->lookup_value(stmt->var_name);
     if (existing && !existing->is_local) {
         sym = existing;
         bindings.bind(current_instance_id, stmt.get(), existing);
     } else {
-        verify_no_shadowing(stmt->var_name, stmt->location);
+        verify_no_shadowing(stmt->var_name,
+                            stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant,
+                            stmt->location);
 
         sym = create_symbol(stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant,
                             stmt->var_name,
@@ -398,7 +501,7 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
                             current_scope->parent != nullptr);
         sym->module_id = current_module_id;
         sym->instance_id = current_instance_id;
-        current_scope->define(stmt->var_name, sym);
+        current_scope->define_value(stmt->var_name, sym);
         bindings.bind(current_instance_id, stmt.get(), sym);
     }
 
@@ -418,7 +521,7 @@ void Resolver::resolve_expr(ExprPtr expr) {
 
     switch (expr->kind) {
         case Expr::Kind::Identifier: {
-            Symbol* sym = current_scope ? current_scope->lookup(expr->name) : nullptr;
+            Symbol* sym = current_scope ? current_scope->lookup_value(expr->name) : nullptr;
             if (!sym) {
                 // Binding-only resolver: unresolved identifiers are deferred to type checking.
                 break;
@@ -452,7 +555,17 @@ void Resolver::resolve_expr(ExprPtr expr) {
             break;
         case Expr::Kind::Call:
             if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
-                Symbol* sym = current_scope ? current_scope->lookup(expr->operand->name) : nullptr;
+                Symbol* sym = nullptr;
+                if (current_scope) {
+                    if (expr->is_constructor_call) {
+                        sym = current_scope->lookup_type(expr->operand->name);
+                    } else {
+                        std::vector<Symbol*> overloads = current_scope->lookup_functions(expr->operand->name);
+                        if (overloads.size() == 1) {
+                            sym = overloads.front();
+                        }
+                    }
+                }
                 if (sym) {
                     bindings.bind(current_instance_id, expr->operand.get(), sym);
                 }
@@ -496,18 +609,18 @@ void Resolver::resolve_expr(ExprPtr expr) {
             break;
         case Expr::Kind::Assignment: {
             if (expr->left && expr->left->kind == Expr::Kind::Identifier) {
-                Symbol* sym = current_scope ? current_scope->lookup(expr->left->name) : nullptr;
+                Symbol* sym = current_scope ? current_scope->lookup_value(expr->left->name) : nullptr;
                 if (!sym) {
                     resolve_expr(expr->right);
                     if (expr->left->type) {
                         resolve_type(expr->left->type);
                     }
-                    verify_no_shadowing(expr->left->name, expr->location);
+                    verify_no_shadowing(expr->left->name, Symbol::Kind::Variable, expr->location);
 
                     Symbol* new_sym = create_symbol(Symbol::Kind::Variable, expr->left->name, nullptr, true, true);
                     new_sym->module_id = current_module_id;
                     new_sym->instance_id = current_instance_id;
-                    current_scope->define(expr->left->name, new_sym);
+                    current_scope->define_value(expr->left->name, new_sym);
                     bindings.bind(current_instance_id, expr->left.get(), new_sym);
                     bindings.set_new_variable(current_instance_id, expr.get(), true);
                     break;
@@ -532,7 +645,7 @@ void Resolver::resolve_expr(ExprPtr expr) {
                 Symbol* sym = create_symbol(Symbol::Kind::Variable, "_", nullptr, false, true);
                 sym->module_id = current_module_id;
                 sym->instance_id = current_instance_id;
-                current_scope->define("_", sym);
+                current_scope->define_value("_", sym);
             }
             resolve_expr(loop_body(expr));
             pop_scope();
@@ -578,7 +691,7 @@ void Resolver::resolve_type(TypePtr type) {
             }
             break;
         case Type::Kind::Named: {
-            Symbol* sym = current_scope ? current_scope->lookup(type->type_name) : nullptr;
+            Symbol* sym = current_scope ? current_scope->lookup_type(type->type_name) : nullptr;
             if (sym && sym->kind == Symbol::Kind::Type) {
                 bindings.bind(current_instance_id, type.get(), sym);
             }
@@ -618,15 +731,44 @@ void Resolver::handle_import(StmtPtr stmt) {
     ModuleInstance& instance = get_or_create_instance(module_id, current_scope->id, stmt->location);
 
     std::string module_prefix = qualified_import_prefix(stmt->import_path);
-    for (const auto& pair : instance.symbols) {
-        if (current_scope->exists_in_current(pair.first)) {
+    for (const auto& pair : instance.value_symbols) {
+        if (current_scope->has_visible_name_in_current(pair.first)) {
             throw CompileError("Name already defined: " + pair.first, stmt->location);
         }
-        current_scope->define(pair.first, pair.second);
+        current_scope->define_value(pair.first, pair.second);
         if (!module_prefix.empty()) {
             std::string qualified = module_prefix + "::" + pair.first;
-            if (!current_scope->exists_in_current(qualified)) {
-                current_scope->define(qualified, pair.second);
+            if (!current_scope->has_visible_name_in_current(qualified)) {
+                current_scope->define_value(qualified, pair.second);
+            }
+        }
+    }
+    for (const auto& pair : instance.type_symbols) {
+        if (current_scope->exists_type_in_current(pair.first)) {
+            throw CompileError("Name already defined: " + pair.first, stmt->location);
+        }
+        current_scope->define_type(pair.first, pair.second);
+        if (!module_prefix.empty()) {
+            std::string qualified = module_prefix + "::" + pair.first;
+            if (!current_scope->exists_type_in_current(qualified)) {
+                current_scope->define_type(qualified, pair.second);
+            }
+        }
+    }
+    for (const auto& pair : instance.function_overloads) {
+        if (current_scope->exists_value_in_current(pair.first)) {
+            throw CompileError("Name already defined: " + pair.first, stmt->location);
+        }
+        for (Symbol* sym : pair.second) {
+            current_scope->define_function(pair.first, sym);
+        }
+        if (!module_prefix.empty()) {
+            std::string qualified = module_prefix + "::" + pair.first;
+            if (current_scope->exists_value_in_current(qualified)) {
+                throw CompileError("Name already defined: " + qualified, stmt->location);
+            }
+            for (Symbol* sym : pair.second) {
+                current_scope->define_function(qualified, sym);
             }
         }
     }

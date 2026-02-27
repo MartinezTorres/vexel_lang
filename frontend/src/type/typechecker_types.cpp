@@ -140,7 +140,7 @@ TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const S
     // Named/complex types are resolved later through bindings and resolver scopes.
     TypePtr named = Type::make_named(type_str, loc);
     if (bindings) {
-        Symbol* sym = lookup_global(type_str);
+        Symbol* sym = lookup_type_global(type_str);
         if (sym) {
             bindings->bind(current_instance_id, named.get(), sym);
         }
@@ -164,6 +164,18 @@ bool TypeChecker::types_in_same_family(TypePtr a, TypePtr b) {
 bool TypeChecker::is_generic_function(StmtPtr func) {
     if (!func || func->kind != Stmt::Kind::FuncDecl) return false;
 
+    bool has_untyped_receiver = false;
+    for (size_t i = 0; i < func->ref_param_types.size(); ++i) {
+        if (i == 0 && !func->type_namespace.empty()) {
+            continue;
+        }
+        const auto& recv_type = func->ref_param_types[i];
+        if (!recv_type || recv_type->kind == Type::Kind::TypeVar) {
+            has_untyped_receiver = true;
+            break;
+        }
+    }
+
     bool has_untyped_param = false;
     for (const auto& param : func->params) {
         if ((!param.type || param.type->kind == Type::Kind::TypeVar) && !param.is_expression_param) {
@@ -184,7 +196,7 @@ bool TypeChecker::is_generic_function(StmtPtr func) {
         has_typevar_return = true;
     }
 
-    return has_untyped_param || has_typevar_return;
+    return has_untyped_receiver || has_untyped_param || has_typevar_return;
 }
 TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
     if (!type) return nullptr;
@@ -300,7 +312,7 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                 type_sym = bindings->lookup(current_instance_id, type.get());
             }
             if (!type_sym) {
-                type_sym = lookup_global(type->type_name);
+                type_sym = lookup_type_global(type->type_name);
             }
             if (!type_sym) {
                 throw CompileError("Undefined type: " + type->type_name, loc);
@@ -409,7 +421,7 @@ bool TypeChecker::is_abi_data_type(TypePtr type,
                 type_sym = type->resolved_symbol;
             }
             if (!type_sym) {
-                type_sym = lookup_global(type->type_name);
+                type_sym = lookup_type_global(type->type_name);
             }
             if (!type_sym || type_sym->kind != Symbol::Kind::Type || !type_sym->declaration ||
                 type_sym->declaration->kind != Stmt::Kind::TypeDecl) {

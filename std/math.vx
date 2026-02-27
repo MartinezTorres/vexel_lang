@@ -33,7 +33,7 @@ pif32:#f32 = (#f32)3.14159265358979323846264338327950288;
 &!isinf(x:#f64) -> #b;
 &!isfinite(x:#f64) -> #b;
 
-// f32 unary (C-style suffixed names because Vexel currently has no function overloading)
+// f32 unary (C-style suffixed names because ABI-visible external overloads are not supported)
 &!sinf(x:#f32) -> #f32;
 &!cosf(x:#f32) -> #f32;
 &!tanf(x:#f32) -> #f32;

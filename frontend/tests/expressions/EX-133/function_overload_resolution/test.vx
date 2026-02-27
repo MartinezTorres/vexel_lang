@@ -1,0 +1,22 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Internal functions may overload by arity and concrete parameter type; the frontend resolves the selected overload before backend handoff. | Function overload calls resolve to one concrete internal symbol
+
+&pick(x:#i32) -> #i32 {
+  x + 10
+}
+
+&pick(x:#i32, y:#i32) -> #i32 {
+  x + y + 20
+}
+
+&score(x:#i32) -> #i32 {
+  x + 1
+}
+
+&score(x:#u32) -> #i32 {
+  (#i32)x + 2
+}
+
+&^main() -> #i32 {
+  pick(1) + pick(2, 3) + score((#i32)4) + score((#u32)5)
+}

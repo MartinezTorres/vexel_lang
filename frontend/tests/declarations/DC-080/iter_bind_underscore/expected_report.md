@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     els = #Elements([10, 20, 30]);
     sum = 0;
-    els@{
+    els.@_G_Elements({
         sum = sum + _
-    };
+    });
     sum
 }
 ```

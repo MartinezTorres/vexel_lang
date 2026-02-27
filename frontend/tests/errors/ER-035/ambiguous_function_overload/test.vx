@@ -1,0 +1,15 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Ambiguous overload sets are rejected when no candidate is more specific. | Ambiguous overload calls fail clearly
+
+&pick(x:#i32, y) -> #i32 {
+  x
+}
+
+&pick(x, y:#i32) -> #i32 {
+  y
+}
+
+&^main() -> #i32 {
+  value:#i32 = 1;
+  pick(value, value)
+}

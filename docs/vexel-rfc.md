@@ -295,6 +295,20 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Tuple returns are not allowed
 - Backends may restrict the accepted integer widths at ABI boundaries
 - Backend defines calling/linking
+- ABI-visible function overloads are not supported; an external function name must be unique within its scope/module
+
+**Function overloading**:
+- Internal functions and methods may share a surface name as an overload set
+- Overload resolution uses:
+  - receiver count
+  - argument count
+  - concrete receiver types
+  - concrete argument types
+- Generic and non-generic candidates participate in the same overload set
+- If exactly one candidate matches, that candidate is selected
+- If more than one candidate matches with the same best specificity, compilation fails with an ambiguity error
+- Function overload sets share the same surface namespace as values/constants
+- Types live in a separate surface namespace, so a type name may coexist with a function overload set of the same name
 
 **Type constructors**: `#Point(x:#i32, y:#i32);`
 - Can be defined at module level or within any scope
@@ -454,7 +468,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Function definitions can be scoped to blocks (nested functions)
 - Nested functions capture enclosing scope variables by reference
 - No import aliases
-- No shadowing (compilation error if names conflict), except `_` in nested iterations
+- No shadowing (compilation error if names conflict), except:
+  - `_` may shadow in nested iterations
+  - functions may form overload sets with other functions of the same surface name
+  - type names live in a separate surface namespace from functions
 - **Initialization order**: Each module initializes after all of its imports have initialized; within a module constants run in parse order. Cycles are a compile-time error.
 - **Forward references**: Functions and types can be used before definition, constants cannot
 

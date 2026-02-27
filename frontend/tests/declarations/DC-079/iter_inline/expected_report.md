@@ -9,9 +9,9 @@
 &^main() -> #i32 {
     ctr = #Counter(3);
     total = 0;
-    ctr@{
+    ctr.@_G_Counter({
         total = total + _
-    };
+    });
     total
 }
 ```

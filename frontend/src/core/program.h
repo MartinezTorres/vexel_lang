@@ -28,6 +28,9 @@ struct ModuleInstance {
     ModuleId module_id = -1;
     int scope_id = -1;
     std::unordered_map<std::string, Symbol*> symbols;
+    std::unordered_map<std::string, Symbol*> value_symbols;
+    std::unordered_map<std::string, Symbol*> type_symbols;
+    std::unordered_map<std::string, std::vector<Symbol*>> function_overloads;
 };
 
 struct Program {

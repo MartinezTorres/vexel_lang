@@ -1,0 +1,11 @@
+&show(x:#i32) -> #i32 {
+  x
+}
+
+&show(items) -> #i32 {
+  sum:#i32 = 0;
+  items@{
+    sum = sum + show(_)
+  };
+  sum
+}

@@ -145,7 +145,7 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
         if (!id_expr || id_expr->kind != Expr::Kind::Identifier || !desired) return true;
         Symbol* sym = lookup_binding(id_expr.get());
         if (!sym) {
-            sym = lookup_global(id_expr->name);
+            sym = lookup_value_global(id_expr->name);
             if (sym && bindings) {
                 bindings->bind(current_instance_id, id_expr.get(), sym);
             }
@@ -296,7 +296,7 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
                     type_sym = bindings->lookup(current_instance_id, obj_type.get());
                 }
                 if (!type_sym) {
-                    type_sym = lookup_global(obj_type->type_name);
+                    type_sym = lookup_type_global(obj_type->type_name);
                 }
                 if (type_sym &&
                     type_sym->kind == Symbol::Kind::Type &&
@@ -400,7 +400,7 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             }
             Symbol* callee = lookup_binding(expr->operand.get());
             if (!callee) {
-                callee = lookup_global(expr->operand->name);
+                callee = lookup_internal_global(expr->operand->name);
                 if (callee && bindings) {
                     bindings->bind(current_instance_id, expr->operand.get(), callee);
                 }

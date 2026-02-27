@@ -10,7 +10,7 @@
 }
 &^main() -> #i32 {
     r = #Range(0, 5);
-    r@print(_);
+    r.@_G_Range(print(_));
     -> 0;
 }
 ```

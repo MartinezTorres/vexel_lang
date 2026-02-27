@@ -19,7 +19,10 @@ public:
     void resolve_generated_function(StmtPtr func, int instance_id);
 
     Scope* instance_scope(int instance_id) const;
-    Symbol* lookup_in_instance(int instance_id, const std::string& name) const;
+    Symbol* lookup_internal_in_instance(int instance_id, const std::string& name) const;
+    Symbol* lookup_value_in_instance(int instance_id, const std::string& name) const;
+    Symbol* lookup_type_in_instance(int instance_id, const std::string& name) const;
+    std::vector<Symbol*> lookup_functions_in_instance(int instance_id, const std::string& name) const;
 
 private:
     // Resolver invariants (after resolve()):
@@ -47,7 +50,7 @@ private:
 
     void push_scope(int forced_id = -1);
     void pop_scope();
-    void verify_no_shadowing(const std::string& name, const SourceLocation& loc);
+    void verify_no_shadowing(const std::string& name, Symbol::Kind kind, const SourceLocation& loc);
 
     void resolve_instance(int instance_id);
     void predeclare_instance_symbols(ModuleInstance& instance);
@@ -65,7 +68,12 @@ private:
     void collect_imports_expr(ExprPtr expr, std::vector<std::vector<std::string>>& out) const;
     bool module_depends_on(int module_id, int target_module_id) const;
 
-    Symbol* create_symbol(Symbol::Kind kind, const std::string& name, StmtPtr decl, bool is_mutable, bool is_local);
+    Symbol* create_symbol(Symbol::Kind kind,
+                          const std::string& name,
+                          StmtPtr decl,
+                          bool is_mutable,
+                          bool is_local,
+                          const std::string& surface_name = "");
     ModuleInstance& get_or_create_instance(int module_id, int scope_id, const SourceLocation& loc);
 
     bool try_resolve_module_path(const std::vector<std::string>& import_path,
