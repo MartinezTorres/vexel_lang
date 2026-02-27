@@ -1,0 +1,27 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native non-zero-fraction fixed-point casts lower and execute with fixed-point scaling.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_shl(' out.c && grep -Fq 'vx_ai_shr_u(' out.c && grep -Fq 'vx_ai_from_double_u(' out.c && printf '%s\n' '#include "out.h"' 'vx_u72_t vx_ua(void) { vx_u72_t v = {{0}}; v.b[3] = 0x80; v.b[4] = 0x07; return v; }' 'vx_i72_t vx_sa(void) { vx_i72_t v = {{0}}; v.b[3] = 0x80; v.b[4] = 0x09; return v; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -lm -o out && ./out
+
+&!ua() -> #u40.32;
+&!sa() -> #i40.32;
+
+&^main() -> #i32 {
+  u:#u40.32 = ua();
+  s:#i40.32 = sa();
+
+  u16f:#u16.8 = (#u16.8)u;
+  u40f:#u40.32 = (#u40.32)u16f;
+
+  i24:#i24 = (#i24)s;
+  i40f:#i40.32 = (#i40.32)i24;
+
+  f:#f64 = (#f64)s;
+  s2:#i40.32 = (#i40.32)f;
+
+  b:#b = (#b)s2;
+  u40:#u40 = (#u40)s2;
+
+  ok:#b = (u40f == u) && (i24 == (#i24)9) && (i40f == (#i40.32)9) && (s2 == s) && b && (u40 == (#u40)9);
+  ok ? 0 : 1
+}

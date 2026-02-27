@@ -20,11 +20,7 @@ bool fixed_cast_meta(const TypePtr& type,
                     int64_t& fractional_bits) {
     if (!is_fixed_primitive_type(type)) return false;
     int64_t bits_i64 = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
-    const bool native_width = (bits_i64 == 8 || bits_i64 == 16 || bits_i64 == 32 || bits_i64 == 64);
-    const bool zero_fraction_any_width = (type->fractional_bits == 0 && bits_i64 > 0);
-    if (!(native_width || zero_fraction_any_width)) {
-        return false;
-    }
+    if (bits_i64 <= 0) return false;
     total_bits = static_cast<uint64_t>(bits_i64);
     is_signed_raw = type->primitive == PrimitiveType::FixedInt;
     fractional_bits = type->fractional_bits;
@@ -250,8 +246,7 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         int64_t src_frac = 0;
         if (source_is_fixed &&
             !fixed_cast_meta(source_type, src_fixed_bits, src_fixed_signed, src_frac)) {
-            error_msg =
-                "Fixed-point compile-time casts currently support only native storage widths (8/16/32/64) or zero-fraction fixed-point widths";
+            error_msg = "Fixed-point compile-time cast source has invalid storage width";
             return false;
         }
         (void)src_fixed_bits;
@@ -261,8 +256,7 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
         int64_t dst_frac = 0;
         if (target_is_fixed &&
             !fixed_cast_meta(target_type, dst_fixed_bits, dst_fixed_signed, dst_frac)) {
-            error_msg =
-                "Fixed-point compile-time casts currently support only native storage widths (8/16/32/64) or zero-fraction fixed-point widths";
+            error_msg = "Fixed-point compile-time cast target has invalid storage width";
             return false;
         }
 

@@ -581,8 +581,8 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
     };
     auto fixed_cast_storage_supported = [&](TypePtr t) {
         if (!is_fixed_primitive(t)) return true;
-        return fixed_native_storage_width_supported(t) ||
-               fixed_zero_frac_supported_any_width(t);
+        int64_t bits = type_bits(t->primitive, t->integer_bits, t->fractional_bits);
+        return bits > 0;
     };
 
     if (is_fixed_primitive(operand_type) || is_fixed_primitive(target_type)) {
@@ -597,7 +597,7 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
         if (!fixed_cast_storage_supported(operand_type) ||
             !fixed_cast_storage_supported(target_type)) {
             throw CompileError(
-                "Fixed-point casts currently support only native storage widths (8/16/32/64) or zero-fraction fixed-point widths",
+                "Fixed-point casts require positive total storage width",
                 expr->location);
         }
         if ((is_signed_int(target_type->primitive) || is_unsigned_int(target_type->primitive)) &&
