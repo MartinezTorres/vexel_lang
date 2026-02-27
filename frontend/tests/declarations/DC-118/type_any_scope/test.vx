@@ -5,6 +5,6 @@
 // DC-118: Type constructors in any scope
 &^main() -> #i32 {
     #Local(value:#i32);
-    obj:#Local = Local(42);
+    obj:#Local = #Local(42);
     obj.value
 }

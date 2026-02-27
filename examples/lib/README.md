@@ -29,7 +29,7 @@ Usage:
 ### vector.vx
 Dynamic-size vector with fixed capacity:
 - `#Vec(data, len:#i32, cap:#i32)` – fields: backing array, current length, capacity
-- Construct with the type constructor: `Vec(backing_array, len, cap)`
+- Construct with the type constructor: `#Vec(backing_array, len, cap)`
 - `&(v)#Vec::push(item)`, `set(idx, val)`
 - `&(v)#Vec::clear()`, `size()`, `is_empty()`, `is_full()`
 - `&(v)#Vec::each($expr)` – iterate with an expression parameter
@@ -37,14 +37,14 @@ Dynamic-size vector with fixed capacity:
 ### stack.vx
 LIFO stack implementation:
 - `#Stack(data, top:#i32)` – fields: backing array, top index
-- Construct with the type constructor: `Stack(backing_array, top)`
+- Construct with the type constructor: `#Stack(backing_array, top)`
 - `&(s)#Stack::push(item)`
 - `&(s)#Stack::clear()`, `size()`, `is_empty()`, `is_full()`
 
 ### set.vx
 Sorted set for unique elements:
 - `#Set(data, len:#i32, cap:#i32)` – sorted backing array with capacity
-- Construct with the type constructor: `Set(backing_array, len, cap)`
+- Construct with the type constructor: `#Set(backing_array, len, cap)`
 - `&(s)#Set::insert(item)`, `remove(item)`, `contains(item)`
 - `&(s)#Set::clear()`, `size()`, `is_empty()`, `is_full()`
 - `&(s)#Set::each($expr)` – iterate with an expression parameter

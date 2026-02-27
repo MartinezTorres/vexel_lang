@@ -6,7 +6,7 @@
 
 &^test() -> #i32 {
     #Local(y:#i32);
-    l:#Local = Local(42);
+    l:#Local = #Local(42);
     l.y
 }
 

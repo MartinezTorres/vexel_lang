@@ -7,10 +7,10 @@
 // This will be fully evaluated at compile-time
 &^main() -> #i32 {
   // Create a point at compile-time
-  p:#Point = Point(10, 20);
+  p:#Point = #Point(10, 20);
 
   // Create a 3D vector at compile-time
-  v:#Vec3 = Vec3(p.x, p.y, 30);
+  v:#Vec3 = #Vec3(p.x, p.y, 30);
 
   // All arithmetic computed at compile-time
   v.x + v.y + v.z

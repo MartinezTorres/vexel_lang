@@ -11,7 +11,7 @@
 }
 
 &^main() -> #i32 {
-    obj:#Iterable = Iterable(3);
+    obj:#Iterable = #Iterable(3);
     sum:#i32 = 0;
     obj@{ sum = sum + _; }
     sum

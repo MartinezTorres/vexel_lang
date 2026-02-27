@@ -12,7 +12,7 @@
 
 &^main() -> #i32 {
     first:#i32 = 0;
-    rng:#Range = Range(1, 5);
+    rng:#Range = #Range(1, 5);
     rng@{ first = _; }
     first
 }

@@ -6,7 +6,7 @@
 #Result(r:#i32);
 
 &(a)#Result::+(b:#Result) -> #Result {
-    Result(a.r + b.r)
+    #Result(a.r + b.r)
 }
 
 &^main() -> #i32 {

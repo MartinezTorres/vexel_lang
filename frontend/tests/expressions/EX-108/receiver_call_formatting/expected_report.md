@@ -8,8 +8,8 @@
 &!seed1() -> #i32;
 &!seed2() -> #i32;
 &^main() -> #i32 {
-    a = Vec(seed1());
-    b = Vec(seed2());
+    a = #Vec(seed1());
+    b = #Vec(seed2());
     a.len() + b.len()
 }
 ```

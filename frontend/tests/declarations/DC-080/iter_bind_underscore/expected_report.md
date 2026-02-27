@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    els = Elements([10, 20, 30]);
+    els = #Elements([10, 20, 30]);
     sum = 0;
     els@{
         sum = sum + _

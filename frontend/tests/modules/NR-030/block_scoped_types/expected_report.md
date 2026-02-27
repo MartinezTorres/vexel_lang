@@ -4,7 +4,7 @@
 &^main() -> #i32 {
     {
         #LocalType(x: #i32);
-        val = LocalType(42)
+        val = #LocalType(42)
     };
     -> 0;
 }

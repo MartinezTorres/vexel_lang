@@ -5,6 +5,6 @@
 #Pair(a, b);
 
 &^main() -> #i32 {
-    p:#Pair = Pair(10, 20);
+    p:#Pair = #Pair(10, 20);
     p.a
 }

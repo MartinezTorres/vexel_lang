@@ -4,13 +4,13 @@
 #Box(v:#i32);
 
 &(lhs)#Box::.+(rhs:#Box) -> #Box {
-  Box(lhs.v + rhs.v)
+  #Box(lhs.v + rhs.v)
 }
 
 &!idx() -> #u8;
 
 &^main() -> #i32 {
-  xs:#Box[2] = [Box(1), Box(2)];
-  xs[idx()] .+= Box(1);
+  xs:#Box[2] = [#Box(1), #Box(2)];
+  xs[idx()] .+= #Box(1);
   0
 }

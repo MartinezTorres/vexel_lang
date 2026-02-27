@@ -5,7 +5,7 @@
 #Vec2(x:#i32, y:#i32);
 
 &(self)#Vec2::+(other:#Vec2) -> #Vec2 {
-  Vec2(self.x + other.x, self.y + other.y)
+  #Vec2(self.x + other.x, self.y + other.y)
 }
 
 &(self)#Vec2::==(other:#Vec2) -> #b {
@@ -13,9 +13,9 @@
 }
 
 &^main() -> #i32 {
-  a = Vec2(1, 2);
-  b = Vec2(3, 4);
+  a = #Vec2(1, 2);
+  b = #Vec2(3, 4);
   sum = a + b;
-  expected = Vec2(4, 6);
+  expected = #Vec2(4, 6);
   sum == expected ? 1 : 0
 }

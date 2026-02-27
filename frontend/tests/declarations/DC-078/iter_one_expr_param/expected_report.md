@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    series = Series(4);
+    series = #Series(4);
     series@{
         -> 0;
     };

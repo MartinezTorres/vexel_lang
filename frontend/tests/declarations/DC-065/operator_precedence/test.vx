@@ -6,12 +6,12 @@
 #Custom(data:#i32);
 
 &(c)#Custom::+(other:#Custom) -> #Custom {
-    Custom(c.data + other.data * 2)
+    #Custom(c.data + other.data * 2)
 }
 
 &^main() -> #i32 {
-    a:#Custom = Custom(1);
-    b:#Custom = Custom(2);
+    a:#Custom = #Custom(1);
+    b:#Custom = #Custom(2);
     c:#Custom = a + b;
     c.data
 }

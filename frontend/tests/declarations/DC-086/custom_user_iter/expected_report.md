@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    ut = UserType([100, 200]);
+    ut = #UserType([100, 200]);
     total = 0;
     ut@{
         total = total + _

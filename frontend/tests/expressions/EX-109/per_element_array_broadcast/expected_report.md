@@ -3,7 +3,7 @@
 // Lowered Vexel module: tests/expressions/EX-109/per_element_array_broadcast/test.vx
 #Box(v: #i32);
 &(lhs)#Box::.+(rhs: #Box) -> #Box {
-    Box(lhs.v + rhs.v)
+    #Box(lhs.v + rhs.v)
 }
 &!seed() -> #i32;
 &!tick() -> #b;
@@ -13,8 +13,8 @@
     xs = [base, base + 1];
     m = [[1, 2], [3, 4]];
     row = [10, 20];
-    boxes = [Box(base), Box(base + 1)];
-    offs = [Box(10), Box(20)];
+    boxes = [#Box(base), #Box(base + 1)];
+    offs = [#Box(10), #Box(20)];
     a = [xs[0] + 3, xs[1] + 3];
     b = [[m[0][0] * row[0], m[0][1] * row[1]], [m[1][0] * row[0], m[1][1] * row[1]]];
     c = [a[0] == 4, a[1] == 5];

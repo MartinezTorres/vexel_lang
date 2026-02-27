@@ -15,7 +15,7 @@ cat >"$SRC" <<'VXEOF'
 &!input() -> #i32;
 
 &^main() -> #i32 {
-  v = Vec2(input(), 2);
+  v = #Vec2(input(), 2);
   v.x + v.y
 }
 VXEOF

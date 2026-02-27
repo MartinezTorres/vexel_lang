@@ -6,12 +6,12 @@
 #Number(val:#i32);
 
 &(lhs)#Number::+(rhs:#Number) -> #Number {
-    Number(lhs.val + rhs.val)
+    #Number(lhs.val + rhs.val)
 }
 
 &^main() -> #i32 {
-    a:#Number = Number(10);
-    b:#Number = Number(20);
+    a:#Number = #Number(10);
+    b:#Number = #Number(20);
     c:#Number = a + b;
     c.val
 }

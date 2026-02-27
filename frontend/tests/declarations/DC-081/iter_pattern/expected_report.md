@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    coll = Collection([1, 2, 3, 4]);
+    coll = #Collection([1, 2, 3, 4]);
     product = 1;
     coll@{
         product = product * _

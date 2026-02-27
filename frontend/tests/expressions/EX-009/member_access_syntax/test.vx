@@ -9,7 +9,7 @@
 );
 
 &^main() -> #i32 {
-    r:#Rectangle = Rectangle(5, 10);
+    r:#Rectangle = #Rectangle(5, 10);
     w:#i32 = r.width;
     h:#i32 = r.height;
     -> w * h;

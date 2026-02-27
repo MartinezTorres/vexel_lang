@@ -5,6 +5,6 @@
 #Point(x:#i32, y:#i32);
 
 &^main() -> #i32 {
-    p:#Point = Point(10, 20);
+    p:#Point = #Point(10, 20);
     p.x
 }

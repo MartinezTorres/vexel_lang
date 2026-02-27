@@ -494,7 +494,7 @@ std::string CodeGenerator::gen_unary(ExprPtr expr) {
 
 std::string CodeGenerator::gen_call(ExprPtr expr) {
     // Check if this is a type constructor call
-    if (expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
+    if (expr->is_constructor_call && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
         Symbol* sym = binding_for(expr->operand);
         StmtPtr type_decl;
         auto type_it = type_decl_map.find(expr->operand->name);

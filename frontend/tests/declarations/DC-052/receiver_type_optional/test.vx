@@ -10,6 +10,6 @@
 }
 
 &^main() -> #i32 {
-    thing:#Thing = Thing(42);
+    thing:#Thing = #Thing(42);
     thing.get()
 }

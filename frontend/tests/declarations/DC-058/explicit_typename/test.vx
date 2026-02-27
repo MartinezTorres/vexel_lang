@@ -8,7 +8,7 @@
 &(e)#Entity::update() { e.state = e.state + 1; }
 
 &^main() -> #i32 {
-    entity:#Entity = Entity(0);
+    entity:#Entity = #Entity(0);
     entity.update();
     entity.state
 }

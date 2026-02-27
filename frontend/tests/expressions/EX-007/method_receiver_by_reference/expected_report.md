@@ -6,7 +6,7 @@
     self.value = self.value + 1
 }
 &^main() -> #i32 {
-    c = Counter(0);
+    c = #Counter(0);
     c.increment();
     c.increment();
     -> c.value;

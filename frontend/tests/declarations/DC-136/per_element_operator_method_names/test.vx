@@ -4,7 +4,7 @@
 #Flag(v:#b);
 
 &(a)#Flag::.&&(b:#Flag) -> #Flag {
-  Flag(a.v && b.v)
+  #Flag(a.v && b.v)
 }
 
 &(a)#Flag::.==(b:#Flag) -> #b {
@@ -12,6 +12,6 @@
 }
 
 &^main() -> #i32 {
-  x:#Flag = Flag(1) .&& Flag(0);
-  (x .== Flag(0)) ? 0 : 1
+  x:#Flag = #Flag(1) .&& #Flag(0);
+  (x .== #Flag(0)) ? 0 : 1
 }

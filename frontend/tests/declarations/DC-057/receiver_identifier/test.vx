@@ -8,6 +8,6 @@
 &(d)#Data::process() -> #i32 { d.x }
 
 &^main() -> #i32 {
-    data:#Data = Data(55);
+    data:#Data = #Data(55);
     data.process()
 }

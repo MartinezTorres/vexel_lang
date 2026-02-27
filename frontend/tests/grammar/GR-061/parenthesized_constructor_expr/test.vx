@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#expressions
+// @desc: Parenthesized constructor expressions are parsed as expressions, not casts. | Parenthesized #Type(...) stays an expression
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    p:#Point = (#Point(1, 2));
+    p.x + p.y
+}

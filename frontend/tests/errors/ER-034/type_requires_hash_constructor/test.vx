@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#named-composite-types
+// @desc: Type constructors require a leading '#' in expression position. | Named type constructors require #Type(...)
+
+#Point(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+    p:#Point = Point(1, 2);
+    0
+}

@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    cnt = Container([1, 2, 3]);
+    cnt = #Container([1, 2, 3]);
     sum = 0;
     cnt@{
         sum = sum + _

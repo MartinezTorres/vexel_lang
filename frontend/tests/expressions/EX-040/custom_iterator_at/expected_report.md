@@ -9,7 +9,7 @@
 &print(arg0: #i32) {
 }
 &^main() -> #i32 {
-    r = Range(0, 5);
+    r = #Range(0, 5);
     r@print(_);
     -> 0;
 }

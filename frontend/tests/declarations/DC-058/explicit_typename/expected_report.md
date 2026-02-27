@@ -6,7 +6,7 @@
     e.state = e.state + 1
 }
 &^main() -> #i32 {
-    entity = Entity(0);
+    entity = #Entity(0);
     entity.update();
     entity.state
 }

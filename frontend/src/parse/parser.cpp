@@ -1376,11 +1376,21 @@ ExprPtr Parser::parse_unary() {
         pos = after_paren;
 
         if (check(TokenType::Hash)) {
-            // Cast
-            TypePtr type = parse_type();
-            consume(TokenType::RightParen, "Expected ')'");
-            ExprPtr operand = parse_unary();
-            return Expr::make_cast(type, operand, loc);
+            size_t type_start = pos;
+            bool is_cast = false;
+            TypePtr cast_type = nullptr;
+            try {
+                cast_type = parse_type();
+                is_cast = check(TokenType::RightParen);
+            } catch (const CompileError&) {
+                is_cast = false;
+            }
+            if (is_cast) {
+                consume(TokenType::RightParen, "Expected ')'");
+                ExprPtr operand = parse_unary();
+                return Expr::make_cast(cast_type, operand, loc);
+            }
+            pos = type_start;
         }
 
         ExprPtr expr = parse_expr();
@@ -1518,6 +1528,49 @@ ExprPtr Parser::parse_primary() {
         auto e = parse_array();
         e->annotations = annotations;
         return e;
+    }
+
+    if (check(TokenType::Hash)) {
+        size_t scan = pos + 1;
+        bool looks_like_constructor = scan < tokens.size() && tokens[scan].type == TokenType::Identifier;
+        if (looks_like_constructor) {
+            ++scan;
+            while (scan < tokens.size() && tokens[scan].type == TokenType::DoubleColon) {
+                ++scan;
+                if (scan >= tokens.size() || tokens[scan].type != TokenType::Identifier) {
+                    looks_like_constructor = false;
+                    break;
+                }
+                ++scan;
+            }
+            looks_like_constructor = looks_like_constructor &&
+                                     scan < tokens.size() &&
+                                     tokens[scan].type == TokenType::LeftParen;
+        }
+        if (looks_like_constructor) {
+            consume(TokenType::Hash, "Expected '#'");
+            std::vector<std::string> path;
+            path.push_back(consume(TokenType::Identifier, "Expected constructor type name after '#'").lexeme);
+            while (match(TokenType::DoubleColon)) {
+                path.push_back(consume(TokenType::Identifier, "Expected identifier").lexeme);
+            }
+            consume(TokenType::LeftParen, "Expected '(' after constructor type name");
+            std::vector<ExprPtr> args;
+            if (!check(TokenType::RightParen)) {
+                do {
+                    args.push_back(parse_expr());
+                } while (match(TokenType::Comma));
+            }
+            consume(TokenType::RightParen, "Expected ')'");
+            std::string qualified_name = path.front();
+            for (size_t i = 1; i < path.size(); ++i) {
+                qualified_name += "::" + path[i];
+            }
+            auto callee = Expr::make_identifier(qualified_name, loc);
+            auto call = Expr::make_constructor_call(callee, std::move(args), loc);
+            call->annotations = annotations;
+            return call;
+        }
     }
 
     // Expression parameter reference: $identifier

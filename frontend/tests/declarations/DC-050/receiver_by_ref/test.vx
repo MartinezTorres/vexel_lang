@@ -10,7 +10,7 @@
 }
 
 &^main() -> #i32 {
-    cnt:#Counter = Counter(0);
+    cnt:#Counter = #Counter(0);
     cnt.increment();
     cnt.value
 }

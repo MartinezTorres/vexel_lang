@@ -7,7 +7,7 @@
     a
 }
 &^main() -> #i32 {
-    acc = Accumulator(0);
+    acc = #Accumulator(0);
     acc = acc + 10;
     acc.sum
 }

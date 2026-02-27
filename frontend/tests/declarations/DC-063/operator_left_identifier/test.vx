@@ -6,12 +6,12 @@
 #Value(n:#i32);
 
 &(v)#Value::+(other:#Value) -> #Value {
-    Value(v.n + other.n)
+    #Value(v.n + other.n)
 }
 
 &^main() -> #i32 {
-    a:#Value = Value(5);
-    b:#Value = Value(10);
+    a:#Value = #Value(5);
+    b:#Value = #Value(10);
     c:#Value = a + b;
     c.n
 }

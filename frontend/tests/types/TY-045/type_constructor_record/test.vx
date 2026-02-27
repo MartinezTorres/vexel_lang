@@ -5,6 +5,6 @@
 #Vec2(x:#i32, y:#i32);
 
 &^main() -> #i32 {
-    v:#Vec2 = Vec2(5, 10);
+    v:#Vec2 = #Vec2(5, 10);
     v.x + v.y
 }

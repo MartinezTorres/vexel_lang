@@ -5,6 +5,6 @@
 #Rect(w:#i32, h:#i32);
 
 &^main() -> #i32 {
-    r:#Rect = Rect(100, 50);
+    r:#Rect = #Rect(100, 50);
     r.w * r.h
 }

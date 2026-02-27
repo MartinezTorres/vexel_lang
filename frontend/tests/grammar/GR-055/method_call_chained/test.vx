@@ -3,10 +3,10 @@
 
 
 #Wrapper(v:#i32);
-&(w)#Wrapper::inc() -> #Wrapper { Wrapper(w.v + 1) }
+&(w)#Wrapper::inc() -> #Wrapper { #Wrapper(w.v + 1) }
 
 &^main() -> #i32 {
-  w:#Wrapper = Wrapper(1);
+  w:#Wrapper = #Wrapper(1);
   w = w.inc();
   w = w.inc();
   w.v

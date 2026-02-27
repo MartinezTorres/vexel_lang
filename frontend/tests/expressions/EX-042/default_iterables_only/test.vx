@@ -9,7 +9,7 @@
 );
 
 &^main() -> #i32 {
-    p:#Point = Point(1, 2);
+    p:#Point = #Point(1, 2);
     // ERROR: Point is not iterable
     p@{};
     -> 0;

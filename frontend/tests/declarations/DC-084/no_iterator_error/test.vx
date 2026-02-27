@@ -6,7 +6,7 @@
 #NoIterator(x:#i32);
 
 &^main() -> #i32 {
-    ni:#NoIterator = NoIterator(5);
+    ni:#NoIterator = #NoIterator(5);
     // Uncommenting would error: ni@{ }
     0
 }

@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    seq = Sequence(3);
+    seq = #Sequence(3);
     seq@{
         -> 0;
     };

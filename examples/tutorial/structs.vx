@@ -5,11 +5,11 @@
 }
 
 &(lhs)#Vec2::+(rhs:#Vec2) -> #Vec2 {
-  Vec2(lhs.x + rhs.x, lhs.y + rhs.y)
+  #Vec2(lhs.x + rhs.x, lhs.y + rhs.y)
 }
 
 &^main() -> #i32 {
-  v = Vec2(3, 4);
-  sum = v + Vec2(1, 2);
+  v = #Vec2(3, 4);
+  sum = v + #Vec2(1, 2);
   sum.len2()
 }

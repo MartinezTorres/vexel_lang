@@ -6,7 +6,7 @@
 #BinOp(x:#i32);
 
 &(a)#BinOp::+(b:#BinOp) -> #BinOp {
-    BinOp(a.x + b.x)
+    #BinOp(a.x + b.x)
 }
 
 &^main() -> #i32 {

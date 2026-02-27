@@ -89,6 +89,11 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
     }
 
     // Check if this is a type constructor call
+    if (sym->kind == Symbol::Kind::Type && !expr->is_constructor_call) {
+        error_msg = "Type '" + func_name + "' is not callable; use #" + func_name + "(...)";
+        return false;
+    }
+
     if (sym->kind == Symbol::Kind::Type) {
         return eval_type_constructor(expr, result);
     }

@@ -10,6 +10,6 @@
 }
 
 &^main() -> #i32 {
-    pt:#Point = Point(3, 4);
+    pt:#Point = #Point(3, 4);
     pt.distance()
 }

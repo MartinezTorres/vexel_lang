@@ -6,7 +6,7 @@
 #Box(v:#i32);
 
 &(lhs)#Box::.+(rhs:#Box) -> #Box {
-  Box(lhs.v + rhs.v)
+  #Box(lhs.v + rhs.v)
 }
 
 &!seed() -> #i32;
@@ -20,8 +20,8 @@
 
   xs:#i32[2] = [1, 2];
   flags:#b[2] = [0 == 1, pulse];
-  boxes:#Box[2] = [Box(base), Box(base + 1)];
-  off:#Box = Box(10);
+  boxes:#Box[2] = [#Box(base), #Box(base + 1)];
+  off:#Box = #Box(10);
 
   xs .+= base;
   flags .||= one;

@@ -88,7 +88,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Type constructors**: `#Name(field[:Type],...);`
 - Defines record type `#Name`
-- Auto-generates constructor callable as `Name(args...)`
+- Auto-generates constructor callable as `#Name(args...)`
 - Fields accessed via `.field`
 - Can be defined at module level or within any scope
 - **Cannot be recursive** (no self-reference in fields, no pointers)
@@ -314,7 +314,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Receiver expressions (if any) evaluate left-to-right before the argument list
   - Arguments then evaluate left-to-right; call dispatch happens after all operands finish
 - **Method call**: `receiver.fname(args)` (receiver passed by reference if mutating, otherwise by value)
-- **Constructor**: `TypeName(args)`
+- **Constructor**: `#TypeName(args)`
 - **Member**: `x.y`
 - **Index**: `arr[expr]`
   - Indexing a vector yields its scalar element type
@@ -662,4 +662,4 @@ line_comment ::= '//' .*
 - `fname(...)`: function call (internal or external)
 - `receiver.fname(...)`: method (receiver by reference if mutating, otherwise by value)
 - `(r1, r2).fname(...)`: multi-receiver method
-- `TypeName(...)`: constructor
+- `#TypeName(...)`: constructor

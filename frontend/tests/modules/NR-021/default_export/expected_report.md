@@ -6,7 +6,7 @@
     x = 42;
     VALUE = 100;
     y = VALUE;
-    p = Point(1, 2);
+    p = #Point(1, 2);
     result = x == 42 && y == 100 && p.x == 1 && p.y == 2 ? 0 : 1;
     -> result;
 }

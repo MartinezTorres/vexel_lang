@@ -6,7 +6,7 @@
 #Type(v:#i32);
 
 &(t)#Type::+(other:#Type) -> #Type {
-    Type(t.v + other.v)
+    #Type(t.v + other.v)
 }
 
 &^main() -> #i32 {

@@ -11,7 +11,7 @@
 #Point(x:#i32, y:#i32);
 
 &^create_point(x:#i32, y:#i32) -> #Point {
-    Point(x, y);
+    #Point(x, y);
 }
 
 &^point_sum(p:#Point) -> #i32 {

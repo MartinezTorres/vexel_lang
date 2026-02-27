@@ -28,19 +28,19 @@
 
 &(v)#Vec3::normalize() -> #Vec3 {
     len = v.length();
-    -> Vec3(v.x / len, v.y / len, v.z / len);
+    -> #Vec3(v.x / len, v.y / len, v.z / len);
 }
 
 &(v)#Vec3::add(o:#Vec3) -> #Vec3 {
-    -> Vec3(v.x + o.x, v.y + o.y, v.z + o.z);
+    -> #Vec3(v.x + o.x, v.y + o.y, v.z + o.z);
 }
 
 &(v)#Vec3::sub(o:#Vec3) -> #Vec3 {
-    -> Vec3(v.x - o.x, v.y - o.y, v.z - o.z);
+    -> #Vec3(v.x - o.x, v.y - o.y, v.z - o.z);
 }
 
 &(v)#Vec3::mul(s:#f64) -> #Vec3 {
-    -> Vec3(v.x * s, v.y * s, v.z * s);
+    -> #Vec3(v.x * s, v.y * s, v.z * s);
 }
 
 &(v)#Vec3::reflect(n:#Vec3) -> #Vec3 {
@@ -51,7 +51,7 @@
 
 // Component-wise multiply for colors
 &(v)#Vec3::cmul(o:#Vec3) -> #Vec3 {
-    -> Vec3(v.x * o.x, v.y * o.y, v.z * o.z);
+    -> #Vec3(v.x * o.x, v.y * o.y, v.z * o.z);
 }
 
 // ============================================================================
@@ -154,42 +154,42 @@
 &make_spheres() -> #Sphere[5] {
     -> [
         // Large sphere - floor
-        Sphere(
-            Vec3(0.0, -5001.0, 0.0),
+        #Sphere(
+            #Vec3(0.0, -5001.0, 0.0),
             5000.0,
-            Vec3(0.5, 0.5, 0.5),
+            #Vec3(0.5, 0.5, 0.5),
             10.0,
             0.2
         ),
         // Red sphere
-        Sphere(
-            Vec3(-2.0, 0.0, -5.0),
+        #Sphere(
+            #Vec3(-2.0, 0.0, -5.0),
             1.0,
-            Vec3(0.9, 0.2, 0.2),
+            #Vec3(0.9, 0.2, 0.2),
             500.0,
             0.3
         ),
         // Green sphere
-        Sphere(
-            Vec3(0.0, 0.0, -4.0),
+        #Sphere(
+            #Vec3(0.0, 0.0, -4.0),
             1.0,
-            Vec3(0.2, 0.9, 0.2),
+            #Vec3(0.2, 0.9, 0.2),
             100.0,
             0.4
         ),
         // Blue sphere
-        Sphere(
-            Vec3(2.0, 0.0, -5.0),
+        #Sphere(
+            #Vec3(2.0, 0.0, -5.0),
             1.0,
-            Vec3(0.2, 0.2, 0.9),
+            #Vec3(0.2, 0.2, 0.9),
             500.0,
             0.3
         ),
         // Yellow sphere (small, elevated)
-        Sphere(
-            Vec3(0.0, 1.5, -4.5),
+        #Sphere(
+            #Vec3(0.0, 1.5, -4.5),
             0.5,
-            Vec3(0.9, 0.9, 0.2),
+            #Vec3(0.9, 0.9, 0.2),
             200.0,
             0.5
         )
@@ -198,8 +198,8 @@
 
 &make_lights() -> #Light[2] {
     -> [
-        Light(Vec3(3.0, 5.0, -2.0), 0.6),
-        Light(Vec3(-3.0, 5.0, -3.0), 0.4)
+        #Light(#Vec3(3.0, 5.0, -2.0), 0.6),
+        #Light(#Vec3(-3.0, 5.0, -3.0), 0.4)
     ];
 }
 
@@ -251,10 +251,10 @@
         normal.y = ny / nlen;
         normal.z = nz / nlen;
 
-        -> HitRecord(1, closest_t, hit_point, normal, hit_idx);
+        -> #HitRecord(1, closest_t, hit_point, normal, hit_idx);
     };
 
-    -> HitRecord(0, -1.0, Vec3(0.0, 0.0, 0.0), Vec3(0.0, 0.0, 0.0), 0);
+    -> #HitRecord(0, -1.0, #Vec3(0.0, 0.0, 0.0), #Vec3(0.0, 0.0, 0.0), 0);
 }
 
 // ============================================================================
@@ -281,7 +281,7 @@
         light_distance = light_dir.length();
         light_dir = light_dir.normalize();
 
-        shadow_ray = Ray(point, light_dir);
+        shadow_ray = #Ray(point, light_dir);
         shadow_hit = trace_scene(shadow_ray, spheres, 0.001, light_distance);
 
         // Only add lighting if not in shadow
@@ -343,7 +343,7 @@
     depth:#u8
 ) -> #Vec3 {
     depth == 0 ? {
-        -> Vec3(0.0, 0.0, 0.0);
+        -> #Vec3(0.0, 0.0, 0.0);
     };
 
     hit = trace_scene(r, spheres, 0.001, 1000.0);
@@ -371,7 +371,7 @@
         };
 
         reflect_dir = r.direction.mul(-1.0).reflect(hit.normal);
-        reflect_ray = Ray(hit.point, reflect_dir);
+        reflect_ray = #Ray(hit.point, reflect_dir);
         reflected_color = trace_ray(reflect_ray, spheres, lights, depth - 1);
 
         // Blend local and reflected color
@@ -383,7 +383,7 @@
 
     // Sky gradient background
     t = 0.5 * (r.direction.y + 1.0);
-    sky_color = Vec3(0.5, 0.7, 1.0).mul(t).add(Vec3(1.0, 1.0, 1.0).mul(1.0 - t));
+    sky_color = #Vec3(0.5, 0.7, 1.0).mul(t).add(#Vec3(1.0, 1.0, 1.0).mul(1.0 - t));
     -> sky_color;
 }
 
@@ -401,13 +401,13 @@ VIEWPORT_HEIGHT = 2.0;
 VIEWPORT_WIDTH = VIEWPORT_HEIGHT * ASPECT_RATIO;
 FOCAL_LENGTH = 1.0;
 
-CAMERA_ORIGIN = Vec3(0.0, 1.0, 0.0);
-VIEWPORT_U = Vec3(VIEWPORT_WIDTH, 0.0, 0.0);
-VIEWPORT_V = Vec3(0.0, -VIEWPORT_HEIGHT, 0.0);
+CAMERA_ORIGIN = #Vec3(0.0, 1.0, 0.0);
+VIEWPORT_U = #Vec3(VIEWPORT_WIDTH, 0.0, 0.0);
+VIEWPORT_V = #Vec3(0.0, -VIEWPORT_HEIGHT, 0.0);
 VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
     .sub(VIEWPORT_U.mul(0.5))
     .sub(VIEWPORT_V.mul(0.5))
-    .sub(Vec3(0.0, 0.0, FOCAL_LENGTH));
+    .sub(#Vec3(0.0, 0.0, FOCAL_LENGTH));
 
 // ============================================================================
 // PPM Output Functions
@@ -473,7 +473,7 @@ VIEWPORT_LOWER_LEFT = CAMERA_ORIGIN
                 .add(VIEWPORT_V.mul(v));
 
             ray_dir = pixel_pos.sub(CAMERA_ORIGIN).normalize();
-            ray = Ray(CAMERA_ORIGIN, ray_dir);
+            ray = #Ray(CAMERA_ORIGIN, ray_dir);
 
             // Trace ray with reflections (max depth 3)
             color = trace_ray(ray, spheres, lights, (#u8)3);

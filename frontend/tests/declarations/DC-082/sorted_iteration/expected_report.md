@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    set = SortedSet([1, 2, 3]);
+    set = #SortedSet([1, 2, 3]);
     result = 0;
     set@@{
         result = result + _

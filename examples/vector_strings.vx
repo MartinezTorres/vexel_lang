@@ -16,7 +16,7 @@
 
 &^main() -> #i32 {
   // Create a vector of strings
-  v:#StrVec = StrVec(["Hello", "World", "from", "Vexel"], 4, 4);
+  v:#StrVec = #StrVec(["Hello", "World", "from", "Vexel"], 4, 4);
 
   print_vector_strings(v);
 

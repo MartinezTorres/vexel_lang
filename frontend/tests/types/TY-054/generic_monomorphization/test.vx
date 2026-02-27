@@ -5,7 +5,7 @@
 #Container(value);
 
 &^main() -> #i32 {
-    c1:#Container = Container(42);
-    c2:#Container = Container(3.14);
+    c1:#Container = #Container(42);
+    c2:#Container = #Container(3.14);
     c1.value
 }

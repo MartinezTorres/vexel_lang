@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    obj = Iterable(3);
+    obj = #Iterable(3);
     sum = 0;
     obj@{
         sum = sum + _

@@ -338,6 +338,14 @@ private:
                     return 12;
                 };
 
+                if (expr->is_constructor_call) {
+                    out << "#";
+                    out << format_expr(expr->operand, my_prec, level) << "(";
+                    append_args(expr->args);
+                    out << ")";
+                    break;
+                }
+
                 if (!expr->receivers.empty() && expr->operand && expr->operand->kind == Expr::Kind::Identifier) {
                     const std::string display_name = method_suffix_name(expr->operand->name);
                     if (is_operator_name(display_name)) {

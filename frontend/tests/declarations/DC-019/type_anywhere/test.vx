@@ -4,7 +4,7 @@
 
 // DC-019: Type definitions can appear anywhere
 &^main() -> #i32 {
-    p:#Point = Point(10, 20);
+    p:#Point = #Point(10, 20);
     0
 }
 

@@ -5,6 +5,6 @@
 #Node(value:#i32);
 
 &^main() -> #i32 {
-    n:#Node = Node(42);
+    n:#Node = #Node(42);
     n.value
 }

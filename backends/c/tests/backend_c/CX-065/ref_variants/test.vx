@@ -14,9 +14,9 @@ bump:#i32;
 
 &^main() -> #i32 {
     x:#i32 = read_i32();
-    a:#Box = Box(x);
-    a = Box(x + 1);
-    const_box:#Box = Box(x + 2);
+    a:#Box = #Box(x);
+    a = #Box(x + 1);
+    const_box:#Box = #Box(x + 2);
     bump = 0;
     a.get() + const_box.get() + bump
 }

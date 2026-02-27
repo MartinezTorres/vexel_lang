@@ -10,7 +10,7 @@
 }
 
 &^main() -> #i32 {
-    calc:#Calculator = Calculator(0);
+    calc:#Calculator = #Calculator(0);
     calc.add(10);
     calc.result
 }

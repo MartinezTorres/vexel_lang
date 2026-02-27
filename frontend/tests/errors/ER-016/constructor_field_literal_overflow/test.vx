@@ -4,6 +4,6 @@
 #Packet(size:#u8);
 
 &^main() -> #i32 {
-    p:#Packet = Packet(300);
+    p:#Packet = #Packet(300);
     0
 }

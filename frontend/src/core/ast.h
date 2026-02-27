@@ -108,6 +108,7 @@ struct Expr {
     // Call
     std::vector<ExprPtr> args;
     std::vector<ExprPtr> receivers;
+    bool is_constructor_call = false;
 
     // ArrayLiteral
     std::vector<ExprPtr> elements;
@@ -147,6 +148,9 @@ struct Expr {
     static ExprPtr make_binary(const std::string& op, ExprPtr l, ExprPtr r, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_unary(const std::string& op, ExprPtr operand, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_call(ExprPtr func, std::vector<ExprPtr> args, const SourceLocation& loc = SourceLocation());
+    static ExprPtr make_constructor_call(ExprPtr func,
+                                        std::vector<ExprPtr> args,
+                                        const SourceLocation& loc = SourceLocation());
     static ExprPtr make_index(ExprPtr arr, ExprPtr idx, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_member(ExprPtr obj, const std::string& field, const SourceLocation& loc = SourceLocation());
     static ExprPtr make_array(std::vector<ExprPtr> elems, const SourceLocation& loc = SourceLocation());

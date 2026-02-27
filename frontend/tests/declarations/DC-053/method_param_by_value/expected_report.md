@@ -6,7 +6,7 @@
     c.result = c.result + val
 }
 &^main() -> #i32 {
-    calc = Calculator(0);
+    calc = #Calculator(0);
     calc.add(10);
     calc.result
 }

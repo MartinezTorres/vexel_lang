@@ -8,7 +8,7 @@
 }
 &^main() -> #i32 {
     first = 0;
-    rng = Range(1, 5);
+    rng = #Range(1, 5);
     rng@{
         first = _
     };

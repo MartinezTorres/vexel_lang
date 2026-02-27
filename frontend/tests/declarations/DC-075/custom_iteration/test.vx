@@ -11,7 +11,7 @@
 }
 
 &^main() -> #i32 {
-    cnt:#Container = Container([1, 2, 3]);
+    cnt:#Container = #Container([1, 2, 3]);
     sum:#i32 = 0;
     cnt@{ sum = sum + _; }
     sum

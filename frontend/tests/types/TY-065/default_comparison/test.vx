@@ -5,7 +5,7 @@
 #Value(x:#i32);
 
 &^main() -> #i32 {
-    v1:#Value = Value(10);
-    v2:#Value = Value(20);
+    v1:#Value = #Value(10);
+    v2:#Value = #Value(20);
     (v1 < v2) ? 1 : 0
 }

@@ -12,7 +12,7 @@
 }
 
 &^main() -> #i32 {
-    c:#Counter = Counter(0);
+    c:#Counter = #Counter(0);
     c.increment();
     c.increment();
     -> c.value;  // Should be 2

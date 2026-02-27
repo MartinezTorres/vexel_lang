@@ -16,7 +16,7 @@
 &print(arg0:#i32) { }
 
 &^main() -> #i32 {
-    r:#ReverseRange = ReverseRange(0, 5);
+    r:#ReverseRange = #ReverseRange(0, 5);
     r@@print(_);
     -> 0;
 }

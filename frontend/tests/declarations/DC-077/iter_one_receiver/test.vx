@@ -11,7 +11,7 @@
 }
 
 &^main() -> #i32 {
-    seq:#Sequence = Sequence(3);
+    seq:#Sequence = #Sequence(3);
     seq@{ -> 0; };
     0
 }

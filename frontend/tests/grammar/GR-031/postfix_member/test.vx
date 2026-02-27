@@ -6,7 +6,7 @@
 #Outer(inner:#Inner);
 
 &^main() -> #i32 {
-  o:#Outer = Outer(Inner(5))
+  o:#Outer = #Outer(#Inner(5))
   value:#i32 = o.inner.v
   value
 }

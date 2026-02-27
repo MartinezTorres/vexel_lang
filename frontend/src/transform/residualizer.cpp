@@ -87,6 +87,7 @@ bool expr_structurally_equal(const ExprPtr& a, const ExprPtr& b) {
             }
             return true;
         case Expr::Kind::Call:
+            if (a->is_constructor_call != b->is_constructor_call) return false;
             if (!expr_structurally_equal(a->operand, b->operand)) return false;
             if (a->args.size() != b->args.size()) return false;
             if (a->receivers.size() != b->receivers.size()) return false;
@@ -595,7 +596,7 @@ ExprPtr Residualizer::ctvalue_to_expr(const CTValue& value, const ExprPtr& origi
             result = Expr::make_tuple(std::move(elems), value_loc);
         } else {
             ExprPtr callee = Expr::make_identifier(comp->type_name, value_loc);
-            result = Expr::make_call(callee, std::move(elems), value_loc);
+            result = Expr::make_constructor_call(callee, std::move(elems), value_loc);
         }
     } else {
         return nullptr;

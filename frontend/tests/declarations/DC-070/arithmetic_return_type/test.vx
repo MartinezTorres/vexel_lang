@@ -6,11 +6,11 @@
 #Arithmetic(val:#i32);
 
 &(a)#Arithmetic::+(b:#Arithmetic) -> #Arithmetic {
-    Arithmetic(a.val + b.val)
+    #Arithmetic(a.val + b.val)
 }
 
 &(a)#Arithmetic::*(b:#Arithmetic) -> #Arithmetic {
-    Arithmetic(a.val * b.val)
+    #Arithmetic(a.val * b.val)
 }
 
 &^main() -> #i32 {

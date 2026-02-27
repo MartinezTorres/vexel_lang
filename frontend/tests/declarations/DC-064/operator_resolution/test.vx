@@ -6,12 +6,12 @@
 #Integer(i:#i32);
 
 &(a)#Integer::+(b:#Integer) -> #Integer {
-    Integer(a.i + b.i)
+    #Integer(a.i + b.i)
 }
 
 &^main() -> #i32 {
-    x:#Integer = Integer(100);
-    y:#Integer = Integer(200);
+    x:#Integer = #Integer(100);
+    y:#Integer = #Integer(200);
     z:#Integer = x + y;
     z.i
 }

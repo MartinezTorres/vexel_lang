@@ -244,6 +244,12 @@ ExprPtr Expr::make_call(ExprPtr func, std::vector<ExprPtr> args, const SourceLoc
     return e;
 }
 
+ExprPtr Expr::make_constructor_call(ExprPtr func, std::vector<ExprPtr> args, const SourceLocation& loc) {
+    ExprPtr e = make_call(func, std::move(args), loc);
+    e->is_constructor_call = true;
+    return e;
+}
+
 ExprPtr Expr::make_index(ExprPtr arr, ExprPtr idx, const SourceLocation& loc) {
     auto e = std::make_shared<Expr>();
     e->kind = Kind::Index;

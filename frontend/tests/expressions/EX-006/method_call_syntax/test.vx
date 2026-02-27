@@ -13,7 +13,7 @@
 }
 
 &^main() -> #i32 {
-    p:#Point = Point(3, 4);
+    p:#Point = #Point(3, 4);
     d:#i32 = p.distance_from_origin();
     -> d;
 }

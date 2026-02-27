@@ -7,7 +7,7 @@
     loop
 }
 &^main() -> #i32 {
-    ctr = Counter(3);
+    ctr = #Counter(3);
     total = 0;
     ctr@{
         total = total + _

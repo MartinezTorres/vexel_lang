@@ -6,6 +6,6 @@
 #Global(x:#i32);
 
 &^main() -> #i32 {
-    g:#Global = Global(10);
+    g:#Global = #Global(10);
     g.x
 }

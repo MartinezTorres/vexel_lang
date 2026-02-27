@@ -5,7 +5,7 @@
 #Value(x:#i32);
 
 &^main() -> #i32 {
-    v:#Value = Value(42);
+    v:#Value = #Value(42);
     bytes:#u8[4] = (#u8[4])v;
     0
 }

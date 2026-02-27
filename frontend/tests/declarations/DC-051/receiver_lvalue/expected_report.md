@@ -6,7 +6,7 @@
     b.val = new_val
 }
 &^main() -> #i32 {
-    box = Box(10);
+    box = #Box(10);
     box.set(20);
     box.val
 }

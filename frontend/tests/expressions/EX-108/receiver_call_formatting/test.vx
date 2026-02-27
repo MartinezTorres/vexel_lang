@@ -11,7 +11,7 @@
 &!seed2() -> #i32;
 
 &^main() -> #i32 {
-  a:#Vec = Vec(seed1());
-  b:#Vec = Vec(seed2());
+  a:#Vec = #Vec(seed1());
+  b:#Vec = #Vec(seed2());
   a.len() + b.len()
 }

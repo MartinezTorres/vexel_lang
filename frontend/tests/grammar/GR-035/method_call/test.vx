@@ -9,7 +9,7 @@
 }
 
 &^main() -> #i32 {
-    obj:#Point = Point(1, 2);
-    other:#Point = Point(3, 4);
+    obj:#Point = #Point(1, 2);
+    other:#Point = #Point(3, 4);
     obj.sum_with(other);
 }

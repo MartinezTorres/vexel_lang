@@ -5,6 +5,6 @@
 #Simple(x:#i32, y:#i32);
 
 &^main() -> #i32 {
-    s:#Simple = Simple(1, 2);
+    s:#Simple = #Simple(1, 2);
     s.x
 }

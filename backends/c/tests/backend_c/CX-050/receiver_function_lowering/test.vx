@@ -12,7 +12,7 @@
 }
 
 &^main() -> #i32 {
-    w:#Wrapper = Wrapper(7);
+    w:#Wrapper = #Wrapper(7);
     c:#Wrapper = w.copy();
     -> c.value;
 }

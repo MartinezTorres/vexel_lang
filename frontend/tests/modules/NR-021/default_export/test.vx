@@ -9,7 +9,7 @@
     x:#i32 = lib::publicFunc();
     lib::VALUE = 100;
     y:#i32 = lib::VALUE;
-    p:#Point = Point(1, 2);
+    p:#Point = #Point(1, 2);
     result:#i32 = (x == 42 && y == 100 && p.x == 1 && p.y == 2) ? (#i32)0 : (#i32)1;
     -> result;
 }

@@ -1135,6 +1135,12 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         }
     };
 
+    if (sym->kind == Symbol::Kind::Type && !expr->is_constructor_call) {
+        throw CompileError("Type '" + expr->operand->name + "' is not callable; use #" +
+                           expr->operand->name + "(...)",
+                           expr->location);
+    }
+
     if (sym->kind == Symbol::Kind::Type && sym->declaration) {
         for (size_t i = 0; i < expr->args.size() && i < sym->declaration->fields.size(); i++) {
             TypePtr field_type = sym->declaration->fields[i].type;

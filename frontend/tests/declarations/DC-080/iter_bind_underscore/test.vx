@@ -11,7 +11,7 @@
 }
 
 &^main() -> #i32 {
-    els:#Elements = Elements([10, 20, 30]);
+    els:#Elements = #Elements([10, 20, 30]);
     sum:#i32 = 0;
     els@{ sum = sum + _; }
     sum

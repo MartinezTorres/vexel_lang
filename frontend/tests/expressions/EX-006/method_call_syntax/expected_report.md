@@ -6,7 +6,7 @@
     -> self.x * self.x + self.y * self.y;
 }
 &^main() -> #i32 {
-    p = Point(3, 4);
+    p = #Point(3, 4);
     d = p.distance_from_origin();
     -> d;
 }
