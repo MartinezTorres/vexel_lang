@@ -36,6 +36,7 @@ private:
     bool check_dotted_operator(TokenType inner_type) const;
     bool match_dotted_operator(TokenType inner_type, std::string& out_op);
     bool check_member_dot() const;
+    bool check_probe_dot() const;
     Token consume(TokenType type, const std::string& msg);
     void skip_semis();
     bool is_annotation_start();

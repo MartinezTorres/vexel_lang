@@ -109,6 +109,7 @@ struct Expr {
     std::vector<ExprPtr> args;
     std::vector<ExprPtr> receivers;
     bool is_constructor_call = false;
+    bool is_existence_probe = false;
 
     // ArrayLiteral
     std::vector<ExprPtr> elements;

@@ -323,6 +323,7 @@
         <a href="playground.html?file=examples/tutorial/globals.vx&backend=c">globals</a>,
         <a href="playground.html?file=examples/tutorial/exports.vx&backend=c">exports</a>,
         <a href="playground.html?file=examples/tutorial/typeof_demo.vx&backend=c">typeof</a>,
+        <a href="playground.html?file=examples/tutorial/existence_probe.vx&backend=c">existence_probe</a>,
         <a href="playground.html?file=examples/tutorial/iteration.vx&backend=c">iteration</a>,
         <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
         <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">vector_matrix</a>,
@@ -411,7 +412,23 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>5) Native vectors, matrices, and algebra</h3>
+        <h3>5) Existence probes</h3>
+        <p>
+          <code>.?</code> asks whether a field or exact call shape exists without evaluating the receiver or arguments.
+          The result is compile-time <code>#b</code>, so optional APIs can be handled explicitly without weakening normal calls.
+        </p>
+        <pre><code>#Box(x:#i32);
+
+&(self)#Box::len() -&gt; #i32 { self.x }
+
+&^main() -&gt; #i32 {
+  b = #Box(4);
+  (b.?x ? 1 : 0) + (b.?len() ? 4 : 0) + (b.?missing ? 8 : 0)
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>6) Native vectors, matrices, and algebra</h3>
         <p>
           Vectors and matrices are explicit frontend types. They use array literals for construction,
           lower to arrays before backend handoff, and provide native algebraic operators.
@@ -430,7 +447,7 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>6) Bundled std::math and array lifting</h3>
+        <h3>7) Bundled std::math and array lifting</h3>
         <p>
           The bundled fallback <code>::std::math;</code> surface is compiler-recognized for compile-time folding.
           Unary and binary math calls can also lift over arrays with strict broadcasting.
@@ -446,7 +463,7 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>7) Compile-time execution and dead-code elimination</h3>
+        <h3>8) Compile-time execution and dead-code elimination</h3>
         <p>
           Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
         </p>

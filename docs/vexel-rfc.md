@@ -328,6 +328,12 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Receiver expressions (if any) evaluate left-to-right before the argument list
   - Arguments then evaluate left-to-right; call dispatch happens after all operands finish
 - **Method call**: `receiver.fname(args)` (receiver passed by reference if mutating, otherwise by value)
+- **Existence probe**: `receiver.?member` / `receiver.?fname(args)` / `(a, b).?fname(args)`
+  - Compile-time only, non-evaluating, and non-side-effecting
+  - Uses the same member/call resolution rules as ordinary access/calls, including overload resolution by full call shape
+  - Returns `#b`
+  - Missing fields/methods yield `0`
+  - Ambiguous probes or probes that depend on unresolved receiver/argument types are compile-time errors
 - **Constructor**: `#TypeName(args)`
 - **Member**: `x.y`
 - **Index**: `arr[expr]`

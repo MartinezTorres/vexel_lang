@@ -1,0 +1,22 @@
+// Compile-time member and method availability checks.
+
+#Box(x:#i32);
+
+&(self)#Box::len() -> #i32 {
+  self.x
+}
+
+&(lhs, rhs)sum() -> #i32 {
+  lhs.x + rhs.x
+}
+
+&^main() -> #i32 {
+  a = #Box(4);
+  b = #Box(5);
+
+  (a.?x ? 1 : 0) +
+  (a.?missing ? 2 : 0) +
+  (a.?len() ? 4 : 0) +
+  (a.?nope() ? 8 : 0) +
+  ((a, b).?sum() ? 16 : 0)
+}

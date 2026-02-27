@@ -173,6 +173,8 @@ private:
     TypePtr check_call(ExprPtr expr);
     TypePtr check_index(ExprPtr expr);
     TypePtr check_member(ExprPtr expr);
+    TypePtr check_probe_call(ExprPtr expr);
+    TypePtr check_probe_member(ExprPtr expr);
     TypePtr check_array_literal(ExprPtr expr);
     TypePtr check_tuple_literal(ExprPtr expr);
     TypePtr check_block(ExprPtr expr);
@@ -187,6 +189,15 @@ private:
     TypePtr check_process_expr(ExprPtr expr);
     TypePtr try_operator_overload(ExprPtr expr, const std::string& op, TypePtr left_type);
     bool try_custom_iteration(ExprPtr expr, TypePtr iterable_type);
+
+    struct OverloadResolutionResult {
+        enum class Status { NoMatch, Unique, Ambiguous };
+        Status status = Status::NoMatch;
+        Symbol* symbol = nullptr;
+    };
+    OverloadResolutionResult resolve_function_overload(const std::vector<Symbol*>& candidates,
+                                                       const std::vector<TypePtr>& receiver_types,
+                                                       const std::vector<ExprPtr>& args);
 
     void warn_annotation(const Annotation& ann, const std::string& msg);
 

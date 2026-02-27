@@ -357,6 +357,8 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     for (const auto& rec : expr->receivers) {
         cloned->receivers.push_back(clone_expr(rec));
     }
+    cloned->is_constructor_call = expr->is_constructor_call;
+    cloned->is_existence_probe = expr->is_existence_probe;
 
     // Clone statements (for blocks) - deep cloning
     for (const auto& stmt : expr->statements) {

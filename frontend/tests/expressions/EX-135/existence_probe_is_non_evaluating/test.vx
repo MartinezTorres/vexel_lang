@@ -1,0 +1,7 @@
+#Box(x:#i32);
+
+&!make_box() -> #Box;
+
+&^main() -> #i32 {
+  make_box().?x ? 1 : 0
+}

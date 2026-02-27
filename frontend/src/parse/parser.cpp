@@ -104,6 +104,13 @@ bool Parser::check_member_dot() const {
     return tokens[pos].type == TokenType::Dot && tokens[pos + 1].type == TokenType::Identifier;
 }
 
+bool Parser::check_probe_dot() const {
+    if (pos + 2 >= tokens.size()) return false;
+    return tokens[pos].type == TokenType::Dot &&
+           tokens[pos + 1].type == TokenType::Question &&
+           tokens[pos + 2].type == TokenType::Identifier;
+}
+
 Token Parser::consume(TokenType type, const std::string& msg) {
     if (!check(type)) {
         record_error(msg, current().location);
@@ -1349,22 +1356,34 @@ ExprPtr Parser::parse_unary() {
             if (is_multi_receiver && check(TokenType::RightParen)) {
                 size_t paren_pos = pos;
                 pos++; // skip ')'
-                if (check_member_dot()) {
+                if (check_member_dot() || check_probe_dot()) {
+                    bool is_probe = check_probe_dot();
                     pos++; // consume '.'
-                    std::string method = consume(TokenType::Identifier, "Expected method name").lexeme;
-                    consume(TokenType::LeftParen, "Expected '('");
-                    std::vector<ExprPtr> args;
-                    if (!check(TokenType::RightParen)) {
-                        do {
-                            args.push_back(parse_expr());
-                        } while (match(TokenType::Comma));
+                    if (is_probe) {
+                        consume(TokenType::Question, "Expected '?'");
                     }
-                    consume(TokenType::RightParen, "Expected ')'");
+                    std::string method = consume(TokenType::Identifier, "Expected method name").lexeme;
+                    if (!check(TokenType::LeftParen)) {
+                        if (is_probe) {
+                            throw CompileError("Multi-receiver existence probes require call syntax", current().location);
+                        }
+                        pos = paren_pos;
+                    } else {
+                        consume(TokenType::LeftParen, "Expected '('");
+                        std::vector<ExprPtr> args;
+                        if (!check(TokenType::RightParen)) {
+                            do {
+                                args.push_back(parse_expr());
+                            } while (match(TokenType::Comma));
+                        }
+                        consume(TokenType::RightParen, "Expected ')'");
 
-                    auto func = Expr::make_identifier(method, loc);
-                    auto call = Expr::make_call(func, args, loc);
-                    call->receivers = receivers;
-                    return parse_postfix_suffix(call);
+                        auto func = Expr::make_identifier(method, loc);
+                        auto call = Expr::make_call(func, args, loc);
+                        call->receivers = receivers;
+                        call->is_existence_probe = is_probe;
+                        return parse_postfix_suffix(call);
+                    }
                 }
                 pos = paren_pos;
             }
@@ -1440,6 +1459,30 @@ ExprPtr Parser::parse_postfix_suffix(ExprPtr expr) {
             ExprPtr index = parse_expr();
             consume(TokenType::RightBracket, "Expected ']'");
             expr = Expr::make_index(expr, index, expr->location);
+        } else if (check_probe_dot()) {
+            pos++; // consume '.'
+            consume(TokenType::Question, "Expected '?'");
+            std::string member = consume(TokenType::Identifier, "Expected member name").lexeme;
+
+            if (check(TokenType::LeftParen)) {
+                pos++;
+                std::vector<ExprPtr> args;
+                if (!check(TokenType::RightParen)) {
+                    do {
+                        args.push_back(parse_expr());
+                    } while (match(TokenType::Comma));
+                }
+                consume(TokenType::RightParen, "Expected ')'");
+
+                auto method = Expr::make_identifier(member, expr->location);
+                auto call = Expr::make_call(method, args, expr->location);
+                call->receivers.push_back(expr);
+                call->is_existence_probe = true;
+                expr = call;
+            } else {
+                expr = Expr::make_member(expr, member, expr->location);
+                expr->is_existence_probe = true;
+            }
         } else if (check_member_dot()) {
             pos++; // consume '.'
             std::string member = consume(TokenType::Identifier, "Expected member name").lexeme;

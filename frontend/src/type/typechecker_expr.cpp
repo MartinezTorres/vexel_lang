@@ -1041,7 +1041,303 @@ TypePtr TypeChecker::check_unary(ExprPtr expr) {
     return operand_type;
 }
 
+TypeChecker::OverloadResolutionResult TypeChecker::resolve_function_overload(
+    const std::vector<Symbol*>& candidates,
+    const std::vector<TypePtr>& receiver_types,
+    const std::vector<ExprPtr>& args) {
+    OverloadResolutionResult result;
+    std::vector<bool> arg_checked(args.size(), false);
+
+    auto candidate_matches = [&](Symbol* candidate, int& specificity, bool& exact_match) -> bool {
+        if (!candidate || candidate->kind != Symbol::Kind::Function || !candidate->declaration) {
+            return false;
+        }
+        StmtPtr decl = candidate->declaration;
+        if (decl->ref_params.size() != receiver_types.size()) {
+            return false;
+        }
+        if (decl->params.size() != args.size()) {
+            return false;
+        }
+
+        specificity = 0;
+        exact_match = true;
+
+        for (size_t i = 0; i < receiver_types.size(); ++i) {
+            TypePtr param_type = nullptr;
+            if (i == 0 && !decl->type_namespace.empty()) {
+                param_type = Type::make_named(decl->type_namespace, candidate->declaration->location);
+            } else if (i < decl->ref_param_types.size()) {
+                param_type = decl->ref_param_types[i];
+            }
+            if (!param_type || param_type->kind == Type::Kind::TypeVar) {
+                exact_match = false;
+                continue;
+            }
+            specificity += 2;
+            if (!types_compatible(receiver_types[i], param_type)) {
+                return false;
+            }
+            if (!types_equal(receiver_types[i], param_type)) {
+                exact_match = false;
+            }
+        }
+
+        for (size_t i = 0; i < args.size(); ++i) {
+            const Parameter& param = decl->params[i];
+            if (param.is_expression_param) {
+                exact_match = false;
+                continue;
+            }
+            ExprPtr arg_expr = args[i];
+            if (!arg_checked[i]) {
+                check_expr(arg_expr);
+                arg_checked[i] = true;
+            }
+            if (!param.type || param.type->kind == Type::Kind::TypeVar) {
+                exact_match = false;
+                continue;
+            }
+            specificity += 1;
+            if (!types_compatible(arg_expr->type, param.type) &&
+                !literal_assignable_to(param.type, arg_expr)) {
+                return false;
+            }
+            if (!types_equal(arg_expr->type, param.type)) {
+                exact_match = false;
+            }
+        }
+        return true;
+    };
+
+    Symbol* best = nullptr;
+    int best_specificity = std::numeric_limits<int>::min();
+    bool best_exact = false;
+    bool ambiguous = false;
+    for (Symbol* candidate : candidates) {
+        int specificity = 0;
+        bool exact = false;
+        if (!candidate_matches(candidate, specificity, exact)) {
+            continue;
+        }
+        if (!best ||
+            exact > best_exact ||
+            (exact == best_exact && specificity > best_specificity)) {
+            best = candidate;
+            best_specificity = specificity;
+            best_exact = exact;
+            ambiguous = false;
+            continue;
+        }
+        if (exact == best_exact && specificity == best_specificity) {
+            ambiguous = true;
+        }
+    }
+
+    if (!best) {
+        result.status = OverloadResolutionResult::Status::NoMatch;
+        return result;
+    }
+    if (ambiguous) {
+        result.status = OverloadResolutionResult::Status::Ambiguous;
+        return result;
+    }
+
+    result.status = OverloadResolutionResult::Status::Unique;
+    result.symbol = best;
+    return result;
+}
+
+TypePtr TypeChecker::check_probe_call(ExprPtr expr) {
+    auto materialize_result = [&](bool exists) -> TypePtr {
+        expr->kind = Expr::Kind::IntLiteral;
+        expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+        expr->uint_val = exists ? 1 : 0;
+        expr->exact_int_val = APInt(static_cast<int64_t>(exists ? 1 : 0));
+        expr->has_exact_int_val = true;
+        expr->literal_is_unsigned = false;
+        expr->raw_literal = exists ? "1" : "0";
+        expr->name.clear();
+        expr->op.clear();
+        expr->left = nullptr;
+        expr->right = nullptr;
+        expr->operand = nullptr;
+        expr->condition = nullptr;
+        expr->true_expr = nullptr;
+        expr->false_expr = nullptr;
+        expr->args.clear();
+        expr->receivers.clear();
+        expr->elements.clear();
+        expr->result_expr = nullptr;
+        expr->is_constructor_call = false;
+        expr->is_existence_probe = false;
+        return expr->type;
+    };
+
+    auto probe_type_ready = [&](TypePtr type, bool allow_untyped_integer_literal) -> bool {
+        std::function<bool(TypePtr)> ready = [&](TypePtr t) -> bool {
+            t = resolve_type(t);
+            if (!t) return false;
+            switch (t->kind) {
+                case Type::Kind::Primitive:
+                    if (is_untyped_integer_type(t)) {
+                        return allow_untyped_integer_literal;
+                    }
+                    return true;
+                case Type::Kind::Named:
+                    return true;
+                case Type::Kind::Array:
+                case Type::Kind::Vector:
+                case Type::Kind::Matrix:
+                    return ready(t->element_type);
+                case Type::Kind::TypeVar:
+                case Type::Kind::TypeOf:
+                    return false;
+            }
+            return false;
+        };
+        return ready(type);
+    };
+
+    std::vector<TypePtr> receiver_types;
+    if (!expr->receivers.empty()) {
+        receiver_types.reserve(expr->receivers.size());
+        bool multi_receiver = expr->receivers.size() > 1;
+        for (const auto& rec : expr->receivers) {
+            if (multi_receiver && rec && rec->kind != Expr::Kind::Identifier) {
+                throw CompileError("Multi-receiver calls require identifier receivers", expr->location);
+            }
+            TypePtr rec_type = check_expr(rec);
+            if (!probe_type_ready(rec_type, false)) {
+                throw CompileError("Existence probe requires concrete receiver types", rec->location);
+            }
+            receiver_types.push_back(rec_type);
+        }
+    }
+
+    if (!expr->operand || expr->operand->kind != Expr::Kind::Identifier) {
+        throw CompileError("Existence probe requires a direct member call name", expr->location);
+    }
+
+    const std::string original_name = expr->operand->name;
+    std::string func_name = original_name;
+    if (expr->receivers.size() == 1) {
+        TypePtr receiver_type = receiver_types.empty() ? nullptr : receiver_types[0];
+        if (receiver_type && receiver_type->kind == Type::Kind::Named &&
+            original_name.find("::") == std::string::npos) {
+            func_name = receiver_type->type_name + "::" + original_name;
+        }
+    }
+
+    for (const auto& arg : expr->args) {
+        TypePtr arg_type = check_expr(arg);
+        const bool allow_untyped_integer = arg && arg->kind == Expr::Kind::IntLiteral;
+        if (!probe_type_ready(arg_type, allow_untyped_integer)) {
+            throw CompileError("Existence probe requires concrete argument types", arg->location);
+        }
+    }
+
+    std::vector<Symbol*> candidates = lookup_functions_global(func_name);
+    if (candidates.empty()) {
+        return materialize_result(false);
+    }
+
+    OverloadResolutionResult resolved = resolve_function_overload(candidates, receiver_types, expr->args);
+    if (resolved.status == OverloadResolutionResult::Status::Ambiguous) {
+        throw CompileError("Ambiguous overload for function: " + func_name, expr->location);
+    }
+    return materialize_result(resolved.status == OverloadResolutionResult::Status::Unique);
+}
+
+TypePtr TypeChecker::check_probe_member(ExprPtr expr) {
+    auto materialize_result = [&](bool exists) -> TypePtr {
+        expr->kind = Expr::Kind::IntLiteral;
+        expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
+        expr->uint_val = exists ? 1 : 0;
+        expr->exact_int_val = APInt(static_cast<int64_t>(exists ? 1 : 0));
+        expr->has_exact_int_val = true;
+        expr->literal_is_unsigned = false;
+        expr->raw_literal = exists ? "1" : "0";
+        expr->name.clear();
+        expr->op.clear();
+        expr->left = nullptr;
+        expr->right = nullptr;
+        expr->operand = nullptr;
+        expr->condition = nullptr;
+        expr->true_expr = nullptr;
+        expr->false_expr = nullptr;
+        expr->args.clear();
+        expr->receivers.clear();
+        expr->elements.clear();
+        expr->result_expr = nullptr;
+        expr->is_constructor_call = false;
+        expr->is_existence_probe = false;
+        return expr->type;
+    };
+
+    auto receiver_ready = [&](TypePtr type) -> bool {
+        std::function<bool(TypePtr)> ready = [&](TypePtr t) -> bool {
+            t = resolve_type(t);
+            if (!t) return false;
+            switch (t->kind) {
+                case Type::Kind::Primitive:
+                    return !is_untyped_integer_type(t);
+                case Type::Kind::Named:
+                    return true;
+                case Type::Kind::Array:
+                case Type::Kind::Vector:
+                case Type::Kind::Matrix:
+                    return ready(t->element_type);
+                case Type::Kind::TypeVar:
+                case Type::Kind::TypeOf:
+                    return false;
+            }
+            return false;
+        };
+        return ready(type);
+    };
+
+    TypePtr obj_type = check_expr(expr->operand);
+    if (!receiver_ready(obj_type)) {
+        throw CompileError("Existence probe requires a concrete receiver type", expr->location);
+    }
+
+    obj_type = resolve_type(obj_type);
+    if (obj_type && obj_type->kind == Type::Kind::Named) {
+        if (obj_type->type_name.find(TUPLE_TYPE_PREFIX) == 0 &&
+            expr->name.size() >= 3 && expr->name.substr(0, 2) == std::string(MANGLED_PREFIX)) {
+            size_t field_index = std::stoull(expr->name.substr(2));
+            auto tuple_it = forced_tuple_types.find(obj_type->type_name);
+            if (tuple_it != forced_tuple_types.end()) {
+                return materialize_result(field_index < tuple_it->second.size());
+            }
+            return materialize_result(false);
+        }
+
+        Symbol* type_sym = nullptr;
+        if (bindings) {
+            type_sym = bindings->lookup(current_instance_id, obj_type.get());
+        }
+        if (!type_sym) {
+            type_sym = lookup_type_global(obj_type->type_name);
+        }
+        if (type_sym && type_sym->kind == Symbol::Kind::Type && type_sym->declaration) {
+            for (const auto& field : type_sym->declaration->fields) {
+                if (field.name == expr->name) {
+                    return materialize_result(true);
+                }
+            }
+        }
+    }
+
+    return materialize_result(false);
+}
+
 TypePtr TypeChecker::check_call(ExprPtr expr) {
+    if (expr->is_existence_probe) {
+        return check_probe_call(expr);
+    }
+
     std::vector<TypePtr> receiver_types;
     if (!expr->receivers.empty()) {
         receiver_types.reserve(expr->receivers.size());
@@ -1101,101 +1397,113 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                 } else {
                     throw CompileError("Undefined function: " + func_name, expr->location);
                 }
-            } else if (candidates.size() == 1) {
-                sym = candidates.front();
-                expr->operand->name = sym->name;
-                has_symbol = true;
             } else {
-                std::vector<bool> arg_checked(expr->args.size(), false);
-                auto candidate_matches = [&](Symbol* candidate, int& specificity, bool& exact_match) -> bool {
-                    if (!candidate || candidate->kind != Symbol::Kind::Function || !candidate->declaration) {
-                        return false;
+                auto try_std_math_array_overload = [&]() -> OverloadResolutionResult {
+                    OverloadResolutionResult math_result;
+                    if (!expr->receivers.empty()) {
+                        return math_result;
                     }
-                    StmtPtr decl = candidate->declaration;
-                    if (decl->ref_params.size() != expr->receivers.size()) {
-                        return false;
-                    }
-                    if (decl->params.size() != expr->args.size()) {
-                        return false;
-                    }
-                    specificity = 0;
-                    exact_match = true;
-                    for (size_t i = 0; i < receiver_types.size(); ++i) {
-                        TypePtr param_type = nullptr;
-                        if (i == 0 && !decl->type_namespace.empty()) {
-                            param_type = Type::make_named(decl->type_namespace, expr->location);
-                        } else if (i < decl->ref_param_types.size()) {
-                            param_type = decl->ref_param_types[i];
+
+                    std::vector<TypePtr> scalar_arg_types;
+                    scalar_arg_types.reserve(expr->args.size());
+                    bool saw_array_like = false;
+                    for (const auto& arg : expr->args) {
+                        TypePtr arg_type = arg ? resolve_type(arg->type) : nullptr;
+                        if (is_array_like_type(arg_type)) {
+                            saw_array_like = true;
+                            scalar_arg_types.push_back(array_like_scalar_type(arg_type));
+                        } else {
+                            scalar_arg_types.push_back(arg_type);
                         }
-                        if (!param_type || param_type->kind == Type::Kind::TypeVar) {
-                            exact_match = false;
-                            continue;
-                        }
-                        specificity += 2;
-                        if (!types_compatible(receiver_types[i], param_type)) {
+                    }
+                    if (!saw_array_like) {
+                        return math_result;
+                    }
+
+                    auto candidate_matches = [&](Symbol* candidate, int& specificity, bool& exact_match) -> bool {
+                        if (!candidate || candidate->kind != Symbol::Kind::Function || !candidate->declaration) {
                             return false;
                         }
-                        if (!types_equal(receiver_types[i], param_type)) {
-                            exact_match = false;
-                        }
-                    }
-                    for (size_t i = 0; i < expr->args.size(); ++i) {
-                        const Parameter& param = decl->params[i];
-                        if (param.is_expression_param) {
-                            exact_match = false;
-                            continue;
-                        }
-                        ExprPtr arg_expr = expr->args[i];
-                        if (!arg_checked[i]) {
-                            check_expr(arg_expr);
-                            arg_checked[i] = true;
-                        }
-                        if (!param.type || param.type->kind == Type::Kind::TypeVar) {
-                            exact_match = false;
-                            continue;
-                        }
-                        specificity += 1;
-                        if (!types_compatible(arg_expr->type, param.type) &&
-                            !literal_assignable_to(param.type, arg_expr)) {
+                        if (!is_bundled_std_math_symbol(candidate)) {
                             return false;
                         }
-                        if (!types_equal(arg_expr->type, param.type)) {
-                            exact_match = false;
+                        StmtPtr decl = candidate->declaration;
+                        if (!decl->ref_params.empty() || decl->params.size() != scalar_arg_types.size()) {
+                            return false;
+                        }
+
+                        specificity = 0;
+                        exact_match = true;
+                        for (size_t i = 0; i < scalar_arg_types.size(); ++i) {
+                            TypePtr arg_type = scalar_arg_types[i];
+                            TypePtr param_type = decl->params[i].type;
+                            if (!param_type || param_type->kind == Type::Kind::TypeVar) {
+                                exact_match = false;
+                                continue;
+                            }
+                            specificity += 1;
+                            if (!types_compatible(arg_type, param_type) &&
+                                !literal_assignable_to(param_type, expr->args[i])) {
+                                return false;
+                            }
+                            if (!types_equal(arg_type, param_type)) {
+                                exact_match = false;
+                            }
+                        }
+                        return true;
+                    };
+
+                    Symbol* best = nullptr;
+                    int best_specificity = std::numeric_limits<int>::min();
+                    bool best_exact = false;
+                    bool ambiguous = false;
+                    for (Symbol* candidate : candidates) {
+                        int specificity = 0;
+                        bool exact = false;
+                        if (!candidate_matches(candidate, specificity, exact)) {
+                            continue;
+                        }
+                        if (!best ||
+                            exact > best_exact ||
+                            (exact == best_exact && specificity > best_specificity)) {
+                            best = candidate;
+                            best_specificity = specificity;
+                            best_exact = exact;
+                            ambiguous = false;
+                            continue;
+                        }
+                        if (exact == best_exact && specificity == best_specificity) {
+                            ambiguous = true;
                         }
                     }
-                    return true;
+
+                    if (!best) {
+                        return math_result;
+                    }
+                    if (ambiguous) {
+                        math_result.status = OverloadResolutionResult::Status::Ambiguous;
+                        return math_result;
+                    }
+                    math_result.status = OverloadResolutionResult::Status::Unique;
+                    math_result.symbol = best;
+                    return math_result;
                 };
 
-                Symbol* best = nullptr;
-                int best_specificity = std::numeric_limits<int>::min();
-                bool best_exact = false;
-                bool ambiguous = false;
-                for (Symbol* candidate : candidates) {
-                    int specificity = 0;
-                    bool exact = false;
-                    if (!candidate_matches(candidate, specificity, exact)) {
-                        continue;
+                OverloadResolutionResult resolved = resolve_function_overload(candidates, receiver_types, expr->args);
+                if (resolved.status == OverloadResolutionResult::Status::NoMatch) {
+                    OverloadResolutionResult math_resolved = try_std_math_array_overload();
+                    if (math_resolved.status == OverloadResolutionResult::Status::Ambiguous) {
+                        throw CompileError("Ambiguous overload for function: " + func_name, expr->location);
                     }
-                    if (!best ||
-                        exact > best_exact ||
-                        (exact == best_exact && specificity > best_specificity)) {
-                        best = candidate;
-                        best_specificity = specificity;
-                        best_exact = exact;
-                        ambiguous = false;
-                        continue;
+                    if (math_resolved.status == OverloadResolutionResult::Status::NoMatch) {
+                        throw CompileError("No matching overload for function: " + func_name, expr->location);
                     }
-                    if (exact == best_exact && specificity == best_specificity) {
-                        ambiguous = true;
-                    }
+                    resolved = math_resolved;
                 }
-                if (!best) {
-                    throw CompileError("No matching overload for function: " + func_name, expr->location);
-                }
-                if (ambiguous) {
+                if (resolved.status == OverloadResolutionResult::Status::Ambiguous) {
                     throw CompileError("Ambiguous overload for function: " + func_name, expr->location);
                 }
-                sym = best;
+                sym = resolved.symbol;
                 expr->operand->name = sym->name;
                 has_symbol = true;
             }
@@ -1527,6 +1835,10 @@ TypePtr TypeChecker::check_index(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_member(ExprPtr expr) {
+    if (expr->is_existence_probe) {
+        return check_probe_member(expr);
+    }
+
     TypePtr obj_type = check_expr(expr->operand);
 
     // Look up the object's type definition if it's a named type

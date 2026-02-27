@@ -30,6 +30,12 @@
     "summary": "Type expression #[expr] examples."
   },
   {
+    "id": "existence_probe",
+    "title": "Existence Probe",
+    "path": "examples/tutorial/existence_probe.vx",
+    "summary": "Compile-time field and method availability checks."
+  },
+  {
     "id": "iteration",
     "title": "Iteration",
     "path": "examples/tutorial/iteration.vx",
