@@ -362,7 +362,8 @@
         <h3>2) Types, literals, and declarations</h3>
         <p>
           Primitive types are explicit (<code>#b</code>, <code>#iN</code>, <code>#uN</code>, <code>#f16/#f32/#f64</code>, <code>#s</code>).
-          Frontend accepts any positive integer width; backends can support subsets (for C/megalinker: 8/16/32/64).
+          Frontend accepts any positive integer width; shipped backends use native fast paths at
+          <code>8/16/32/64</code> and lower other widths explicitly.
         </p>
         <pre><code>flag:#b = 1;
 count:#i27 = -10;
@@ -480,7 +481,7 @@ dead:#i32 = mul(9, 9);
         </p>
         <ul>
           <li><code>[[nonreentrant]]</code>: recognized by C and megalinker on ABI boundaries.</li>
-          <li><code>[[nonbanked]]</code>: recognized by megalinker for global placement.</li>
+          <li><code>[[nonbanked]]</code>: recognized by megalinker on global variables to force RAM placement.</li>
           <li><code>[[sdcccall(0)]]</code> / <code>[[sdcccall(1)]]</code>: recognized by megalinker on <code>&amp;!</code> and <code>&amp;^</code>.</li>
           <li><code>[[addr(...)]]</code> / <code>[[address(...)]]</code>: recognized by C and megalinker for <code>!!</code> bindings.</li>
         </ul>

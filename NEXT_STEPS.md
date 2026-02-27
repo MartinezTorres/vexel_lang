@@ -53,7 +53,7 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
   - [x] array lifting + broadcasting behavior
   - [x] final semantic lock + documentation consistency sweep
 - [x] Feature 5: native vector/matrix language support (independent feature)
-- [~] Final pass: full code+docs audit and mismatch remediation
+- [x] Final pass: full code+docs audit and mismatch remediation
 
 ## Working Log Entries
 
@@ -118,6 +118,16 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
     - frontend APInt no longer depends on Boost.Multiprecision
     - `make web` now completes cleanly with the local Emscripten toolchain
     - exact-integer conversions used by the evaluator/backends now route through the frontend-owned APInt surface (`to_double`, `to_unsigned_le_bytes`) instead of backend-specific raw access
+  - final cleanup fixes:
+    - corrected stale landing-page wording about shipped backend integer-width support: C/megalinker now document native fast paths at `8/16/32/64` with explicit lowering for other widths
+    - corrected landing-page annotation docs so `[[nonbanked]]` is described as a megalinker global-variable hint
+    - corrected stale example commentary in `examples/operator_methods.vx`; the sample also lowers with megalinker
+    - refreshed `TODO.md` arbitrary-integer notes so they no longer describe APInt as Boost-backed
+  - final verification rerun:
+    - `make test`
+    - `make docs-check`
+    - all non-library examples compile with `-b c` (`34` examples)
+    - all tutorial manifest entries compile with `-b megalinker` (`15` entries)
 
 ## Progress notes (local, temporary context)
 

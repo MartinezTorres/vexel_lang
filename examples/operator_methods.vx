@@ -1,6 +1,6 @@
 // Demonstrates operator overloading via Type::operator methods
-// Note: this sample targets the C backend; the banked backend forbids returning
-// or passing structs by value, so Vec2::+ would need a different lowering there.
+// This sample also lowers with megalinker; internal struct-returning operators are
+// lowered by the backend and do not require C ABI struct-by-value support.
 
 #Vec2(x:#i32, y:#i32);
 

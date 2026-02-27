@@ -134,7 +134,7 @@ If a new architectural issue is discovered while implementing a step:
     - Typechecker representability checks read fixed-width literal/CTE values and therefore cannot enforce arbitrary-width semantics soundly.
     - Residualizer reconstructs literals from fixed-width CTE values, so exact large constants cannot round-trip.
   - Implementation strategy (Step 3 scope, frontend only; backend lowering remains Step 5):
-    - Use a frontend-owned arbitrary-precision integer representation for exact integer math (chosen implementation: wrapper over `boost::multiprecision::cpp_int` to avoid inventing a new bigint engine in this step).
+    - Use a frontend-owned arbitrary-precision integer representation for exact integer math.
     - Keep unresolved integer literals exact until constrained by type context; do not reintroduce smallest-fitting fallback.
     - Preserve strict representability diagnostics at the point where a concrete integer type is required.
   - Step 3 exact file plan (refresh before coding):
@@ -171,10 +171,8 @@ If a new architectural issue is discovered while implementing a step:
     - Tests/docs:
       - `frontend/tests/lexer/*`, `frontend/tests/typechecker/*`, `frontend/tests/expressions/*` for >64-bit literals and exact representability.
       - `docs/vexel-rfc.md` clarify exact literal behavior (no lexer overflow before typing; contextual representability).
-  - Note:
-    - `boost::multiprecision::cpp_int` is available in the current environment (verified locally). If CI portability becomes an issue, revisit with a vendored frontend-only bigint implementation; do not regress semantics.
   - Implementation notes (actual changes made):
-    - Added frontend-owned exact integer wrapper `APInt` (`boost::multiprecision::cpp_int`) and threaded exact integer payloads through AST literals.
+    - Added frontend-owned exact integer wrapper `APInt` and threaded exact integer payloads through AST literals.
     - Lexer/parser now preserve integer literal text and parse exact values without host-width overflow.
     - `CTValue` now supports `CTExactInt`; evaluator, casts, assignments, and residualizer materialization support exact integers.
     - Compile-time integer coercion/casts now support arbitrary widths (frontend semantics); fixed-width wrap/sign behavior remains enforced at concretization.
