@@ -325,7 +325,7 @@ bool CompileTimeEvaluator::eval_cast(ExprPtr expr, CTValue& result) {
                 return false;
             }
             if (is_float(target_type->primitive)) {
-                double raw_d = raw.raw().convert_to<double>();
+                double raw_d = raw.to_double();
                 result = std::ldexp(raw_d, -static_cast<int>(src_frac));
                 return true;
             }

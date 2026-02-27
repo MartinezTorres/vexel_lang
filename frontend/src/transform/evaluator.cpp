@@ -720,7 +720,7 @@ double CompileTimeEvaluator::to_float(const CTValue& v) {
     if (std::holds_alternative<uint64_t>(v)) return (double)std::get<uint64_t>(v);
     if (std::holds_alternative<CTExactInt>(v)) {
         const CTExactInt& exact = std::get<CTExactInt>(v);
-        return exact.value.raw().convert_to<double>();
+        return exact.value.to_double();
     }
     if (std::holds_alternative<bool>(v)) return std::get<bool>(v) ? 1.0 : 0.0;
     throw CompileError("Cannot convert value to float in compile-time evaluation (" + ct_value_kind(v) + ")",

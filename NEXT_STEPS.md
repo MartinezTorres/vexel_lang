@@ -114,12 +114,10 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
     - tutorial manifest paths and `docs/index.html` playground links
     - top-level and tutorial examples compile with `-b c`
     - tutorial manifest entries compile with `-b megalinker`
-  - open blocker:
-    - `make web` fails in this environment because the current Emscripten toolchain does not provide an Emscripten-compatible Boost.Multiprecision header stack for `frontend/src/core/apint.h`
-    - naive host-header inclusion was tested and rejected: it produces incompatible Boost/libc++ interactions under Emscripten
-    - clean path forward is not a Makefile tweak; it requires either:
-      1. an Emscripten-compatible Boost header/toolchain setup, or
-      2. removing the frontend APInt dependency on Boost for the web build (larger architectural change)
+  - resolved blocker:
+    - frontend APInt no longer depends on Boost.Multiprecision
+    - `make web` now completes cleanly with the local Emscripten toolchain
+    - exact-integer conversions used by the evaluator/backends now route through the frontend-owned APInt surface (`to_double`, `to_unsigned_le_bytes`) instead of backend-specific raw access
 
 ## Progress notes (local, temporary context)
 
