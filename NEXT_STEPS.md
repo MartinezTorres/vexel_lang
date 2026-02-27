@@ -35,13 +35,13 @@ This document is the authoritative working log for execution. The workflow must 
 Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
 
 - [x] Feature 1: per-element operators stage 1A/1B (syntax, lowering, broadcasting, regressions)
-- [~] Feature 2: fixed-point (`#uI.F/#iI.F`) full completion
+- [x] Feature 2: fixed-point (`#uI.F/#iI.F`) full completion
   - [x] parser/type plumbing (`I+F>0`, `F<0`, type storage, mangling/stringification)
   - [x] native + non-native cast support (frontend/CTE/C/megalinker)
   - [x] non-native non-zero-fraction `* / %` + compound support
-  - [ ] bitwise/shift semantics for `F != 0` (or explicit final-language rule + enforcement)
-  - [ ] signed fixed-point bitwise/shift semantics (or explicit final-language rule + enforcement)
-  - [ ] 64-bit fixed-point `* / %` semantics/backend support
+  - [x] bitwise/shift semantics for `F != 0` (or explicit final-language rule + enforcement)
+  - [x] signed fixed-point bitwise/shift semantics (or explicit final-language rule + enforcement)
+  - [x] 64-bit fixed-point `* / %` semantics/backend support
 - [x] Feature 3: std module system (`std/` fallback + local override resolution)
 - [~] Feature 4: compiler-recognized `std::math`
   - [x] scalar surface + CTE fold + backend libc mapping
@@ -56,6 +56,26 @@ Legend: `[ ]` pending, `[~]` in progress, `[x]` complete.
 - Established explicit execution contract (no scope reduction, no deferral on hard semantics).
 - Set this file as the authoritative status tracker and decision log.
 - Open priorities remain fixed-point completion (Feature 2 gaps), math semantic lock cleanup, and Feature 5.
+- Fixed-point hard-decision lock (root cause + decision + impact):
+  - Root cause:
+    - Fixed-point support grew in staged subsets with conservative guards (unsigned+`F=0` for bitwise/shift, `8/16/32` for `* / %`) that no longer match language intent.
+    - Frontend/CTE/backend behavior diverged as these guards moved independently.
+  - Decision A (bitwise/shift semantics for fixed-point):
+    - Define `~ & | ^ << >>` (and compound forms) on fixed-point as **raw-bit operations** on the stored two's-complement/unsigned representation, regardless of fractional bits.
+    - Right shift on signed fixed-point is arithmetic shift on raw bits.
+    - This applies uniformly to native and non-native widths.
+  - Decision B (`64-bit` fixed-point `* / %`):
+    - Enable full support with the same fixed scaling rules (`truncate toward zero`) and avoid backend UB/overflow by lowering through extint helper arithmetic where native-width arithmetic is unsafe.
+  - Impact:
+    - Typechecker restrictions for fixed bitwise/shift are removed.
+    - CTE implements the same raw-bit rules for all fixed-point bitwise/shift operations.
+    - C + megalinker backends align with the same semantics and add 64-bit-safe lowering for fixed `* / %`.
+- Execution update:
+  - Completed the fixed-point semantic closure pass in frontend + C backend + megalinker backend.
+  - Added frontend regression coverage for signed/fractional fixed bitwise/shift and native 64-bit fixed `* / %`.
+  - Added backend regression coverage (C: `CX-110`, `CX-111`; megalinker test-script cases).
+  - Updated fixed-point error fixtures to match the final-language rules and removed obsolete unsigned/zero-fraction-only expectations.
+  - Full suite passed after the pass (`make test`, `make frontend-test`, `python3 backends/c/tests/run_tests.py`, `bash backends/ext/megalinker/tests/test.sh`).
 
 ## Progress notes (local, temporary context)
 
@@ -106,9 +126,9 @@ Notes from implementation:
   - frontend now allows a native-width (`I+F` in 8/16/32/64) same-type arithmetic subset: unary `-`, binary `+`/`-`, and comparisons
   - frontend now also allows native-width same-type compound `+=` / `-=`
   - frontend/backend/CTE support explicit casts among fixed/integer/bool/float primitives for native and non-native fixed-point widths
-  - frontend/backend/CTE now support fixed-point `*`, `/`, `%`, `*=`, `/=`, `%=` for native storage widths up to 32 bits (`8/16/32`)
+  - frontend/backend/CTE now support fixed-point `*`, `/`, `%`, `*=`, `/=`, `%=` for native storage widths `8/16/32/64`
   - frontend/backend/CTE support same-type non-native non-zero-fraction fixed-point unary `-`, `+`, `-`, comparisons, and compound `+=` / `-=` (extint-backed raw semantics)
-  - fixed-point bitwise/shift for `F != 0` and 64-bit fixed-point `* / %` remain open
+  - fixed-point bitwise/shift and native 64-bit fixed-point `* / %` are fully wired in frontend/CTE/backends
   - regressions added for syntax acceptance, invalid non-positive total width, explicit unsupported-operation diagnostics, and C/megalinker ABI signature emission
 
 ## 1) Overloadable per-element operators (Matlab-style)

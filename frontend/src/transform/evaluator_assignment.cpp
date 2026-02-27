@@ -45,7 +45,7 @@ bool fixed_muldiv_meta_supported(const TypePtr& type,
                                  bool& is_signed_raw,
                                  int64_t& fractional_bits) {
     if (!fixed_native_meta(type, total_bits, is_signed_raw, fractional_bits)) return false;
-    return total_bits == 8 || total_bits == 16 || total_bits == 32;
+    return total_bits == 8 || total_bits == 16 || total_bits == 32 || total_bits == 64;
 }
 
 APInt trunc_div_pow2(const APInt& value, uint64_t shift) {
@@ -340,21 +340,16 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 out = ctvalue_from_exact_int(wrap_raw(raw), !fixed_signed);
                 return true;
             }
-            if (fixed_signed || fixed_frac != 0) {
-                error_msg =
-                    "Fixed-point compile-time bitwise/shift compound assignments require unsigned fixed-point operands with zero fractional bits";
-                return false;
-            }
             if (binary_op == "&") {
-                out = ctvalue_from_exact_int(wrap_raw(l & r), true);
+                out = ctvalue_from_exact_int(wrap_raw(l & r), !fixed_signed);
                 return true;
             }
             if (binary_op == "|") {
-                out = ctvalue_from_exact_int(wrap_raw(l | r), true);
+                out = ctvalue_from_exact_int(wrap_raw(l | r), !fixed_signed);
                 return true;
             }
             if (binary_op == "^") {
-                out = ctvalue_from_exact_int(wrap_raw(l ^ r), true);
+                out = ctvalue_from_exact_int(wrap_raw(l ^ r), !fixed_signed);
                 return true;
             }
             if (r.is_negative()) {
@@ -367,9 +362,9 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
             }
             uint64_t shift = r.to_u64();
             if (binary_op == "<<") {
-                out = ctvalue_from_exact_int(wrap_raw(l << shift), true);
+                out = ctvalue_from_exact_int(wrap_raw(l << shift), !fixed_signed);
             } else {
-                out = ctvalue_from_exact_int(wrap_raw(l >> shift), true);
+                out = ctvalue_from_exact_int(wrap_raw(l >> shift), !fixed_signed);
             }
             return true;
             }
@@ -406,7 +401,7 @@ bool CompileTimeEvaluator::eval_assignment(ExprPtr expr, CTValue& result) {
                 int64_t muldiv_frac = 0;
                 if (!fixed_muldiv_meta_supported(fixed_type, muldiv_bits, muldiv_signed, muldiv_frac)) {
                     error_msg = "Fixed-point compound assignment '" + assign_op +
-                                "' currently supports only native storage widths up to 32 bits (8/16/32)";
+                                "' currently supports only native storage widths (8/16/32/64)";
                     return false;
                 }
                 APInt raw(uint64_t(0));

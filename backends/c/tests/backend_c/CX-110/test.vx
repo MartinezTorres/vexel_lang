@@ -1,0 +1,33 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Fixed-point bitwise/shift operators are supported for signed and fractional widths.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_shr_s(' out.c && grep -Fq 'vx_ai_shl(' out.c && grep -Fq 'vx_ai_not(' out.c
+
+&!sx() -> #i40.8;
+&!sy() -> #i40.8;
+
+&^main() -> #i32 {
+  x:#i40.8 = sx();
+  y:#i40.8 = sy();
+  a:#i40.8 = x & y;
+  b:#i40.8 = x | y;
+  c:#i40.8 = x ^ y;
+  d:#i40.8 = x >> y;
+  e:#i40.8 = x << y;
+  f:#i40.8 = ~x;
+
+  x &= y;
+  x |= y;
+  x ^= y;
+  x >>= y;
+  x <<= y;
+
+  g:#u40.8 = (#u40.8)f;
+  g &= g;
+  g |= g;
+  g ^= g;
+  g >>= g;
+  g <<= g;
+
+  (a == b) ? 1 : 0
+}
