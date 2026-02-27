@@ -359,6 +359,7 @@ ExprPtr TypeChecker::clone_expr(ExprPtr expr) {
     }
     cloned->is_constructor_call = expr->is_constructor_call;
     cloned->is_existence_probe = expr->is_existence_probe;
+    cloned->is_optional_semantic_block = expr->is_optional_semantic_block;
 
     // Clone statements (for blocks) - deep cloning
     for (const auto& stmt : expr->statements) {

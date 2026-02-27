@@ -324,6 +324,7 @@
         <a href="playground.html?file=examples/tutorial/exports.vx&backend=c">exports</a>,
         <a href="playground.html?file=examples/tutorial/typeof_demo.vx&backend=c">typeof</a>,
         <a href="playground.html?file=examples/tutorial/existence_probe.vx&backend=c">existence_probe</a>,
+        <a href="playground.html?file=examples/tutorial/optional_block.vx&backend=c">optional_block</a>,
         <a href="playground.html?file=examples/tutorial/iteration.vx&backend=c">iteration</a>,
         <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
         <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">vector_matrix</a>,
@@ -428,7 +429,24 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>6) Native vectors, matrices, and algebra</h3>
+        <h3>6) Optional semantic blocks</h3>
+        <p>
+          <code>#{ ... }</code> is a statement-only optional block. The frontend keeps it only if semantic resolution succeeds;
+          missing imports, missing symbols, missing members, and no-matching-overload cases discard the whole block with no residue.
+          Syntax errors, ambiguity, and other normal compile errors still fail the build.
+        </p>
+        <pre><code>&amp;^main() -&gt; #i32 {
+  value:#i32 = 1;
+  #{
+    ::missing::feature;
+    value = 2;
+  }
+  value
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>7) Native vectors, matrices, and algebra</h3>
         <p>
           Vectors and matrices are explicit frontend types. They use array literals for construction,
           lower to arrays before backend handoff, and provide native algebraic operators.
@@ -447,7 +465,7 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>7) Bundled std::math and array lifting</h3>
+        <h3>8) Bundled std::math and array lifting</h3>
         <p>
           The bundled fallback <code>::std::math;</code> surface is compiler-recognized for compile-time folding.
           Unary and binary math calls can also lift over arrays with strict broadcasting.
@@ -463,7 +481,7 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>8) Compile-time execution and dead-code elimination</h3>
+        <h3>9) Compile-time execution and dead-code elimination</h3>
         <p>
           Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
         </p>
@@ -477,7 +495,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>8) Multi-file modules</h3>
+        <h3>10) Multi-file modules</h3>
         <p>Use module imports and keep related logic in separate files.</p>
         <div class="code-title">main.vx</div>
         <pre><code>::math;
@@ -492,7 +510,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>9) Backend hints (annotation pass-through)</h3>
+        <h3>11) Backend hints (annotation pass-through)</h3>
         <p>
           Frontend parses annotations but does not globally whitelist them. Backend-specific hints are consumed by the selected backend.
         </p>
@@ -505,7 +523,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>10) Compile and inspect outputs</h3>
+        <h3>12) Compile and inspect outputs</h3>
         <p>The unified driver always requires a backend.</p>
         <pre><code>./build/vexel -b c -o out path/to/main.vx
 ./build/vexel -b megalinker -o out path/to/main.vx

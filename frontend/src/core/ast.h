@@ -117,6 +117,7 @@ struct Expr {
     // Block
     std::vector<StmtPtr> statements;
     ExprPtr result_expr;
+    bool is_optional_semantic_block = false;
 
     bool is_sorted_iteration = false;
     bool was_parenthesized = false;

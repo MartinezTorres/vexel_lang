@@ -1,0 +1,8 @@
+&^main() -> #i32 {
+  value:#i32 = 1;
+  #{
+    ::missing::feature;
+    value = 2;
+  }
+  value
+}

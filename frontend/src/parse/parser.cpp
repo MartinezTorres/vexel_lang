@@ -868,6 +868,13 @@ StmtPtr Parser::parse_stmt_no_semi() {
         return Stmt::make_continue(loc);
     }
 
+    if (check(TokenType::Hash) && peek().type == TokenType::LeftBrace) {
+        consume(TokenType::Hash, "Expected '#'");
+        ExprPtr block = parse_block();
+        block->is_optional_semantic_block = true;
+        return Stmt::make_expr(block, loc);
+    }
+
     if (check(TokenType::Hash)) {
         return parse_type_decl();
     }

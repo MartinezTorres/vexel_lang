@@ -1,5 +1,6 @@
 #include "typechecker.h"
 #include "expr_access.h"
+#include "ast_walk.h"
 
 #include <algorithm>
 #include <array>
@@ -421,6 +422,132 @@ void TypeChecker::register_tuple_type(const std::string& name, const std::vector
 }
 
 TypePtr TypeChecker::check_block(ExprPtr expr) {
+    if (expr->is_optional_semantic_block) {
+        // Optional semantic blocks must either validate exactly like a normal
+        // block or disappear without leaving any partial type facts behind.
+        struct StmtStateSnapshot {
+            bool is_generic = false;
+            TypePtr var_type;
+            std::vector<TypePtr> param_types;
+            std::vector<TypePtr> ref_param_types;
+            TypePtr return_type;
+            std::vector<TypePtr> return_types;
+            std::vector<TypePtr> field_types;
+        };
+
+        std::unordered_map<Symbol*, TypePtr> symbol_types;
+        if (program) {
+            for (const auto& sym : program->symbols) {
+                if (sym) {
+                    symbol_types[sym.get()] = sym->type;
+                }
+            }
+        }
+
+        std::unordered_map<Stmt*, StmtStateSnapshot> stmt_states;
+        std::unordered_set<Stmt*> visited_statements;
+        std::function<void(const ExprPtr&)> snapshot_expr;
+        std::function<void(const StmtPtr&)> snapshot_stmt;
+        snapshot_expr = [&](const ExprPtr& node) {
+            if (!node) return;
+            for_each_expr_child(
+                node,
+                [&](const ExprPtr& child) { snapshot_expr(child); },
+                [&](const StmtPtr& child) { snapshot_stmt(child); });
+        };
+        snapshot_stmt = [&](const StmtPtr& stmt) {
+            if (!stmt || !visited_statements.insert(stmt.get()).second) return;
+            StmtStateSnapshot snap;
+            snap.is_generic = stmt->is_generic;
+            snap.var_type = stmt->var_type;
+            snap.return_type = stmt->return_type;
+            snap.return_types = stmt->return_types;
+            snap.ref_param_types = stmt->ref_param_types;
+            for (const auto& param : stmt->params) {
+                snap.param_types.push_back(param.type);
+            }
+            for (const auto& field : stmt->fields) {
+                snap.field_types.push_back(field.type);
+            }
+            stmt_states[stmt.get()] = snap;
+
+            for_each_stmt_child(
+                stmt,
+                [&](const ExprPtr& child_expr) { snapshot_expr(child_expr); },
+                [&](const StmtPtr& child_stmt) { snapshot_stmt(child_stmt); });
+        };
+
+        if (program) {
+            for (const auto& mod_info : program->modules) {
+                for (const auto& stmt : mod_info.module.top_level) {
+                    snapshot_stmt(stmt);
+                }
+            }
+        }
+        for (const auto& pending : pending_instantiations) {
+            snapshot_stmt(pending);
+        }
+
+        auto saved_type_var_bindings = type_var_bindings;
+        auto saved_instantiations = instantiations;
+        auto saved_pending_instantiations = pending_instantiations;
+        auto saved_forced_tuple_types = forced_tuple_types;
+        auto saved_constexpr_values = known_constexpr_values;
+        auto saved_constexpr_conditions = constexpr_condition_cache;
+        auto saved_checked_statements = checked_statements;
+
+        auto restore_snapshot = [&]() {
+            for (const auto& entry : symbol_types) {
+                entry.first->type = entry.second;
+            }
+            for (const auto& entry : stmt_states) {
+                Stmt* stmt = entry.first;
+                const StmtStateSnapshot& snap = entry.second;
+                stmt->is_generic = snap.is_generic;
+                stmt->var_type = snap.var_type;
+                stmt->return_type = snap.return_type;
+                stmt->return_types = snap.return_types;
+                stmt->ref_param_types = snap.ref_param_types;
+                for (size_t i = 0; i < snap.param_types.size() && i < stmt->params.size(); ++i) {
+                    stmt->params[i].type = snap.param_types[i];
+                }
+                for (size_t i = 0; i < snap.field_types.size() && i < stmt->fields.size(); ++i) {
+                    stmt->fields[i].type = snap.field_types[i];
+                }
+            }
+            type_var_bindings = saved_type_var_bindings;
+            instantiations = saved_instantiations;
+            pending_instantiations = saved_pending_instantiations;
+            forced_tuple_types = saved_forced_tuple_types;
+            known_constexpr_values = saved_constexpr_values;
+            constexpr_condition_cache = saved_constexpr_conditions;
+            checked_statements = saved_checked_statements;
+        };
+
+        try {
+            for (auto& stmt : expr->statements) {
+                check_stmt(stmt);
+            }
+            TypePtr result_type = nullptr;
+            if (expr->result_expr) {
+                result_type = check_expr(expr->result_expr);
+            }
+            expr->type = result_type;
+            expr->is_optional_semantic_block = false;
+            return result_type;
+        } catch (const CompileError& err) {
+            if (!is_optional_semantic_failure(err)) {
+                throw;
+            }
+            restore_snapshot();
+            expr->statements.clear();
+            expr->result_expr = nullptr;
+            expr->type = nullptr;
+            expr->is_optional_semantic_block = false;
+            return nullptr;
+        }
+    }
+
     for (auto& stmt : expr->statements) {
         check_stmt(stmt);
     }

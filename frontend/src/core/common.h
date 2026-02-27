@@ -24,6 +24,26 @@ public:
         : std::runtime_error(msg), location(loc) {}
 };
 
+inline bool is_optional_semantic_failure(const CompileError& error) {
+    const std::string msg = error.what();
+    auto starts_with = [&](const char* prefix) {
+        return msg.rfind(prefix, 0) == 0;
+    };
+
+    // Optional semantic blocks only suppress a narrow, explicit set of
+    // semantic-resolution failures. Everything else remains a hard error.
+    return starts_with("Undefined identifier: ") ||
+           starts_with("Undefined function: ") ||
+           starts_with("Undefined constructor type: ") ||
+           starts_with("No matching overload for function: ") ||
+           msg.find(" has no field: ") != std::string::npos ||
+           msg.find(" is not iterable") != std::string::npos ||
+           starts_with("Expression is not iterable") ||
+           starts_with("Import failed: cannot resolve module") ||
+           starts_with("Import failed: module not found") ||
+           starts_with("Identifier is not a type: ");
+}
+
 // Diagnostic severity levels
 enum class DiagnosticLevel {
     Error,

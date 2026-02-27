@@ -340,6 +340,20 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Indexing a vector yields its scalar element type
   - Indexing a matrix yields a row vector
 - **Block**: `{ stmt; ... }` evaluates statements, yields last expression
+- **Optional semantic block**: `#{ ... }`
+  - Statement-only
+  - Parsed like a normal block, then semantically validated in isolation
+  - If validation succeeds, it behaves exactly like the underlying block
+  - If validation fails with one of these frontend semantic-resolution failures, the whole block is discarded with no residue:
+    - undefined identifier
+    - undefined function
+    - undefined constructor type
+    - no matching overload
+    - missing field/member
+    - non-iterable use
+    - import-resolution failure
+    - identifier used as a type when it is not a type
+  - It does not swallow parse/lex errors, ambiguity, ordinary type mismatches, internal compiler errors, or backend failures
 - **Conditional (expression)**: `cond ? expr_true : expr_false`
   - Compiler attempts to evaluate cond at compile time
   - If successful (compile-time constant), branches can have different types (dead branch eliminated)
@@ -624,6 +638,7 @@ import       ::= '::' qname ';'
 block        ::= '{' { stmt } [ expr ] '}'
 stmt         ::= [ annots ] stmt_core
 stmt_core    ::= var_decl
+               | '#{' { stmt } [ expr ] '}'
                | expr [ ';' ]
                | '->' [ expr ] ';'
                | '->|' ';'

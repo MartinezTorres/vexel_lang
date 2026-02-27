@@ -596,10 +596,21 @@ void Resolver::resolve_expr(ExprPtr expr) {
             break;
         case Expr::Kind::Block:
             push_scope();
-            for (auto& st : expr->statements) {
-                resolve_stmt(st);
+            try {
+                for (auto& st : expr->statements) {
+                    resolve_stmt(st);
+                }
+                resolve_expr(expr->result_expr);
+            } catch (const CompileError& err) {
+                pop_scope();
+                if (expr->is_optional_semantic_block && is_optional_semantic_failure(err)) {
+                    expr->statements.clear();
+                    expr->result_expr = nullptr;
+                    expr->is_optional_semantic_block = false;
+                    break;
+                }
+                throw;
             }
-            resolve_expr(expr->result_expr);
             pop_scope();
             break;
         case Expr::Kind::Conditional:

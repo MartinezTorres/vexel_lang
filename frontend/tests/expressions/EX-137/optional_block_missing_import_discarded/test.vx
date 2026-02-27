@@ -1,0 +1,8 @@
+&^main() -> #i32 {
+  value:#i32 = 1;
+  #{
+    ::missing::module;
+    value = 2;
+  }
+  value
+}

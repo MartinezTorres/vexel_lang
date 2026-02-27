@@ -36,6 +36,12 @@
     "summary": "Compile-time field and method availability checks."
   },
   {
+    "id": "optional_block",
+    "title": "Optional Block",
+    "path": "examples/tutorial/optional_block.vx",
+    "summary": "Statement-only optional semantic regions."
+  },
+  {
     "id": "iteration",
     "title": "Iteration",
     "path": "examples/tutorial/iteration.vx",
