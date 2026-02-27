@@ -1,0 +1,19 @@
+&!ua() -> #u40.32;
+&!ub() -> #u40.32;
+
+&^main() -> #i32 {
+  u:#u40.32 = ua();
+  v:#u40.32 = ub();
+
+  prod:#u40.32 = u * v;
+  back:#u40.32 = prod / v;
+  rem:#u40.32 = prod % v;
+
+  acc:#u40.32 = u;
+  acc *= v;
+  acc /= v;
+  acc %= v;
+
+  ok:#b = (back == u) && (acc == u) && (rem < v);
+  ok ? 0 : 1
+}

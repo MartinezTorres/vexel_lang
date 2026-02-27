@@ -841,8 +841,9 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                    type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits) > 0) {
             // Supported for any fixed-point width via raw same-type integer-like lowering.
         } else if ((assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
-                   fixed_zero_frac_supported_any_width(lhs_type)) {
-            // Supported via integer-like lowering for zero-fraction fixed-point widths.
+                   (!fixed_native_storage_width_supported(lhs_type) ||
+                    fixed_zero_frac_supported_any_width(lhs_type))) {
+            // Supported for non-native fixed-point widths and zero-fraction fixed-point widths.
         } else if (assign_op != "=") {
             int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
             if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
@@ -852,6 +853,7 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             }
         }
         if ((assign_op == "*=" || assign_op == "/=" || assign_op == "%=") &&
+            fixed_native_storage_width_supported(lhs_type) &&
             !fixed_zero_frac_supported_any_width(lhs_type) &&
             !fixed_muldiv_storage_width_supported(lhs_type)) {
             throw CompileError(
@@ -973,7 +975,8 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             } else if (binary_op == "+" || binary_op == "-") {
                 compound_value_type = lhs_type;
             } else if ((binary_op == "*" || binary_op == "/" || binary_op == "%") &&
-                       fixed_zero_frac_supported_any_width(lhs_type)) {
+                       (!fixed_native_storage_width_supported(lhs_type) ||
+                        fixed_zero_frac_supported_any_width(lhs_type))) {
                 compound_value_type = lhs_type;
             } else {
                 int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);

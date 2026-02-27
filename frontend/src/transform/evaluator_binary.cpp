@@ -151,11 +151,11 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             (expr->op == "+" || expr->op == "-" ||
              expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
              expr->op == "<=" || expr->op == ">" || expr->op == ">=");
-        const bool is_zero_frac_muldivmod_op =
+        const bool is_any_frac_muldivmod_op =
             (expr->op == "*" || expr->op == "/" || expr->op == "%");
         if (!is_bitwise_shift_op &&
             !is_any_frac_addsubcmp_op &&
-            !(fixed_frac == 0 && is_zero_frac_muldivmod_op)) {
+            !is_any_frac_muldivmod_op) {
             // Let the native fixed-point path below handle remaining native-only arithmetic.
         } else {
         APInt l(uint64_t(0));
@@ -176,16 +176,28 @@ bool CompileTimeEvaluator::eval_binary(ExprPtr expr, CTValue& result) {
             result = ctvalue_from_exact_int(expr->op == "+" ? wrap_raw(l + r) : wrap_raw(l - r), !fixed_signed);
             return true;
         }
-        if (fixed_frac == 0 && (expr->op == "*" || expr->op == "/" || expr->op == "%")) {
+        if (expr->op == "*" || expr->op == "/" || expr->op == "%") {
             if ((expr->op == "/" || expr->op == "%") && r.is_zero()) {
                 error_msg = (expr->op == "/")
                     ? "Division by zero in compile-time evaluation"
                     : "Modulo by zero in compile-time evaluation";
                 return false;
             }
-            if (expr->op == "*") result = ctvalue_from_exact_int(wrap_raw(l * r), !fixed_signed);
-            else if (expr->op == "/") result = ctvalue_from_exact_int(wrap_raw(l / r), !fixed_signed);
-            else result = ctvalue_from_exact_int(wrap_raw(l % r), !fixed_signed);
+            APInt raw(uint64_t(0));
+            if (expr->op == "*") {
+                raw = scale_by_pow2_trunc_zero(l * r, -fixed_frac);
+            } else if (expr->op == "/") {
+                if (!fixed_raw_div(l, r, fixed_frac, raw)) {
+                    error_msg = "Division by zero in compile-time evaluation";
+                    return false;
+                }
+            } else {
+                if (!fixed_raw_mod(l, r, fixed_frac, raw)) {
+                    error_msg = "Modulo by zero in compile-time evaluation";
+                    return false;
+                }
+            }
+            result = ctvalue_from_exact_int(wrap_raw(raw), !fixed_signed);
             return true;
         }
         if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||

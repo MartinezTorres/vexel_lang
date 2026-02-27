@@ -1,0 +1,24 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Non-native non-zero-fraction fixed-point mul/div/mod and compound forms lower and execute with fixed-point scaling.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && grep -Fq 'vx_ai_mul(' out.c && grep -Fq 'vx_ai_udivmod(' out.c && grep -Fq 'vx_ai_shr_u(' out.c && printf '%s\n' '#include "out.h"' 'vx_u72_t vx_ua(void) { vx_u72_t v = {{0}}; v.b[4] = 7; return v; }' 'vx_u72_t vx_ub(void) { vx_u72_t v = {{0}}; v.b[4] = 11; return v; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+&!ua() -> #u40.32;
+&!ub() -> #u40.32;
+
+&^main() -> #i32 {
+  u:#u40.32 = ua();
+  v:#u40.32 = ub();
+
+  p:#u40.32 = u * v;
+  d:#u40.32 = p / v;
+  m:#u40.32 = p % v;
+
+  c:#u40.32 = u;
+  c *= v;
+  c /= v;
+  c %= v;
+
+  ok:#b = (d == u) && (c == u) && (m < v);
+  ok ? 0 : 1
+}

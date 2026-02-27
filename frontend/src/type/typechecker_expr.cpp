@@ -512,7 +512,8 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             return expr->type;
         }
         if ((expr->op == "*" || expr->op == "/" || expr->op == "%") &&
-            fixed_zero_frac_supported_any_width(left_type)) {
+            (!fixed_native_storage_width_supported(left_type) ||
+             fixed_zero_frac_supported_any_width(left_type))) {
             expr->type = left_type;
             return expr->type;
         }
