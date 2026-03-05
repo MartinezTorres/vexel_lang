@@ -1,4 +1,25 @@
-// Bundled std::bits placeholder.
-// Future bit reinterpretation APIs should live here behind explicit library calls.
+// Bundled std::bits surface.
+// These APIs are explicit bit reinterpretation (no numeric conversion).
 
 bits_tag:#i32 = 7;
+
+&!f32_as_u32(x:#f32) -> #u32;
+&!u32_as_f32(x:#u32) -> #f32;
+&!f64_as_u64(x:#f64) -> #u64;
+&!u64_as_f64(x:#u64) -> #f64;
+
+&f32_as_i32(x:#f32) -> #i32 {
+  (#i32)f32_as_u32(x)
+}
+
+&i32_as_f32(x:#i32) -> #f32 {
+  u32_as_f32((#u32)x)
+}
+
+&f64_as_i64(x:#f64) -> #i64 {
+  (#i64)f64_as_u64(x)
+}
+
+&i64_as_f64(x:#i64) -> #f64 {
+  u64_as_f64((#u64)x)
+}

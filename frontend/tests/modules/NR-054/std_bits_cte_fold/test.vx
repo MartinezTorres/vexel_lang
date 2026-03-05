@@ -1,0 +1,13 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Frontend compile-time evaluation folds bundled std::bits reinterpretation calls when arguments are constexpr. | std::bits calls fold in constexpr evaluation
+
+::std::bits;
+
+&^main() -> #i32 {
+  a:#u32 = std::bits::f32_as_u32((#f32)1.0);
+  b:#f32 = std::bits::u32_as_f32(a);
+  c:#u64 = std::bits::f64_as_u64(1.0);
+  d:#f64 = std::bits::u64_as_f64(c);
+
+  (a == (#u32)1065353216 && (#i32)b == 1 && d == 1.0) ? 0 : 1
+}

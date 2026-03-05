@@ -329,6 +329,7 @@
         <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
         <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">array_shapes</a>,
         <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">math_arrays</a>,
+        <a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c">bits_reinterpret</a>,
         <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">constexpr_dce</a>,
         <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">sieve</a>,
         <a href="playground.html?file=examples/tutorial/matrix_sum.vx&backend=c">matrix_sum</a>,
@@ -480,7 +481,22 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>9) Compile-time execution and dead-code elimination</h3>
+        <h3>9) Bundled std::bits reinterpretation</h3>
+        <p>
+          The bundled fallback <code>::std::bits;</code> surface provides explicit bit reinterpretation helpers.
+          Local <code>std/bits.vx</code> overrides are ordinary modules and do not receive builtin folding/lowering.
+        </p>
+        <pre><code>::std::bits;
+
+&amp;^main() -&gt; #i32 {
+  bits:#u32 = std::bits::f32_as_u32((#f32)1.0);
+  back:#f32 = std::bits::u32_as_f32(bits);
+  (bits == (#u32)1065353216 &amp;&amp; (#i32)back == 1) ? 0 : 1
+}</code></pre>
+      </div>
+
+      <div class="tutorial-step">
+        <h3>10) Compile-time execution and dead-code elimination</h3>
         <p>
           Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
         </p>
@@ -494,7 +510,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>10) Multi-file modules</h3>
+        <h3>11) Multi-file modules</h3>
         <p>Use module imports and keep related logic in separate files.</p>
         <div class="code-title">main.vx</div>
         <pre><code>::math;
@@ -509,7 +525,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>11) Backend hints (annotation pass-through)</h3>
+        <h3>12) Backend hints (annotation pass-through)</h3>
         <p>
           Frontend parses annotations but does not globally whitelist them. Backend-specific hints are consumed by the selected backend.
         </p>
@@ -522,7 +538,7 @@ dead:#i32 = mul(9, 9);
       </div>
 
       <div class="tutorial-step">
-        <h3>12) Compile and inspect outputs</h3>
+        <h3>13) Compile and inspect outputs</h3>
         <p>The unified driver always requires a backend.</p>
         <pre><code>./build/vexel -b c -o out path/to/main.vx
 ./build/vexel -b megalinker -o out path/to/main.vx

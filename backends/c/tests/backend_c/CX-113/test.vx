@@ -1,17 +1,20 @@
-// @rfc: docs/vexel-rfc.md#declarations
-// @desc: Bundled std::print is an ordinary overloaded library surface; arrays recurse through the generic iterable fallback. | std::print uses overload resolution, not a compiler builtin
-// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' '#include <stdio.h>' 'void vx_putchar(uint8_t c) { putchar((int)c); }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out -lm && python3 -c "import subprocess, sys; out = subprocess.check_output(['./out']); sys.exit(0 if out == b'sum=42\\n[1, 2, 3]\\n' else 1)"
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Bundled std::bits bit reinterpretation functions execute correctly through the C backend runtime path.
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out -lm && ./out
 
-::std::print;
+::std::bits;
 
 &^main() -> #i32 {
-  answer:#i32 = 42;
-  xs:#i32[3] = [1, 2, 3];
+  a:#u32 = std::bits::f32_as_u32((#f32)1.0);
+  b:#f32 = std::bits::u32_as_f32(a);
+  c:#u64 = std::bits::f64_as_u64(1.0);
+  d:#f64 = std::bits::u64_as_f64(c);
 
-  print("sum=");
-  print(answer);
-  print_newline();
-  print(xs);
-  print_newline();
-  0
+  ok_a:#b = (a == (#u32)1065353216);
+  ok_b:#b = ((#i32)b == 1);
+  ok_c:#b = (c == (#u64)4607182418800017408);
+  ok_d:#b = (d == 1.0);
+
+  (ok_a && ok_b && ok_c && ok_d) ? 0 : 1
 }

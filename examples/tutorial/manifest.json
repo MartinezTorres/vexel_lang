@@ -66,6 +66,12 @@
     "summary": "Bundled std::math folding and array lifting."
   },
   {
+    "id": "bits_reinterpret",
+    "title": "std::bits Reinterpret",
+    "path": "examples/tutorial/bits_reinterpret.vx",
+    "summary": "Bundled std::bits bit reinterpretation helpers."
+  },
+  {
     "id": "constexpr",
     "title": "Constexpr + DCE",
     "path": "examples/tutorial/constexpr_dce.vx",

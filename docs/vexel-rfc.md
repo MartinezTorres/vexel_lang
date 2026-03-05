@@ -451,6 +451,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
     - bundled unary math calls lift over array-shaped values element-wise
     - bundled binary math calls lift over array-shaped values using strict broadcasting (trailing-dimension alignment, singleton expansion, scalar lifting)
     - current array lifting requires side-effect-free arguments because lifting lowers to repeated indexed scalar calls without temporary materialization
+  - Bundled `std/bits.vx` is compiler-recognized only when the bundled fallback module is selected
+    - project-local `std/bits.vx` overrides are ordinary modules and receive no builtin folding/runtime mapping
+    - bundled bit reinterpretation helpers (`f32_as_u32`, `u32_as_f32`, `f64_as_u64`, `u64_as_f64`) may be folded at compile time when arguments are constexpr
 - Scoped imports instantiate their module once per lexical scope; instances do not share mutable state
 - Re-importing the same module in the same scope is permitted only when every top-level definition is identical (functions/types textually equal; constants equal after compile-time evaluation); otherwise it is a compile error
 - Imports can be scoped to blocks

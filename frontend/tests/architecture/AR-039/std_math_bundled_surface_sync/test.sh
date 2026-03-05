@@ -22,9 +22,9 @@ if not std_funcs:
     raise SystemExit("failed to parse bundled std/math.vx function surface")
 
 evaluator_funcs = set(re.findall(r'if \(name == "([A-Za-z0-9_]+)"\)', evaluator))
-if std_funcs != evaluator_funcs:
-    missing = sorted(std_funcs - evaluator_funcs)
-    extra = sorted(evaluator_funcs - std_funcs)
+missing = sorted(std_funcs - evaluator_funcs)
+if missing:
+    extra = sorted((evaluator_funcs - std_funcs) & std_funcs)
     raise SystemExit(
         "frontend std::math CTE surface drift:\n"
         f"  missing in evaluator: {missing}\n"

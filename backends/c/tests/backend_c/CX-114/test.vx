@@ -1,0 +1,12 @@
+// @rfc: docs/vexel-rfc.md#name-resolution--modules
+// @desc: Project-local std::bits overrides are ordinary modules; bundled std::bits runtime lowering must not apply to local overrides.
+// @expect-exit: 0
+// @command: mkdir -p std && printf '%s\n' '&!f32_as_u32(x:#f32) -> #u32;' > std/bits.vx && {VEXEL} -b c test.vx && grep -Fq 'uint32_t vx_f32_as_u32(' out.h && grep -Fq 'vx_f32_as_u32(' out.c
+
+::std::bits;
+&!seedf() -> #f32;
+
+&^main() -> #i32 {
+  x:#u32 = std::bits::f32_as_u32(seedf());
+  (#i32)x
+}

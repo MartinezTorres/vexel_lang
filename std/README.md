@@ -36,5 +36,10 @@ Current status:
   - C-generating backends map bundled `std::math` externs to libc symbols
     instead of emitting mangled external names; local overrides emit normal
     external symbols.
-- `std/bits.vx` remains a placeholder namespace for future explicit bit
-  reinterpretation APIs (`std::bits::*`).
+- `std/bits.vx` provides explicit bit reinterpretation APIs:
+  - `f32_as_u32`, `u32_as_f32`, `f64_as_u64`, `u64_as_f64`.
+  - signed convenience wrappers are provided (`f32_as_i32`, `i32_as_f32`,
+    `f64_as_i64`, `i64_as_f64`).
+  - compiler-recognized folding/runtime lowering applies only to the bundled
+    fallback module in this directory (not to project-local `std/bits.vx`
+    overrides).

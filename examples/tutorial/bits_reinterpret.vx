@@ -1,0 +1,8 @@
+::std::bits;
+
+&^main() -> #i32 {
+  bits:#u32 = std::bits::f32_as_u32((#f32)1.0);
+  back:#f32 = std::bits::u32_as_f32(bits);
+
+  (bits == (#u32)1065353216 && (#i32)back == 1) ? 0 : 1
+}

@@ -3,6 +3,7 @@
 #include "evaluator_internal.h"
 #include "typechecker.h"
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <utility>
 
@@ -238,9 +239,97 @@ bool CompileTimeEvaluator::eval_call(ExprPtr expr, CTValue& result) {
         return false;
     };
 
+    auto try_eval_std_bits_external = [&](CTValue& out) -> bool {
+        if (!func->is_external || !sym) return false;
+        if (!expr->receivers.empty()) return false;
+        const Program* program = type_checker ? type_checker->get_program() : nullptr;
+        if (!program || sym->module_id < 0) return false;
+        const ModuleInfo* mod_info = program->module(sym->module_id);
+        if (!mod_info || mod_info->origin != ModuleOrigin::BundledStd) return false;
+        const std::string path = mod_info->path;
+        bool from_std_bits =
+            path == "std/bits.vx" ||
+            (path.size() >= 11 && path.compare(path.size() - 11, 11, "std/bits.vx") == 0);
+        if (!from_std_bits) return false;
+        std::string name = func->func_name;
+        for (const auto& p : func->params) {
+            if (p.is_expression_param) return false;
+        }
+
+        std::vector<CTValue> args;
+        args.reserve(expr->args.size());
+        for (size_t i = 0; i < expr->args.size(); ++i) {
+            CTValue v;
+            if (!try_evaluate(expr->args[i], v)) {
+                return false;
+            }
+            if (i < func->params.size() && func->params[i].type) {
+                CTValue coerced;
+                if (!coerce_value_to_type(v, func->params[i].type, coerced)) {
+                    return false;
+                }
+                args.push_back(copy_ct_value(coerced));
+            } else {
+                args.push_back(copy_ct_value(v));
+            }
+        }
+
+        auto f32_as_u32 = [&]() -> bool {
+            if (args.size() != 1) return false;
+            float x = static_cast<float>(to_float(args[0]));
+            uint32_t bits = 0;
+            static_assert(sizeof(bits) == sizeof(x), "f32/u32 size mismatch");
+            std::memcpy(&bits, &x, sizeof(bits));
+            out = ctvalue_from_exact_int(APInt(static_cast<uint64_t>(bits)), true);
+            return true;
+        };
+        auto u32_as_f32 = [&]() -> bool {
+            if (args.size() != 1) return false;
+            APInt raw(uint64_t(0));
+            bool raw_unsigned = false;
+            if (!ctvalue_to_exact_int(args[0], raw, raw_unsigned)) return false;
+            uint32_t bits = static_cast<uint32_t>(raw.wrapped_unsigned(32).to_u64());
+            float x = 0.0f;
+            static_assert(sizeof(bits) == sizeof(x), "u32/f32 size mismatch");
+            std::memcpy(&x, &bits, sizeof(x));
+            out = static_cast<double>(x);
+            return true;
+        };
+        auto f64_as_u64 = [&]() -> bool {
+            if (args.size() != 1) return false;
+            double x = to_float(args[0]);
+            uint64_t bits = 0;
+            static_assert(sizeof(bits) == sizeof(x), "f64/u64 size mismatch");
+            std::memcpy(&bits, &x, sizeof(bits));
+            out = ctvalue_from_exact_int(APInt(bits), true);
+            return true;
+        };
+        auto u64_as_f64 = [&]() -> bool {
+            if (args.size() != 1) return false;
+            APInt raw(uint64_t(0));
+            bool raw_unsigned = false;
+            if (!ctvalue_to_exact_int(args[0], raw, raw_unsigned)) return false;
+            uint64_t bits = raw.wrapped_unsigned(64).to_u64();
+            double x = 0.0;
+            static_assert(sizeof(bits) == sizeof(x), "u64/f64 size mismatch");
+            std::memcpy(&x, &bits, sizeof(x));
+            out = x;
+            return true;
+        };
+
+        if (name == "f32_as_u32") return f32_as_u32();
+        if (name == "u32_as_f32") return u32_as_f32();
+        if (name == "f64_as_u64") return f64_as_u64();
+        if (name == "u64_as_f64") return u64_as_f64();
+        return false;
+    };
+
     // Check if this is pure enough for compile-time evaluation.
     if (func->is_external) {
         if (try_eval_std_math_external(result)) {
+            return true;
+        }
+        if (try_eval_std_bits_external(result)) {
             return true;
         }
         error_msg = "External functions cannot be evaluated at compile time";
