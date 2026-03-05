@@ -1848,19 +1848,9 @@ TypePtr Parser::parse_type() {
         };
 
         if ((name == "v" || name == "m") && check(TokenType::LeftParen)) {
-            consume(TokenType::LeftParen, "Expected '('");
-            TypePtr elem_type = parse_type();
-            consume(TokenType::Comma, "Expected ','");
-            ExprPtr first_dim = parse_expr();
-            if (name == "v") {
-                consume(TokenType::RightParen, "Expected ')'");
-                type = Type::make_vector(elem_type, first_dim, loc);
-            } else {
-                consume(TokenType::Comma, "Expected ','");
-                ExprPtr second_dim = parse_expr();
-                consume(TokenType::RightParen, "Expected ')'");
-                type = Type::make_matrix(elem_type, first_dim, second_dim, loc);
-            }
+            throw CompileError(
+                "Vector/matrix shorthand '#" + name + "(...)' is no longer supported; use arrays '#T[N]' and nested arrays",
+                loc);
         } else if (name == "b") {
             type = Type::make_primitive(PrimitiveType::Bool, loc);
         } else if (name == "s") {

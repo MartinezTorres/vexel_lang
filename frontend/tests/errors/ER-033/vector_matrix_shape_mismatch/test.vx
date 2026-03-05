@@ -1,9 +1,9 @@
 // @rfc: docs/vexel-rfc.md#types
-// @desc: Native vector and matrix operators reject mismatched shapes. | Vector/matrix shape mismatch is rejected
+// @desc: Plain arithmetic operators do not accept array operands. | Array operands require per-element dotted operators
 
 &^main() -> #i32 {
-  a:#v(#i32, 2) = [1, 2];
-  b:#v(#i32, 3) = [3, 4, 5];
-  c:#v(#i32, 2) = a + b;
+  a:#i32[2] = [1, 2];
+  b:#i32[2] = [3, 4];
+  c:#i32 = a * b;
   0
 }

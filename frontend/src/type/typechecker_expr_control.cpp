@@ -713,19 +713,6 @@ TypePtr TypeChecker::check_cast(ExprPtr expr) {
         int64_t bits = type_bits(t->primitive, t->integer_bits, t->fractional_bits);
         return bits > 0;
     };
-    if (is_vector_or_matrix_type(operand_type) || is_vector_or_matrix_type(target_type)) {
-        TypePtr lowered_operand = lower_shape_type_to_array(operand_type);
-        TypePtr lowered_target = lower_shape_type_to_array(target_type);
-        if (!types_equal(lowered_operand, lowered_target) &&
-            !types_compatible(lowered_operand, lowered_target) &&
-            !types_compatible(lowered_target, lowered_operand)) {
-            throw CompileError("Vector/matrix casts require identical lowered array shape and compatible element types",
-                               expr->location);
-        }
-        expr->type = target_type;
-        return expr->type;
-    }
-
     if (is_fixed_primitive(operand_type) || is_fixed_primitive(target_type)) {
         if (is_byte_array_cast()) {
             expr->type = target_type;
@@ -785,8 +772,6 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             case Type::Kind::Primitive:
                 return is_untyped_integer_primitive(t);
             case Type::Kind::Array:
-            case Type::Kind::Vector:
-            case Type::Kind::Matrix:
                 return type_has_unresolved_parts(t->element_type);
             case Type::Kind::Named:
                 return false;
@@ -1341,9 +1326,7 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
     }
 
     if (!iterable_type ||
-        (iterable_type->kind != Type::Kind::Array &&
-         iterable_type->kind != Type::Kind::Vector &&
-         iterable_type->kind != Type::Kind::Matrix)) {
+        iterable_type->kind != Type::Kind::Array) {
         if (iterable_type && iterable_type->kind == Type::Kind::Named) {
             std::string type_name = iterable_type->type_name;
             std::string method = expr->is_sorted_iteration ? "@@" : "@";
@@ -1361,9 +1344,6 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
     TypePtr loop_type = iterable_type && iterable_type->element_type
         ? iterable_type->element_type
         : make_fresh_typevar();
-    if (iterable_type && iterable_type->kind == Type::Kind::Matrix) {
-        loop_type = Type::make_vector(iterable_type->element_type, iterable_type->matrix_cols, expr->location);
-    }
     assign_loop_symbol_expr(expr->right, loop_type, bindings, current_instance_id);
     std::unordered_set<std::string> mutated_names;
     collect_mutated_base_names_expr(expr->right, mutated_names);

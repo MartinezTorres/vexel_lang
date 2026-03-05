@@ -327,7 +327,7 @@
         <a href="playground.html?file=examples/tutorial/optional_block.vx&backend=c">optional_block</a>,
         <a href="playground.html?file=examples/tutorial/iteration.vx&backend=c">iteration</a>,
         <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
-        <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">vector_matrix</a>,
+        <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">array_shapes</a>,
         <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">math_arrays</a>,
         <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">constexpr_dce</a>,
         <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">sieve</a>,
@@ -446,21 +446,20 @@ value:#[seed] = 7;</code></pre>
       </div>
 
       <div class="tutorial-step">
-        <h3>7) Native vectors, matrices, and algebra</h3>
+        <h3>7) Arrays and nested arrays</h3>
         <p>
-          Vectors and matrices are explicit frontend types. They use array literals for construction,
-          lower to arrays before backend handoff, and provide native algebraic operators.
+          Use <code>#T[N]</code> for arrays and nest dimensions for matrix-like layouts.
+          Per-element arithmetic uses dotted operators (<code>.+</code>, <code>.*</code>, etc.).
         </p>
         <pre><code>&amp;^main() -&gt; #i32 {
-  a:#v(#i32, 3) = [1, 2, 3];
-  b:#v(#i32, 3) = [4, 5, 6];
-  dot:#i32 = a * b;
+  a:#i32[3] = [1, 2, 3];
+  b:#i32[3] = [4, 5, 6];
+  c:#i32[3] = a .+ b;
 
-  m:#m(#i32, 2, 2) = [[1, 2], [3, 4]];
-  v:#v(#i32, 2) = [2, 3];
-  r:#v(#i32, 2) = m * v;
+  m:#i32[2][2] = [[1, 2], [3, 4]];
+  s:#i32[2][2] = m .* 2;
 
-  dot + r[0] + r[1]
+  c[0] + c[1] + c[2] + s[1][1]
 }</code></pre>
       </div>
 

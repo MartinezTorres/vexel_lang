@@ -20,17 +20,14 @@ cat >"$SRC" <<'VXEOF'
 }
 VXEOF
 
-"$DRIVER" -b vexel -o "$OUT_BASE" "$SRC" >"$TMP_DIR/stdout.log" 2>"$TMP_DIR/stderr.log"
-
-if ! grep -Eq '^\^palette:[[:space:]]*#u8\[3\][[:space:]]*=' "$OUT_VX"; then
-  echo "vector type syntax must lower to a fixed-size array type" >&2
-  cat "$OUT_VX" >&2
+"$DRIVER" -b vexel -o "$OUT_BASE" "$SRC" >"$TMP_DIR/stdout.log" 2>"$TMP_DIR/stderr.log" && {
+  echo "legacy #v/#m syntax must be rejected" >&2
   exit 1
-fi
+}
 
-if ! grep -Eq '^\^weights:[[:space:]]*#i32\[2\]\[2\][[:space:]]*=' "$OUT_VX"; then
-  echo "matrix type syntax must lower to nested fixed-size array types" >&2
-  cat "$OUT_VX" >&2
+if ! grep -Fq "Vector/matrix shorthand '#v(...)' is no longer supported" "$TMP_DIR/stderr.log"; then
+  echo "expected explicit #v/#m deprecation diagnostic" >&2
+  cat "$TMP_DIR/stderr.log" >&2
   exit 1
 fi
 

@@ -58,29 +58,6 @@ std::string mangle_type_component(TypePtr type) {
             }
             return component;
         }
-        case Type::Kind::Vector: {
-            std::string component = "vec_" + mangle_type_component(type->element_type);
-            if (type->array_size && type->array_size->kind == Expr::Kind::IntLiteral) {
-                if (type->array_size->has_exact_int_val) {
-                    component += "_n" + type->array_size->exact_int_val.to_string();
-                } else {
-                    component += "_n" + std::to_string(type->array_size->uint_val);
-                }
-            }
-            return component;
-        }
-        case Type::Kind::Matrix: {
-            std::string component = "mat_" + mangle_type_component(type->element_type);
-            auto append_dim = [&](ExprPtr dim) {
-                if (dim && dim->kind == Expr::Kind::IntLiteral) {
-                    if (dim->has_exact_int_val) component += "_n" + dim->exact_int_val.to_string();
-                    else component += "_n" + std::to_string(dim->uint_val);
-                }
-            };
-            append_dim(type->array_size);
-            append_dim(type->matrix_cols);
-            return component;
-        }
         case Type::Kind::TypeVar:
             return "tv_" + type->var_name;
         case Type::Kind::TypeOf:
@@ -111,13 +88,6 @@ TypePtr freeze_signature_type(TypePtr type) {
         } else {
             frozen->array_size = type->array_size;
         }
-    } else if (type->kind == Type::Kind::Vector) {
-        frozen->element_type = freeze_signature_type(type->element_type);
-        frozen->array_size = type->array_size;
-    } else if (type->kind == Type::Kind::Matrix) {
-        frozen->element_type = freeze_signature_type(type->element_type);
-        frozen->array_size = type->array_size;
-        frozen->matrix_cols = type->matrix_cols;
     }
     return frozen;
 }
@@ -142,13 +112,6 @@ bool TypeSignature::types_equal_static(TypePtr a, TypePtr b) {
         case Type::Kind::Array:
             return types_equal_static(a->element_type, b->element_type) &&
                    array_sizes_equal(a->array_size, b->array_size);
-        case Type::Kind::Vector:
-            return types_equal_static(a->element_type, b->element_type) &&
-                   array_sizes_equal(a->array_size, b->array_size);
-        case Type::Kind::Matrix:
-            return types_equal_static(a->element_type, b->element_type) &&
-                   array_sizes_equal(a->array_size, b->array_size) &&
-                   array_sizes_equal(a->matrix_cols, b->matrix_cols);
         case Type::Kind::Named:
             return a->type_name == b->type_name;
         case Type::Kind::TypeVar:
@@ -175,15 +138,6 @@ size_t TypeSignatureHash::type_hash(TypePtr t) {
         case Type::Kind::Array:
             hash ^= type_hash(t->element_type) << 4;
             hash ^= array_size_hash(t->array_size) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            break;
-        case Type::Kind::Vector:
-            hash ^= type_hash(t->element_type) << 4;
-            hash ^= array_size_hash(t->array_size) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            break;
-        case Type::Kind::Matrix:
-            hash ^= type_hash(t->element_type) << 4;
-            hash ^= array_size_hash(t->array_size) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-            hash ^= array_size_hash(t->matrix_cols) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
             break;
         case Type::Kind::Named:
             hash ^= std::hash<std::string>{}(t->type_name);
@@ -425,10 +379,6 @@ void collect_typevar_bindings(TypePtr pattern,
     }
     if (pattern->kind == Type::Kind::Array && concrete->kind == Type::Kind::Array) {
         collect_typevar_bindings(pattern->element_type, concrete->element_type, type_map);
-    } else if (pattern->kind == Type::Kind::Vector && concrete->kind == Type::Kind::Vector) {
-        collect_typevar_bindings(pattern->element_type, concrete->element_type, type_map);
-    } else if (pattern->kind == Type::Kind::Matrix && concrete->kind == Type::Kind::Matrix) {
-        collect_typevar_bindings(pattern->element_type, concrete->element_type, type_map);
     }
 }
 
@@ -447,16 +397,6 @@ TypePtr TypeChecker::substitute_type_with_map(TypePtr type,
     }
 
     if (type->kind == Type::Kind::Array) {
-        TypePtr elem = substitute_type_with_map(type->element_type, type_map);
-        if (elem == type->element_type) {
-            return type;
-        }
-        TypePtr cloned = std::make_shared<Type>(*type);
-        cloned->element_type = elem;
-        return cloned;
-    }
-
-    if (type->kind == Type::Kind::Vector || type->kind == Type::Kind::Matrix) {
         TypePtr elem = substitute_type_with_map(type->element_type, type_map);
         if (elem == type->element_type) {
             return type;

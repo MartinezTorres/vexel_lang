@@ -1,32 +1,20 @@
 // @rfc: docs/vexel-rfc.md#types
-// @desc: Native vector and matrix operators lower in the frontend and execute through the C backend as array/scalar code.
+// @desc: Nested arrays of named structs are valid arrays and compile through the C backend.
 // @expect-exit: 0
 // @command: {VEXEL} -b c test.vx && gcc -std=c11 -O2 out.c -o out -lm && ./out
 
+#Pixel(r:#u8, g:#u8, b:#u8);
+
 &^main() -> #i32 {
-  a:#v(#i32, 3) = [1, 2, 3];
-  b:#v(#i32, 3) = [4, 5, 6];
-  c:#v(#i32, 3) = a + b;
-  half:#v(#i32, 3) = c / 2;
-  want:#v(#i32, 3) = [5, 7, 9];
-  same:#b = c == want;
-  ordered:#b = a < b;
-  dot:#i32 = a * b;
+  img:#Pixel[2][2] = [
+    [#Pixel(1, 2, 3), #Pixel(4, 5, 6)],
+    [#Pixel(7, 8, 9), #Pixel(10, 11, 12)]
+  ];
 
-  left:#m(#i32, 2, 2) = [[1, 2], [3, 4]];
-  right:#m(#i32, 2, 2) = [[5, 6], [7, 8]];
-  prod:#m(#i32, 2, 2) = left * right;
+  total:#i32 = (#i32)img[0][0].r +
+               (#i32)img[0][1].g +
+               (#i32)img[1][0].b +
+               (#i32)img[1][1].r;
 
-  v:#v(#i32, 2) = [2, 3];
-  mv:#v(#i32, 2) = left * v;
-  vm:#v(#i32, 2) = v * left;
-
-  total:#i32 = dot +
-               prod[0][0] + prod[0][1] + prod[1][0] + prod[1][1] +
-               mv[0] + mv[1] +
-               vm[0] + vm[1] +
-               half[0] + half[1] + half[2] +
-               (#i32)same + (#i32)ordered;
-
-  total == 230 ? 0 : 1
+  total == 25 ? 0 : 1
 }

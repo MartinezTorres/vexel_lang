@@ -72,20 +72,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Once a concrete element type is known, each element must be representable in that type
 - Size is part of type: `#i32[10]` != `#i32[20]`
 
-**Vectors**: `#v(#T, N)` where `N` is a compile-time known positive integer.
-- Element type `#T` must currently be a primitive scalar (`#b`, integers, fixed-point, `#f16/#f32/#f64`)
-- Array literal syntax is reused for values; vector semantics come from the declared or expected type
-  - Example: `v:#v(#i32, 3) = [1, 2, 3]`
-- Explicit casts are allowed between vectors and same-shape arrays of the same element type
-- Vectors are lowered by the frontend to fixed-size arrays before backend handoff
-
-**Matrices**: `#m(#T, R, C)` where `R` and `C` are compile-time known positive integers.
-- Element type restrictions match vectors
-- Matrix values reuse nested array literal syntax
-  - Example: `m:#m(#i32, 2, 2) = [[1, 2], [3, 4]]`
-- Explicit casts are allowed between matrices and same-shape nested arrays of the same element type
-- Matrices are lowered by the frontend to nested fixed-size arrays before backend handoff
-
 **Type constructors**: `#Name(field[:Type],...);`
 - Defines record type `#Name`
 - Auto-generates constructor callable as `#Name(args...)`
@@ -117,7 +103,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - All values support `<`, `>`, `<=`, `>=`, `==`, and `!=`.
 - Primitives (`#i*`, `#u*`, `#f*`, `#b`, `#s`) use numeric or lexicographic ordering.
 - Arrays compare lexicographically by element; mismatched lengths compare by prefix.
-- Vectors and matrices compare lexicographically in row-major order; shapes must match exactly.
 - Composite types compare by fields in declaration order.
 - Operator methods (e.g., `&(lhs)#Vec2::==(rhs)`) override the default comparison when defined.
 
@@ -175,7 +160,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Exported immutable global**: `^name[:Type] = expr`
   - ABI-visible symbol
   - Must be immutable and compile-time constant
-  - Type must be ABI-safe data (`primitive`, fixed-size arrays/vectors/matrices of ABI-safe data, or named structs recursively composed of ABI-safe fields)
+  - Type must be ABI-safe data (`primitive`, fixed-size arrays of ABI-safe data, or named structs recursively composed of ABI-safe fields)
   - Tuple types, type variables, and unresolved type expressions are rejected at the ABI boundary
   - Exported globals are retained as ABI roots (not removed by dead-code elimination)
 - **Mutable (variables)**: `name:Type`
@@ -280,7 +265,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - ABI boundary types only:
   - Primitives (`#iN`, `#uN`, `#f16`, `#f32`, `#f64`, `#b`, `#s`)
   - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
-  - Top-level arrays, vectors, and matrices are not allowed in parameters/returns (wrap in a named struct instead)
+  - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
   - Tuple returns are not allowed
 - Backends may restrict the accepted integer widths at ABI boundaries
 - Cannot be eliminated
@@ -291,7 +276,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - ABI boundary types only:
   - Primitives (`#iN`, `#uN`, `#f16`, `#f32`, `#f64`, `#b`, `#s`)
   - Named structs whose fields recursively use primitives, fixed-size arrays, or named structs
-  - Top-level arrays, vectors, and matrices are not allowed in parameters/returns (wrap in a named struct instead)
+  - Top-level arrays are not allowed in parameters/returns (wrap in a named struct instead)
   - Tuple returns are not allowed
 - Backends may restrict the accepted integer widths at ABI boundaries
 - Backend defines calling/linking
@@ -337,8 +322,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Constructor**: `#TypeName(args)`
 - **Member**: `x.y`
 - **Index**: `arr[expr]`
-  - Indexing a vector yields its scalar element type
-  - Indexing a matrix yields a row vector
 - **Block**: `{ stmt; ... }` evaluates statements, yields last expression
 - **Optional semantic block**: `#{ ... }`
   - Statement-only
@@ -388,19 +371,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - `a..a` where a == b → compile error (would produce empty array)
   - Both bounds must be compile-time constants
   - Type inference follows array literal rules (collective type for all elements)
-
-**Native vector/matrix operators**:
-- `+` / `-`: element-wise addition/subtraction; both operands must have the same shape and kind (`vector` vs `matrix`)
-- Unary `+` / `-`: element-wise
-- `*`:
-  - vector `*` vector: dot product (scalar result)
-  - matrix `*` vector: matrix-vector multiplication
-  - vector `*` matrix: vector-matrix multiplication
-  - matrix `*` matrix: matrix multiplication
-  - vector/matrix `*` scalar and scalar `*` vector/matrix: scalar scaling
-- `/`: vector/matrix divided by a scalar
-- `==`, `!=`, `<`, `<=`, `>`, `>=`: same-kind, same-shape comparisons with lexicographic row-major ordering
-- Dotted per-element operators are separate syntax; they do not replace the native vector/matrix algebra above
 
 **Precedence** (high to low):
 - Postfix (call, index, member)
@@ -478,7 +448,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Bundled `std/math.vx` is compiler-recognized only when the bundled fallback module is selected
     - project-local `std/math.vx` overrides are ordinary modules and receive no builtin folding/runtime mapping
     - bundled unary and binary math calls may be folded at compile time when arguments are constexpr
-    - bundled unary math calls lift over array-shaped values (arrays, vectors, matrices) element-wise
+    - bundled unary math calls lift over array-shaped values element-wise
     - bundled binary math calls lift over array-shaped values using strict broadcasting (trailing-dimension alignment, singleton expansion, scalar lifting)
     - current array lifting requires side-effect-free arguments because lifting lowers to repeated indexed scalar calls without temporary materialization
 - Scoped imports instantiate their module once per lexical scope; instances do not share mutable state

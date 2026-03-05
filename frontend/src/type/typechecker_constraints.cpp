@@ -91,8 +91,6 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             case Type::Kind::Primitive:
                 return is_untyped_integer_primitive_type(t);
             case Type::Kind::Array:
-            case Type::Kind::Vector:
-            case Type::Kind::Matrix:
                 return type_is_unresolved(t->element_type);
             case Type::Kind::Named:
                 return false;
@@ -316,13 +314,8 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             if (expr->operand) {
                 TypePtr arr_type = resolve_type(expr->operand->type);
                 if (arr_type &&
-                    (arr_type->kind == Type::Kind::Array ||
-                     arr_type->kind == Type::Kind::Vector ||
-                     arr_type->kind == Type::Kind::Matrix)) {
+                    arr_type->kind == Type::Kind::Array) {
                     TypePtr elem_target = arr_type->element_type;
-                    if (arr_type->kind == Type::Kind::Matrix) {
-                        elem_target = Type::make_vector(arr_type->element_type, arr_type->matrix_cols, arr_type->location);
-                    }
                     if (!refine_slot(elem_target, target)) return false;
                     TypePtr operand_type = resolve_type(expr->operand->type);
                     if (!operand_type ||
@@ -367,9 +360,7 @@ bool TypeChecker::apply_type_constraint(const ExprPtr& expr, TypePtr target) {
             return refine_expr_type(expr, target);
 
         case Expr::Kind::ArrayLiteral: {
-            if (target->kind != Type::Kind::Array &&
-                target->kind != Type::Kind::Vector &&
-                target->kind != Type::Kind::Matrix) {
+            if (target->kind != Type::Kind::Array) {
                 return refine_expr_type(expr, target);
             }
             TypePtr lowered_target = lower_shape_type_to_array(target);

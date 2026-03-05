@@ -55,9 +55,9 @@
   },
   {
     "id": "vector_matrix",
-    "title": "Vectors and Matrices",
+    "title": "Arrays and Shapes",
     "path": "examples/tutorial/vector_matrix.vx",
-    "summary": "Native vector/matrix types and algebra."
+    "summary": "Nested arrays and dotted per-element arithmetic."
   },
   {
     "id": "math_arrays",

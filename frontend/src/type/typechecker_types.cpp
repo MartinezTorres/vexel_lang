@@ -9,47 +9,6 @@
 namespace vexel {
 
 TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const SourceLocation& loc) {
-    auto parse_shape_dim_literal = [&](const std::string& text) -> ExprPtr {
-        unsigned long long value = 0;
-        try {
-            value = std::stoull(text);
-        } catch (const std::exception&) {
-            throw CompileError("Invalid shape dimension in type '#" + type_str + "'", loc);
-        }
-        return Expr::make_int_exact(APInt(static_cast<uint64_t>(value)), true, loc, text);
-    };
-    auto parse_vector_or_matrix = [&](char prefix) -> TypePtr {
-        if (type_str.size() < 5 || type_str[0] != prefix || type_str[1] != '(' || type_str.back() != ')') {
-            return nullptr;
-        }
-        std::string inner = type_str.substr(2, type_str.size() - 3);
-        if (prefix == 'v') {
-            size_t comma = inner.rfind(',');
-            if (comma == std::string::npos) return nullptr;
-            std::string elem_part = inner.substr(0, comma);
-            std::string size_part = inner.substr(comma + 1);
-            elem_part.erase(remove_if(elem_part.begin(), elem_part.end(), ::isspace), elem_part.end());
-            size_part.erase(remove_if(size_part.begin(), size_part.end(), ::isspace), size_part.end());
-            return Type::make_vector(parse_type_from_string(elem_part, loc),
-                                     parse_shape_dim_literal(size_part),
-                                     loc);
-        }
-        size_t first = inner.find(',');
-        if (first == std::string::npos) return nullptr;
-        size_t second = inner.find(',', first + 1);
-        if (second == std::string::npos) return nullptr;
-        std::string elem_part = inner.substr(0, first);
-        std::string rows_part = inner.substr(first + 1, second - first - 1);
-        std::string cols_part = inner.substr(second + 1);
-        elem_part.erase(remove_if(elem_part.begin(), elem_part.end(), ::isspace), elem_part.end());
-        rows_part.erase(remove_if(rows_part.begin(), rows_part.end(), ::isspace), rows_part.end());
-        cols_part.erase(remove_if(cols_part.begin(), cols_part.end(), ::isspace), cols_part.end());
-        return Type::make_matrix(parse_type_from_string(elem_part, loc),
-                                 parse_shape_dim_literal(rows_part),
-                                 parse_shape_dim_literal(cols_part),
-                                 loc);
-    };
-
     // Parse primitive types
     auto parse_fixed_family = [&](char prefix, PrimitiveType kind) -> TypePtr {
         if (type_str.size() < 4 || type_str[0] != prefix) return nullptr;
@@ -129,8 +88,6 @@ TypePtr TypeChecker::parse_type_from_string(const std::string& type_str, const S
     if (auto fixed_uint = parse_fixed_family('u', PrimitiveType::FixedUInt)) return fixed_uint;
     if (auto int_type = parse_int_family('i', PrimitiveType::Int)) return int_type;
     if (auto uint_type = parse_int_family('u', PrimitiveType::UInt)) return uint_type;
-    if (auto vec_type = parse_vector_or_matrix('v')) return vec_type;
-    if (auto mat_type = parse_vector_or_matrix('m')) return mat_type;
     if (type_str == "f16") return Type::make_primitive(PrimitiveType::F16, loc);
     if (type_str == "f32") return Type::make_primitive(PrimitiveType::F32, loc);
     if (type_str == "f64") return Type::make_primitive(PrimitiveType::F64, loc);
@@ -252,56 +209,6 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
             }
             return type;
         }
-        case Type::Kind::Vector:
-        case Type::Kind::Matrix: {
-            type->element_type = validate_type(type->element_type, loc);
-            if (!type->element_type || type->element_type->kind != Type::Kind::Primitive ||
-                !(type->element_type->primitive == PrimitiveType::Bool ||
-                  is_signed_int(type->element_type->primitive) ||
-                  is_unsigned_int(type->element_type->primitive) ||
-                  is_signed_fixed(type->element_type->primitive) ||
-                  is_unsigned_fixed(type->element_type->primitive) ||
-                  is_float(type->element_type->primitive))) {
-                throw CompileError("Vector and matrix element types must be primitive scalar types", loc);
-            }
-            auto validate_dim = [&](ExprPtr& dim, const std::string& what) {
-                if (!dim) {
-                    throw CompileError(what + " must be present", loc);
-                }
-                CTEQueryResult q = query_constexpr(dim);
-                if (q.status == CTEQueryStatus::Error) {
-                    throw CompileError(q.message.empty() ? (what + " evaluation failed") : q.message, loc);
-                }
-                if (q.status != CTEQueryStatus::Known) {
-                    throw CompileError(what + " must be a compile-time constant", loc);
-                }
-                APInt normalized(uint64_t(0));
-                if (std::holds_alternative<int64_t>(q.value)) {
-                    int64_t v = std::get<int64_t>(q.value);
-                    if (v <= 0) throw CompileError(what + " must be positive", loc);
-                    normalized = APInt(static_cast<uint64_t>(v));
-                } else if (std::holds_alternative<uint64_t>(q.value)) {
-                    uint64_t v = std::get<uint64_t>(q.value);
-                    if (v == 0) throw CompileError(what + " must be positive", loc);
-                    normalized = APInt(v);
-                } else if (std::holds_alternative<CTExactInt>(q.value)) {
-                    const CTExactInt& exact = std::get<CTExactInt>(q.value);
-                    if (exact.value.is_negative() || exact.value.is_zero()) {
-                        throw CompileError(what + " must be positive", loc);
-                    }
-                    normalized = exact.value;
-                } else {
-                    throw CompileError(what + " must be an integer compile-time constant", loc);
-                }
-                dim = Expr::make_int_exact(normalized, true, dim->location, normalized.to_string());
-            };
-            validate_dim(type->array_size,
-                         type->kind == Type::Kind::Vector ? "Vector length" : "Matrix row count");
-            if (type->kind == Type::Kind::Matrix) {
-                validate_dim(type->matrix_cols, "Matrix column count");
-            }
-            return type;
-        }
         case Type::Kind::Named: {
             if (type->type_name.rfind(TUPLE_TYPE_PREFIX, 0) == 0) {
                 return type;
@@ -387,18 +294,6 @@ bool TypeChecker::is_abi_data_type(TypePtr type,
                 return false;
             }
             return is_abi_data_type(type->element_type, visiting_named_types, reason);
-        case Type::Kind::Vector:
-            if (!type->array_size) {
-                if (reason) *reason = "vector length must be compile-time known";
-                return false;
-            }
-            return is_abi_data_type(type->element_type, visiting_named_types, reason);
-        case Type::Kind::Matrix:
-            if (!type->array_size || !type->matrix_cols) {
-                if (reason) *reason = "matrix shape must be compile-time known";
-                return false;
-            }
-            return is_abi_data_type(type->element_type, visiting_named_types, reason);
         case Type::Kind::Named: {
             if (type->type_name.empty()) {
                 if (reason) *reason = "named type has no identifier";
@@ -469,10 +364,6 @@ bool TypeChecker::is_external_abi_boundary_type(TypePtr type, std::string* reaso
     }
     if (type->kind == Type::Kind::Array) {
         if (reason) *reason = "top-level arrays are not allowed at function ABI boundaries";
-        return false;
-    }
-    if (type->kind == Type::Kind::Vector || type->kind == Type::Kind::Matrix) {
-        if (reason) *reason = "top-level vectors and matrices are not allowed at function ABI boundaries";
         return false;
     }
 

@@ -29,8 +29,6 @@ bool type_is_concrete(const TypeUseContext* ctx, TypePtr type) {
         case Type::Kind::TypeOf:
             return false;
         case Type::Kind::Array:
-        case Type::Kind::Vector:
-        case Type::Kind::Matrix:
             return type_is_concrete(ctx, type->element_type);
         default:
             return true;

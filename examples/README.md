@@ -29,7 +29,7 @@ find examples -name '*.vx' -print0 | xargs -0 -n1 ./build/vexel -b c
 - `tutorial/` contains the curated learning examples used by the playground.
 - `tutorial/manifest.json` defines tutorial order/title/summary for playground navigation.
 - Most files are single-file examples; `tutorial/multifile/` shows a multi-file module import.
-- `tutorial/vector_matrix.vx` demonstrates native `#v(...)` / `#m(...)` algebra.
+- `tutorial/vector_matrix.vx` demonstrates array and nested-array arithmetic with dotted per-element operators.
 - `tutorial/math_arrays.vx` demonstrates bundled `std::math` array lifting and folding.
 
 ## Library and Showcase

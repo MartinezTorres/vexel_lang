@@ -13,7 +13,6 @@ Current status:
 - `std/print.vx` provides an ordinary overloaded `print(...)` surface.
   - Supported directly: `#s`, `#b`, signed/unsigned integers through `#i64`/`#u64`.
   - Arrays recurse through a generic iterable fallback.
-  - Vectors and matrices print through the same path after frontend lowering to arrays.
   - This is library code; there is no compiler builtin `print`.
 - `std/math.vx` has a phase-1 scalar math surface backed by C `<math.h>` names.
   - Includes scalar math functions (`sqrt`, `sin`, `pow`, ...) and classification
@@ -26,7 +25,7 @@ Current status:
   - The frontend can fold supported bundled `std::math` calls at compile time
     when arguments are constexpr.
   - Array-shaped lifting is supported for bundled `std::math` calls:
-    - unary functions accept arrays/vectors/matrices and lift element-wise
+    - unary functions accept arrays and lift element-wise
     - binary functions use strict broadcasting (trailing-dimension alignment,
       singleton-dimension expansion, scalar lifting)
     - incompatible shapes are compile-time errors (no implicit transpose,
