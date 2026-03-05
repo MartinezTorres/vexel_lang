@@ -1,4 +1,5 @@
 #include "typechecker.h"
+#include "binding_cleanup.h"
 #include "cte_engine.h"
 #include "expr_access.h"
 #include "resolver.h"
@@ -171,6 +172,26 @@ unsigned long long TypeChecker::expr_key(int instance_id, const Expr* expr) cons
 
 unsigned long long TypeChecker::expr_key(const Expr* expr) const {
     return expr_key(current_instance_id, expr);
+}
+
+void TypeChecker::replace_expr_in_place(ExprPtr target, ExprPtr replacement) {
+    if (!target || !replacement) return;
+
+    SourceLocation preserved_location = target->location;
+    std::vector<Annotation> preserved_annotations = target->annotations;
+    bool preserved_parenthesized = target->was_parenthesized;
+    int preserved_scope_instance = target->scope_instance_id;
+
+    *target = *replacement;
+
+    target->location = preserved_location;
+    if (target->annotations.empty()) {
+        target->annotations = std::move(preserved_annotations);
+    }
+    target->was_parenthesized = target->was_parenthesized || preserved_parenthesized;
+    if (target->scope_instance_id < 0) {
+        target->scope_instance_id = preserved_scope_instance;
+    }
 }
 
 void TypeChecker::check_program(Program& program_in) {

@@ -32,6 +32,12 @@ public:
         return it->second;
     }
 
+    void unbind(int instance_id, const void* node) {
+        if (!node) return;
+        symbol_map.erase({instance_id, node});
+        new_var_map.erase({instance_id, node});
+    }
+
     void set_new_variable(int instance_id, const void* node, bool value) {
         if (!node) return;
         new_var_map[{instance_id, node}] = value;

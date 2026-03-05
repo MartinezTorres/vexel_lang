@@ -2,10 +2,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-CLI="$ROOT/build/vexel"
+BUILD_DIR="${BUILD_DIR:-$ROOT/build}"
+if [[ "$BUILD_DIR" != /* ]]; then
+  BUILD_DIR="$ROOT/$BUILD_DIR"
+fi
+CLI="$BUILD_DIR/vexel"
 
 if [[ ! -x "$CLI" ]]; then
-  if ! VEXEL_ROOT_DIR="$ROOT" make -s -C "$ROOT" driver >/tmp/vexel_driver_build.out 2>/tmp/vexel_driver_build.err; then
+  if ! VEXEL_ROOT_DIR="$ROOT" BUILD_DIR="$BUILD_DIR" make -s -C "$ROOT" driver >/tmp/vexel_driver_build.out 2>/tmp/vexel_driver_build.err; then
     cat /tmp/vexel_driver_build.out /tmp/vexel_driver_build.err >&2
     echo "missing CLI: $CLI" >&2
     exit 1

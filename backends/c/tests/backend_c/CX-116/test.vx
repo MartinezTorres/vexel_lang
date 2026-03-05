@@ -1,0 +1,18 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Bool-array packing into unsigned integers must avoid UB shifts in generated C. | C backend uses width-safe typed shifts for bool-pack casts
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && ! grep -Fq '1u <<' out.c && gcc -std=c11 -O2 -c out.c -o out.o
+
+&^main() -> #i32 {
+  bits:#b[64];
+  i:#i32 = 0;
+  (i < 64)@{
+    bits[i] = 0 == 1;
+    i = i + 1;
+  };
+  bits[0] = 1 == 1;
+  bits[63] = 1 == 1;
+  packed:#u64 = (#u64)bits;
+  unpacked:#b[64] = (#b[64])packed;
+  (unpacked[0] && unpacked[63] && !(unpacked[1] || unpacked[62])) ? 0 : 1
+}

@@ -1,0 +1,17 @@
+// @rfc: docs/vexel-rfc.md#operators
+// @desc: Array self-assignment must avoid overlapping memcpy UB. | Array self-assignment uses memmove lowering
+// @expect-exit: 0
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); ok = re.search(r'\\bmemmove\\s*\\(', src) and not re.search(r'\\bmemcpy\\s*\\(', src); sys.exit(0 if ok else 1)" {VEXEL}
+
+&!sink(v:#u8);
+
+&touch(a:#u8[4]) {
+    sink(a[0]);
+    a = a;
+}
+
+&^main() -> #i32 {
+    x:#u8[4] = [7, 1, 2, 3];
+    touch(x);
+    (#i32)x[0]
+}

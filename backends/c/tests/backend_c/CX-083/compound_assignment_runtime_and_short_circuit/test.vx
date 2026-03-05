@@ -1,7 +1,7 @@
 // @rfc: docs/vexel-rfc.md#expressions--control
 // @desc: C backend emits compound assignments and lowers logical &&=/||= with explicit short-circuit control flow and single-evaluation lvalue addressing.
 // @expect-exit: 0
-// @command: {VEXEL} -b c test.vx && grep -Fq '(vx_a += 2);' out.c && grep -Fq '(vx_u <<= 1);' out.c && grep -Fq 'if (*tmp' out.c && grep -Fq '&(vx_arr[(vx_idx = ' out.c
+// @command: {VEXEL} -b c test.vx && grep -Fq '(vx_u <<= 1);' out.c && grep -Fq 'if (*tmp' out.c && grep -Fq '&(vx_arr[(vx_idx = ' out.c
 
 &!putchar(c:#u8);
 

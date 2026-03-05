@@ -161,7 +161,6 @@ private:
     std::string gen_iteration(ExprPtr expr);
     std::string gen_repeat(ExprPtr expr);
 
-    bool is_compile_time_init(StmtPtr stmt) const;
     std::string mutability_prefix(StmtPtr stmt) const;
     std::string ref_variant_key(const ExprPtr& call, size_t ref_count) const;
     std::vector<std::string> ref_variant_keys_for(StmtPtr stmt) const;
@@ -252,6 +251,7 @@ private:
     bool is_bundled_std_bits_function(const Symbol* sym, StmtPtr decl) const;
     std::string gen_std_bits_builtin_call(const std::string& runtime_name,
                                           const std::string& arg_expr,
+                                          TypePtr source_type,
                                           TypePtr result_type,
                                           const SourceLocation& loc);
     std::string ensure_comparator(TypePtr type);

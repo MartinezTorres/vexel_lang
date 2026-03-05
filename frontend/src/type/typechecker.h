@@ -156,6 +156,7 @@ private:
     unsigned long long stmt_key(const Stmt* stmt) const;
     unsigned long long expr_key(int instance_id, const Expr* expr) const;
     unsigned long long expr_key(const Expr* expr) const;
+    void replace_expr_in_place(ExprPtr target, ExprPtr replacement);
     void validate_invariants(const Module& mod);
 
     void check_stmt(StmtPtr stmt);

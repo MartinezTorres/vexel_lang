@@ -1,5 +1,6 @@
 #include "resolver.h"
 #include "ast_walk.h"
+#include "binding_cleanup.h"
 #include "expr_access.h"
 #include "path_utils.h"
 #include <algorithm>
@@ -279,6 +280,10 @@ void Resolver::predeclare_instance_symbols(ModuleInstance& instance) {
             if (instance.value_symbols.count(stmt->var_name) || instance.function_overloads.count(stmt->var_name)) {
                 throw CompileError("Name already defined: " + stmt->var_name, stmt->location);
             }
+            bool is_resource_binding =
+                stmt->var_init &&
+                (stmt->var_init->kind == Expr::Kind::Resource ||
+                 stmt->var_init->kind == Expr::Kind::Process);
             Symbol* sym = create_symbol(stmt->is_mutable ? Symbol::Kind::Variable : Symbol::Kind::Constant,
                                         stmt->var_name,
                                         stmt,
@@ -288,6 +293,7 @@ void Resolver::predeclare_instance_symbols(ModuleInstance& instance) {
             sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
             sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
             sym->is_exported = stmt->is_exported;
+            sym->is_resource_binding = is_resource_binding;
             sym->module_id = instance.module_id;
             sym->instance_id = instance.id;
             instance.symbols[stmt->var_name] = sym;
@@ -473,6 +479,10 @@ void Resolver::resolve_type_decl(StmtPtr stmt) {
 
 void Resolver::resolve_var_decl(StmtPtr stmt) {
     if (!stmt || stmt->kind != Stmt::Kind::VarDecl) return;
+    bool is_resource_binding =
+        stmt->var_init &&
+        (stmt->var_init->kind == Expr::Kind::Resource ||
+         stmt->var_init->kind == Expr::Kind::Process);
 
     if (stmt->var_type) {
         resolve_type(stmt->var_type);
@@ -501,6 +511,7 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
                             current_scope->parent != nullptr);
         sym->module_id = current_module_id;
         sym->instance_id = current_instance_id;
+        sym->is_resource_binding = is_resource_binding;
         current_scope->define_value(stmt->var_name, sym);
         bindings.bind(current_instance_id, stmt.get(), sym);
     }
@@ -509,10 +520,12 @@ void Resolver::resolve_var_decl(StmtPtr stmt) {
         sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
         sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
         sym->is_exported = stmt->is_exported;
+        sym->is_resource_binding = is_resource_binding;
         defined_globals.insert(sym);
     } else if (sym) {
         sym->is_external = stmt->var_linkage != VarLinkageKind::Normal;
         sym->is_backend_bound = stmt->var_linkage == VarLinkageKind::BackendBound;
+        sym->is_resource_binding = is_resource_binding;
     }
 }
 
@@ -530,7 +543,9 @@ void Resolver::resolve_expr(ExprPtr expr) {
                 (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant)) {
                 bool requires_definition = sym->declaration && sym->declaration->var_init;
                 if (requires_definition && !defined_globals.count(sym)) {
-                    throw CompileError("Undefined identifier: " + expr->name, expr->location);
+                    throw CompileError("Undefined identifier: " + expr->name,
+                                       expr->location,
+                                       CompileErrorCode::UndefinedIdentifier);
                 }
             }
             if (expr->type) {
@@ -604,6 +619,7 @@ void Resolver::resolve_expr(ExprPtr expr) {
             } catch (const CompileError& err) {
                 pop_scope();
                 if (expr->is_optional_semantic_block && is_optional_semantic_failure(err)) {
+                    unbind_expr_tree(bindings, current_instance_id, expr);
                     expr->statements.clear();
                     expr->result_expr = nullptr;
                     expr->is_optional_semantic_block = false;
@@ -709,12 +725,16 @@ void Resolver::handle_import(StmtPtr stmt) {
 
     std::string resolved_path;
     if (!try_resolve_module_path(stmt->import_path, stmt->location.filename, resolved_path)) {
-        throw CompileError("Import failed: cannot resolve module", stmt->location);
+        throw CompileError("Import failed: cannot resolve module",
+                           stmt->location,
+                           CompileErrorCode::ImportResolveFailed);
     }
 
     auto it = program.path_to_id.find(resolved_path);
     if (it == program.path_to_id.end()) {
-        throw CompileError("Import failed: module not found", stmt->location);
+        throw CompileError("Import failed: module not found",
+                           stmt->location,
+                           CompileErrorCode::ImportModuleNotFound);
     }
 
     int module_id = it->second;

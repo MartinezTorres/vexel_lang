@@ -1,6 +1,8 @@
 #include "typechecker.h"
 #include "expr_access.h"
 #include "ast_walk.h"
+#include "binding_cleanup.h"
+#include "cte_value_utils.h"
 
 #include <algorithm>
 #include <array>
@@ -539,6 +541,9 @@ TypePtr TypeChecker::check_block(ExprPtr expr) {
             if (!is_optional_semantic_failure(err)) {
                 throw;
             }
+            if (bindings) {
+                unbind_expr_tree(*bindings, current_instance_id, expr);
+            }
             restore_snapshot();
             expr->statements.clear();
             expr->result_expr = nullptr;
@@ -629,19 +634,7 @@ std::optional<bool> TypeChecker::constexpr_condition(ExprPtr expr) {
     if (!try_evaluate_constexpr(expr, value)) {
         return std::nullopt;
     }
-    if (std::holds_alternative<int64_t>(value)) {
-        return std::get<int64_t>(value) != 0;
-    }
-    if (std::holds_alternative<uint64_t>(value)) {
-        return std::get<uint64_t>(value) != 0;
-    }
-    if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value);
-    }
-    if (std::holds_alternative<double>(value)) {
-        return std::get<double>(value) != 0.0;
-    }
-    return std::nullopt;
+    return cte_scalar_to_bool(value);
 }
 
 TypePtr TypeChecker::check_cast(ExprPtr expr) {
@@ -914,9 +907,15 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
             throw CompileError("Cannot assign to read-only loop variable '_'", expr->location);
         }
         if (!sym->is_mutable) {
-            bool infer_mutable_global =
-                !sym->is_local &&
-                (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
+            bool infer_mutable_global = false;
+            if (!sym->is_local &&
+                (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant) &&
+                sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
+                const StmtPtr& decl = sym->declaration;
+                bool runtime_mutable_candidate =
+                    decl->var_linkage == VarLinkageKind::Normal && !decl->is_exported;
+                infer_mutable_global = runtime_mutable_candidate && !sym->is_resource_binding;
+            }
             bool infer_mutable_local =
                 sym->is_local &&
                 (sym->kind == Symbol::Kind::Variable || sym->kind == Symbol::Kind::Constant);
@@ -1102,31 +1101,11 @@ TypePtr TypeChecker::check_assignment(ExprPtr expr) {
                 compound_value_type = lhs_type;
             } else if (binary_op == "+" || binary_op == "-") {
                 compound_value_type = lhs_type;
-            } else if ((binary_op == "*" || binary_op == "/" || binary_op == "%") &&
-                       (!fixed_native_storage_width_supported(lhs_type) ||
-                        fixed_zero_frac_supported_any_width(lhs_type))) {
+            } else if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
                 compound_value_type = lhs_type;
             } else {
-                int64_t fixed_bits = type_bits(lhs_type->primitive, lhs_type->integer_bits, lhs_type->fractional_bits);
-                if (!(fixed_bits == 8 || fixed_bits == 16 || fixed_bits == 32 || fixed_bits == 64)) {
-                    throw CompileError(
-                        "Fixed-point compound assignments currently support only native storage widths (8/16/32/64)",
-                        expr->location);
-                }
-                if (binary_op == "+" || binary_op == "-") {
-                    compound_value_type = lhs_type;
-                } else if (binary_op == "*" || binary_op == "/" || binary_op == "%") {
-                    if (!fixed_muldiv_storage_width_supported(lhs_type)) {
-                        throw CompileError(
-                            "Fixed-point compound assignment '" + assign_op +
-                                "' currently supports only native storage widths (8/16/32/64)",
-                            expr->location);
-                    }
-                    compound_value_type = lhs_type;
-                } else {
-                    throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
-                                       expr->location);
-                }
+                throw CompileError("Fixed-point compound assignment '" + assign_op + "' is not implemented yet",
+                                   expr->location);
             }
         } else if (binary_op == "&&" || binary_op == "||") {
             std::string context = (binary_op == "&&") ? "Logical operator &&" : "Logical operator ||";
@@ -1331,10 +1310,14 @@ TypePtr TypeChecker::check_iteration(ExprPtr expr) {
             std::string type_name = iterable_type->type_name;
             std::string method = expr->is_sorted_iteration ? "@@" : "@";
             throw CompileError("Type " + type_name + " is not iterable (missing &(self)#" +
-                               type_name + "::" + method + "($loop))", expr->operand->location);
+                                   type_name + "::" + method + "($loop))",
+                               expr->operand->location,
+                               CompileErrorCode::NotIterable);
         }
         throw CompileError("Expression is not iterable (expected array, range, or custom @/@@" +
-                           std::string(" iterator)"), expr->operand->location);
+                               std::string(" iterator)"),
+                           expr->operand->location,
+                           CompileErrorCode::NotIterable);
     }
 
     if (expr->is_sorted_iteration && !iterable_type->element_type) {
@@ -1458,7 +1441,7 @@ TypePtr TypeChecker::check_resource_expr(ExprPtr expr) {
         }
 
         ExprPtr array_literal = Expr::make_array(elements, expr->location);
-        *expr = *array_literal;
+        replace_expr_in_place(expr, array_literal);
         return check_array_literal(expr);
     }
 
@@ -1469,7 +1452,7 @@ TypePtr TypeChecker::check_resource_expr(ExprPtr expr) {
         }
         std::string data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
         ExprPtr literal = Expr::make_string(data, expr->location);
-        *expr = *literal;
+        replace_expr_in_place(expr, literal);
         return check_expr(expr);
     }
 
@@ -1483,7 +1466,7 @@ TypePtr TypeChecker::check_process_expr(ExprPtr expr) {
     std::string output = run_process_command(expr->process_command, expr->location);
     ExprPtr literal = Expr::make_string(output, expr->location);
     literal->type = Type::make_primitive(PrimitiveType::String, expr->location);
-    *expr = *literal;
+    replace_expr_in_place(expr, literal);
     return literal->type;
 }
 

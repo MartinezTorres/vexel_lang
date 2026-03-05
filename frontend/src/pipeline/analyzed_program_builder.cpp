@@ -46,9 +46,9 @@ AnalyzedProgram make_analyzed_program(const Module& merged,
     out.lookup_type_symbol = [&checker](int instance_id, const std::string& type_name) -> Symbol* {
         auto scope = checker.scoped_instance(instance_id);
         (void)scope;
-        Scope* global = checker.get_scope();
-        if (!global) return nullptr;
-        return global->lookup(type_name);
+        Scope* current = checker.get_scope();
+        if (!current) return nullptr;
+        return current->lookup_type(type_name);
     };
 
     return out;

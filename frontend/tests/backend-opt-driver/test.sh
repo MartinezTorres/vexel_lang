@@ -79,6 +79,19 @@ if ! rg -q "Backend must be specified with -b/--backend" missing_b_exe.err; then
 fi
 
 set +e
+"$ROOT/build/vexel" -b --run -o out input.vx >bad_backend_value.out 2>bad_backend_value.err
+status=$?
+set -e
+if [[ $status -eq 0 ]]; then
+  echo "expected backend parse failure when value is option-like"
+  exit 1
+fi
+if ! rg -q -- "-b/--backend requires a backend name" bad_backend_value.err; then
+  echo "missing backend value parse error for option-like token"
+  exit 1
+fi
+
+set +e
 "$ROOT/build/vexel" -b vexel --run -o out input.vx >wrong_backend_run.out 2>wrong_backend_run.err
 status=$?
 set -e
@@ -132,6 +145,7 @@ rm -f \
   missing_b.out missing_b.err \
   missing_b_run.out missing_b_run.err \
   missing_b_exe.out missing_b_exe.err \
+  bad_backend_value.out bad_backend_value.err \
   wrong_backend_run.out wrong_backend_run.err \
   wrong_backend_exe.out wrong_backend_exe.err \
   unknown.out unknown.err

@@ -249,7 +249,7 @@ static void vx_ai_udivmod(uint8_t* out_q, uint8_t* out_r,
                           size_t n, uint8_t top_mask) {
     for (size_t i = 0; i < n; ++i) { out_q[i] = 0; out_r[i] = 0; }
     if (n == 0) return;
-    if (vx_ai_is_zero(b, n)) return;
+    if (vx_ai_is_zero(b, n)) abort();
     unsigned long used_bits = 0;
     for (unsigned bit = 0; bit < 8u; ++bit) {
         if (top_mask & (uint8_t)(1u << bit)) used_bits = (unsigned long)((n - 1) * 8u + bit + 1u);

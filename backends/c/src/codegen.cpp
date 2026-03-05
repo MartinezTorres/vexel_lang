@@ -840,6 +840,9 @@ void CodeGenerator::gen_module(const Module& mod) {
                             ref_type = "void";
                         }
 
+                        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::Array) {
+                            by_ref = false;
+                        }
                         if (by_ref) {
                             ref_type += "*";
                         } else if (ref_type == "void") {
@@ -863,7 +866,9 @@ void CodeGenerator::gen_module(const Module& mod) {
                                 ptype = "uint32_t";
                             }
                         }
-                        if (abi.lower_aggregates && stmt->params[i].type && is_aggregate_type(stmt->params[i].type)) {
+                        if (abi.lower_aggregates && stmt->params[i].type &&
+                            is_aggregate_type(stmt->params[i].type) &&
+                            stmt->params[i].type->kind != Type::Kind::Array) {
                             ptype = gen_type(stmt->params[i].type) + "*";
                         }
                         emit_header(ptype + " " + mangle_name(stmt->params[i].name));
@@ -912,13 +917,20 @@ void CodeGenerator::gen_module(const Module& mod) {
         body.str("");
         body.clear();
 
-        // Find the end of includes in header (after the empty line following includes)
-        size_t includes_end = header_str.find("#include <math.h>");
-        if (includes_end != std::string::npos) {
-            includes_end = header_str.find('\n', includes_end);
-            includes_end = header_str.find('\n', includes_end + 1) + 1; // Skip the empty line
-        } else {
-            includes_end = 0;
+        // Find insertion point just after the include preamble (includes + trailing blank lines).
+        size_t includes_end = 0;
+        size_t cursor = 0;
+        while (cursor < header_str.size()) {
+            size_t line_end = header_str.find('\n', cursor);
+            if (line_end == std::string::npos) line_end = header_str.size();
+            std::string line = header_str.substr(cursor, line_end - cursor);
+            bool is_include = line.rfind("#include ", 0) == 0;
+            bool is_blank = line.empty();
+            if (!is_include && !is_blank) {
+                break;
+            }
+            includes_end = (line_end < header_str.size()) ? (line_end + 1) : line_end;
+            cursor = includes_end;
         }
 
         // Reconstruct header with tuple declarations inserted after includes
@@ -1136,13 +1148,18 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
             by_ref = true;
             current_aggregate_params.insert(stmt->ref_params[i]);
         }
+        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::Array) {
+            // Arrays already lower to pointers in C; avoid pointer-to-pointer receivers.
+            by_ref = false;
+        }
         if (by_ref) {
             current_ref_params.insert(stmt->ref_params[i]);
         }
     }
     for (const auto& param : stmt->params) {
         if (param.is_expression_param) continue;
-        if (abi.lower_aggregates && param.type && is_aggregate_type(param.type)) {
+        if (abi.lower_aggregates && param.type && is_aggregate_type(param.type) &&
+            param.type->kind != Type::Kind::Array) {
             current_aggregate_params.insert(param.name);
         }
     }
@@ -1216,7 +1233,7 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
     frame_params.reserve(stmt->ref_params.size() + stmt->params.size());
     for (size_t i = 0; i < stmt->ref_params.size(); i++) {
         std::string ref_type;
-        TypePtr ref_type_ptr = (i < stmt->ref_param_types.size()) ? stmt->ref_param_types[i] : nullptr;
+        TypePtr ref_type_ptr = resolve_ref_param_type_or_fail(stmt, i);
         bool by_ref = true;
         if (!ref_key.empty() && i < ref_key.size()) {
             by_ref = ref_key[i] == 'M';
@@ -1230,6 +1247,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
             ref_type = mangle_name(stmt->type_namespace);
         } else {
             ref_type = "void";
+        }
+        if (ref_type_ptr && ref_type_ptr->kind == Type::Kind::Array) {
+            by_ref = false;
         }
         if (by_ref) {
             ref_type += "*";
@@ -1250,7 +1270,9 @@ void CodeGenerator::gen_func_decl(StmtPtr stmt, const std::string& ref_key, char
                 ptype = "uint32_t";
             }
         }
-        if (abi.lower_aggregates && stmt->params[i].type && is_aggregate_type(stmt->params[i].type)) {
+        if (abi.lower_aggregates && stmt->params[i].type &&
+            is_aggregate_type(stmt->params[i].type) &&
+            stmt->params[i].type->kind != Type::Kind::Array) {
             ptype = gen_type(stmt->params[i].type) + "*";
         }
         frame_params.emplace_back(ptype, mangle_name(stmt->params[i].name));
@@ -1722,15 +1744,6 @@ void CodeGenerator::gen_var_decl(StmtPtr stmt) {
     }
 
     finalize();
-}
-
-bool CodeGenerator::is_compile_time_init(StmtPtr stmt) const {
-    if (!stmt || !stmt->var_init) return false;
-    if (optimization &&
-        optimization->constexpr_inits.count(stmt_fact_key(fact_instance_id_for_stmt(stmt), stmt.get()))) {
-        return true;
-    }
-    return false;
 }
 
 std::string CodeGenerator::mutability_prefix(StmtPtr stmt) const {

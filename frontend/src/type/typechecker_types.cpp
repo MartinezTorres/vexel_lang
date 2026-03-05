@@ -225,7 +225,9 @@ TypePtr TypeChecker::validate_type(TypePtr type, const SourceLocation& loc) {
                 throw CompileError("Undefined type: " + type->type_name, loc);
             }
             if (type_sym->kind != Symbol::Kind::Type) {
-                throw CompileError("Identifier is not a type: " + type->type_name, loc);
+                throw CompileError("Identifier is not a type: " + type->type_name,
+                                   loc,
+                                   CompileErrorCode::IdentifierNotType);
             }
             if (type_sym->declaration) {
                 check_recursive_type(type->type_name, type_sym->declaration, loc);

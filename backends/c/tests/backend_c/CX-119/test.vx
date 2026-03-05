@@ -1,0 +1,12 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: External aggregate parameters keep by-value ABI in C declarations and calls. | External aggregate calls do not pass hidden pointers
+// @expect-exit: 0
+// @command: python3 -c "import pathlib, re, subprocess, sys; subprocess.run([sys.argv[1], '-b', 'c', 'test.vx'], check=True); src = pathlib.Path('out.c').read_text(); hdr = pathlib.Path('out.h').read_text(); decl_ok = re.search(r'int32_t\\s+vx_consume\\s*\\(\\s*vx_Pair\\s+vx_p\\s*\\)', hdr, re.S) is not None; call_ptr = re.search(r'\\bvx_consume\\s*\\(\\s*&', src) is not None; sys.exit(0 if decl_ok and not call_ptr else 1)" {VEXEL}
+
+#Pair(a:#i32, b:#i32);
+
+&!consume(p:#Pair) -> #i32;
+
+&^main() -> #i32 {
+    consume(#Pair(1, 2))
+}

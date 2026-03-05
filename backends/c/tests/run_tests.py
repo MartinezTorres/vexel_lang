@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import re
 import shutil
 import subprocess
@@ -47,10 +48,20 @@ def parse_metadata(path: Path):
     return command, expect_exit, expect_stderr, run_generated
 
 
-def replace_macros(command: str, root: Path) -> str:
+def resolve_build_dir(root: Path) -> Path:
+    env = os.environ.get("BUILD_DIR", "").strip()
+    if not env:
+        return root / "build"
+    path = Path(env)
+    if not path.is_absolute():
+        path = (root / path).resolve()
+    return path
+
+
+def replace_macros(command: str, root: Path, build_dir: Path) -> str:
     replacements = {
-        "{VEXEL}": str(root / "build" / "vexel"),
-        "{VEXEL_FRONTEND}": str(root / "build" / "vexel-frontend"),
+        "{VEXEL}": str(build_dir / "vexel"),
+        "{VEXEL_FRONTEND}": str(build_dir / "vexel-frontend"),
     }
     for key, value in replacements.items():
         command = command.replace(key, value)
@@ -89,7 +100,8 @@ def compile_and_run(cwd: Path):
 
 def run_test(test_file: Path, root: Path) -> str:
     command, expect_exit, expect_stderr, run_generated = parse_metadata(test_file)
-    command = replace_macros(command, root)
+    build_dir = resolve_build_dir(root)
+    command = replace_macros(command, root, build_dir)
 
     with tempfile.TemporaryDirectory(prefix="vexel_c_test_") as tmp:
         tmp_path = Path(tmp)

@@ -1,0 +1,16 @@
+// @rfc: docs/vexel-rfc.md#declarations
+// @desc: Inline expansion of expression-parameter functions must evaluate non-expression arguments exactly once. | C backend stages non-expression args for inline expansion
+// @expect-exit: 0
+// @command: {VEXEL} -b c test.vx && printf '%s\n' '#include <stdint.h>' 'static int32_t g_calls = 0;' 'int32_t vx_tick(void) { g_calls += 1; return g_calls; }' 'int32_t vx_count(void) { return g_calls; }' > stub.c && gcc -std=c11 -O2 out.c stub.c -o out && ./out
+
+&twice_plus($tail, x:#i32) -> #i32 {
+  x + x + $tail
+}
+
+&!tick() -> #i32;
+&!count() -> #i32;
+
+&^main() -> #i32 {
+  v:#i32 = twice_plus(0, tick());
+  (v == 2 && count() == 1) ? 0 : 1
+}

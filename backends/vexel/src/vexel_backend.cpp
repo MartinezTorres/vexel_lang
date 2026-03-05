@@ -4,6 +4,8 @@
 #include "expr_access.h"
 #include "io_utils.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -532,7 +534,10 @@ void register_backend_vexel() {
     backend.validate_options = validate_vexel_backend_options;
     backend.parse_option = parse_vexel_backend_option;
     backend.print_usage = print_vexel_backend_usage;
-    (void)register_backend(backend);
+    if (!register_backend(backend)) {
+        std::fprintf(stderr, "Failed to register backend 'vexel'\n");
+        std::abort();
+    }
 }
 
 } // namespace vexel

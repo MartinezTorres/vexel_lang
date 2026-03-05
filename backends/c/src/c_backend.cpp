@@ -3,6 +3,8 @@
 #include "codegen.h"
 #include "io_utils.h"
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 
@@ -105,7 +107,10 @@ void register_backend_c() {
     backend.validate_options = validate_c_backend_options;
     backend.parse_option = parse_c_backend_option;
     backend.print_usage = print_c_backend_usage;
-    (void)register_backend(backend);
+    if (!register_backend(backend)) {
+        std::fprintf(stderr, "Failed to register backend 'c'\n");
+        std::abort();
+    }
 }
 
 }

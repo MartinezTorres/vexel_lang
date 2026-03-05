@@ -66,20 +66,8 @@ bool fixed_native_storage_width_supported(const TypePtr& type) {
     return bits == 8 || bits == 16 || bits == 32 || bits == 64;
 }
 
-bool fixed_muldiv_storage_width_supported(const TypePtr& type) {
-    if (!is_fixed_primitive_type(type)) return false;
-    int64_t bits = type_bits(type->primitive, type->integer_bits, type->fractional_bits);
-    return bits == 8 || bits == 16 || bits == 32 || bits == 64;
-}
-
 bool fixed_bitwise_shift_supported(const TypePtr& type) {
     if (!is_fixed_primitive_type(type)) return false;
-    return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
-}
-
-bool fixed_zero_frac_supported_any_width(const TypePtr& type) {
-    if (!is_fixed_primitive_type(type)) return false;
-    if (type->fractional_bits != 0) return false;
     return type_bits(type->primitive, type->integer_bits, type->fractional_bits) > 0;
 }
 
@@ -320,7 +308,7 @@ bool TypeChecker::try_rewrite_std_math_array_call(ExprPtr expr, Symbol* sym) {
 
     std::vector<uint64_t> result_indices;
     ExprPtr rewritten = build(0, result_indices);
-    *expr = *rewritten;
+    replace_expr_in_place(expr, rewritten);
     return true;
 }
 
@@ -389,7 +377,7 @@ bool TypeChecker::try_rewrite_dotted_array_binary(ExprPtr expr, TypePtr left_typ
 
     std::vector<uint64_t> result_indices;
     ExprPtr rewritten = build(0, result_indices);
-    *expr = *rewritten;
+    replace_expr_in_place(expr, rewritten);
     return true;
 }
 
@@ -422,7 +410,9 @@ TypePtr TypeChecker::check_expr(ExprPtr expr) {
                 }
             }
             if (!sym) {
-                throw CompileError("Undefined identifier: " + expr->name, expr->location);
+                throw CompileError("Undefined identifier: " + expr->name,
+                                   expr->location,
+                                   CompileErrorCode::UndefinedIdentifier);
             }
             expr->resolved_symbol = sym;
             if (!sym->type && sym->declaration && sym->declaration->kind == Stmt::Kind::VarDecl) {
@@ -549,32 +539,7 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             expr->type = left_type;
             return expr->type;
         }
-        if ((expr->op == "*" || expr->op == "/" || expr->op == "%") &&
-            (!fixed_native_storage_width_supported(left_type) ||
-             fixed_zero_frac_supported_any_width(left_type))) {
-            expr->type = left_type;
-            return expr->type;
-        }
-        if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
-            expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
-            expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
-            return expr->type;
-        }
-        if (!fixed_native_storage_width_supported(left_type)) {
-            throw CompileError("Fixed-point operators currently support only native storage widths (8/16/32/64)",
-                               expr->location);
-        }
-        if (expr->op == "+" || expr->op == "-") {
-            expr->type = left_type;
-            return expr->type;
-        }
         if (expr->op == "*" || expr->op == "/" || expr->op == "%") {
-            if (!fixed_muldiv_storage_width_supported(left_type)) {
-                throw CompileError(
-                    "Fixed-point operator '" + expr->op +
-                        "' currently supports only native storage widths (8/16/32/64)",
-                    expr->location);
-            }
             expr->type = left_type;
             return expr->type;
         }
@@ -1126,7 +1091,9 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                 sym = lookup_type_global(func_name);
             }
             if (!sym) {
-                throw CompileError("Undefined constructor type: " + func_name, expr->location);
+                throw CompileError("Undefined constructor type: " + func_name,
+                                   expr->location,
+                                   CompileErrorCode::UndefinedConstructorType);
             }
             expr->operand->name = sym->surface_name;
             has_symbol = true;
@@ -1144,7 +1111,9 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                     sym = type_sym;
                     has_symbol = true;
                 } else {
-                    throw CompileError("Undefined function: " + func_name, expr->location);
+                    throw CompileError("Undefined function: " + func_name,
+                                       expr->location,
+                                       CompileErrorCode::UndefinedFunction);
                 }
             } else {
                 auto try_std_math_array_overload = [&]() -> OverloadResolutionResult {
@@ -1245,7 +1214,9 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
                         throw CompileError("Ambiguous overload for function: " + func_name, expr->location);
                     }
                     if (math_resolved.status == OverloadResolutionResult::Status::NoMatch) {
-                        throw CompileError("No matching overload for function: " + func_name, expr->location);
+                        throw CompileError("No matching overload for function: " + func_name,
+                                           expr->location,
+                                           CompileErrorCode::NoMatchingFunctionOverload);
                     }
                     resolved = math_resolved;
                 }
@@ -1652,7 +1623,9 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
                     return expr->type;
                 }
             }
-            throw CompileError("Type " + obj_type->type_name + " has no field: " + expr->name, expr->location);
+            throw CompileError("Type " + obj_type->type_name + " has no field: " + expr->name,
+                               expr->location,
+                               CompileErrorCode::MissingField);
         }
     }
 

@@ -12,7 +12,7 @@ export CXXFLAGS
 all: driver
 
 #driver
-.PHONY: driver driver-test
+.PHONY: driver driver-test driver-clean
 driver: $(BUILD_DIR)/vexel
 
 $(BUILD_DIR)/vexel: frontend backends FORCE
@@ -25,7 +25,7 @@ driver-clean:
 	+$(MAKE) -C driver clean
 
 # Build frontend
-.PHONY: frontend frontend-test frontend-debug-invariants-test
+.PHONY: frontend frontend-test frontend-debug-invariants-test frontend-clean
 frontend: $(BUILD_DIR)/vexel-frontend
 
 $(BUILD_DIR)/vexel-frontend: FORCE
@@ -42,12 +42,19 @@ frontend-clean:
 
 # Backends
 BACKEND_DIRS := $(filter-out backends/ext/ backends/tests/,$(wildcard backends/*/ backends/ext/*/))
-BACKEND_NAMES := $(sort $(notdir $(patsubst %/,%,$(BACKEND_DIRS))))
+BACKEND_NAME_LIST := $(notdir $(patsubst %/,%,$(BACKEND_DIRS)))
+BACKEND_NAMES := $(sort $(BACKEND_NAME_LIST))
+DUP_BACKEND_NAMES := $(sort $(foreach n,$(BACKEND_NAMES),$(if $(filter-out 1,$(words $(filter $(n),$(BACKEND_NAME_LIST)))),$(n),)))
+
+ifneq ($(strip $(DUP_BACKEND_NAMES)),)
+$(error Duplicate backend names detected: $(DUP_BACKEND_NAMES). Ensure each backend directory basename is unique across backends/ and backends/ext/)
+endif
+
 BACKENDS_TARGETS := $(addprefix backend-,$(BACKEND_NAMES))
 BACKENDS_CLEAN_TARGETS := $(addprefix backend-,$(addsuffix -clean,$(BACKEND_NAMES)))
 
 backend_dir = $(firstword $(filter %/$1/,$(BACKEND_DIRS)))
-.PHONY: backends
+.PHONY: backends $(BACKENDS_TARGETS) $(BACKENDS_CLEAN_TARGETS) backend-conformance-test
 
 backends: $(BACKENDS_TARGETS)
 
@@ -71,7 +78,7 @@ backend-conformance-test:
 	@bash backends/conformance_test.sh
 
 #tests
-.PHONY: backend-conformance-test docs-check
+.PHONY: backend-conformance-test docs-check test clean web
 docs-check:
 	@index="docs/index.html"; \
 	search_cmd() { \

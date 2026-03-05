@@ -1,0 +1,15 @@
+// @rfc: backends/c/README.md#calling--dispatch-rules
+// @desc: Array receivers lower without pointer-to-pointer ABI mismatches. | Array receiver calls compile and run with flat pointer lowering
+// @expect-exit: 9
+// @run-generated: true
+// @command: {VEXEL} -b c test.vx
+
+&(arr)fill(v:#u8) {
+    arr[0] = v;
+}
+
+&^main() -> #i32 {
+    a:#u8[4] = [1, 2, 3, 4];
+    (a).fill(9);
+    (#i32)a[0]
+}

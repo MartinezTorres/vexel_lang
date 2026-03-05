@@ -60,7 +60,12 @@ bool try_read_backend_arg(int argc,
             error = "-b/--backend requires an argument";
             return true;
         }
-        out_backend = argv[++index];
+        const char* value = argv[++index];
+        if (value[0] == '-') {
+            error = "-b/--backend requires a backend name, got option-like token '" + std::string(value) + "'";
+            return true;
+        }
+        out_backend = value;
         return true;
     }
 
@@ -69,6 +74,10 @@ bool try_read_backend_arg(int argc,
         const char* value = argv[index] + std::strlen(kPrefix);
         if (*value == '\0') {
             error = "--backend requires a non-empty value";
+            return true;
+        }
+        if (*value == '-') {
+            error = "--backend requires a backend name, got option-like token '" + std::string(value) + "'";
             return true;
         }
         out_backend = value;

@@ -15,6 +15,7 @@ struct Symbol {
     bool is_external = false;
     bool is_backend_bound = false;
     bool is_exported = false;
+    bool is_resource_binding = false;
     StmtPtr declaration = nullptr;
     int module_id = -1;
     int instance_id = -1;
