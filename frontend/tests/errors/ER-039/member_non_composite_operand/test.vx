@@ -1,0 +1,6 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Member access requires named or tuple values. | Reject member access on primitive values
+
+&^main() -> #i32 {
+    1.foo
+}

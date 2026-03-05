@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Length/absolute rejects unsupported operand kinds. | Reject |expr| on non-numeric non-array non-string values
+
+#S(a:#i32);
+
+&^main() -> #i32 {
+    s = #S(7);
+    |s|
+}

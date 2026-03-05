@@ -1288,9 +1288,32 @@ TypePtr TypeChecker::check_range(ExprPtr expr) {
 }
 
 TypePtr TypeChecker::check_length(ExprPtr expr) {
-    check_expr(expr->operand);
-    expr->type = Type::make_primitive(PrimitiveType::Int, expr->location, 32);
-    return expr->type;
+    TypePtr operand_type = check_expr(expr->operand);
+    if (!operand_type) {
+        throw CompileError("Length operator requires array, string, or numeric operand", expr->location);
+    }
+
+    if (operand_type->kind == Type::Kind::Array) {
+        expr->type = Type::make_primitive(PrimitiveType::Int, expr->location, 32);
+        return expr->type;
+    }
+
+    if (operand_type->kind == Type::Kind::Primitive) {
+        if (operand_type->primitive == PrimitiveType::String) {
+            expr->type = Type::make_primitive(PrimitiveType::Int, expr->location, 32);
+            return expr->type;
+        }
+        if (is_signed_int(operand_type->primitive) ||
+            is_unsigned_int(operand_type->primitive) ||
+            is_signed_fixed(operand_type->primitive) ||
+            is_unsigned_fixed(operand_type->primitive) ||
+            is_float(operand_type->primitive)) {
+            expr->type = operand_type;
+            return expr->type;
+        }
+    }
+
+    throw CompileError("Length operator requires array, string, or numeric operand", expr->location);
 }
 
 TypePtr TypeChecker::check_iteration(ExprPtr expr) {

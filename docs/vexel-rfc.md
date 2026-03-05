@@ -22,9 +22,9 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Identifiers**: `[A-Za-z_][A-Za-z0-9_]*` (no length limit)
 - **Comments**: `//` to end-of-line
 - **Literals**:
-  - Integers: `123`, `0xFF`. Parsed as exact unresolved signed/unsigned integer literals (no host-width overflow during lexing/parsing); concrete integer types are inferred from surrounding constraints.
-  - Floats: `1.23`. Default: `#f64`
-  - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\NNN` (octal), no length limit
+  - Integers: `123`, `0xFF`, `0XFF`. Parsed as exact unresolved signed/unsigned integer literals (no host-width overflow during lexing/parsing); concrete integer types are inferred from surrounding constraints.
+  - Floats: `1.23`, `1.23e4`, `1.23E-4`. Default: `#f64`
+  - Strings: `"..."` with escapes: `\n` `\r` `\t` `\\` `\"` `\xHH` (hex) `\N`, `\NN`, or `\NNN` (octal), no length limit
   - Chars: `'a'`. Default: `#u8`
 - **Sigils**: `$` (expression param), `@` (iteration), `&` (function decl), `&!` (external function), `&^` (exported function), `^` (exported global), `!` (external global symbol), `!!` (backend-bound global), `#` (type)
 - **Operators**: `+ - * / % & | ^ ~ << >> == != < <= > >= = -> ->| ->> . , ; : :: @ @@ ! && || ? ( ) { } [ ]` plus dotted per-element binary and compound-assignment variants (for example `.+`, `.*`, `.==`, `.&&`, `.<<`, `.+=`, `.||=`). User types may overload scalar and dotted operator names via operator methods.
@@ -163,12 +163,13 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Type must be ABI-safe data (`primitive`, fixed-size arrays of ABI-safe data, or named structs recursively composed of ABI-safe fields)
   - Tuple types, type variables, and unresolved type expressions are rejected at the ABI boundary
   - Exported globals are retained as ABI roots (not removed by dead-code elimination)
-- **Mutable (variables)**: `name:Type`
-  - No initialization at declaration
+- **Mutable (variables)**: `name:Type` or `name:Type = expr` when `expr` is not compile-time constant
+  - Initialization at declaration is allowed
   - Can be modified at runtime
-  - Contents undefined until first assignment
+  - Declarations without initializer have undefined contents until first assignment
+  - Declarations with non-constexpr initializers execute at runtime
   - Backend typically places in RAM
-  - Must be initialized before use (compiler may not enforce)
+  - Must be initialized before use
 - **External symbol global**: `!name:Type;`
   - Declares a symbol provided outside the compilation unit
   - No initializer allowed
@@ -312,6 +313,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Function call**: `fname(args)` (includes external functions)
   - Receiver expressions (if any) evaluate left-to-right before the argument list
   - Arguments then evaluate left-to-right; call dispatch happens after all operands finish
+  - Qualified spelling `a::b::fname(args)` is accepted; frontend resolution currently binds by the final segment (`fname`) after import flattening
 - **Method call**: `receiver.fname(args)` (receiver passed by reference if mutating, otherwise by value)
 - **Existence probe**: `receiver.?member` / `receiver.?fname(args)` / `(a, b).?fname(args)`
   - Compile-time only, non-evaluating, and non-side-effecting
@@ -379,11 +381,10 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Shifts (<< >>)
 - Multiplicative (* / %)
 - Additive (+ -)
+- Comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`) — non-associative (chained comparisons are rejected without parentheses)
 - Bitwise AND (&)
 - Bitwise XOR (^)
 - Bitwise OR (|)
-- Relational (< <= > >=)
-- Equality (== !=)
 - Logical AND (&&)
 - Logical OR (||)
 - Conditional (?:)
@@ -409,12 +410,14 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 **Parsing rules**:
 - && binds tighter than ||
+- Comparison operators bind tighter than bitwise operators
 - Dotted per-element operators mirror the precedence/associativity of their scalar counterparts (for example `.*` binds like `*`, `.+` binds like `+`)
 - Dotted per-element operators over arrays use strict broadcasting (trailing-dimension alignment, singleton expansion, scalar lifting)
   - Incompatible shapes are compile-time errors (no implicit transpose/reshape/flatten)
   - Current frontend lowering requires side-effect-free operands for dotted array operators (element-wise expansion duplicates indexed scalar expressions)
 - Ambiguous expressions require parentheses
 - Nested conditionals must be explicitly parenthesized
+- In statement position, a leading `#Name(...)` is parsed as a type declaration; constructor-only statements should be wrapped as expressions (for example `(#Name(...));`)
 - Parser errors on ambiguity rather than guessing intent
 
 ## Annotations & Lowered Form
@@ -428,7 +431,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 
 ## Name Resolution & Modules
 
-- Single namespace per module (functions, variables, and types share namespace)
+- Values/functions share one namespace per module (including overload sets); type names use a separate namespace
 - Import: `::A::B;`
 - Resource expressions: `::A::B::file.ext` used in expression context load the referenced resource at compile time
   - Files resolve using the same search order as modules (project root, then relative to the importing file; `std/*` uses the standard-library search rule below)
@@ -497,13 +500,13 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Statement conditionals (`cond ? stmt`) do not produce values and require boolean conditions
 
 **Compile-time execution**:
-- Array sizes and global initializers must be compile-time constants
+- Array sizes and immutable global initializers must be compile-time constants
 - Immutable globals (initialized at declaration) are compile-time constants
 - Functions execute at compile time when needed for constants (no explicit purity annotation)
 - **Initialization is sequential**: Each module's imports initialize first; within a module, constants run top-to-bottom
 - **During initialization**: Can only reference previously defined constants
 - **Compile-time execution constraints**:
-  - Cannot call external functions (`&!`)
+  - Cannot call external functions (`&!`), except compiler-recognized bundled `std/math` and `std/bits` intrinsics when the bundled modules are in use
   - Cannot modify mutable globals
   - Can only read immutable globals defined earlier
   - All paths must be deterministic (no runtime-dependent branches)
@@ -537,7 +540,12 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Division by zero: runtime trap
 - Modulo operator (`%`): unsigned integers only (well-defined result)
 - Bitwise operators (`&`, `|`, `^`, `~`, `<<`, `>>`): both operands must be unsigned integers
-- Length operator `|expr|`: arrays must declare a compile-time constant length; strings are allowed dynamically, other operand types are rejected
+- Length/absolute operator `|expr|`:
+  - arrays: compile-time length (array size)
+  - strings: runtime or compile-time length
+  - signed integers/floats/fixed-point: absolute value
+  - unsigned integers/fixed-point: identity
+  - other operand types are rejected
 - Shift amount must be less than type bit width (undefined otherwise)
 - Boolean arrays can be converted to/from integers via casting (creates copy)
 - Composite types can be converted to/from byte arrays via casting (creates copy)
@@ -594,6 +602,8 @@ recv_prefix  ::= '(' refparams ')' [ '#' ident '::' ]
 func_name    ::= ident | op_name
 ret_spec     ::= type | '(' type ',' type { ',' type } ')'
 op_name      ::= '+' | '-' | '*' | '/' | '%' | '==' | '!=' | '<' | '<=' | '>' | '>=' | '@' | '@@'
+               | '.+' | '.-' | '.*' | './' | '.%' | '.==' | '.!=' | '.<' | '.<=' | '.>' | '.>='
+               | '.&' | '.|' | '.^' | '.<<' | '.>>' | '.&&' | '.||'
 
 params       ::= param { ',' param }
 param        ::= [ '$' ] ident [ ':' type ]
@@ -605,7 +615,7 @@ var_decl     ::= [ '^' ] ident [ ':' type ] [ '=' expr ] [ ';' ]
 type_decl    ::= '#' ident '(' [ fields ] ')' ';'
 fields       ::= ident [ ':' type ] { ',' ident [ ':' type ] }
 
-import       ::= '::' qname ';'
+import       ::= '::' mod_qname ';'
                | '::' string '->' ident ';'    // process import
 
 block        ::= '{' { stmt } [ expr ] '}'
@@ -624,31 +634,35 @@ stmt_core    ::= var_decl
                | func
 
 expr         ::= assign
-assign       ::= cond | (lvalue '=' expr)
+assign       ::= cond | (lvalue assign_op expr)
+assign_op    ::= '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '&&=' | '||='
+               | '.+=' | '.-=' | '.*=' | './=' | '.%=' | '.&=' | '.|=' | '.^=' | '.<<=' | '.>>=' | '.&&=' | '.||='
 cond         ::= logic_or ( '?' expr ':' expr )?
 logic_or     ::= logic_and { '||' logic_and }
 logic_and    ::= bit_or { '&&' bit_or }
 bit_or       ::= bit_xor { '|' bit_xor }
 bit_xor      ::= bit_and { '^' bit_and }
 bit_and      ::= compare { '&' compare }
-compare      ::= shift { ('=='|'!='|'<'|'<='|'>'|'>=') shift }
+compare      ::= shift [ ('=='|'!='|'<'|'<='|'>'|'>=') shift ]
 shift        ::= range { ('<<'|'>>') range }
 range        ::= sum [ '..' sum ]
 sum          ::= prod { ('+'|'-') prod }
 prod         ::= unary { ('*'|'/'|'%') unary }
 unary        ::= postfix | ('-'|'!'|'~') unary | '|' unary '|' | '(' type ')' unary
 postfix      ::= primary { call | index | member }
-primary      ::= literal | var | resource | '(' expr ')' | block | array
+primary      ::= literal | var | resource | '(' expr ')' | tuple | block | array
 
 var          ::= ident [ ':' type ]
-resource     ::= '::' qname
+resource     ::= '::' res_qname
 call         ::= '(' [ arglist ] ')'
 index        ::= '[' expr ']'
-member       ::= '.' ident
+member       ::= '.' ident | '.?' ident
 arglist      ::= expr { ',' expr }
 array        ::= '[' [ expr { ',' expr } ] ']'
+tuple        ::= '(' expr ',' expr { ',' expr } ')'
 
-qname        ::= path_seg { '::' path_seg }
+mod_qname    ::= ident { '::' ident }
+res_qname    ::= path_seg { '::' path_seg }
 path_seg     ::= ident { '.' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
@@ -659,11 +673,11 @@ type_atom    ::= ident | '[' expr ']'
 lvalue       ::= var | index | member
 
 literal      ::= number | float | string | char
-number       ::= [0-9]+ | '0x' [0-9A-Fa-f]+
-float        ::= [0-9]+ '.' [0-9]+
+number       ::= [0-9]+ | '0' [xX] [0-9A-Fa-f]+
+float        ::= [0-9]+ '.' [0-9]+ [ ('e'|'E') [ '+' | '-' ] [0-9]+ ]
 string       ::= '"' ( escape | [^"\\] )* '"'
 char         ::= "'" ( escape | [^'\\] ) "'"
-escape       ::= '\\' ( [nrt\\'"] | 'x' hex hex | [0-3] [0-7] [0-7] )
+escape       ::= '\\' ( [nrt\\'"] | 'x' hex hex | [0-3] [0-7]? [0-7]? )
 hex          ::= [0-9A-Fa-f]
 
 line_comment ::= '//' .*

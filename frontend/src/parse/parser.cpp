@@ -1401,7 +1401,7 @@ ExprPtr Parser::parse_unary() {
 
         pos = after_paren;
 
-        if (check(TokenType::Hash)) {
+        if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
             size_t type_start = pos;
             bool is_cast = false;
             TypePtr cast_type = nullptr;

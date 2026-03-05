@@ -3,6 +3,14 @@
 
 namespace vexel {
 
+namespace {
+
+bool is_vexel_whitespace(char c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+}
+
 Lexer::Lexer(const std::string& src, const std::string& fname)
     : source(src), filename(fname), pos(0), line(1), column(1) {}
 
@@ -35,7 +43,7 @@ bool Lexer::match(char expected) {
 }
 
 void Lexer::skip_whitespace() {
-    while (isspace(peek())) {
+    while (is_vexel_whitespace(peek())) {
         advance();
     }
 }
@@ -227,7 +235,7 @@ std::vector<Token> Lexer::tokenize() {
 
     while (peek() != '\0') {
         // Skip all whitespace and comments
-        while (isspace(peek()) || (peek() == '/' && peek(1) == '/')) {
+        while (is_vexel_whitespace(peek()) || (peek() == '/' && peek(1) == '/')) {
             skip_whitespace();
             skip_comment();
         }

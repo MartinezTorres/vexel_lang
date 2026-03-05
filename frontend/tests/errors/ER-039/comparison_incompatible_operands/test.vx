@@ -1,0 +1,6 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Comparison operators require compatible operand types. | Reject primitive/string mixed comparisons
+
+&^main() -> #i32 {
+    (1 < "a") ? 1 : 0
+}

@@ -4,6 +4,7 @@
 #include "evaluator_internal.h"
 #include "typechecker.h"
 #include <algorithm>
+#include <cmath>
 #include <functional>
 
 namespace vexel {
@@ -1404,6 +1405,29 @@ bool CompileTimeEvaluator::eval_length(ExprPtr expr, CTValue& result) {
         if (std::holds_alternative<std::string>(val)) {
             uint64_t len = static_cast<uint64_t>(std::get<std::string>(val).size());
             result = ctvalue_from_exact_int(APInt(len), true);
+            return true;
+        }
+        if (std::holds_alternative<int64_t>(val)) {
+            APInt exact(std::get<int64_t>(val));
+            result = ctvalue_from_exact_int(exact.is_negative() ? -exact : exact, false);
+            return true;
+        }
+        if (std::holds_alternative<uint64_t>(val)) {
+            result = std::get<uint64_t>(val);
+            return true;
+        }
+        if (std::holds_alternative<CTExactInt>(val)) {
+            const CTExactInt& exact = std::get<CTExactInt>(val);
+            if (exact.is_unsigned) {
+                result = ctvalue_from_exact_int(exact.value, true);
+                return true;
+            }
+            APInt abs_val = exact.value.is_negative() ? -exact.value : exact.value;
+            result = ctvalue_from_exact_int(abs_val, false);
+            return true;
+        }
+        if (std::holds_alternative<double>(val)) {
+            result = std::fabs(std::get<double>(val));
             return true;
         }
     }

@@ -508,7 +508,11 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
             return;
         }
         if (!target_type || target_type->kind != Type::Kind::Primitive ||
-            target_type->primitive == PrimitiveType::Bool ||
+            !(is_signed_int(target_type->primitive) ||
+              is_unsigned_int(target_type->primitive) ||
+              is_signed_fixed(target_type->primitive) ||
+              is_unsigned_fixed(target_type->primitive) ||
+              is_float(target_type->primitive)) ||
             is_untyped_integer_type(target_type)) {
             return;
         }
@@ -641,6 +645,43 @@ TypePtr TypeChecker::check_binary(ExprPtr expr) {
     // Comparison operators
     if (expr->op == "==" || expr->op == "!=" || expr->op == "<" ||
         expr->op == "<=" || expr->op == ">" || expr->op == ">=") {
+        concretize_untyped_against(expr->left, left_type, right_type, expr->op);
+        concretize_untyped_against(expr->right, right_type, left_type, expr->op);
+        auto concretize_bool_literal = [&](ExprPtr side_expr, TypePtr& side_type, TypePtr target_type) {
+            if (!is_untyped_integer_type(side_type) ||
+                !target_type ||
+                target_type->kind != Type::Kind::Primitive ||
+                target_type->primitive != PrimitiveType::Bool) {
+                return;
+            }
+            if (!literal_assignable_to(target_type, side_expr) ||
+                !apply_type_constraint(side_expr, target_type)) {
+                throw CompileError("Integer literal is not representable for operator " + expr->op,
+                                   side_expr ? side_expr->location : expr->location);
+            }
+            side_type = target_type;
+        };
+        concretize_bool_literal(expr->left, left_type, right_type);
+        concretize_bool_literal(expr->right, right_type, left_type);
+        std::function<bool(TypePtr, TypePtr)> comparison_compatible = [&](TypePtr lhs, TypePtr rhs) -> bool {
+            lhs = resolve_type(lhs);
+            rhs = resolve_type(rhs);
+            if (!lhs || !rhs) return true;
+            if (lhs->kind == Type::Kind::TypeVar || rhs->kind == Type::Kind::TypeVar) {
+                return true;
+            }
+            if (lhs->kind == Type::Kind::Array && rhs->kind == Type::Kind::Array) {
+                return comparison_compatible(lhs->element_type, rhs->element_type);
+            }
+            if (lhs->kind == Type::Kind::Named && rhs->kind == Type::Kind::Named) {
+                return types_equal(lhs, rhs);
+            }
+            return types_compatible(lhs, rhs) || types_compatible(rhs, lhs);
+        };
+        if (!comparison_compatible(left_type, right_type)) {
+            throw CompileError("Operator " + expr->op + " requires compatible operands",
+                               expr->location);
+        }
         expr->type = Type::make_primitive(PrimitiveType::Bool, expr->location);
         return expr->type;
     }
@@ -1529,6 +1570,11 @@ TypePtr TypeChecker::check_index(ExprPtr expr) {
     TypePtr arr_type = check_expr(expr->operand);
     check_expr(expr->args[0]);
 
+    if (!arr_type || arr_type->kind == Type::Kind::TypeVar) {
+        expr->type = make_fresh_typevar();
+        return expr->type;
+    }
+
     if (arr_type && arr_type->kind == Type::Kind::Array) {
         expr->type = arr_type->element_type;
         return expr->type;
@@ -1540,8 +1586,7 @@ TypePtr TypeChecker::check_index(ExprPtr expr) {
         return expr->type;
     }
 
-    expr->type = make_fresh_typevar();
-    return expr->type;
+    throw CompileError("Index operator requires array or string operand", expr->location);
 }
 
 TypePtr TypeChecker::check_member(ExprPtr expr) {
@@ -1550,6 +1595,11 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
     }
 
     TypePtr obj_type = check_expr(expr->operand);
+
+    if (!obj_type || obj_type->kind == Type::Kind::TypeVar) {
+        expr->type = make_fresh_typevar();
+        return expr->type;
+    }
 
     // Look up the object's type definition if it's a named type
     if (obj_type && obj_type->kind == Type::Kind::Named) {
@@ -1629,9 +1679,7 @@ TypePtr TypeChecker::check_member(ExprPtr expr) {
         }
     }
 
-    // Fallback to type variable if we can't determine field type
-    expr->type = make_fresh_typevar();
-    return expr->type;
+    throw CompileError("Member access requires named or tuple value", expr->location);
 }
 
 TypePtr TypeChecker::check_array_literal(ExprPtr expr) {

@@ -1,0 +1,6 @@
+// @rfc: docs/vexel-rfc.md#runtime-semantics
+// @desc: Indexing requires array or string operands. | Reject indexing on non-indexable operands
+
+&^main() -> #i32 {
+    1[0]
+}
