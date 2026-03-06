@@ -19,7 +19,7 @@ gcc out.c -o simple -lm
 - `backends/c/` - portable C backend (`libvexel-c.a`, tests).
 - `backends/ext/` - optional local external backends discovered by the build/driver (for example `megalinker` when present).
 - `driver/` - unified `build/vexel` CLI that lists registered backends.
-- `docs/` - language RFC (`docs/vexel-rfc.md`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
+- `docs/` - language RFC (`docs/vexel-rfc.md`), detailed spec chapters (`docs/spec/`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
 - `playground/` - WebAssembly playground build (compile-to-C visualization).
 - `std/` - bundled standard-library module fallback (`::std::*` imports; project-local `std/` overrides per module path).
 - `examples/` - sample programs plus `examples/lib/` helper modules.
@@ -27,6 +27,7 @@ gcc out.c -o simple -lm
 ## Documentation Policy
 
 - `docs/vexel-rfc.md` is the normative language specification.
+- `docs/spec/index.md` is the detailed, chaptered elaboration of RFC behavior.
 - `README.md` is the operational guide (build, CLI, extension points, tests).
 - Compiler/backend behavior is documented next to the owning code path.
 
@@ -124,7 +125,8 @@ Process expressions execute host commands. They are **disabled by default**; pas
 - Suites live under `frontend/tests` and `backends/*/tests` (plus backend conformance in `backends/conformance_test.sh`).
 - Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
 - `make test` builds and runs the full suite.
-- `make frontend-test`, `make backend-c-test`, and `make backend-conformance-test` run focused suites.
+- `make ci` runs the release gate aggregate (`test` + frontend perf guards).
+- `make frontend-test`, `make frontend-perf-test`, `make backend-c-test`, and `make backend-conformance-test` run focused suites.
 
 ## Web Playground
 
