@@ -1,0 +1,9 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Parenthesized #Type(...) is parsed as an expression statement, not a type declaration. | Parentheses disambiguate constructor expression statements
+
+#Pair(x:#i32, y:#i32);
+
+&^main() -> #i32 {
+  (#Pair(1, 2));
+  0
+}

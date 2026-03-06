@@ -20,8 +20,9 @@ DRIVER_BIN = $(BUILD_DIR)/vexel
 TEST_TARGETS := $(patsubst %/test.vx,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.vx))
 TEST_TARGETS += $(patsubst %/test.sh,$(BUILD_DIR)/frontend-%/test_report.md,$(call rwildcard,tests/,test.sh))
 TEST_CHECK_TARGETS := $(patsubst %.md,%.checked,$(TEST_TARGETS))
+PERF_TEST_CHECK_TARGETS := $(filter $(BUILD_DIR)/frontend-tests/performance/%,$(TEST_CHECK_TARGETS))
 
-.PHONY: all clean test debug-invariants-test
+.PHONY: all clean test perf-test debug-invariants-test
 
 all: $(BUILD_DIR)/vexel-frontend $(BUILD_DIR)/lib/libvexelfrontend.a
 
@@ -46,6 +47,9 @@ $(BUILD_DIR)/frontend/%.o: src/%.cpp
 
 test: $(TEST_CHECK_TARGETS)
 	@echo "All tests passed!"
+
+perf-test: $(PERF_TEST_CHECK_TARGETS)
+	@echo "Performance tests passed!"
 
 debug-invariants-test:
 	+$(MAKE) clean

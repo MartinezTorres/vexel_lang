@@ -12,5 +12,6 @@ Run:
 
 - `make frontend-test` (from repo root), or
 - `make -C frontend test`
+- `make frontend-perf-test` for CTE performance guards only.
 
 Backend/runtime behaviour is covered under `backends/*/tests`.

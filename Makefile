@@ -25,7 +25,7 @@ driver-clean:
 	+$(MAKE) -C driver clean
 
 # Build frontend
-.PHONY: frontend frontend-test frontend-debug-invariants-test frontend-clean
+.PHONY: frontend frontend-test frontend-perf-test frontend-debug-invariants-test frontend-clean
 frontend: $(BUILD_DIR)/vexel-frontend
 
 $(BUILD_DIR)/vexel-frontend: FORCE
@@ -33,6 +33,9 @@ $(BUILD_DIR)/vexel-frontend: FORCE
 
 frontend-test:
 	+$(MAKE) -C frontend test
+
+frontend-perf-test:
+	+$(MAKE) -C frontend perf-test
 
 frontend-debug-invariants-test:
 	+$(MAKE) -C frontend debug-invariants-test
