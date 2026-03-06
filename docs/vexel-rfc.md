@@ -1,8 +1,10 @@
-# VEXEL - Language Specification (v0.2.1)
+# VEXEL - Language Specification (v1.0-rc1)
 
 ## Preamble
 
 Vexel: strongly typed, minimal, operator-based language with no keywords.
+
+**Release status**: v1.0-rc1 (feature freeze for language syntax/semantics; only clarifications and bug-fix wording changes).
 
 **No keywords**: All syntax via sigils and operators. No reserved words. Primitive type names (`iN`, `uN`, `f16`, `f32`, `f64`, `b`, `s`) are only special after the `#` sigil; they may be used as identifiers elsewhere.
 

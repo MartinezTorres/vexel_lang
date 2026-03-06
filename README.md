@@ -2,7 +2,7 @@
 
 C++ implementation of the Vexel language front-end plus the portable C backend.
 
-**Status**: Language RFC v0.2.1 is implemented for the c backend.
+**Status**: Language RFC v1.0-rc1 is implemented for the c backend.
 
 ## Quick Start
 
@@ -155,7 +155,7 @@ In repository settings, configure Pages to use **GitHub Actions** as the source.
 ## Licensing & Releases
 
 - License: MIT (see `LICENSE`).
-- Status: RFC v0.2.1 implemented for c. Publish release notes in `CHANGELOG.md` as features land.
+- Status: RFC v1.0-rc1 implemented for c. Publish release notes in `CHANGELOG.md` as features land.
 
 ## Examples
 
