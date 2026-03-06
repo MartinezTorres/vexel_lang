@@ -8,8 +8,8 @@
 // This should fail at compile time if we try to use the result
 
 &^main() -> #i32 {
-    arr [3]#i32 = [1, 2, 3]
+    arr:#i32[3] = [1, 2, 3]
     // Try to assign the result of @ (should fail)
-    x #i32 = arr @ i { i }
+    x:#i32 = arr @ i { i }
     x
 }

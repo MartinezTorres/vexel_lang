@@ -1,5 +1,5 @@
 // @rfc: docs/vexel-rfc.md#types
-// @desc: Prefix array type spelling is accepted in cast targets. | Prefix array casts parse and lower
+// @desc: Prefix array type spelling is not supported. | Reject prefix array cast syntax
 
 &^main() -> #i32 {
     bytes:#u8[4] = [1,2,3,4];

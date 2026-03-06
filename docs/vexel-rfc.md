@@ -63,7 +63,6 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - Size must be a non-negative integer resolvable at compile time
 - Cannot depend on external calls, runtime values, or I/O
 - Examples: `#i32[10]`, `#u8[2+3]`, `#f32[pow(2,3)]` (if pow is pure)
-- Equivalent prefix spelling is accepted for a single dimension: `[N]#T`
 - Array length: `|arr|` yields compile-time constant integer (array size)
 - Literal `[e1,e2,...]` infers size from element count (may be empty)
   - `[ ]` produces `#T[0]` for the target type `#T` when context requires an array
@@ -667,7 +666,6 @@ path_seg     ::= ident { '.' ident }
 ident        ::= [A-Za-z_][A-Za-z0-9_]*
 
 type         ::= '#' type_atom { '[' expr ']' }
-             | '[' expr ']' '#' type_atom
 type_atom    ::= ident | '[' expr ']'
 
 lvalue       ::= var | index | member

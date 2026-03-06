@@ -1,0 +1,8 @@
+// @rfc: docs/vexel-rfc.md#types
+// @desc: Array cast targets use canonical '#T[N]' spelling. | Canonical array casts parse and lower
+
+&^main() -> #i32 {
+    bytes:#u8[4] = [1,2,3,4];
+    packed:#u32 = (#u8[4])bytes;
+    (#i32)packed
+}

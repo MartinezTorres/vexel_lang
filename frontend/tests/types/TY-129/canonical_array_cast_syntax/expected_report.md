@@ -1,6 +1,6 @@
 ## Stdout
 ```
-// Lowered Vexel module: tests/types/TY-129/prefix_array_cast_syntax/test.vx
+// Lowered Vexel module: tests/types/TY-129/canonical_array_cast_syntax/test.vx
 &^main() -> #i32 {
     bytes = [1, 2, 3, 4];
     packed = ( #u8[4] ) bytes;

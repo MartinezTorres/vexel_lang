@@ -247,7 +247,7 @@ StmtPtr Parser::parse_var_decl(bool allow_double_bang_local) {
     TypePtr type = nullptr;
     if (match(TokenType::Colon)) {
         type = parse_type();
-    } else if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
+    } else if (check(TokenType::Hash)) {
         type = parse_type();
     }
 
@@ -1401,7 +1401,7 @@ ExprPtr Parser::parse_unary() {
 
         pos = after_paren;
 
-        if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
+        if (check(TokenType::Hash)) {
             size_t type_start = pos;
             bool is_cast = false;
             TypePtr cast_type = nullptr;
@@ -1647,7 +1647,7 @@ ExprPtr Parser::parse_primary() {
         if (check(TokenType::Colon)) {
             size_t colon_pos = pos;
             pos++; // consume colon
-            if (check(TokenType::Hash) || check(TokenType::LeftBracket)) {
+            if (check(TokenType::Hash)) {
                 // This is a type annotation
                 TypePtr type = parse_type();
                 id->type = type;
@@ -1744,12 +1744,6 @@ ExprPtr Parser::parse_array() {
 
 TypePtr Parser::parse_type() {
     SourceLocation loc = current().location;
-    ExprPtr leading_size = nullptr;
-    if (match(TokenType::LeftBracket)) {
-        leading_size = parse_expr();
-        consume(TokenType::RightBracket, "Expected ']'");
-    }
-
     consume(TokenType::Hash, "Expected '#'");
 
     TypePtr type;
@@ -1871,13 +1865,7 @@ TypePtr Parser::parse_type() {
     }
 
     std::vector<ExprPtr> dimensions;
-    if (leading_size) {
-        dimensions.push_back(leading_size);
-    }
     while (match(TokenType::LeftBracket)) {
-        if (leading_size) {
-            throw CompileError("Array size specified twice in type", loc);
-        }
         dimensions.push_back(parse_expr());
         consume(TokenType::RightBracket, "Expected ']'");
     }

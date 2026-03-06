@@ -9,8 +9,8 @@
 // Duplicate of RT-036 and RT-041 for completeness
 
 &^main() -> #i32 {
-    x:[2]#i32 = [5, 10]
-    y:[2]#i32 = x  // Copy
+    x:#i32[2] = [5, 10]
+    y:#i32[2] = x  // Copy
     y[0] = 100
     x[0] + x[1]  // Should still be 5 + 10 = 15
 }
