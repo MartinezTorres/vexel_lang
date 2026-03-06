@@ -81,7 +81,7 @@ backend-conformance-test:
 	@bash backends/conformance_test.sh
 
 #tests
-.PHONY: backend-conformance-test docs-check test clean web
+.PHONY: backend-conformance-test docs-check test ci clean web
 docs-check:
 	@index="docs/index.html"; \
 	search_cmd() { \
@@ -102,6 +102,8 @@ docs-check:
 	echo "ok"
 
 test: driver-test frontend-test backend-conformance-test docs-check
+
+ci: test frontend-perf-test
 
 # CLEAN
 clean: driver-clean frontend-clean $(BACKENDS_CLEAN_TARGETS)
