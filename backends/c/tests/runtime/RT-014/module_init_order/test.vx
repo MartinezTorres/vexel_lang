@@ -8,7 +8,7 @@
 // RT-014: Module initialization is sequential: each module's imports initialize first
 // This is a positive test showing correct initialization order
 
-value #i32 = 42
+value:#i32 = 42
 
 &^main() -> #i32 {
     value

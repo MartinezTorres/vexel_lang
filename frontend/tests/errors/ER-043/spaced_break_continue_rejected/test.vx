@@ -1,0 +1,10 @@
+// @rfc: docs/vexel-rfc.md#expressions--control
+// @desc: Loop-control arrows use contiguous tokens only. | Reject spaced forms '-> |' and '-> >'
+
+&^main() -> #i32 {
+    i:#i32 = 0;
+    (i < 2)@{
+        -> |;
+    };
+    0
+}

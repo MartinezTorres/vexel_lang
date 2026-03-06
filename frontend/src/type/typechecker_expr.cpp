@@ -995,6 +995,9 @@ TypePtr TypeChecker::check_probe_call(ExprPtr expr) {
     }
 
     std::vector<Symbol*> candidates = lookup_functions_global(func_name);
+    if (candidates.empty() && resolver && current_instance_id >= 0) {
+        candidates = resolver->lookup_functions_in_instance(current_instance_id, func_name);
+    }
     if (candidates.empty()) {
         return materialize_result(false);
     }
@@ -1121,10 +1124,19 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
         }
 
         Symbol* bound_sym = lookup_binding(expr->operand.get());
-        if (bound_sym &&
-            ((bound_sym->kind == Symbol::Kind::Function && bound_sym->name == expr->operand->name) ||
-             (bound_sym->kind == Symbol::Kind::Type && bound_sym->surface_name == func_name))) {
-            sym = bound_sym;
+        if (bound_sym) {
+            if (bound_sym->kind == Symbol::Kind::Function) {
+                const std::string& operand_name = expr->operand->name;
+                if (bound_sym->name == operand_name ||
+                    bound_sym->surface_name == operand_name ||
+                    bound_sym->name == func_name ||
+                    bound_sym->surface_name == func_name) {
+                    sym = bound_sym;
+                }
+            } else if (bound_sym->kind == Symbol::Kind::Type &&
+                       (bound_sym->surface_name == func_name || bound_sym->name == func_name)) {
+                sym = bound_sym;
+            }
         }
 
         if (expr->is_constructor_call) {
@@ -1145,6 +1157,9 @@ TypePtr TypeChecker::check_call(ExprPtr expr) {
             }
             if (candidates.empty()) {
                 candidates = lookup_functions_global(func_name);
+                if (candidates.empty() && resolver && current_instance_id >= 0) {
+                    candidates = resolver->lookup_functions_in_instance(current_instance_id, func_name);
+                }
             }
             if (candidates.empty()) {
                 Symbol* type_sym = lookup_type_global(func_name);

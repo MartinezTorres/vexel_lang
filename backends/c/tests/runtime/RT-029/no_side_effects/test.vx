@@ -15,7 +15,7 @@ modify_state() -> #i32 {
 }
 
 // Should fail at compile time
-value #i32 = modify_state()
+value:#i32 = modify_state()
 
 &^main() -> #i32 {
     value

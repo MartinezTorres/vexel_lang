@@ -137,6 +137,7 @@ bool Parser::token_starts_expression(TokenType type) const {
         case TokenType::CharLiteral:
         case TokenType::LeftBrace:
         case TokenType::LeftBracket:
+        case TokenType::Hash:
         case TokenType::Dollar:
         case TokenType::Identifier:
         case TokenType::DoubleColon:
@@ -210,7 +211,7 @@ bool Parser::looks_like_var_decl_with_linkage(bool allow_double_bang_local) cons
 
     if (cursor >= tokens.size()) return false;
     const TokenType next = tokens[cursor].type;
-    const bool typed = next == TokenType::Colon || next == TokenType::Hash || next == TokenType::LeftBracket;
+    const bool typed = next == TokenType::Colon;
     if (!typed && next != TokenType::Assign && next != TokenType::Semicolon) {
         return false;
     }
@@ -246,8 +247,6 @@ StmtPtr Parser::parse_var_decl(bool allow_double_bang_local) {
 
     TypePtr type = nullptr;
     if (match(TokenType::Colon)) {
-        type = parse_type();
-    } else if (check(TokenType::Hash)) {
         type = parse_type();
     }
 
@@ -842,14 +841,6 @@ StmtPtr Parser::parse_stmt_no_semi() {
     SourceLocation loc = current().location;
 
     if (match(TokenType::Arrow)) {
-        if (match(TokenType::BitOr)) {
-            consume(TokenType::Semicolon, "Expected ';'");
-            return Stmt::make_break(loc);
-        }
-        if (match(TokenType::Greater)) {
-            consume(TokenType::Semicolon, "Expected ';'");
-            return Stmt::make_continue(loc);
-        }
         ExprPtr ret_expr = nullptr;
         if (!check(TokenType::Semicolon)) {
             ret_expr = parse_expr();

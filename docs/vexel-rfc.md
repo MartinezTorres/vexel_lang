@@ -83,6 +83,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 **No function types**: Functions cannot be stored in variables or passed as values. Function references only exist through direct calls or generic instantiation.
 
 **Type annotation**: `x:#T`
+- Shorthand `x #T` is not valid; `:` is required.
 
 **Type expressions**: `#[expr]`
 - Resolves to the static type of `expr` in the current scope.
@@ -321,6 +322,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
   - Missing fields/methods yield `0`
   - Ambiguous probes or probes that depend on unresolved receiver/argument types are compile-time errors
 - **Constructor**: `#TypeName(args)`
+  - In statement position, bare `#TypeName(...)` parses as a type declaration; wrap constructor statements in parentheses (`(#TypeName(...));`) when needed
 - **Member**: `x.y`
 - **Index**: `arr[expr]`
 - **Block**: `{ stmt; ... }` evaluates statements, yields last expression
@@ -359,6 +361,7 @@ Vexel: strongly typed, minimal, operator-based language with no keywords.
 - **Repeat**: `(cond)@expr` repeats expr while cond is true
   - Condition re-evaluates before every iteration; no `_` is bound in this form
 - **Loop control**: `->|;` (break), `->>;` (continue) - affect innermost enclosing loop
+  - Tokens are contiguous (`->|`, `->>`); spaced forms (`-> |`, `-> >`) are not valid
 - **Return**: `-> expr;` returns value from current function; `->;` returns without value
 - **Length/Absolute**: `|expr|` returns (type-dependent):
   - Arrays: compile-time constant length (size of array)

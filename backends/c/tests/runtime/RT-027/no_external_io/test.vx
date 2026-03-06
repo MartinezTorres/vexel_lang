@@ -14,7 +14,7 @@ compute() -> #i32 {
     io_func()
 }
 
-value #i32 = compute()
+value:#i32 = compute()
 
 &^main() -> #i32 {
     value

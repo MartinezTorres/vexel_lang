@@ -10,6 +10,6 @@
 &^main() -> #i32 {
     x:#i32 = 0
     // Try to assign the result of a statement conditional (should fail)
-    y #i32 = (1 ? x = 5)
+    y:#i32 = (1 ? x = 5)
     y
 }

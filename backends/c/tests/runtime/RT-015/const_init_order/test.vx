@@ -7,9 +7,9 @@
 
 // RT-015: Within a module, constants initialize top-to-bottom in parse order
 
-first #i32 = 10
-second #i32 = first + 20
-third #i32 = second + 30
+first:#i32 = 10
+second:#i32 = first + 20
+third:#i32 = second + 30
 
 &^main() -> #i32 {
     third  // Should be 10 + 20 + 30 = 60
