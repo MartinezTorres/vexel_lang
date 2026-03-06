@@ -22,6 +22,7 @@ When this detailed spec and the RFC diverge, the RFC wins and this spec must be 
 8. [Diagnostics and Strictness](08-diagnostics-strictness.md)
 9. [Frontend/Backend Contract](09-backend-contract.md)
 10. [Conformance and Release Gates](10-conformance.md)
+11. [Bundled Standard Library Semantics (`std`)](11-std-bundled.md)
 
 ## Scope
 
