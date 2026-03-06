@@ -6,17 +6,18 @@
   <title>Vexel Language</title>
   <style>
     :root {
-      --bg: #0c1118;
-      --panel: #111a26;
-      --panel-2: #0f1622;
-      --ink: #e8edf7;
-      --muted: #9eacc2;
-      --accent: #6ad4ff;
-      --accent-2: #ffc670;
-      --line: #243247;
-      --ok: #7de39f;
-      --danger: #ff7979;
-      --shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+      --bg: #081018;
+      --bg-soft: #0d1824;
+      --panel: #111f2d;
+      --panel-2: #17283a;
+      --ink: #edf4ff;
+      --muted: #a8bbd4;
+      --line: #2a425e;
+      --accent: #5ed0ff;
+      --accent-2: #ffd173;
+      --ok: #74e6a2;
+      --warn: #ffb780;
+      --shadow: 0 22px 58px rgba(0, 0, 0, 0.45);
     }
 
     * { box-sizing: border-box; }
@@ -24,17 +25,26 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: radial-gradient(1100px 600px at 0% -20%, #143a5f44, transparent 60%),
-                  radial-gradient(900px 500px at 120% 10%, #5f402144, transparent 55%),
+      background: radial-gradient(1000px 600px at 0% -25%, #1d4c7540, transparent 60%),
+                  radial-gradient(900px 520px at 110% 8%, #6f4f2140, transparent 58%),
                   var(--bg);
       color: var(--ink);
-      font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    a {
+      color: #9fdfff;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
     }
 
     .wrap {
-      width: min(1120px, 94vw);
+      width: min(1160px, 94vw);
       margin: 0 auto;
-      padding: 20px 0 48px;
+      padding: 22px 0 54px;
     }
 
     .top {
@@ -42,7 +52,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 16px 0;
+      flex-wrap: wrap;
+      padding: 10px 0 12px;
     }
 
     .brand {
@@ -52,28 +63,39 @@
     }
 
     .logo {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: linear-gradient(140deg, var(--accent) 0%, var(--accent-2) 100%);
-      color: #0b1017;
+      width: 38px;
+      height: 38px;
+      border-radius: 11px;
+      background: linear-gradient(145deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #101822;
       display: grid;
       place-items: center;
       font-weight: 800;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
+      box-shadow: var(--shadow);
     }
 
-    .brand span {
-      font-weight: 700;
-      letter-spacing: 0.06em;
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .brand-text strong {
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
+      color: #d8e7ff;
+    }
+
+    .brand-text span {
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: 0.84rem;
     }
 
     .nav {
       display: flex;
-      gap: 10px;
+      gap: 9px;
       flex-wrap: wrap;
     }
 
@@ -85,44 +107,68 @@
       border-radius: 10px;
       border: 1px solid var(--line);
       color: var(--ink);
+      background: var(--bg-soft);
       text-decoration: none;
       font-size: 0.92rem;
-      background: var(--panel-2);
-      transition: transform .15s ease, border-color .15s ease;
+      transition: transform .14s ease, border-color .14s ease;
     }
 
     .btn:hover {
       transform: translateY(-1px);
-      border-color: #3b4f68;
+      border-color: #416286;
+      text-decoration: none;
     }
 
     .btn.primary {
       border-color: transparent;
-      background: linear-gradient(140deg, #3ec8ff 0%, #ffc670 100%);
-      color: #11151d;
+      background: linear-gradient(140deg, #3dc8ff 0%, #ffd173 100%);
+      color: #0f1722;
       font-weight: 700;
     }
 
     .hero {
       margin-top: 12px;
-      background: linear-gradient(180deg, #121d2b 0%, #0f1825 100%);
+      padding: 28px;
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 26px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #122132 0%, #0d1a28 100%);
       box-shadow: var(--shadow);
     }
 
+    .hero-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      border: 1px solid #355677;
+      background: #132536;
+      color: #c7dbf5;
+      border-radius: 999px;
+      padding: 4px 11px;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
     .hero h1 {
-      margin: 0 0 10px;
-      font-size: clamp(1.7rem, 3.2vw, 2.4rem);
-      line-height: 1.15;
+      margin: 0;
+      font-size: clamp(1.8rem, 3.3vw, 2.55rem);
+      line-height: 1.12;
+      max-width: 19ch;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+      letter-spacing: 0.01em;
     }
 
     .hero p {
-      margin: 0;
+      margin: 10px 0 0;
       color: var(--muted);
-      max-width: 72ch;
-      line-height: 1.5;
+      line-height: 1.56;
+      max-width: 76ch;
     }
 
     .hero-actions {
@@ -132,37 +178,37 @@
       gap: 10px;
     }
 
-    .grid {
+    .hero-grid {
       margin-top: 18px;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
+      gap: 10px;
     }
 
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 14px;
+    .hero-card {
+      border: 1px solid #29435f;
+      background: #122030;
+      border-radius: 12px;
+      padding: 12px;
     }
 
-    .card h3 {
-      margin: 0 0 8px;
-      font-size: 0.98rem;
+    .hero-card h3 {
+      margin: 0 0 6px;
       color: var(--accent);
-      text-transform: uppercase;
+      font-size: 0.9rem;
       letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
 
-    .card p {
+    .hero-card p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.5;
-      font-size: 0.93rem;
+      font-size: 0.9rem;
+      line-height: 1.44;
     }
 
     .section {
-      margin-top: 26px;
+      margin-top: 24px;
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 16px;
@@ -170,99 +216,149 @@
     }
 
     .section h2 {
-      margin: 0 0 12px;
+      margin: 0 0 10px;
       font-size: 1.3rem;
     }
 
-    .section p {
-      color: var(--muted);
-      line-height: 1.55;
+    .section > p {
       margin: 0 0 12px;
-    }
-
-    .section ul {
-      margin: 0 0 12px 20px;
-      padding: 0;
       color: var(--muted);
-      line-height: 1.55;
+      line-height: 1.56;
     }
 
-    .section li {
-      margin: 0 0 7px;
+    .path-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
     }
 
-    .tutorial-step {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid #223245;
+    .path-card {
+      border: 1px solid #2f4b67;
+      border-radius: 12px;
+      padding: 14px;
+      background: var(--panel-2);
     }
 
-    pre {
+    .path-card h3 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+      color: #dff1ff;
+    }
+
+    .path-card p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 0.92rem;
+    }
+
+    .cmd {
       margin: 0;
       padding: 14px;
-      border-radius: 12px;
-      border: 1px solid #2a3d56;
-      background: #0a121d;
-      color: #dfe9f8;
+      border: 1px solid #2f4968;
+      border-radius: 11px;
+      background: #0a131d;
+      color: #e4eefc;
       font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
       font-size: 0.9rem;
-      overflow-x: auto;
       line-height: 1.45;
+      overflow-x: auto;
     }
 
-    code {
-      font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
-      background: #172232;
-      border: 1px solid #2f435e;
-      border-radius: 7px;
-      padding: 1px 6px;
-      color: #d3e2f8;
+    .list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
     }
 
-    .tutorial-step h3 {
-      margin: 0 0 8px;
-      font-size: 1rem;
-      color: var(--accent-2);
-    }
-
-    .code-title {
-      margin: 8px 0 8px;
-      font-size: 0.9rem;
+    .list li {
+      border: 1px solid #2d475f;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #12202f;
       color: var(--muted);
-      letter-spacing: 0.02em;
+      line-height: 1.44;
+      font-size: 0.92rem;
     }
+
+    .list strong {
+      color: #d8eaff;
+    }
+
+    .ref-grid {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .ref-card {
+      border: 1px solid #33506f;
+      background: #122133;
+      border-radius: 12px;
+      padding: 13px;
+    }
+
+    .ref-card h3 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+      color: var(--accent-2);
+      letter-spacing: 0.03em;
+    }
+
+    .ref-card p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.42;
+      font-size: 0.9rem;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .status {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
 
     .playground-frame {
       margin-top: 12px;
       border: 1px solid var(--line);
       border-radius: 12px;
       width: 100%;
-      min-height: 680px;
+      min-height: 700px;
       background: #0b1119;
     }
 
-    .status {
-      margin-top: 10px;
-      font-size: 0.92rem;
-      color: var(--muted);
-    }
-
-    .status.ok { color: var(--ok); }
-    .status.error { color: var(--danger); }
-
     .foot {
       margin-top: 18px;
-      color: var(--muted);
-      font-size: 0.9rem;
       text-align: center;
+      color: var(--muted);
+      font-size: 0.88rem;
     }
 
-    @media (max-width: 980px) {
-      .grid {
+    @media (max-width: 1040px) {
+      .hero-grid,
+      .ref-grid {
+        grid-template-columns: 1fr;
+      }
+      .path-grid,
+      .split {
         grid-template-columns: 1fr;
       }
       .playground-frame {
-        min-height: 520px;
+        min-height: 560px;
       }
     }
   </style>
@@ -272,300 +368,185 @@
     <header class="top">
       <div class="brand">
         <div class="logo">V</div>
-        <span>Vexel Language</span>
+        <div class="brand-text">
+          <strong>Vexel Language</strong>
+          <span>Whole-program compile-time-first language</span>
+        </div>
       </div>
       <nav class="nav">
-        <a class="btn" href="#tutorial">Tutorial</a>
-        <a class="btn" href="vexel-rfc.md">RFC</a>
-        <a class="btn" href="spec/index.md">Detailed Spec</a>
-        <a class="btn" href="../README.md">Repository Guide</a>
+        <a class="btn" href="#paths">Paths</a>
+        <a class="btn" href="#learn">Learn</a>
+        <a class="btn" href="#reference">Reference</a>
+        <a class="btn" href="#playground">Playground</a>
+        <a class="btn" href="https://github.com/martineztorres/vexel_lang">Repository</a>
         <a class="btn primary" href="playground.html">Open Playground</a>
       </nav>
     </header>
 
     <section class="hero">
-      <h1>Whole-program language built for aggressive compile-time execution</h1>
+      <div class="hero-top">
+        <span class="badge">v1.0-rc1 • feature freeze</span>
+      </div>
+      <h1>One docs hub: learn fast, inspect semantics, run code in-browser.</h1>
       <p>
-        Vexel is intentionally constrained so the frontend can model the full program graph,
+        Vexel is constrained by design so the frontend can model the full graph,
         execute compile-time paths deeply, and remove dead code before backend emission.
-        The C backend is reference-grade; additional backends can diverge in implementation strategy.
+        Use this page as the entry point to tutorial flow, normative RFC, chaptered specification,
+        backend contracts, and the live playground.
       </p>
       <div class="hero-actions">
-        <a class="btn primary" href="playground.html">Launch Playground</a>
-        <a class="btn" href="vexel-rfc.md">Read RFC</a>
+        <a class="btn primary" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Start in Playground</a>
+        <a class="btn" href="vexel-rfc.md">Read RFC (normative)</a>
         <a class="btn" href="spec/index.md">Read Detailed Spec</a>
+        <a class="btn" href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">Repository Guide</a>
+      </div>
+      <div class="hero-grid">
+        <article class="hero-card">
+          <h3>Frontend Owns Semantics</h3>
+          <p>CTE, DCE, type-soundness, and graph analysis are frontend responsibilities.</p>
+        </article>
+        <article class="hero-card">
+          <h3>Backend Contract</h3>
+          <p>Backends consume analyzed/residualized program contracts and may diverge in implementation strategy.</p>
+        </article>
+        <article class="hero-card">
+          <h3>Pragmatic Workflow</h3>
+          <p>Use tutorial examples + playground first, then verify behavior in RFC/spec and test gates.</p>
+        </article>
       </div>
     </section>
 
-    <section class="grid">
-      <article class="card">
-        <h3>Core Model</h3>
-        <p>No pointers, no heap allocation, no implicit standard API, and whole-program visibility.</p>
-      </article>
-      <article class="card">
-        <h3>Frontend Ownership</h3>
-        <p>Compile-time execution, analysis, type soundness, and dead-code elimination are frontend responsibilities.</p>
-      </article>
-      <article class="card">
-        <h3>Backend Contract</h3>
-        <p>Backends consume analyzed/residualized AST and frontend facts. They do not define language semantics.</p>
-      </article>
+    <section class="section" id="paths">
+      <h2>Choose Your Path</h2>
+      <p>Pick the shortest path for your goal. Everything links back to runnable examples.</p>
+      <div class="path-grid">
+        <article class="path-card">
+          <h3>Learn the language</h3>
+          <p>Follow the curated tutorial track and run each step directly in the playground.</p>
+          <a href="#learn">Open Learning Track</a>
+        </article>
+        <article class="path-card">
+          <h3>Validate semantics</h3>
+          <p>Start from RFC, then drill into chaptered spec for operational detail and constraints.</p>
+          <a href="#reference">Open Reference Stack</a>
+        </article>
+        <article class="path-card">
+          <h3>Contribute to compiler</h3>
+          <p>Use repo guide + architecture contracts + CI gates to keep behavior stable.</p>
+          <a href="#contribute">Open Contributor Path</a>
+        </article>
+        <article class="path-card">
+          <h3>Explore codegen output</h3>
+          <p>Run examples with different backends and inspect emitted output files live.</p>
+          <a href="#playground">Open Playground Section</a>
+        </article>
+      </div>
     </section>
 
-    <section class="section" id="tutorial">
-      <h2>Language Tutorial</h2>
+    <section class="section" id="quickstart">
+      <h2>Quick Start</h2>
+      <p>Minimal local workflow.</p>
+      <pre class="cmd"><code>make
+./build/vexel -b c examples/simple.vx
+gcc out.c -o simple -lm
+./simple</code></pre>
+    </section>
+
+    <section class="section" id="learn">
+      <h2>Learning Track (15-20 min)</h2>
       <p>
-        This page is a practical tour of Vexel syntax and workflow. It starts from a tiny program and
-        ends at backend-oriented output inspection.
+        Tutorial sources live in <code>examples/tutorial/</code>. Each step below opens directly in
+        <code>playground.html</code>.
       </p>
+      <ol class="list">
+        <li><strong>1. Quick Add:</strong> function + entrypoint baseline — <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">open</a></li>
+        <li><strong>2. Hello + extern:</strong> ABI import and side-effect boundary — <a href="playground.html?file=examples/tutorial/hello.vx&backend=c">open</a></li>
+        <li><strong>3. Structs + methods:</strong> named types and operators — <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">open</a></li>
+        <li><strong>4. Arrays and shapes:</strong> nested arrays and per-element operations — <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">open</a></li>
+        <li><strong>5. std::math lift:</strong> bundled math folding and broadcasting — <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">open</a></li>
+        <li><strong>6. std::bits reinterpret:</strong> explicit bit reinterpretation — <a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c">open</a></li>
+        <li><strong>7. Constexpr + DCE:</strong> pure folding and dead-symbol removal — <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">open</a></li>
+        <li><strong>8. Prime sieve:</strong> stress CTE on nontrivial loops — <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">open</a></li>
+        <li><strong>9. Multi-file modules:</strong> import flow across files — <a href="playground.html?file=examples/tutorial/multifile/main.vx&backend=c">open</a></li>
+      </ol>
+    </section>
+
+    <section class="section" id="reference">
+      <h2>Reference Stack</h2>
+      <p>Use these in order when checking language behavior.</p>
+      <div class="ref-grid">
+        <article class="ref-card">
+          <h3>RFC (Normative)</h3>
+          <p>Concise source of truth for syntax and semantics.</p>
+          <a href="vexel-rfc.md">Open <code>docs/vexel-rfc.md</code></a>
+        </article>
+        <article class="ref-card">
+          <h3>Detailed Spec</h3>
+          <p>Chaptered operational semantics and contracts.</p>
+          <a href="spec/index.md">Open <code>docs/spec/index.md</code></a>
+        </article>
+        <article class="ref-card">
+          <h3>Bundled std Spec</h3>
+          <p>`std::math` and `std::bits` behavior, folding, and backend mapping.</p>
+          <a href="spec/11-std-bundled.md">Open <code>docs/spec/11-std-bundled.md</code></a>
+        </article>
+      </div>
       <p>
-        Tutorial sources live in <code>examples/tutorial/</code>. You can open each directly in the playground:
-        <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">quickadd</a>,
-        <a href="playground.html?file=examples/tutorial/hello.vx&backend=c">hello</a>,
-        <a href="playground.html?file=examples/tutorial/globals.vx&backend=c">globals</a>,
-        <a href="playground.html?file=examples/tutorial/exports.vx&backend=c">exports</a>,
-        <a href="playground.html?file=examples/tutorial/typeof_demo.vx&backend=c">typeof</a>,
-        <a href="playground.html?file=examples/tutorial/existence_probe.vx&backend=c">existence_probe</a>,
-        <a href="playground.html?file=examples/tutorial/optional_block.vx&backend=c">optional_block</a>,
-        <a href="playground.html?file=examples/tutorial/iteration.vx&backend=c">iteration</a>,
-        <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">structs</a>,
-        <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">array_shapes</a>,
-        <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">math_arrays</a>,
-        <a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c">bits_reinterpret</a>,
-        <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">constexpr_dce</a>,
-        <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">sieve</a>,
-        <a href="playground.html?file=examples/tutorial/matrix_sum.vx&backend=c">matrix_sum</a>,
-        <a href="playground.html?file=examples/tutorial/abi_hints.vx&backend=c">abi_hints</a>,
-        <a href="playground.html?file=examples/tutorial/reentrant.vx&backend=c">reentrant</a>,
-        <a href="playground.html?file=examples/tutorial/multifile/main.vx&backend=c">multifile</a>.
+        Chapter shortcuts:
+        <a href="spec/02-grammar.md">Grammar</a>,
+        <a href="spec/03-types.md">Types</a>,
+        <a href="spec/04-execution-model.md">Execution model</a>,
+        <a href="spec/05-analysis-optimization.md">Analysis/optimization</a>,
+        <a href="spec/07-abi-boundary.md">ABI boundary</a>,
+        <a href="spec/09-backend-contract.md">Frontend/backend contract</a>,
+        <a href="spec/10-conformance.md">Conformance gates</a>.
       </p>
+    </section>
 
-      <div class="tutorial-step">
-        <h3>1) Program shape and ABI boundaries</h3>
-        <p>
-          Function declarations use <code>&amp;</code>. Entry points/exports use <code>&amp;^</code>.
-          External function imports use <code>&amp;!</code>. Global imports use <code>!</code> (external symbol)
-          or <code>!!</code> (backend-bound binding).
-        </p>
-        <pre><code>&amp;!putchar(c:#u8);
-!PORT:#u8;
-[[addr(0x4000)]]
-!!CTRL:#u8;
-
-&amp;print_char(c:#u8) {
-  putchar(c);
-  CTRL = PORT
-}
-
-&amp;^main() -&gt; #i32 {
-  print_char(65);
-  0
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>2) Types, literals, and declarations</h3>
-        <p>
-          Primitive types are explicit (<code>#b</code>, <code>#iN</code>, <code>#uN</code>, <code>#f16/#f32/#f64</code>, <code>#s</code>).
-          Frontend accepts any positive integer width; shipped backends use native fast paths at
-          <code>8/16/32/64</code> and lower other widths explicitly.
-        </p>
-        <pre><code>flag:#b = 1;
-count:#i27 = -10;
-size:#u13 = 4095;
-name:#s = "Vexel";
-bytes:#u8[4] = [1, 2, 3, 4];</code></pre>
-        <p>
-          Type expressions are supported with <code>#[expr]</code> and use the static type of <code>expr</code>.
-        </p>
-        <pre><code>seed:#u16 = 42;
-table:#[seed][8];
-value:#[seed] = 7;</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>3) Control flow, loops, and iteration</h3>
-        <p>
-          Conditionals can be expression-level (<code>a ? b : c</code>) or block-style. Loops use <code>@{ ... }</code>.
-        </p>
-        <pre><code>&amp;^main() -&gt; #i32 {
-  sum:#i32 = 0;
-  i:#i32 = 0;
-  (i &lt; 4)@{
-    sum = sum + i;
-    i = i + 1;
-  };
-  sum
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>4) Structs, methods, and operators</h3>
-        <p>
-          Named structs use <code>#Type(...)</code>. Methods use receiver syntax.
-        </p>
-        <pre><code>#Vec2(x:#i32, y:#i32);
-
-&amp;(self)#Vec2::len2() -&gt; #i32 {
-  self.x * self.x + self.y * self.y
-}
-
-&amp;(lhs)#Vec2::+(rhs:#Vec2) -&gt; #Vec2 {
-  #Vec2(lhs.x + rhs.x, lhs.y + rhs.y)
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>5) Existence probes</h3>
-        <p>
-          <code>.?</code> asks whether a field or exact call shape exists without evaluating the receiver or arguments.
-          The result is compile-time <code>#b</code>, so optional APIs can be handled explicitly without weakening normal calls.
-        </p>
-        <pre><code>#Box(x:#i32);
-
-&(self)#Box::len() -&gt; #i32 { self.x }
-
-&^main() -&gt; #i32 {
-  b = #Box(4);
-  (b.?x ? 1 : 0) + (b.?len() ? 4 : 0) + (b.?missing ? 8 : 0)
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>6) Optional semantic blocks</h3>
-        <p>
-          <code>#{ ... }</code> is a statement-only optional block. The frontend keeps it only if semantic resolution succeeds;
-          missing imports, missing symbols, missing members, and no-matching-overload cases discard the whole block with no residue.
-          Syntax errors, ambiguity, and other normal compile errors still fail the build.
-        </p>
-        <pre><code>&amp;^main() -&gt; #i32 {
-  value:#i32 = 1;
-  #{
-    ::missing::feature;
-    value = 2;
-  }
-  value
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>7) Arrays and nested arrays</h3>
-        <p>
-          Use <code>#T[N]</code> for arrays and nest dimensions for matrix-like layouts.
-          Per-element arithmetic uses dotted operators (<code>.+</code>, <code>.*</code>, etc.).
-        </p>
-        <pre><code>&amp;^main() -&gt; #i32 {
-  a:#i32[3] = [1, 2, 3];
-  b:#i32[3] = [4, 5, 6];
-  c:#i32[3] = a .+ b;
-
-  m:#i32[2][2] = [[1, 2], [3, 4]];
-  s:#i32[2][2] = m .* 2;
-
-  c[0] + c[1] + c[2] + s[1][1]
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>8) Bundled std::math and array lifting</h3>
-        <p>
-          The bundled fallback <code>::std::math;</code> surface is compiler-recognized for compile-time folding.
-          Unary and binary math calls can also lift over arrays with strict broadcasting.
-        </p>
-        <pre><code>::std::math;
-
-&amp;^main() -&gt; #i32 {
-  xs:#f64[2] = [4.0, 9.0];
-  roots:#f64[2] = std::math::sqrt(xs);
-  powers:#f64[2] = std::math::pow(roots, 2.0);
-  ((#i32)powers[0]) + ((#i32)powers[1])
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>9) Bundled std::bits reinterpretation</h3>
-        <p>
-          The bundled fallback <code>::std::bits;</code> surface provides explicit bit reinterpretation helpers.
-          Local <code>std/bits.vx</code> overrides are ordinary modules and do not receive builtin folding/lowering.
-        </p>
-        <pre><code>::std::bits;
-
-&amp;^main() -&gt; #i32 {
-  bits:#u32 = std::bits::f32_as_u32((#f32)1.0);
-  back:#f32 = std::bits::u32_as_f32(bits);
-  (bits == (#u32)1065353216 &amp;&amp; (#i32)back == 1) ? 0 : 1
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>10) Compile-time execution and dead-code elimination</h3>
-        <p>
-          Pure call chains can be folded at compile time; unreachable or unused declarations are removed before backend emission.
-        </p>
-        <pre><code>&amp;mul(a:#i32, b:#i32) -&gt; #i32 { a * b }
-&amp;add(a:#i32, b:#i32) -&gt; #i32 { a + b }
-
-result:#i32 = add(mul(6, 7), 0);
-dead:#i32 = mul(9, 9);
-
-&amp;^main() -&gt; #i32 { result }</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>11) Multi-file modules</h3>
-        <p>Use module imports and keep related logic in separate files.</p>
-        <div class="code-title">main.vx</div>
-        <pre><code>::math;
-
-&amp;^main() -&gt; #i32 {
-  add(20, 22)
-}</code></pre>
-        <div class="code-title">math.vx</div>
-        <pre><code>&amp;add(a:#i32, b:#i32) -&gt; #i32 {
-  a + b
-}</code></pre>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>12) Backend hints (annotation pass-through)</h3>
-        <p>
-          Frontend parses annotations but does not globally whitelist them. Backend-specific hints are consumed by the selected backend.
-        </p>
-        <ul>
-          <li><code>[[nonreentrant]]</code>: recognized by C and megalinker on ABI boundaries.</li>
-          <li><code>[[nonbanked]]</code>: recognized by megalinker on global variables to force RAM placement.</li>
-          <li><code>[[sdcccall(0)]]</code> / <code>[[sdcccall(1)]]</code>: recognized by megalinker on <code>&amp;!</code> and <code>&amp;^</code>.</li>
-          <li><code>[[addr(...)]]</code> / <code>[[address(...)]]</code>: recognized by C and megalinker for <code>!!</code> bindings.</li>
-        </ul>
-      </div>
-
-      <div class="tutorial-step">
-        <h3>13) Compile and inspect outputs</h3>
-        <p>The unified driver always requires a backend.</p>
-        <pre><code>./build/vexel -b c -o out path/to/main.vx
-./build/vexel -b megalinker -o out path/to/main.vx
-./build/vexel -b vexel -o out path/to/main.vx</code></pre>
-        <p>
-          Run <code>./build/vexel --help</code> to see frontend flags and backend-specific options for all discovered backends.
-        </p>
+    <section class="section" id="contribute">
+      <h2>Contributor Path</h2>
+      <div class="split">
+        <div>
+          <p>Use architecture contracts and standard gates before pushing changes.</p>
+          <pre class="cmd"><code>make ci
+make web
+make docs-check</code></pre>
+          <p>
+            Key references:
+            <a href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">README guide</a>,
+            <a href="https://github.com/martineztorres/vexel_lang/blob/main/frontend/src/architecture.md">frontend architecture contract</a>,
+            <a href="spec/09-backend-contract.md">backend contract chapter</a>.
+          </p>
+        </div>
+        <div>
+          <p>
+            For backend development, start from discovered backends under <code>backends/</code> and
+            optional local backends under <code>backends/ext/</code>. Backend-specific options are surfaced
+            by the unified driver help.
+          </p>
+          <pre class="cmd"><code>./build/vexel --help
+./build/vexel -b c --help
+./build/vexel -b megalinker --help</code></pre>
+        </div>
       </div>
     </section>
 
     <section class="section" id="playground">
-      <h2>Playground</h2>
+      <h2>Playground Integration</h2>
       <p>
-        The embedded frame below loads <code>docs/playground.html</code>.
-        If it is not present in your local checkout yet, use the button to open it after running <code>make web</code>.
+        The embedded frame below loads <code>docs/playground.html</code>. Use it to compile examples,
+        switch backend outputs, and inspect emitted files without local toolchain steps.
       </p>
       <div class="hero-actions">
         <a class="btn primary" href="playground.html">Open playground.html</a>
+        <a class="btn" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Open tutorial default</a>
       </div>
       <div id="playgroundStatus" class="status">Checking playground availability...</div>
       <iframe id="playgroundFrame" class="playground-frame" src="playground.html" title="Vexel Playground"></iframe>
     </section>
 
     <div class="foot">
-      Vexel docs front page is source-controlled. Playground payload is generated separately.
+      Landing page is source-controlled. <code>docs/playground.html</code> is generated separately.
     </div>
   </div>
 
@@ -584,7 +565,7 @@ dead:#i32 = mul(9, 9);
         })
         .catch(() => {
           status.textContent = "playground.html is not present locally yet. Run 'make web' or wait for GitHub Pages deploy.";
-          status.classList.add("error");
+          status.classList.add("warn");
           frame.removeAttribute("src");
           frame.setAttribute("title", "Playground not available");
         });
