@@ -25,6 +25,8 @@ check_backend_file() {
 }
 
 check_backend_file "$ROOT/backends/c/src/codegen.cpp" "C backend"
-check_backend_file "$ROOT/backends/ext/megalinker/src/codegen.cpp" "Megalinker backend"
+if [ -f "$ROOT/backends/ext/megalinker/src/codegen.cpp" ]; then
+  check_backend_file "$ROOT/backends/ext/megalinker/src/codegen.cpp" "Megalinker backend"
+fi
 
 echo "ok"

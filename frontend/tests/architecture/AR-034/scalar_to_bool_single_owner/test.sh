@@ -12,6 +12,10 @@ AP_CPP="$ROOT/frontend/src/pipeline/analyzed_program_builder.cpp"
 EV_CPP="$ROOT/frontend/src/transform/evaluator.cpp"
 C_CG="$ROOT/backends/c/src/codegen.cpp"
 M_CG="$ROOT/backends/ext/megalinker/src/codegen.cpp"
+BACKEND_CODEGENS=("$C_CG")
+if [ -f "$M_CG" ]; then
+  BACKEND_CODEGENS+=("$M_CG")
+fi
 
 if ! rg -q 'bool cte_scalar_to_bool\(const CTValue& value, bool& out\)' "$UTIL_H"; then
   echo "CTE scalar-to-bool conversion must be declared in core utility header" >&2
@@ -23,7 +27,7 @@ if ! rg -q 'bool cte_scalar_to_bool\(const CTValue& value, bool& out\)' "$UTIL_C
   exit 1
 fi
 
-if rg -q 'static bool ct_scalar_to_bool\(' "$C_CG" "$M_CG"; then
+if rg -q 'static bool ct_scalar_to_bool\(' "${BACKEND_CODEGENS[@]}"; then
   echo "Backends must not duplicate scalar-to-bool conversion helpers" >&2
   exit 1
 fi
@@ -33,7 +37,7 @@ if rg -q '(^|[[:space:]])bool scalar_to_bool\(' "$OPT_CPP" "$RES_CPP" "$AP_CPP" 
   exit 1
 fi
 
-if ! rg -q 'cte_scalar_to_bool\(' "$OPT_CPP" "$RES_CPP" "$AP_CPP" "$EV_CPP" "$C_CG" "$M_CG"; then
+if ! rg -q 'cte_scalar_to_bool\(' "$OPT_CPP" "$RES_CPP" "$AP_CPP" "$EV_CPP" "${BACKEND_CODEGENS[@]}"; then
   echo "Call sites must use core cte_scalar_to_bool helper" >&2
   exit 1
 fi
