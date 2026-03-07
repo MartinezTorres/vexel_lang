@@ -2,6 +2,7 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -Wall -Wextra -O2
 LDFLAGS ?=
 BUILD_DIR ?= $(abspath ../build)
+.DEFAULT_GOAL := all
 
 BACKEND_DIRS := $(filter-out ../backends/ext/ ../backends/tests/,$(wildcard ../backends/*/ ../backends/ext/*/))
 BACKEND_NAME_LIST := $(notdir $(patsubst %/,%,$(BACKEND_DIRS)))
@@ -61,6 +62,14 @@ AUTO_REGISTER = $(BUILD_DIR)/driver/autoregister.cpp
 AUTO_REGISTER_OBJ = $(BUILD_DIR)/driver/autoregister.o
 BACKEND_MANIFEST = $(BUILD_DIR)/driver/backend_manifest.txt
 OBJECTS += $(AUTO_REGISTER_OBJ)
+
+define backend_lib_rule
+$(BUILD_DIR)/backends/$(1)/libvexel-$(1).a: FORCE
+	@dir="$(call backend_dir,$(1))"; \
+	if [ -z "$$$$dir" ]; then echo "Unknown backend '$(1)'"; exit 1; fi; \
+	$(MAKE) -C "$$$$dir"
+endef
+$(foreach name,$(BACKEND_NAMES),$(eval $(call backend_lib_rule,$(name))))
 
 .PHONY: all clean test
 
