@@ -6,7 +6,7 @@
   <title>Vexel Architecture</title>
   <link rel="stylesheet" href="library.css">
 </head>
-<body>
+<body class="arch-page">
   <div class="site">
     <header class="topbar">
       <div class="brand">
@@ -19,25 +19,33 @@
       <nav class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="tutorial.html">Tutorial</a>
-        <a href="law.html">RFC</a>
+        <a href="law.html">Law</a>
         <a class="primary" href="playground.html">Playground</a>
         <a class="active" href="architecture.html">Architecture</a>
         <a href="anti-goals.html">Anti-goals</a>
+        <a href="contributor-guide.html">Contribute</a>
         <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
       </nav>
     </header>
 
-    <section class="hero">
-      <p class="role">Role: Architecture</p>
-      <h1>The frontend decides semantics; backends decide realization.</h1>
-      <p class="lead">
-        Vexel architecture is strict about ownership. Semantic decisions are resolved before backend emission.
-        Backends receive an analyzed/residual contract and focus on target strategy.
-      </p>
-      <div class="links">
-        <a href="spec/09-backend-contract.md">Backend contract chapter</a>
-        <a href="spec/05-analysis-optimization.md">Analysis and optimization chapter</a>
+    <section class="hero hero-grid">
+      <div>
+        <p class="role">Role: Architecture</p>
+        <h1>The frontend decides semantics; backends decide realization.</h1>
+        <p class="lead">
+          Vexel architecture is strict about ownership. Semantic decisions are resolved before backend emission.
+          Backends receive an analyzed/residual contract and focus on target strategy.
+        </p>
+        <div class="thesis">Language law is resolved before emission strategy begins.</div>
+        <div class="links">
+          <a href="spec/09-backend-contract.md">Backend contract chapter</a>
+          <a href="spec/05-analysis-optimization.md">Analysis and optimization chapter</a>
+        </div>
       </div>
+      <aside class="hero-seal" aria-label="Architecture seal">
+        <img src="design/vex.png" alt="Vexel mechanical horse seal">
+        <p>Machine view: ownership first, optimization second, emission last.</p>
+      </aside>
     </section>
 
     <main class="main">

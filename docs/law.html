@@ -6,7 +6,7 @@
   <title>Vexel Law and Specification</title>
   <link rel="stylesheet" href="library.css">
 </head>
-<body>
+<body class="law-page">
   <div class="site">
     <header class="topbar">
       <div class="brand">
@@ -19,25 +19,33 @@
       <nav class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
         <a href="tutorial.html">Tutorial</a>
-        <a class="active" href="law.html">RFC</a>
+        <a class="active" href="law.html">Law</a>
         <a class="primary" href="playground.html">Playground</a>
         <a href="architecture.html">Architecture</a>
         <a href="anti-goals.html">Anti-goals</a>
+        <a href="contributor-guide.html">Contribute</a>
         <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
       </nav>
     </header>
 
-    <section class="hero">
-      <p class="role">Role: RFC + Specification</p>
-      <h1>Read law first. Read elaboration second.</h1>
-      <p class="lead">
-        The RFC is normative. Detailed spec chapters elaborate behavior and contracts.
-        If there is any disagreement, the RFC wins.
-      </p>
-      <div class="links">
-        <a href="vexel-rfc.md">Open RFC (normative)</a>
-        <a href="spec/index.md">Open detailed spec index</a>
+    <section class="hero hero-grid">
+      <div>
+        <p class="role">Role: RFC + Specification</p>
+        <h1>Read law first. Read elaboration second.</h1>
+        <p class="lead">
+          The RFC is normative. Detailed spec chapters elaborate behavior and contracts.
+          If there is any disagreement, the RFC wins.
+        </p>
+        <div class="thesis">RFC outranks explanation. Spec explains, it does not redefine.</div>
+        <div class="links">
+          <a href="vexel-rfc.md">Open RFC (normative)</a>
+          <a href="spec/index.md">Open detailed spec index</a>
+        </div>
       </div>
+      <aside class="hero-seal" aria-label="Law seal">
+        <img src="design/vex.png" alt="Vexel mechanical horse seal">
+        <p>Law is sharp because behavior must be testable.</p>
+      </aside>
     </section>
 
     <main class="main">
