@@ -6,19 +6,22 @@
   <title>Vexel Playground</title>
   <style>
     :root {
-      --bg: #0f1115;
-      --bg-2: #151821;
-      --panel: #1a1f2b;
-      --panel-2: #11151d;
-      --ink: #e7edf7;
-      --muted: #a9b2c3;
-      --accent: #ffb454;
-      --accent-2: #4dd0e1;
-      --danger: #ff6b6b;
-      --tab: #1f2432;
-      --tab-active: #273047;
-      --outline: #2e364a;
-      --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+      --field: #f1f6fb;
+      --field-cold: #e8eff6;
+      --ink: #111820;
+      --ink-soft: #3a4a5f;
+      --pearl: #0d131b;
+      --pearl-soft: #121c27;
+      --line: #b9c7d7;
+      --line-strong: #93a9bf;
+      --blue: #1d70bf;
+      --blue-bright: #2a8ce8;
+      --orange: #d57024;
+      --danger: #b33030;
+      --code-bg: #0e1620;
+      --code-bg-soft: #121d29;
+      --code-line: #30475f;
+      --shadow: 0 1px 0 #ffffff;
       --code-line-height: 1.5;
       --code-font-size: 0.95rem;
       --mobile-code-lines: 20;
@@ -29,123 +32,155 @@
     html, body {
       height: 100%;
       margin: 0;
-      background: var(--bg);
+      background: var(--field);
       color: var(--ink);
-      font-family: "Space Grotesk", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
 
     body {
       display: flex;
       align-items: stretch;
       justify-content: center;
-      background: radial-gradient(1200px 600px at 10% -20%, rgba(77, 208, 225, 0.18), transparent 60%),
-                  radial-gradient(900px 500px at 110% 10%, rgba(255, 180, 84, 0.16), transparent 55%),
-                  linear-gradient(180deg, #0c0f14 0%, #121722 50%, #0f1115 100%);
     }
 
     .app {
-      width: min(1600px, 96vw);
-      height: 96vh;
+      width: min(1640px, 96vw);
+      min-height: 100vh;
       display: grid;
-      grid-template-rows: auto 1fr 190px;
-      gap: 16px;
-      padding: 16px;
+      grid-template-rows: auto 1fr 210px;
+      gap: 12px;
+      padding: 12px;
     }
 
     .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: var(--panel);
-      border: 1px solid var(--outline);
-      border-radius: 14px;
-      padding: 12px 16px;
+      border: 1px solid var(--line-strong);
+      border-top: 3px solid var(--pearl);
+      background: #f7fbff;
+      padding: 10px 12px;
       box-shadow: var(--shadow);
+      gap: 10px;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      min-width: 0;
     }
 
     .logo {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: conic-gradient(from 140deg, var(--accent), var(--accent-2), #ffffff22, var(--accent));
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line-strong);
+      background: #f1f7ff;
       display: grid;
       place-items: center;
-      color: #0a0c11;
-      font-weight: 700;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: grayscale(10%) contrast(108%);
+      display: block;
+    }
+
+    .brand-meta {
+      min-width: 0;
     }
 
     .brand h1 {
-      font-size: 1.1rem;
+      font-size: 1rem;
       margin: 0;
-      letter-spacing: 0.04em;
       text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .brand-sub {
+      margin: 2px 0 0;
+      color: var(--ink-soft);
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .controls {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .btn, select {
-      border: 1px solid var(--outline);
-      background: var(--tab);
+      border: 1px solid var(--line);
+      background: #f8fcff;
       color: var(--ink);
-      padding: 8px 12px;
-      border-radius: 10px;
-      font-size: 0.9rem;
+      padding: 7px 10px;
+      font-size: 0.81rem;
       cursor: pointer;
-      transition: transform 0.15s ease, border 0.15s ease, background 0.15s ease;
+      transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    select {
+      max-width: 240px;
     }
 
     .btn:hover, select:hover {
-      transform: translateY(-1px);
-      border-color: #3b4760;
-      background: var(--tab-active);
+      border-color: var(--blue);
+      color: var(--blue);
+      background: #ffffff;
     }
 
     .btn:disabled {
       opacity: 0.55;
       cursor: not-allowed;
-      transform: none;
     }
 
     .btn.primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #ffd18a 100%);
-      color: #201404;
-      border-color: transparent;
+      background: var(--pearl);
+      border-color: var(--pearl);
+      color: #f3f8ff;
       font-weight: 600;
     }
 
-    #tutorialSelect {
-      min-width: 230px;
+    .btn.warn {
+      border-color: var(--orange);
+      color: #8a3d08;
+      background: #fff4ea;
     }
 
     .btn.ghost {
       background: transparent;
     }
 
+    #tutorialSelect {
+      min-width: 230px;
+    }
+
     .panes {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 12px;
       min-height: 0;
     }
 
     .pane {
       display: flex;
       flex-direction: column;
-      background: var(--panel);
-      border: 1px solid var(--outline);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--line-strong);
+      background: #f9fcff;
       overflow: hidden;
       min-height: 0;
     }
@@ -154,28 +189,29 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--outline);
-      background: var(--panel-2);
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--line);
+      background: var(--field-cold);
+      gap: 8px;
     }
 
     .pane-title {
-      font-size: 0.9rem;
-      color: var(--muted);
+      font-size: 0.8rem;
+      color: #25364a;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      flex: 0 0 auto;
     }
 
     .pane-path {
       flex: 1;
-      margin-left: 10px;
-      margin-right: 10px;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      color: #8fa1be;
-      font-size: 0.8rem;
+      color: #46607c;
+      font-size: 0.78rem;
       font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
@@ -183,9 +219,9 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--outline);
-      background: var(--tab);
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #eef4fb;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
@@ -193,11 +229,11 @@
     }
 
     .tutorial-banner {
-      border-bottom: 1px solid var(--outline);
-      background: #141b27;
-      color: var(--muted);
-      font-size: 0.84rem;
-      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #f4f8fd;
+      color: #445a73;
+      font-size: 0.81rem;
+      padding: 8px 10px;
       line-height: 1.35;
       min-height: 42px;
       display: flex;
@@ -205,37 +241,41 @@
     }
 
     .tab {
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--muted);
-      padding: 6px 10px;
-      border-radius: 10px;
-      font-size: 0.85rem;
+      border: 1px solid var(--line);
+      background: #f8fcff;
+      color: #48607a;
+      padding: 6px 8px;
+      font-size: 0.78rem;
       cursor: pointer;
       white-space: nowrap;
-      transition: 0.15s ease;
+      transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
       scroll-snap-align: start;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
     .tab.active {
-      color: var(--ink);
-      background: var(--tab-active);
-      border-color: #394258;
+      color: #f4f8fe;
+      background: var(--pearl);
+      border-color: var(--pearl);
     }
 
     .tab.dir {
-      color: #8ed0ff;
-      border-color: #35506f;
+      color: var(--blue);
+      border-color: #9cb6d0;
+      background: #f1f7ff;
     }
 
     .tab.parent {
-      color: #ffd18a;
-      border: 1px dashed #5c4b2f;
+      color: #8a3d08;
+      border-color: #d8b49b;
+      background: #fff4ea;
     }
 
     .tab.add {
-      color: var(--accent-2);
-      border: 1px dashed #3b4760;
+      color: #285988;
+      border-style: dashed;
     }
 
     .editor, .output {
@@ -243,26 +283,24 @@
       border: none;
       outline: none;
       resize: none;
-      background: #0f141c;
-      color: #e9efff;
+      background: var(--code-bg);
+      color: #d7e7f8;
       font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
       font-size: var(--code-font-size);
       line-height: var(--code-line-height);
-      padding: 16px;
+      padding: 14px;
       min-height: 0;
     }
 
     .output {
-      background: #0d1118;
-      color: #c7d2e5;
+      background: var(--code-bg-soft);
+      color: #c8d9ec;
     }
 
     .debug {
-      background: var(--panel);
-      border: 1px solid var(--outline);
-      border-radius: 16px;
-      padding: 12px 16px;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--line-strong);
+      background: #f7fbff;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -273,52 +311,68 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      color: var(--muted);
+      color: #33485f;
       text-transform: uppercase;
       letter-spacing: 0.08em;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
     .debug-log {
       flex: 1;
-      background: #0b0e13;
-      border: 1px solid #222b3d;
-      border-radius: 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--code-line);
       padding: 10px;
       font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
-      font-size: 0.85rem;
-      color: #aeb9cc;
+      font-size: 0.83rem;
+      color: #b8cce2;
       overflow: auto;
       white-space: pre-wrap;
+      line-height: 1.44;
     }
 
     .status {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.85rem;
-      color: var(--muted);
+      font-size: 0.79rem;
+      color: #42566e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
     .status-dot {
       width: 8px;
       height: 8px;
-      border-radius: 50%;
-      background: #3ddc84;
-      box-shadow: 0 0 6px rgba(61, 220, 132, 0.5);
+      background: #1f8d52;
     }
 
     .status-dot.loading {
-      background: #ffb454;
-      box-shadow: 0 0 6px rgba(255, 180, 84, 0.45);
+      background: var(--orange);
     }
 
     .status-dot.error {
-      background: #ff6b6b;
-      box-shadow: 0 0 6px rgba(255, 107, 107, 0.5);
+      background: var(--danger);
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1240px) {
+      .app {
+        grid-template-rows: auto 1fr 190px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .controls {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 1000px) {
       .app {
         height: auto;
         min-height: 100vh;
@@ -334,20 +388,14 @@
       .app {
         width: 100vw;
         min-height: 100vh;
-        padding: 10px;
-        gap: 10px;
-      }
-
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
+        padding: 8px;
+        gap: 8px;
       }
 
       .controls {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        gap: 7px;
       }
 
       .controls .status {
@@ -365,14 +413,6 @@
       .controls .btn,
       .controls select {
         width: 100%;
-      }
-
-      .pane-header {
-        padding: 9px 11px;
-      }
-
-      .tabs {
-        padding: 7px 10px;
       }
 
       .editor, .output {
@@ -394,13 +434,17 @@
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <div class="logo">V</div>
-        <h1>Vexel Playground</h1>
+        <div class="logo"><img src="design/vex.png" alt="Vexel seal"></div>
+        <div class="brand-meta">
+          <h1>Vexel Playground</h1>
+          <p class="brand-sub">Role: Playground / compile, inspect outputs, verify contracts.</p>
+        </div>
       </div>
       <div class="controls">
         <button class="btn primary" id="compileBtn" disabled>Compile</button>
         <button class="btn" id="addFileBtn">Add File</button>
         <button class="btn" id="shareBtn">Copy Link</button>
+        <button class="btn warn" type="button" onclick="window.location.href='index.html'">Back to Gate</button>
         <select id="backendSelect"></select>
         <button class="btn ghost" id="tutorialPrevBtn" title="Previous tutorial step">Prev</button>
         <button class="btn ghost" id="tutorialNextBtn" title="Next tutorial step">Next</button>

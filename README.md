@@ -1,35 +1,63 @@
 # Vexel Compiler
 
-C++ implementation of the Vexel language front-end plus the portable C backend.
+**Role**: Repository threshold and reading map.
 
-**Status**: Language RFC v1.0-rc1 is implemented for the c backend.
+Vexel is a whole-program, compile-time-first language that gives up raw-pointer escape hatches so the compiler can preserve global reasoning, then lowers through backends (including portable C).
 
-## Quick Start
+Vexel exists to keep program logic, compile-time execution, optimization intent, and emitted artifacts in one codebase instead of splitting semantics across generator layers and side tools.
+
+## Minimal Example
+
+```vx
+&add(a:#i32, b:#i32) -> #i32 { a + b }
+res:#i32 = add(40, 2)
+&^main() -> #i32 { res }
+```
+
+This folds to a constant path before backend emission.
+
+## Fastest Way In
+
+- **Playground**: https://martineztorres.github.io/vexel_lang/ (open `Playground` route)
+- **Local quick start**:
 
 ```bash
-make                                  # build compiler + backends
-./build/vexel -b c examples/simple.vx # emit out.c/out.h with the c backend
+make
+./build/vexel -b c examples/simple.vx
 gcc out.c -o simple -lm
 ./simple
 ```
 
-## Components & Layout
+- **Tutorial route**: `docs/tutorial.md` or `docs/playground.html` with `examples/tutorial/*`.
 
-- `frontend/` - lexer/parser/typechecker/evaluator/AST + analysis pipeline (`libvexelfrontend.a`, `build/vexel-frontend`, tests).
-- `backends/c/` - portable C backend (`libvexel-c.a`, tests).
-- `backends/ext/` - optional local external backends discovered by the build/driver (for example `megalinker` when present).
-- `driver/` - unified `build/vexel` CLI that lists registered backends.
-- `docs/` - language RFC (`docs/vexel-rfc.md`), detailed spec chapters (`docs/spec/`), curated landing page (`docs/index.html`), and generated playground page (`docs/playground.html`).
-- `playground/` - WebAssembly playground build (compile-to-C visualization).
-- `std/` - bundled standard-library module fallback (`::std::*` imports; project-local `std/` overrides per module path).
-- `examples/` - sample programs plus `examples/lib/` helper modules.
+## Reading Map
+
+Use this order:
+
+1. **Read the law**: [RFC](docs/vexel-rfc.md) (normative source of truth).
+2. **Read elaboration**: [Detailed spec](docs/spec/index.md) (operational semantics and contracts).
+3. **Taste behavior**: [Tutorial](docs/tutorial.md) + [Playground](docs/playground.html).
+4. **Open the machine**: [Architecture](docs/architecture.md).
+5. **Understand refusals**: [Anti-goals](docs/anti-goals.md).
+6. **Modify implementation**: sections below (layout, pipeline, backend contract, tests).
+
+## Repository Structure
+
+- `frontend/` — lexer/parser/typechecker/evaluator/AST + analysis pipeline (`libvexelfrontend.a`, `build/vexel-frontend`, tests).
+- `backends/c/` — portable C backend (`libvexel-c.a`, tests).
+- `backends/ext/` — optional local external backends discovered by build/driver (for example `megalinker` when present).
+- `driver/` — unified `build/vexel` CLI and backend dispatch.
+- `docs/` — landing (`docs/index.html`), RFC, detailed spec, tutorial, architecture, anti-goals, generated playground page.
+- `playground/` — WebAssembly playground build (self-contained `docs/playground.html`).
+- `std/` — bundled standard-library module fallback (`::std::*` imports; project-local `std/` overrides per module path).
+- `examples/` — sample programs plus tutorial corpus.
 
 ## Documentation Policy
 
-- `docs/vexel-rfc.md` is the normative language specification.
-- `docs/spec/index.md` is the detailed, chaptered elaboration of RFC behavior.
-- `README.md` is the operational guide (build, CLI, extension points, tests).
-- Compiler/backend behavior is documented next to the owning code path.
+- `docs/vexel-rfc.md` is normative.
+- `docs/spec/index.md` elaborates RFC behavior.
+- `README.md` is the repository map and operational guide.
+- Compiler/backend behavior is documented next to owning code paths.
 
 Implementation index:
 
@@ -75,9 +103,9 @@ Debug invariant checks live in `frontend/src/pipeline/pass_invariants.h`.
 ./build/vexel-frontend --allow-process foo.vx   # opt in to process expressions
 ```
 
-Vexel emits C; compile the generated `.c` with your host toolchain (e.g., `gcc -std=c11 -O2 -lm`).
+Vexel emits C; compile the generated `.c` with your host toolchain (for example `gcc -std=c11 -O2 -lm`).
 
-The unified driver forwards unknown options to the selected backend. If neither the frontend nor that backend recognizes an option, compilation fails with combined usage output.
+The unified driver forwards unknown options to the selected backend. If neither frontend nor selected backend recognizes an option, compilation fails with combined usage output.
 Backend selection is always explicit: pass `-b <name>` for every compile mode (`--run` / `--emit-exe` included).
 `--type-strictness` levels: `0` relaxed unresolved integer flow, `1` requires explicit type annotations for new variables, `2` additionally rejects unresolved literal flow across inferred call boundaries.
 
@@ -88,14 +116,14 @@ Backend plugin API is defined in `frontend/src/support/backend_registry.h`.
 Backend architecture rule:
 
 - The frontend/backend boundary is the `AnalyzedProgram` contract.
-- Backend code generation is intentionally backend-owned; no shared codegen layer.
-- Backends are expected to diverge in lowering strategy and target behavior.
-- Reentrancy is analyzed in the frontend graph pass; each backend documents its boundary defaults and whether it consumes `[[nonreentrant]]`.
+- Backend code generation is backend-owned (no shared codegen layer).
+- Backends may diverge in lowering strategy and target behavior.
+- Reentrancy is analyzed in the frontend graph pass; each backend documents boundary defaults and whether it consumes `[[nonreentrant]]`.
 
 Current reentrancy contract:
 
 - C backend (`backends/c/README.md`): recognizes `[[nonreentrant]]`; defaults to reentrant entry/exit boundaries (`R/R`).
-- External backends under `backends/ext/<name>/` define their own reentrancy defaults in their local README.
+- External backends under `backends/ext/<name>/` define their own reentrancy defaults in local README.
 
 Each backend must provide:
 
@@ -118,19 +146,19 @@ Conformance script: `backends/conformance_test.sh`.
 
 ### Process Expressions (Safety)
 
-Process expressions execute host commands. They are **disabled by default**; pass `--allow-process` when you trust the input. Keep them off for untrusted sources and CI.
+Process expressions execute host commands. They are **disabled by default**; pass `--allow-process` only for trusted inputs.
 
 ## Requirements & Testing
 
 - Suites live under `frontend/tests` and `backends/*/tests` (plus backend conformance in `backends/conformance_test.sh`).
 - Frontend tests use the Makefile harness; backend C tests use metadata inside `test.vx` files.
-- `make test` builds and runs the full suite.
-- `make ci` runs the release gate aggregate (`test` + frontend perf guards).
-- `make frontend-test`, `make frontend-perf-test`, `make backend-c-test`, and `make backend-conformance-test` run focused suites.
+- `make test` builds and runs full suite.
+- `make ci` runs release gate aggregate (`test` + frontend perf guards).
+- Focused suites: `make frontend-test`, `make frontend-perf-test`, `make backend-c-test`, `make backend-conformance-test`.
 
 ## Web Playground
 
-The web playground runs the unified compiler in WebAssembly, lets you choose a backend, and shows emitted output files. The generated `docs/playground.html` is self-contained (compiler embedded).
+The web playground runs the unified compiler in WebAssembly, lets you choose a backend, and shows emitted output files. Generated `docs/playground.html` is self-contained.
 
 Live playground: https://martineztorres.github.io/vexel_lang/
 
@@ -140,25 +168,19 @@ make web
 python3 -m http.server
 ```
 
-Open `http://localhost:8000/docs/` in a browser. You can copy `docs/playground.html` to another machine and it will still work.
-Open `http://localhost:8000/docs/playground.html` for the playground directly.
-Playground build and embed logic live in `playground/Makefile`, `playground/embed.py`, and `playground/web_main.cpp`.
+Open `http://localhost:8000/docs/` for landing+routes, and `http://localhost:8000/docs/playground.html` for direct playground.
 
-GitHub Pages deployment uses a workflow that runs `make web` and publishes `docs/`. The landing page (`docs/index.html`) is source-controlled; `docs/playground.html` is generated.
-In repository settings, configure Pages to use **GitHub Actions** as the source.
+GitHub Pages deployment runs `make web` and publishes `docs/`.
+Landing (`docs/index.html`) is source-controlled; playground (`docs/playground.html`) is generated from `playground/playground.template.html`.
 
 ## Supported Platforms & Toolchains
 
-- Builds require a C++17 compiler. The Makefiles honor `CXX`, so you can run `CXX=clang++ make` to select a toolchain.
-- Generated C is compiled with a host C11 toolchain during runtime tests; defaults assume `gcc -std=c11 -O2 -lm`.
-- Backends: c (portable C) is stable.
-- Optional native mode: if `libtcc` and `tcc` runtime files (`libtcc1.a`) are detected at build time, `build/vexel` supports `--run` and `--emit-exe` using backend c.
+- Requires a C++17 compiler. Makefiles honor `CXX` (`CXX=clang++ make` supported).
+- Generated C is compiled with host C11 toolchain in runtime tests (default assumes `gcc -std=c11 -O2 -lm`).
+- Backends: `c` is stable.
+- Optional native mode: if `libtcc` and runtime files (`libtcc1.a`) are detected, `build/vexel` supports `--run` and `--emit-exe` with backend `c`.
 
 ## Licensing & Releases
 
-- License: MIT (see `LICENSE`).
-- Status: RFC v1.0-rc1 implemented for c. Publish release notes in `CHANGELOG.md` as features land.
-
-## Examples
-
-Example programs live in `examples/`. The playground loads this tree recursively and lets you compile whichever `.vx` file is currently selected in the source navigator.
+- License: MIT (`LICENSE`).
+- Status: RFC v1.0-rc1 implemented for `c`; release notes land in `CHANGELOG.md`.

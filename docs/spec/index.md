@@ -1,5 +1,7 @@
 # Vexel Detailed Specification (v1.0-rc1)
 
+**Role**: Specification (detailed semantics and elaboration of the RFC).
+
 This document set expands `docs/vexel-rfc.md` into an implementation-focused, readable specification with examples.
 
 Normative order:

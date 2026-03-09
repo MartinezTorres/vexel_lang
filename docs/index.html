@@ -6,18 +6,22 @@
   <title>Vexel Language</title>
   <style>
     :root {
-      --bg: #081018;
-      --bg-soft: #0d1824;
-      --panel: #111f2d;
-      --panel-2: #17283a;
-      --ink: #edf4ff;
-      --muted: #a8bbd4;
-      --line: #2a425e;
-      --accent: #5ed0ff;
-      --accent-2: #ffd173;
-      --ok: #74e6a2;
-      --warn: #ffb780;
-      --shadow: 0 22px 58px rgba(0, 0, 0, 0.45);
+      --field: #f2f7fc;
+      --field-cold: #e8eef5;
+      --ink: #101419;
+      --ink-soft: #334153;
+      --pearl: #0b1117;
+      --pearl-soft: #121b24;
+      --line: #bac6d4;
+      --line-strong: #8fa4b8;
+      --blue: #1d6fbe;
+      --blue-bright: #2789e6;
+      --orange: #d86f1f;
+      --ok: #147d46;
+      --warn: #ad4d18;
+      --code-bg: #0d141d;
+      --code-line: #2d4358;
+      --max: 1220px;
     }
 
     * { box-sizing: border-box; }
@@ -25,15 +29,13 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: radial-gradient(1000px 600px at 0% -25%, #1d4c7540, transparent 60%),
-                  radial-gradient(900px 520px at 110% 8%, #6f4f2140, transparent 58%),
-                  var(--bg);
+      background: var(--field);
       color: var(--ink);
-      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     }
 
     a {
-      color: #9fdfff;
+      color: var(--blue);
       text-decoration: none;
     }
 
@@ -41,251 +43,504 @@
       text-decoration: underline;
     }
 
-    .wrap {
-      width: min(1160px, 94vw);
+    .site {
+      width: min(var(--max), 95vw);
       margin: 0 auto;
-      padding: 22px 0 54px;
+      padding: 14px 0 44px;
     }
 
-    .top {
+    .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      padding: 10px 0 12px;
+      gap: 14px;
+      border-top: 4px solid var(--pearl);
+      border-bottom: 1px solid var(--line);
+      padding: 10px 0;
+      margin-bottom: 14px;
     }
 
     .brand {
       display: flex;
       align-items: center;
       gap: 12px;
+      min-width: 0;
     }
 
-    .logo {
-      width: 38px;
-      height: 38px;
-      border-radius: 11px;
-      background: linear-gradient(145deg, var(--accent) 0%, var(--accent-2) 100%);
-      color: #101822;
+    .brand-mark {
+      width: 42px;
+      height: 42px;
       display: grid;
       place-items: center;
-      font-weight: 800;
-      letter-spacing: 0.03em;
-      box-shadow: var(--shadow);
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, #f7fbff 0%, #dfe8f2 100%);
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--pearl);
     }
 
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+    .brand-copy {
+      min-width: 0;
     }
 
-    .brand-text strong {
-      font-size: 0.95rem;
-      letter-spacing: 0.05em;
+    .brand-copy strong {
+      display: block;
+      font-size: 0.98rem;
       text-transform: uppercase;
-      color: #d8e7ff;
+      letter-spacing: 0.08em;
     }
 
-    .brand-text span {
-      color: var(--muted);
+    .brand-copy span {
+      display: block;
+      margin-top: 1px;
+      color: var(--ink-soft);
       font-size: 0.84rem;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .nav {
       display: flex;
-      gap: 9px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      padding: 9px 14px;
-      border-radius: 10px;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav a {
       border: 1px solid var(--line);
+      padding: 8px 12px;
       color: var(--ink);
-      background: var(--bg-soft);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
       text-decoration: none;
-      font-size: 0.92rem;
-      transition: transform .14s ease, border-color .14s ease;
+      background: #f8fbff;
+      transition: border-color 120ms ease, color 120ms ease;
     }
 
-    .btn:hover {
-      transform: translateY(-1px);
-      border-color: #416286;
-      text-decoration: none;
+    .nav a:hover {
+      border-color: var(--blue);
+      color: var(--blue);
     }
 
-    .btn.primary {
-      border-color: transparent;
-      background: linear-gradient(140deg, #3dc8ff 0%, #ffd173 100%);
-      color: #0f1722;
+    .nav a.primary {
+      background: var(--pearl);
+      color: #f3f8ff;
+      border-color: var(--pearl);
+    }
+
+    .gate {
+      border: 1px solid var(--line-strong);
+      background: linear-gradient(180deg, #f7fbff 0%, #edf3f9 100%);
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gate-main {
+      padding: 26px 28px;
+      border-right: 1px solid var(--line);
+      position: relative;
+    }
+
+    .gate-main::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 110px;
+      height: 4px;
+      background: var(--blue);
+    }
+
+    .gate-note {
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.76rem;
+      color: var(--ink-soft);
+    }
+
+    .gate h1 {
+      margin: 10px 0 8px;
+      font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+      line-height: 1.06;
+      max-width: 18ch;
+      letter-spacing: 0.01em;
       font-weight: 700;
     }
 
-    .hero {
-      margin-top: 12px;
-      padding: 28px;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: linear-gradient(180deg, #122132 0%, #0d1a28 100%);
-      box-shadow: var(--shadow);
-    }
-
-    .hero-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .badge {
-      border: 1px solid #355677;
-      background: #132536;
-      color: #c7dbf5;
-      border-radius: 999px;
-      padding: 4px 11px;
-      font-size: 0.78rem;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-
-    .hero h1 {
+    .subtitle {
       margin: 0;
-      font-size: clamp(1.8rem, 3.3vw, 2.55rem);
-      line-height: 1.12;
-      max-width: 19ch;
-      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
-      letter-spacing: 0.01em;
+      min-height: 1.4em;
+      font-size: 0.88rem;
+      color: var(--blue);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
-    .hero p {
-      margin: 10px 0 0;
-      color: var(--muted);
-      line-height: 1.56;
-      max-width: 76ch;
+    .gate p {
+      margin: 12px 0 0;
+      max-width: 72ch;
+      line-height: 1.52;
+      color: #24303f;
     }
 
-    .hero-actions {
-      margin-top: 18px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .hero-grid {
-      margin-top: 18px;
+    .trade {
+      margin-top: 14px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #eef4fb;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: 1fr 1fr;
     }
 
-    .hero-card {
-      border: 1px solid #29435f;
-      background: #122030;
-      border-radius: 12px;
-      padding: 12px;
+    .trade-block {
+      padding: 12px 14px;
     }
 
-    .hero-card h3 {
-      margin: 0 0 6px;
-      color: var(--accent);
-      font-size: 0.9rem;
-      letter-spacing: 0.05em;
+    .trade-block + .trade-block {
+      border-left: 1px solid var(--line);
+    }
+
+    .trade-block h2 {
+      margin: 0 0 7px;
+      font-size: 0.8rem;
       text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
-    .hero-card p {
+    .trade-block ul {
       margin: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
+      padding-left: 16px;
+      color: #2d3a4a;
+      font-size: 0.89rem;
       line-height: 1.44;
     }
 
-    .section {
-      margin-top: 24px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 22px;
+    .gate-actions {
+      margin-top: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
-    .section h2 {
-      margin: 0 0 10px;
-      font-size: 1.3rem;
+    .gate-actions a {
+      border: 1px solid var(--line-strong);
+      background: #f8fbff;
+      color: var(--ink);
+      padding: 9px 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.79rem;
+      text-decoration: none;
     }
 
-    .section > p {
-      margin: 0 0 12px;
-      color: var(--muted);
-      line-height: 1.56;
+    .gate-actions a.key {
+      background: var(--pearl);
+      border-color: var(--pearl);
+      color: #f4f8fe;
     }
 
-    .path-grid {
+    .gate-actions a.warn {
+      border-color: var(--orange);
+      color: #8f3e08;
+      background: #fff6ef;
+    }
+
+    .gate-seal {
+      background: var(--pearl);
+      color: #dbe8f7;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-      margin-top: 12px;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100%;
     }
 
-    .path-card {
-      border: 1px solid #2f4b67;
-      border-radius: 12px;
-      padding: 14px;
-      background: var(--panel-2);
+    .seal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #263548;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.77rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
-    .path-card h3 {
-      margin: 0 0 6px;
-      font-size: 1rem;
-      color: #dff1ff;
+    .seal-header span:last-child {
+      color: #8da4bf;
     }
 
-    .path-card p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      line-height: 1.45;
-      font-size: 0.92rem;
+    .seal-art {
+      padding: 16px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 10px;
     }
 
-    .cmd {
+    .seal-art img {
+      width: min(100%, 360px);
+      border: 1px solid #2a3d52;
+      background: #101820;
+      filter: grayscale(10%) contrast(108%);
+      display: block;
+    }
+
+    .seal-caption {
       margin: 0;
-      padding: 14px;
-      border: 1px solid #2f4968;
-      border-radius: 11px;
-      background: #0a131d;
-      color: #e4eefc;
-      font-family: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
-      font-size: 0.9rem;
+      text-align: center;
+      color: #afc1d6;
+      font-size: 0.83rem;
+      max-width: 30ch;
       line-height: 1.45;
+    }
+
+    .seal-foot {
+      border-top: 1px solid #263548;
+      padding: 10px 12px;
+      font-size: 0.8rem;
+      color: #9eb3ca;
+      line-height: 1.45;
+    }
+
+    .band {
+      margin-top: 16px;
+      border: 1px solid var(--line-strong);
+      background: #f8fbff;
+      padding: 18px;
+      position: relative;
+    }
+
+    .band h2 {
+      margin: 0;
+      font-size: 1.14rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .band-intro {
+      margin: 7px 0 0;
+      line-height: 1.52;
+      color: #2d3947;
+    }
+
+    .proof-grid {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .proof {
+      border: 1px solid var(--code-line);
+      background: var(--code-bg);
+      color: #d6e7fa;
+      padding: 12px;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.84rem;
+      line-height: 1.5;
       overflow-x: auto;
+      margin: 0;
+      white-space: pre;
+    }
+
+    .proof-label {
+      margin: 0 0 6px;
+      color: #8fb2d6;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.73rem;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .routes {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-top: 1px solid var(--line);
+      border-left: 1px solid var(--line);
+    }
+
+    .route {
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #eef4fb;
+      padding: 12px;
+      min-height: 136px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      text-decoration: none;
+      color: var(--ink);
+      position: relative;
+      transition: background 120ms ease;
+    }
+
+    .route::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 28px;
+      height: 3px;
+      background: var(--line-strong);
+      transition: width 140ms ease, background 140ms ease;
+    }
+
+    .route:hover {
+      background: #f7fbff;
+      text-decoration: none;
+    }
+
+    .route:hover::before {
+      width: 56px;
+      background: var(--blue);
+    }
+
+    .route h3 {
+      margin: 0;
+      font-size: 0.83rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .route p {
+      margin: 8px 0 0;
+      color: #334153;
+      font-size: 0.88rem;
+      line-height: 1.42;
+    }
+
+    .route span {
+      display: inline-block;
+      margin-top: 10px;
+      color: var(--blue);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .stack {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: #f9fcff;
+      padding: 14px;
+    }
+
+    .panel h3 {
+      margin: 0;
+      font-size: 0.9rem;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .panel p {
+      margin: 8px 0 0;
+      color: #2f3b4a;
+      line-height: 1.48;
+      font-size: 0.9rem;
+    }
+
+    .panel ul {
+      margin: 8px 0 0;
+      padding-left: 16px;
+      color: #2f3b4a;
+      line-height: 1.48;
+      font-size: 0.9rem;
+    }
+
+    .panel .links {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .panel .links a {
+      border: 1px solid var(--line);
+      padding: 6px 9px;
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      color: var(--ink);
+      text-decoration: none;
+      background: #ffffff;
+    }
+
+    .panel .links a:hover {
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .cmd,
+    .code {
+      margin: 10px 0 0;
+      border: 1px solid var(--code-line);
+      background: var(--code-bg);
+      color: #d6e7fa;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.84rem;
+      line-height: 1.5;
+      padding: 12px;
+      overflow-x: auto;
+      white-space: pre;
     }
 
     .list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
+      margin: 10px 0 0;
       display: grid;
       gap: 8px;
     }
 
-    .list li {
-      border: 1px solid #2d475f;
-      border-radius: 10px;
-      padding: 10px 12px;
-      background: #12202f;
-      color: var(--muted);
-      line-height: 1.44;
-      font-size: 0.92rem;
+    .list a {
+      display: block;
+      border: 1px solid var(--line);
+      background: #f0f6fd;
+      padding: 10px;
+      text-decoration: none;
+      color: var(--ink);
     }
 
-    .list strong {
-      color: #d8eaff;
+    .list a:hover {
+      border-color: var(--blue);
+    }
+
+    .list a strong {
+      display: block;
+      font-size: 0.83rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+      margin-bottom: 5px;
+      color: #203247;
+    }
+
+    .list a span {
+      display: block;
+      font-size: 0.9rem;
+      color: #344253;
+      line-height: 1.42;
     }
 
     .ref-grid {
@@ -295,265 +550,351 @@
       gap: 10px;
     }
 
-    .ref-card {
-      border: 1px solid #33506f;
-      background: #122133;
-      border-radius: 12px;
-      padding: 13px;
+    .ref {
+      border: 1px solid var(--line);
+      background: #f0f6fd;
+      padding: 11px;
     }
 
-    .ref-card h3 {
-      margin: 0 0 8px;
-      font-size: 0.98rem;
-      color: var(--accent-2);
-      letter-spacing: 0.03em;
+    .ref h3 {
+      margin: 0;
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
     }
 
-    .ref-card p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      line-height: 1.42;
+    .ref p {
+      margin: 7px 0 0;
+      color: #334154;
       font-size: 0.9rem;
+      line-height: 1.45;
     }
 
-    .split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      align-items: start;
+    .ref a {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    .warn-band {
+      border-left: 4px solid var(--orange);
+      background: #fff4ea;
+      padding: 10px 12px;
+      margin-top: 10px;
+      color: #6f2f07;
+      line-height: 1.48;
     }
 
     .status {
-      margin-top: 8px;
-      color: var(--muted);
+      margin-top: 10px;
       font-size: 0.9rem;
+      color: #3a4758;
     }
 
     .status.ok { color: var(--ok); }
     .status.warn { color: var(--warn); }
 
     .playground-frame {
-      margin-top: 12px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
       width: 100%;
-      min-height: 700px;
-      background: #0b1119;
+      min-height: 760px;
+      border: 1px solid var(--line-strong);
+      background: #f4f9ff;
+      margin-top: 10px;
     }
 
-    .foot {
+    footer {
       margin-top: 18px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+      color: #425264;
+      font-size: 0.86rem;
       text-align: center;
-      color: var(--muted);
-      font-size: 0.88rem;
     }
 
-    @media (max-width: 1040px) {
-      .hero-grid,
+    @media (max-width: 1160px) {
+      .routes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .gate { grid-template-columns: 1fr; }
+      .gate-main { border-right: none; border-bottom: 1px solid var(--line); }
+      .proof-grid,
+      .stack,
       .ref-grid {
         grid-template-columns: 1fr;
       }
-      .path-grid,
-      .split {
-        grid-template-columns: 1fr;
-      }
-      .playground-frame {
-        min-height: 560px;
-      }
+    }
+
+    @media (max-width: 820px) {
+      .site { width: 97vw; }
+      .topbar { align-items: flex-start; }
+      .nav { justify-content: flex-start; }
+      .routes { grid-template-columns: 1fr; }
+      .trade { grid-template-columns: 1fr; }
+      .trade-block + .trade-block { border-left: none; border-top: 1px solid var(--line); }
+      .playground-frame { min-height: 620px; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="top">
+  <div class="site">
+    <header class="topbar">
       <div class="brand">
-        <div class="logo">V</div>
-        <div class="brand-text">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
           <strong>Vexel Language</strong>
-          <span>Whole-program compile-time-first language</span>
+          <span>Whole-program compilation with strict refusals</span>
         </div>
       </div>
-      <nav class="nav">
-        <a class="btn" href="#paths">Paths</a>
-        <a class="btn" href="#learn">Learn</a>
-        <a class="btn" href="#reference">Reference</a>
-        <a class="btn" href="#playground">Playground</a>
-        <a class="btn" href="https://github.com/martineztorres/vexel_lang">Repository</a>
-        <a class="btn primary" href="playground.html">Open Playground</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="tutorial.md">Tutorial</a>
+        <a href="vexel-rfc.md">RFC</a>
+        <a href="playground.html">Playground</a>
+        <a href="architecture.md">Architecture</a>
+        <a href="anti-goals.md">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+        <a class="primary" href="playground.html">Open Playground</a>
       </nav>
     </header>
 
-    <section class="hero">
-      <div class="hero-top">
-        <span class="badge">v1.0-rc1 • feature freeze</span>
+    <section class="gate" id="gate">
+      <div class="gate-main">
+        <p class="gate-note">Role: Landing Page / v1.0-rc1</p>
+        <h1>A narrow language that trades escape hatches for global reasoning.</h1>
+        <p class="subtitle" id="rotatingSubtitle" aria-live="polite">Loading doctrine lines...</p>
+        <p>
+          Vexel rejects raw pointers and pointer arithmetic so the compiler can reason over the whole program graph.
+          The frontend executes compile-time paths, removes dead symbols, and hands a reduced contract to backends.
+          The point is not convenience. The point is controllable behavior under full visibility.
+        </p>
+
+        <div class="trade">
+          <article class="trade-block">
+            <h2>Gives Up</h2>
+            <ul>
+              <li>Raw pointer arithmetic.</li>
+              <li>Implicit runtime magic hidden from analysis.</li>
+              <li>Comfort defaults that block whole-program knowledge.</li>
+            </ul>
+          </article>
+          <article class="trade-block">
+            <h2>Gains</h2>
+            <ul>
+              <li>Compile-time execution on real program paths.</li>
+              <li>Aggressive dead-code elimination before codegen.</li>
+              <li>Backend freedom over a stable analyzed contract.</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="gate-actions">
+          <a class="key" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Taste It</a>
+          <a href="tutorial.md">Learn the Shape</a>
+          <a href="vexel-rfc.md">Read the Law</a>
+          <a href="spec/index.md">Read the Spec</a>
+          <a href="architecture.md">Open the Machine</a>
+          <a class="warn" href="anti-goals.md">Read the Refusals</a>
+        </div>
       </div>
-      <h1>One docs hub: learn fast, inspect semantics, run code in-browser.</h1>
-      <p>
-        Vexel is constrained by design so the frontend can model the full graph,
-        execute compile-time paths deeply, and remove dead code before backend emission.
-        Use this page as the entry point to tutorial flow, normative RFC, chaptered specification,
-        backend contracts, and the live playground.
-      </p>
-      <div class="hero-actions">
-        <a class="btn primary" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Start in Playground</a>
-        <a class="btn" href="vexel-rfc.md">Read RFC (normative)</a>
-        <a class="btn" href="spec/index.md">Read Detailed Spec</a>
-        <a class="btn" href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">Repository Guide</a>
-      </div>
-      <div class="hero-grid">
-        <article class="hero-card">
-          <h3>Frontend Owns Semantics</h3>
-          <p>CTE, DCE, type-soundness, and graph analysis are frontend responsibilities.</p>
-        </article>
-        <article class="hero-card">
-          <h3>Backend Contract</h3>
-          <p>Backends consume analyzed/residualized program contracts and may diverge in implementation strategy.</p>
-        </article>
-        <article class="hero-card">
-          <h3>Pragmatic Workflow</h3>
-          <p>Use tutorial examples + playground first, then verify behavior in RFC/spec and test gates.</p>
-        </article>
-      </div>
+
+      <aside class="gate-seal" aria-label="Vexel seal">
+        <div class="seal-header">
+          <span>Seal</span>
+          <span>Vex</span>
+        </div>
+        <div class="seal-art">
+          <img src="design/vex.png" alt="Vexel mechanical horse seal">
+          <p class="seal-caption">Guardian mark. Memory anchor. Not a mascot sticker.</p>
+        </div>
+        <div class="seal-foot">Vexel does not ask to be friendly. It asks to be coherent.</div>
+      </aside>
     </section>
 
-    <section class="section" id="paths">
-      <h2>Choose Your Path</h2>
-      <p>Pick the shortest path for your goal. Everything links back to runnable examples.</p>
-      <div class="path-grid">
-        <article class="path-card">
-          <h3>Learn the language</h3>
-          <p>Follow the curated tutorial track and run each step directly in the playground.</p>
-          <a href="#learn">Open Learning Track</a>
-        </article>
-        <article class="path-card">
-          <h3>Validate semantics</h3>
-          <p>Start from RFC, then drill into chaptered spec for operational detail and constraints.</p>
-          <a href="#reference">Open Reference Stack</a>
-        </article>
-        <article class="path-card">
-          <h3>Contribute to compiler</h3>
-          <p>Use repo guide + architecture contracts + CI gates to keep behavior stable.</p>
-          <a href="#contribute">Open Contributor Path</a>
-        </article>
-        <article class="path-card">
-          <h3>Explore codegen output</h3>
-          <p>Run examples with different backends and inspect emitted output files live.</p>
-          <a href="#playground">Open Playground Section</a>
-        </article>
-      </div>
-    </section>
-
-    <section class="section" id="quickstart">
-      <h2>Quick Start</h2>
-      <p>Minimal local workflow.</p>
-      <pre class="cmd"><code>make
-./build/vexel -b c examples/simple.vx
-gcc out.c -o simple -lm
-./simple</code></pre>
-    </section>
-
-    <section class="section" id="learn">
-      <h2>Learning Track (15-20 min)</h2>
-      <p>
-        Tutorial sources live in <code>examples/tutorial/</code>. Each step below opens directly in
-        <code>playground.html</code>.
-      </p>
-      <ol class="list">
-        <li><strong>1. Quick Add:</strong> function + entrypoint baseline — <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">open</a></li>
-        <li><strong>2. Hello + extern:</strong> ABI import and side-effect boundary — <a href="playground.html?file=examples/tutorial/hello.vx&backend=c">open</a></li>
-        <li><strong>3. Structs + methods:</strong> named types and operators — <a href="playground.html?file=examples/tutorial/structs.vx&backend=c">open</a></li>
-        <li><strong>4. Arrays and shapes:</strong> nested arrays and per-element operations — <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">open</a></li>
-        <li><strong>5. std::math lift:</strong> bundled math folding and broadcasting — <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">open</a></li>
-        <li><strong>6. std::bits reinterpret:</strong> explicit bit reinterpretation — <a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c">open</a></li>
-        <li><strong>7. Constexpr + DCE:</strong> pure folding and dead-symbol removal — <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">open</a></li>
-        <li><strong>8. Prime sieve:</strong> stress CTE on nontrivial loops — <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">open</a></li>
-        <li><strong>9. Multi-file modules:</strong> import flow across files — <a href="playground.html?file=examples/tutorial/multifile/main.vx&backend=c">open</a></li>
-      </ol>
-    </section>
-
-    <section class="section" id="reference">
-      <h2>Reference Stack</h2>
-      <p>Use these in order when checking language behavior.</p>
-      <div class="ref-grid">
-        <article class="ref-card">
-          <h3>RFC (Normative)</h3>
-          <p>Concise source of truth for syntax and semantics.</p>
-          <a href="vexel-rfc.md">Open <code>docs/vexel-rfc.md</code></a>
-        </article>
-        <article class="ref-card">
-          <h3>Detailed Spec</h3>
-          <p>Chaptered operational semantics and contracts.</p>
-          <a href="spec/index.md">Open <code>docs/spec/index.md</code></a>
-        </article>
-        <article class="ref-card">
-          <h3>Bundled std Spec</h3>
-          <p>`std::math` and `std::bits` behavior, folding, and backend mapping.</p>
-          <a href="spec/11-std-bundled.md">Open <code>docs/spec/11-std-bundled.md</code></a>
-        </article>
-      </div>
-      <p>
-        Chapter shortcuts:
-        <a href="spec/02-grammar.md">Grammar</a>,
-        <a href="spec/03-types.md">Types</a>,
-        <a href="spec/04-execution-model.md">Execution model</a>,
-        <a href="spec/05-analysis-optimization.md">Analysis/optimization</a>,
-        <a href="spec/07-abi-boundary.md">ABI boundary</a>,
-        <a href="spec/09-backend-contract.md">Frontend/backend contract</a>,
-        <a href="spec/10-conformance.md">Conformance gates</a>.
-      </p>
-    </section>
-
-    <section class="section" id="contribute">
-      <h2>Contributor Path</h2>
-      <div class="split">
+    <section class="band" id="proof">
+      <h2>Evidence Near the Gate</h2>
+      <p class="band-intro">A small source-to-output artifact. The frontend folds constants and drops unreachable baggage before backend emission.</p>
+      <div class="proof-grid">
         <div>
-          <p>Use architecture contracts and standard gates before pushing changes.</p>
-          <pre class="cmd"><code>make ci
+          <p class="proof-label">Input (Vexel)</p>
+          <pre class="proof"><code>&add(a:#i32, b:#i32) -> #i32 { a + b }
+res:#i32 = add(40, 2)
+&^main() -> #i32 { res }</code></pre>
+        </div>
+        <div>
+          <p class="proof-label">Output (Lowered Vexel / C backend target)</p>
+          <pre class="proof"><code>// compile-time fold
+res = 42;
+&^main() -> #i32 {
+    42
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="router">
+      <h2>Route Selector</h2>
+      <p class="band-intro">Choose a mode. Each route is role-based and points at working content, not placeholders.</p>
+      <div class="routes">
+        <a class="route" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">
+          <div>
+            <h3>Taste It</h3>
+            <p>Compile and inspect outputs in-browser immediately.</p>
+          </div>
+          <span>Playground</span>
+        </a>
+        <a class="route" href="tutorial.md">
+          <div>
+            <h3>Learn It</h3>
+            <p>Follow the curated tutorial sequence with runnable steps.</p>
+          </div>
+          <span>Tutorial Track</span>
+        </a>
+        <a class="route" href="vexel-rfc.md">
+          <div>
+            <h3>Read the Law</h3>
+            <p>Start at RFC, then move into chaptered operational detail.</p>
+          </div>
+          <span>RFC + Spec</span>
+        </a>
+        <a class="route" href="architecture.md">
+          <div>
+            <h3>Inspect Machine</h3>
+            <p>See architecture contracts, gates, and backend entry points.</p>
+          </div>
+          <span>Architecture</span>
+        </a>
+        <a class="route" href="anti-goals.md">
+          <div>
+            <h3>Read Refusals</h3>
+            <p>Understand what Vexel intentionally avoids and why.</p>
+          </div>
+          <span>Anti-goals</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="stack" id="learn">
+      <article class="panel">
+        <h3>Tutorial Track (15-20 min)</h3>
+        <p><strong>Role:</strong> Tutorial. Full page: <a href="tutorial.md">docs/tutorial.md</a>.</p>
+        <p>Examples live in <code>examples/tutorial/</code>. Open each step directly in the playground.</p>
+        <div class="list">
+          <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c"><strong>1. Quick Add</strong><span>Function + entrypoint baseline.</span></a>
+          <a href="playground.html?file=examples/tutorial/hello.vx&backend=c"><strong>2. Hello + extern</strong><span>Import boundary and side-effects.</span></a>
+          <a href="playground.html?file=examples/tutorial/structs.vx&backend=c"><strong>3. Structs + methods</strong><span>Named composites and operators.</span></a>
+          <a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c"><strong>4. Arrays + shapes</strong><span>Nested arrays and per-element operators.</span></a>
+          <a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c"><strong>5. std::math lift</strong><span>Bundled std math folding and broadcasting.</span></a>
+          <a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c"><strong>6. std::bits reinterpret</strong><span>Explicit bit reinterpretation.</span></a>
+          <a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c"><strong>7. Constexpr + DCE</strong><span>Compile-time execution and elimination.</span></a>
+          <a href="playground.html?file=examples/tutorial/sieve.vx&backend=c"><strong>8. Prime Sieve</strong><span>CTE on loop-heavy workload.</span></a>
+          <a href="playground.html?file=examples/tutorial/multifile/main.vx&backend=c"><strong>9. Multi-file modules</strong><span>Import flow across files.</span></a>
+        </div>
+      </article>
+
+      <article class="panel" id="reference">
+        <h3>Law + Specification Stack</h3>
+        <p><strong>Role:</strong> RFC + Specification. Use in order: normative law first, then operational detail.</p>
+        <div class="ref-grid">
+          <article class="ref">
+            <h3>RFC (Normative)</h3>
+            <p>Canonical language law and trade model.</p>
+            <a href="vexel-rfc.md">Open docs/vexel-rfc.md</a>
+          </article>
+          <article class="ref">
+            <h3>Detailed Spec</h3>
+            <p>Chaptered semantics, contracts, and conformance.</p>
+            <a href="spec/index.md">Open docs/spec/index.md</a>
+          </article>
+          <article class="ref">
+            <h3>Bundled std</h3>
+            <p>std::math and std::bits contract surface.</p>
+            <a href="spec/11-std-bundled.md">Open docs/spec/11-std-bundled.md</a>
+          </article>
+        </div>
+        <div class="links" style="margin-top:10px;">
+          <a href="spec/02-grammar.md">Grammar</a>
+          <a href="spec/03-types.md">Types</a>
+          <a href="spec/04-execution-model.md">Execution</a>
+          <a href="spec/05-analysis-optimization.md">Analysis</a>
+          <a href="spec/07-abi-boundary.md">ABI boundary</a>
+          <a href="spec/09-backend-contract.md">Backend contract</a>
+          <a href="spec/10-conformance.md">Conformance</a>
+        </div>
+      </article>
+    </section>
+
+    <section class="stack" id="machine">
+      <article class="panel">
+        <h3>Machine View / Contributor Path</h3>
+        <p><strong>Role:</strong> Architecture + Contributor Guide. Full page: <a href="architecture.md">docs/architecture.md</a>.</p>
+        <p>Use the same gate locally before pushing compiler changes.</p>
+        <pre class="cmd"><code>make ci
 make web
 make docs-check</code></pre>
-          <p>
-            Key references:
-            <a href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">README guide</a>,
-            <a href="https://github.com/martineztorres/vexel_lang/blob/main/frontend/src/architecture.md">frontend architecture contract</a>,
-            <a href="spec/09-backend-contract.md">backend contract chapter</a>.
-          </p>
+        <div class="links">
+          <a href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">README map</a>
+          <a href="https://github.com/martineztorres/vexel_lang/blob/main/frontend/src/architecture.md">Frontend architecture</a>
+          <a href="spec/09-backend-contract.md">Backend contract</a>
         </div>
-        <div>
-          <p>
-            For backend development, start from discovered backends under <code>backends/</code> and
-            optional local backends under <code>backends/ext/</code>. Backend-specific options are surfaced
-            by the unified driver help.
-          </p>
-          <pre class="cmd"><code>./build/vexel --help
-./build/vexel -b c --help
-./build/vexel -b megalinker --help</code></pre>
+      </article>
+
+      <article class="panel" id="refusals">
+        <h3>Refusals / Anti-goals</h3>
+        <p><strong>Role:</strong> Anti-goals. Full page: <a href="anti-goals.md">docs/anti-goals.md</a>.</p>
+        <p>Vexel is deliberate about what it does not optimize for.</p>
+        <ul>
+          <li>No raw pointer arithmetic. Whole-program reasoning has priority.</li>
+          <li>No implicit API behavior hidden from frontend analysis passes.</li>
+          <li>No architecture-by-convenience. Contracts are explicit and test-gated.</li>
+          <li>No "friendly" defaults that erase tradeoffs from the model.</li>
+        </ul>
+        <div class="warn-band">If you need unconstrained low-level mutation first and global analysis later, Vexel is likely the wrong tool.</div>
+        <div class="links">
+          <a href="vexel-rfc.md">Read formal trade model</a>
+          <a href="spec/05-analysis-optimization.md">Read optimization semantics</a>
         </div>
-      </div>
+      </article>
     </section>
 
-    <section class="section" id="playground">
-      <h2>Playground Integration</h2>
-      <p>
-        The embedded frame below loads <code>docs/playground.html</code>. Use it to compile examples,
-        switch backend outputs, and inspect emitted files without local toolchain steps.
-      </p>
-      <div class="hero-actions">
-        <a class="btn primary" href="playground.html">Open playground.html</a>
-        <a class="btn" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Open tutorial default</a>
+    <section class="band" id="playground">
+      <h2>Integrated Playground</h2>
+      <p class="band-intro">The frame loads <code>docs/playground.html</code>. Compile examples, switch backend output, and inspect build logs without leaving the site.</p>
+      <div class="links" style="margin-top:10px;">
+        <a href="playground.html">Open full playground page</a>
+        <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Open tutorial default</a>
       </div>
       <div id="playgroundStatus" class="status">Checking playground availability...</div>
       <iframe id="playgroundFrame" class="playground-frame" src="playground.html" title="Vexel Playground"></iframe>
     </section>
 
-    <div class="foot">
-      Landing page is source-controlled. <code>docs/playground.html</code> is generated separately.
-    </div>
+    <footer>
+      Landing page is source-controlled. <code>docs/playground.html</code> is generated from <code>playground/playground.template.html</code>.
+    </footer>
   </div>
 
   <script>
     (function () {
       const frame = document.getElementById("playgroundFrame");
       const status = document.getElementById("playgroundStatus");
+      const subtitle = document.getElementById("rotatingSubtitle");
+      const lines = [
+        "The compiler sees the graph or it sees nothing.",
+        "No pointers. No alibis. Full visibility.",
+        "Constrain the language. Expand the optimizer.",
+        "Give up escape hatches. Gain whole-program control.",
+        "A severe machine for explicit programs."
+      ];
+      let subtitleIndex = 0;
+
+      function rotateSubtitle() {
+        subtitle.textContent = lines[subtitleIndex % lines.length];
+        subtitleIndex += 1;
+      }
+
+      rotateSubtitle();
+      setInterval(rotateSubtitle, 4200);
 
       fetch("playground.html", { method: "HEAD" })
         .then((response) => {

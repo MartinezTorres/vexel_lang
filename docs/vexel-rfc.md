@@ -1,5 +1,7 @@
 # VEXEL - Language Specification (v1.0-rc1)
 
+**Role**: RFC (normative language definition).
+
 ## Preamble
 
 Vexel: strongly typed, minimal, operator-based language with no keywords.
