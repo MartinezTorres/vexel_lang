@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexel Anti-goals</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="site">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
+          <strong>Vexel Anti-goals</strong>
+          <span>Doctrine by refusal</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="tutorial.html">Tutorial</a>
+        <a href="law.html">RFC</a>
+        <a class="primary" href="playground.html">Playground</a>
+        <a href="architecture.html">Architecture</a>
+        <a class="active" href="anti-goals.html">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <p class="role">Role: Anti-goals</p>
+      <h1>Vexel refuses features that erase compiler certainty.</h1>
+      <p class="lead">
+        This page is a filter. If these refusals conflict with your priorities, Vexel is likely not the right fit.
+      </p>
+      <div class="warn">Opening refusal: Vexel does not optimize for unrestricted local freedom; it optimizes for provable global behavior.</div>
+    </section>
+
+    <main class="main">
+      <section class="section">
+        <h2>Rejected Assumptions</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>"Pointer freedom is mandatory"</h3>
+            <p>Rejected. Raw pointer arithmetic destroys whole-program reasoning and makes CTE/DCE less trustworthy.</p>
+          </article>
+          <article class="card">
+            <h3>"Generators should own compile-time logic"</h3>
+            <p>Rejected. Tool-splitting fragments semantics across layers and weakens compiler visibility.</p>
+          </article>
+          <article class="card">
+            <h3>"Implicit runtime behavior is acceptable"</h3>
+            <p>Rejected. Hidden behavior cannot be validated by frontend analysis and contracts.</p>
+          </article>
+          <article class="card">
+            <h3>"Ergonomic defaults outrank explicit tradeoffs"</h3>
+            <p>Rejected. Vexel keeps tradeoffs visible: fewer escape hatches in exchange for stronger compiler proof.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Why Pointers Are Rejected</h2>
+        <p>
+          Vexel is built around whole-program analysis. Pointer arithmetic allows alias patterns that are difficult to prove globally.
+          Removing that freedom enables stronger compile-time execution and dead-code elimination guarantees.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Why Tool-splitting Is Rejected</h2>
+        <p>
+          In Vexel, compile-time behavior belongs in the language/compiler pipeline, not in external code generators.
+          This keeps ownership clear and behavior testable in one place.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>What Freedom Vexel Does Not Prioritize</h2>
+        <ul>
+          <li>Unconstrained pointer-level mutation as a default coding model.</li>
+          <li>Opaque runtime side effects hidden from analysis passes.</li>
+          <li>Architecture drift introduced by convenience shortcuts.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Filter Line</h2>
+        <div class="warn">
+          If your primary requirement is unconstrained low-level mutation first and compiler reasoning second,
+          Vexel is intentionally not optimized for that workflow.
+        </div>
+        <div class="links">
+          <a href="law.html">Read formal law</a>
+          <a href="spec/05-analysis-optimization.md">Read analysis model</a>
+          <a href="anti-goals.md">Source markdown</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Anti-goals are part of the language identity, not release-note trivia.
+    </footer>
+  </div>
+</body>
+</html>

@@ -28,18 +28,18 @@ gcc out.c -o simple -lm
 ./simple
 ```
 
-- **Tutorial route**: `docs/tutorial.md` or `docs/playground.html` with `examples/tutorial/*`.
+- **Tutorial route**: `docs/tutorial.html` (source: `docs/tutorial.md`) or `docs/playground.html` with `examples/tutorial/*`.
 
 ## Reading Map
 
 Use this order:
 
-1. **Read the law**: [RFC](docs/vexel-rfc.md) (normative source of truth).
+1. **Read the law**: [Law route](docs/law.html) -> [RFC](docs/vexel-rfc.md) (normative source of truth).
 2. **Read elaboration**: [Detailed spec](docs/spec/index.md) (operational semantics and contracts).
-3. **Taste behavior**: [Tutorial](docs/tutorial.md) + [Playground](docs/playground.html).
-4. **Open the machine**: [Architecture](docs/architecture.md).
-5. **Understand refusals**: [Anti-goals](docs/anti-goals.md).
-6. **Modify implementation**: sections below (layout, pipeline, backend contract, tests).
+3. **Taste behavior**: [Tutorial route](docs/tutorial.html) + [Playground](docs/playground.html).
+4. **Open the machine**: [Architecture route](docs/architecture.html).
+5. **Understand refusals**: [Anti-goals route](docs/anti-goals.html).
+6. **Modify implementation**: [Contributor guide](docs/contributor-guide.html), then sections below.
 
 ## Repository Structure
 
@@ -47,7 +47,7 @@ Use this order:
 - `backends/c/` — portable C backend (`libvexel-c.a`, tests).
 - `backends/ext/` — optional local external backends discovered by build/driver (for example `megalinker` when present).
 - `driver/` — unified `build/vexel` CLI and backend dispatch.
-- `docs/` — landing (`docs/index.html`), RFC, detailed spec, tutorial, architecture, anti-goals, generated playground page.
+- `docs/` — landing (`docs/index.html`), role routes (`law/tutorial/architecture/anti-goals/contributor-guide`), RFC/spec sources, generated playground page.
 - `playground/` — WebAssembly playground build (self-contained `docs/playground.html`).
 - `std/` — bundled standard-library module fallback (`::std::*` imports; project-local `std/` overrides per module path).
 - `examples/` — sample programs plus tutorial corpus.

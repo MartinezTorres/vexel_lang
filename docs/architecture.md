@@ -1,6 +1,7 @@
 # Architecture — Open the Machine
 
 **Role**: Architecture (compiler ownership, contracts, and invariants).
+Web route page: `docs/architecture.html`.
 
 Vexel is organized around a strict ownership model:
 
@@ -47,6 +48,15 @@ Contract references:
 - [Specification chapter 09 — Frontend/Backend Contract](spec/09-backend-contract.md)
 - [Specification chapter 07 — ABI Boundary](spec/07-abi-boundary.md)
 - `frontend/src/support/backend_registry.h`
+
+## Residualization / Emission Concept
+
+Frontend passes reduce language semantics into a residual runtime contract:
+
+1. Fold what can be proven compile-time.
+2. Remove dead symbols and unreachable declarations.
+3. Emit analyzed residual behavior only.
+4. Hand this contract to backends for target-specific realization.
 
 ## Invariants and Safety Gates
 

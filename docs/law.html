@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexel Law and Specification</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="site">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
+          <strong>Vexel Law</strong>
+          <span>Normative RFC and detailed specification map</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="tutorial.html">Tutorial</a>
+        <a class="active" href="law.html">RFC</a>
+        <a class="primary" href="playground.html">Playground</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="anti-goals.html">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <p class="role">Role: RFC + Specification</p>
+      <h1>Read law first. Read elaboration second.</h1>
+      <p class="lead">
+        The RFC is normative. Detailed spec chapters elaborate behavior and contracts.
+        If there is any disagreement, the RFC wins.
+      </p>
+      <div class="links">
+        <a href="vexel-rfc.md">Open RFC (normative)</a>
+        <a href="spec/index.md">Open detailed spec index</a>
+      </div>
+    </section>
+
+    <main class="main">
+      <section class="section">
+        <h2>Normative Source</h2>
+        <p><code>docs/vexel-rfc.md</code> defines language law and core semantics.</p>
+        <div class="links">
+          <a href="vexel-rfc.md">RFC markdown</a>
+          <a href="../README.md">README reading map</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Detailed Elaboration Chapters</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Lexical + Grammar</h3>
+            <p><a href="spec/01-lexical.md">01 Lexical</a>, <a href="spec/02-grammar.md">02 Grammar</a></p>
+          </article>
+          <article class="card">
+            <h3>Types + Execution</h3>
+            <p><a href="spec/03-types.md">03 Types</a>, <a href="spec/04-execution-model.md">04 Execution</a></p>
+          </article>
+          <article class="card">
+            <h3>Analysis + Optimization</h3>
+            <p><a href="spec/05-analysis-optimization.md">05 Analysis/optimization</a></p>
+          </article>
+          <article class="card">
+            <h3>Modules + std</h3>
+            <p><a href="spec/06-modules-resources-std.md">06 Modules/resources/std</a>, <a href="spec/11-std-bundled.md">11 Bundled std</a></p>
+          </article>
+          <article class="card">
+            <h3>ABI + Contract</h3>
+            <p><a href="spec/07-abi-boundary.md">07 ABI boundary</a>, <a href="spec/09-backend-contract.md">09 Backend contract</a></p>
+          </article>
+          <article class="card">
+            <h3>Diagnostics + Gates</h3>
+            <p><a href="spec/08-diagnostics-strictness.md">08 Diagnostics</a>, <a href="spec/10-conformance.md">10 Conformance</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Related Routes</h2>
+        <div class="links">
+          <a href="tutorial.html">Tutorial route</a>
+          <a href="architecture.html">Architecture route</a>
+          <a href="anti-goals.html">Refusals route</a>
+          <a href="playground.html">Playground route</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Law page is a route hub. Normative source remains <code>docs/vexel-rfc.md</code>.
+    </footer>
+  </div>
+</body>
+</html>

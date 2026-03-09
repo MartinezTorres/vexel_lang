@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexel Architecture</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="site">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
+          <strong>Vexel Architecture</strong>
+          <span>Ownership, passes, residualization, emission</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="tutorial.html">Tutorial</a>
+        <a href="law.html">RFC</a>
+        <a class="primary" href="playground.html">Playground</a>
+        <a class="active" href="architecture.html">Architecture</a>
+        <a href="anti-goals.html">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <p class="role">Role: Architecture</p>
+      <h1>The frontend decides semantics; backends decide realization.</h1>
+      <p class="lead">
+        Vexel architecture is strict about ownership. Semantic decisions are resolved before backend emission.
+        Backends receive an analyzed/residual contract and focus on target strategy.
+      </p>
+      <div class="links">
+        <a href="spec/09-backend-contract.md">Backend contract chapter</a>
+        <a href="spec/05-analysis-optimization.md">Analysis and optimization chapter</a>
+      </div>
+    </section>
+
+    <main class="main">
+      <section class="section">
+        <h2>Ownership Model</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Frontend owns</h3>
+            <p>Parsing, resolution, typing, monomorphization, CTE, DCE, analysis facts, and concrete type-use validation.</p>
+          </article>
+          <article class="card">
+            <h3>Backend owns</h3>
+            <p>Code emission strategy, ABI realization details, and target-specific implementation choices over analyzed input.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Canonical Stage Order</h2>
+        <ol>
+          <li>Module load</li>
+          <li>Name/scope resolution</li>
+          <li>Type checking</li>
+          <li>Monomorphization</li>
+          <li>Lowering</li>
+          <li>Optimization fact collection</li>
+          <li>Analysis passes (effects, mutability, reentrancy, usage, variants)</li>
+          <li>Type-use validation</li>
+          <li>Live declaration pruning</li>
+          <li>Backend emission</li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <h2>Residualization and Emission Concept</h2>
+        <p>
+          The frontend resolves and executes what can be proven at compile time, then residualizes only behavior that must remain runtime-visible.
+          Backends should not re-interpret language semantics; they should emit target code from this residual contract.
+        </p>
+        <pre class="code"><code>typed AST -> lowered analyzed graph
+        -> CTE + DCE + analysis facts
+        -> residual program contract
+        -> backend-specific emission</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>Invariants and Release Gates</h2>
+        <p>Invariants are guarded by tests, pass checks, and architecture-focused suites.</p>
+        <pre class="code"><code>make test
+make ci
+make frontend-test
+make backend-conformance-test
+make docs-check</code></pre>
+        <div class="links">
+          <a href="../frontend/src/pipeline/pass_invariants.h">pass_invariants.h</a>
+          <a href="../frontend/src/pipeline/pass_invariants.cpp">pass_invariants.cpp</a>
+          <a href="../frontend/tests/architecture">frontend/tests/architecture</a>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Extension Points</h2>
+        <ul>
+          <li>Backends: <code>backends/&lt;name&gt;/</code> and <code>backends/ext/&lt;name&gt;/</code></li>
+          <li>Registry contract: <code>frontend/src/support/backend_registry.h</code></li>
+          <li>Driver entry: <code>driver/src/vexel_main.cpp</code></li>
+          <li>Discovery/build wiring: <code>Makefile</code>, <code>driver/Makefile</code></li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Related Routes</h2>
+        <div class="links">
+          <a href="law.html">Read the law</a>
+          <a href="tutorial.html">Tutorial route</a>
+          <a href="anti-goals.html">Refusals</a>
+          <a href="architecture.md">Architecture source markdown</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Architecture page is a machine map; start from landing/tutorial if you are new to Vexel.
+    </footer>
+  </div>
+</body>
+</html>

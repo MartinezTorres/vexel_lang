@@ -649,13 +649,12 @@
       </div>
       <nav class="nav" aria-label="Primary">
         <a href="index.html">Home</a>
-        <a href="tutorial.md">Tutorial</a>
-        <a href="vexel-rfc.md">RFC</a>
-        <a href="playground.html">Playground</a>
-        <a href="architecture.md">Architecture</a>
-        <a href="anti-goals.md">Anti-goals</a>
+        <a href="tutorial.html">Tutorial</a>
+        <a href="law.html">RFC</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="anti-goals.html">Anti-goals</a>
         <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
-        <a class="primary" href="playground.html">Open Playground</a>
+        <a class="primary" href="playground.html">Playground</a>
       </nav>
     </header>
 
@@ -691,11 +690,11 @@
 
         <div class="gate-actions">
           <a class="key" href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Taste It</a>
-          <a href="tutorial.md">Learn the Shape</a>
-          <a href="vexel-rfc.md">Read the Law</a>
+          <a href="tutorial.html">Learn the Shape</a>
+          <a href="law.html">Read the Law</a>
           <a href="spec/index.md">Read the Spec</a>
-          <a href="architecture.md">Open the Machine</a>
-          <a class="warn" href="anti-goals.md">Read the Refusals</a>
+          <a href="architecture.html">Open the Machine</a>
+          <a class="warn" href="anti-goals.html">Read the Refusals</a>
         </div>
       </div>
 
@@ -714,20 +713,24 @@
 
     <section class="band" id="proof">
       <h2>Evidence Near the Gate</h2>
-      <p class="band-intro">A small source-to-output artifact. The frontend folds constants and drops unreachable baggage before backend emission.</p>
+      <p class="band-intro">Real compile artifact from <code>examples/tutorial/quickadd.vx</code>. Frontend folding and DCE leave a single exported behavior.</p>
       <div class="proof-grid">
         <div>
-          <p class="proof-label">Input (Vexel)</p>
+          <p class="proof-label">Input + command</p>
           <pre class="proof"><code>&add(a:#i32, b:#i32) -> #i32 { a + b }
 res:#i32 = add(40, 2)
-&^main() -> #i32 { res }</code></pre>
+&^main() -> #i32 { res }
+
+./build/vexel -b c examples/tutorial/quickadd.vx -o vxproof</code></pre>
         </div>
         <div>
-          <p class="proof-label">Output (Lowered Vexel / C backend target)</p>
-          <pre class="proof"><code>// compile-time fold
-res = 42;
-&^main() -> #i32 {
-    42
+          <p class="proof-label">Observed output (vxproof.c)</p>
+          <pre class="proof"><code>#include "vxproof.h"
+
+// VEXEL: kind=function export=yes reentrant=yes ref_mask=- pure=yes no_global_write=yes abi=native
+int32_t main(
+) {
+return 42;
 }</code></pre>
         </div>
       </div>
@@ -744,28 +747,28 @@ res = 42;
           </div>
           <span>Playground</span>
         </a>
-        <a class="route" href="tutorial.md">
+        <a class="route" href="tutorial.html">
           <div>
             <h3>Learn It</h3>
             <p>Follow the curated tutorial sequence with runnable steps.</p>
           </div>
           <span>Tutorial Track</span>
         </a>
-        <a class="route" href="vexel-rfc.md">
+        <a class="route" href="law.html">
           <div>
             <h3>Read the Law</h3>
             <p>Start at RFC, then move into chaptered operational detail.</p>
           </div>
           <span>RFC + Spec</span>
         </a>
-        <a class="route" href="architecture.md">
+        <a class="route" href="architecture.html">
           <div>
             <h3>Inspect Machine</h3>
             <p>See architecture contracts, gates, and backend entry points.</p>
           </div>
           <span>Architecture</span>
         </a>
-        <a class="route" href="anti-goals.md">
+        <a class="route" href="anti-goals.html">
           <div>
             <h3>Read Refusals</h3>
             <p>Understand what Vexel intentionally avoids and why.</p>
@@ -778,7 +781,7 @@ res = 42;
     <section class="stack" id="learn">
       <article class="panel">
         <h3>Tutorial Track (15-20 min)</h3>
-        <p><strong>Role:</strong> Tutorial. Full page: <a href="tutorial.md">docs/tutorial.md</a>.</p>
+        <p><strong>Role:</strong> Tutorial. Full page: <a href="tutorial.html">docs/tutorial.html</a>.</p>
         <p>Examples live in <code>examples/tutorial/</code>. Open each step directly in the playground.</p>
         <div class="list">
           <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c"><strong>1. Quick Add</strong><span>Function + entrypoint baseline.</span></a>
@@ -828,13 +831,14 @@ res = 42;
     <section class="stack" id="machine">
       <article class="panel">
         <h3>Machine View / Contributor Path</h3>
-        <p><strong>Role:</strong> Architecture + Contributor Guide. Full page: <a href="architecture.md">docs/architecture.md</a>.</p>
+        <p><strong>Role:</strong> Architecture + Contributor Guide. Full pages: <a href="architecture.html">docs/architecture.html</a> and <a href="contributor-guide.html">docs/contributor-guide.html</a>.</p>
         <p>Use the same gate locally before pushing compiler changes.</p>
         <pre class="cmd"><code>make ci
 make web
 make docs-check</code></pre>
         <div class="links">
           <a href="https://github.com/martineztorres/vexel_lang/blob/main/README.md">README map</a>
+          <a href="contributor-guide.html">Contributor guide route</a>
           <a href="https://github.com/martineztorres/vexel_lang/blob/main/frontend/src/architecture.md">Frontend architecture</a>
           <a href="spec/09-backend-contract.md">Backend contract</a>
         </div>
@@ -842,7 +846,7 @@ make docs-check</code></pre>
 
       <article class="panel" id="refusals">
         <h3>Refusals / Anti-goals</h3>
-        <p><strong>Role:</strong> Anti-goals. Full page: <a href="anti-goals.md">docs/anti-goals.md</a>.</p>
+        <p><strong>Role:</strong> Anti-goals. Full page: <a href="anti-goals.html">docs/anti-goals.html</a>.</p>
         <p>Vexel is deliberate about what it does not optimize for.</p>
         <ul>
           <li>No raw pointer arithmetic. Whole-program reasoning has priority.</li>
@@ -852,7 +856,7 @@ make docs-check</code></pre>
         </ul>
         <div class="warn-band">If you need unconstrained low-level mutation first and global analysis later, Vexel is likely the wrong tool.</div>
         <div class="links">
-          <a href="vexel-rfc.md">Read formal trade model</a>
+          <a href="law.html">Read formal trade model</a>
           <a href="spec/05-analysis-optimization.md">Read optimization semantics</a>
         </div>
       </article>
@@ -879,7 +883,7 @@ make docs-check</code></pre>
       const frame = document.getElementById("playgroundFrame");
       const status = document.getElementById("playgroundStatus");
       const subtitle = document.getElementById("rotatingSubtitle");
-      const lines = [
+      const fallbackLines = [
         "The compiler sees the graph or it sees nothing.",
         "No pointers. No alibis. Full visibility.",
         "Constrain the language. Expand the optimizer.",
@@ -888,13 +892,35 @@ make docs-check</code></pre>
       ];
       let subtitleIndex = 0;
 
-      function rotateSubtitle() {
+      function rotateSubtitle(lines) {
         subtitle.textContent = lines[subtitleIndex % lines.length];
         subtitleIndex += 1;
       }
 
-      rotateSubtitle();
-      setInterval(rotateSubtitle, 4200);
+      function startSubtitleRotation(lines) {
+        if (!Array.isArray(lines) || lines.length === 0) {
+          lines = fallbackLines;
+        }
+        rotateSubtitle(lines);
+        const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!reduceMotion) {
+          setInterval(function () { rotateSubtitle(lines); }, 4200);
+        }
+      }
+
+      fetch("design/subtitles.json")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("subtitle pool missing");
+          }
+          return response.json();
+        })
+        .then((lines) => {
+          startSubtitleRotation(lines);
+        })
+        .catch(() => {
+          startSubtitleRotation(fallbackLines);
+        });
 
       fetch("playground.html", { method: "HEAD" })
         .then((response) => {

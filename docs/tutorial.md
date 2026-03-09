@@ -4,6 +4,7 @@
 
 This tutorial is a guided route through runnable examples under `examples/tutorial/`.
 The fastest path is to open each step in the playground and inspect emitted output files.
+Web route page: `docs/tutorial.html`.
 
 ## How to Use This Tutorial
 
@@ -25,6 +26,18 @@ The tutorial is designed to teach shape and tradeoffs, not only syntax.
 7. [Constexpr + DCE](playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c)
 8. [Prime sieve](playground.html?file=examples/tutorial/sieve.vx&backend=c)
 9. [Multi-file module](playground.html?file=examples/tutorial/multifile/main.vx&backend=c)
+
+## Step Intent (Quick Reference)
+
+- Quick Add: baseline shape and compile-time fold.
+- Hello + extern: ABI import and side-effect boundaries.
+- Structs + methods: type constructor + method/operator surface.
+- Arrays + shapes: nested arrays and per-element operators.
+- std::math arrays: bundled math lift behavior.
+- std::bits reinterpret: explicit bit reinterpretation contract.
+- Constexpr + DCE: dead symbol removal and residual minimization.
+- Prime sieve: loop-heavy compile-time execution behavior.
+- Multi-file module: import resolution and symbol flow.
 
 ## What to Observe
 

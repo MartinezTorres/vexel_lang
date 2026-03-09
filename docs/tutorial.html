@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexel Tutorial</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="site">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
+          <strong>Vexel Tutorial</strong>
+          <span>Learn the shape before reading every rule</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a class="active" href="tutorial.html">Tutorial</a>
+        <a href="law.html">RFC</a>
+        <a class="primary" href="playground.html">Playground</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="anti-goals.html">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <p class="role">Role: Tutorial</p>
+      <h1>Vexel is learned by observing what the compiler can prove.</h1>
+      <p class="lead">
+        This route uses runnable examples from <code>examples/tutorial/</code>. For each step: run in playground,
+        inspect emitted files, and check what was folded or removed.
+      </p>
+      <div class="links">
+        <a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Start from step 1</a>
+        <a href="playground.html">Open playground directly</a>
+        <a href="law.html">Read law while learning</a>
+      </div>
+    </section>
+
+    <main class="main">
+      <section class="section">
+        <h2>How to Run Each Step</h2>
+        <ol>
+          <li>Open the linked file in <code>playground.html</code>.</li>
+          <li>Compile with backend <code>c</code> first.</li>
+          <li>Check output files and build log.</li>
+          <li>Identify what became compile-time known and what remained runtime.</li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <h2>Guided Steps</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>1. Quick Add</h3>
+            <p>Objective: recognize baseline shape and exported entrypoint behavior.</p>
+            <p>Inspect: folded constant in emitted output.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/quickadd.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>2. Hello + extern</h3>
+            <p>Objective: understand external ABI boundary (<code>&!</code>) and side effects.</p>
+            <p>Inspect: extern declaration and emitted call boundary.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/hello.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>3. Structs + methods</h3>
+            <p>Objective: see named type behavior and operator/method syntax.</p>
+            <p>Inspect: lowered representation and method dispatch shape.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/structs.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>4. Arrays + shapes</h3>
+            <p>Objective: nested arrays and per-element arithmetic.</p>
+            <p>Inspect: shape preservation and operator lowering.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/vector_matrix.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>5. std::math arrays</h3>
+            <p>Objective: bundled std lift behavior and folding scope.</p>
+            <p>Inspect: where math calls collapse vs remain runtime.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/math_arrays.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>6. std::bits reinterpret</h3>
+            <p>Objective: explicit bit reinterpretation contract.</p>
+            <p>Inspect: preserved semantics and target mapping hints.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/bits_reinterpret.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>7. Constexpr + DCE</h3>
+            <p>Objective: verify that unused paths are removed.</p>
+            <p>Inspect: symbol reachability and residual output.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/constexpr_dce.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>8. Prime sieve</h3>
+            <p>Objective: stress compile-time loop evaluation.</p>
+            <p>Inspect: runtime residue vs compile-time collapse.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/sieve.vx&backend=c">Open step</a></div>
+          </article>
+          <article class="card">
+            <h3>9. Multi-file module</h3>
+            <p>Objective: understand module import and symbol flow.</p>
+            <p>Inspect: import resolution and emitted dependencies.</p>
+            <div class="links"><a href="playground.html?file=examples/tutorial/multifile/main.vx&backend=c">Open step</a></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Related Routes</h2>
+        <div class="links">
+          <a href="law.html">Read the law</a>
+          <a href="architecture.html">Open the machine</a>
+          <a href="anti-goals.html">Read refusals</a>
+          <a href="vexel-rfc.md">RFC source markdown</a>
+          <a href="tutorial.md">Tutorial source markdown</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Tutorial page is route-oriented. Source example corpus lives under <code>examples/tutorial/</code>.
+    </footer>
+  </div>
+</body>
+</html>

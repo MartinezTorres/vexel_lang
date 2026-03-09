@@ -1,0 +1,10 @@
+[
+  "The compiler sees the graph or it sees nothing.",
+  "No pointers. No alibis. Full visibility.",
+  "Constrain the language. Expand the optimizer.",
+  "Give up escape hatches. Gain whole-program control.",
+  "A severe machine for explicit programs.",
+  "One codebase, one analysis graph, no split semantics.",
+  "Refuse local chaos; keep global certainty.",
+  "Vexel optimizes what it can prove, not what it can guess."
+]

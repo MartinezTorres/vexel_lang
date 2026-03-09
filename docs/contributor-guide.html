@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vexel Contributor Guide</title>
+  <link rel="stylesheet" href="library.css">
+</head>
+<body>
+  <div class="site">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">VX</div>
+        <div class="brand-copy">
+          <strong>Contributor Guide</strong>
+          <span>Work on implementation without breaking contracts</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Home</a>
+        <a href="tutorial.html">Tutorial</a>
+        <a href="law.html">RFC</a>
+        <a class="primary" href="playground.html">Playground</a>
+        <a href="architecture.html">Architecture</a>
+        <a href="anti-goals.html">Anti-goals</a>
+        <a href="https://github.com/martineztorres/vexel_lang">Repository</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <p class="role">Role: Contributor Guide</p>
+      <h1>Change behavior deliberately and keep ownership boundaries intact.</h1>
+      <p class="lead">Use this route after reading law and architecture pages.</p>
+    </section>
+
+    <main class="main">
+      <section class="section">
+        <h2>Primary Gates</h2>
+        <pre class="code"><code>make test
+make ci
+make frontend-test
+make backend-conformance-test
+make docs-check
+make web</code></pre>
+      </section>
+
+      <section class="section">
+        <h2>Source Ownership</h2>
+        <ul>
+          <li>Frontend owns semantics, CTE, DCE, analysis, type soundness.</li>
+          <li>Backends own emission strategy from analyzed contract.</li>
+          <li>Driver owns backend discovery and CLI routing.</li>
+        </ul>
+      </section>
+
+      <section class="section">
+        <h2>Useful Entry Points</h2>
+        <div class="links">
+          <a href="../README.md">README map</a>
+          <a href="architecture.html">Architecture route</a>
+          <a href="../frontend/src/architecture.md">Frontend architecture source</a>
+          <a href="../frontend/tests/architecture">Architecture tests</a>
+          <a href="../driver/src/vexel_main.cpp">Driver source</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Contributor guide is operational. Law and architecture remain upstream sources.
+    </footer>
+  </div>
+</body>
+</html>
