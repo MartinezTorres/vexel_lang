@@ -1,10 +1,14 @@
 [
   "The compiler sees the graph or it sees nothing.",
-  "No pointers. No alibis. Full visibility.",
+  "No pointers. No excuses. Full visibility.",
   "Constrain the language. Expand the optimizer.",
-  "Give up escape hatches. Gain whole-program control.",
-  "A severe machine for explicit programs.",
+  "Give up local freedom. Gain global proof.",
   "One codebase, one analysis graph, no split semantics.",
+  "Vexel optimizes what it can prove, not what it can guess.",
+  "Whole-program first. Comfort second.",
+  "If you want escape hatches, keep walking.",
+  "What is the most approachable language to learn? Not Vexel.",
   "Refuse local chaos; keep global certainty.",
-  "Vexel optimizes what it can prove, not what it can guess."
+  "Make intent explicit or the compiler will not pretend.",
+  "A severe machine for explicit programs."
 ]

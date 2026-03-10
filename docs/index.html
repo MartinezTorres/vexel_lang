@@ -975,9 +975,9 @@ int32_t main(
       const subtitle = document.getElementById("rotatingSubtitle");
       const fallbackLines = [
         "The compiler sees the graph or it sees nothing.",
-        "No pointers. No alibis. Full visibility.",
+        "No pointers. No excuses. Full visibility.",
         "Constrain the language. Expand the optimizer.",
-        "Give up escape hatches. Gain whole-program control.",
+        "If you want escape hatches, keep walking.",
         "A severe machine for explicit programs."
       ];
       let subtitleIndex = 0;
@@ -991,6 +991,7 @@ int32_t main(
         if (!Array.isArray(lines) || lines.length === 0) {
           lines = fallbackLines;
         }
+        subtitleIndex = Math.floor(Math.random() * lines.length);
         rotateSubtitle(lines);
         const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (!reduceMotion) {
