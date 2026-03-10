@@ -1,4 +1,10 @@
 [
+  "Vexel - the language you would not let your kids be friends with.",
+  "Vexel - make love, not Vexel.",
+  "Vexel - honey... I accidentally invented Vexel.",
+  "Vexel - what is the most approachable language to learn? Not Vexel.",
+  "Vexel - no pointers, no excuses.",
+  "Vexel - if you want escape hatches, keep walking.",
   "The compiler sees the graph or it sees nothing.",
   "No pointers. No excuses. Full visibility.",
   "Constrain the language. Expand the optimizer.",
@@ -6,9 +12,8 @@
   "One codebase, one analysis graph, no split semantics.",
   "Vexel optimizes what it can prove, not what it can guess.",
   "Whole-program first. Comfort second.",
-  "If you want escape hatches, keep walking.",
-  "What is the most approachable language to learn? Not Vexel.",
   "Refuse local chaos; keep global certainty.",
+  "If intent is vague, the compiler is not your therapist.",
   "Make intent explicit or the compiler will not pretend.",
   "A severe machine for explicit programs."
 ]
