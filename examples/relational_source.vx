@@ -1,0 +1,20 @@
+// No initializer seeds: the two shape equations determine lengths 4 and 3.
+left:#u8[|right|+1];
+right:#u8[7-|left|];
+^left_length=|left|;
+^right_length=|right|;
+
+// Each call creates its own generic instance and frozen schema capture.
+&packet(offset:#u8,count:#u8,x:#u16) {
+    #Packet(count:#u8,data:#u16[count+offset]);
+    #Packet(count,[x,x+1,x+2])
+}
+
+&^first([[range(0,250)]] x:#u8) {packet(1,|right|-1,(#u16)x)}
+&^second([[range(0,250)]] x:#u8) {packet(2,|left|-3,(#u16)x)}
+
+// A field query can resolve while a pure value equation stays open.
+// A declaration without an initializer would instead denote runtime storage.
+missing:#u8=missing;
+partial=packet(missing,2,(#u16)7);
+^field_type_example:#u8={v:#[partial.count]=42;v};

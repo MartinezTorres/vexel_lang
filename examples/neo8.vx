@@ -1,0 +1,27 @@
+// These constants are supplied by the selected target before resolution.
+^physical_ram:#u16 = __target_ram_bytes;
+^rom_window:#u16 = __target_rom_bank_bytes;
+
+&!msx_putchar(character:#u8);
+
+// &~ remains a materialized C function within this export's banked module.
+&~mix(value:#u16) -> #u16 { value * 3 + 5 }
+
+&^sample(value:#u16, enabled:#b) -> #u16 {
+    result:#u16 = mix(value);
+    enabled ? { result += 7; };
+    result
+}
+
+&^lookup(index:#u8) -> #u8 {
+    table:#u8[4] = [2, 3, 5, 7];
+    table[index]
+}
+
+&^entry() -> #u16 {
+    msx_putchar('V');
+    msx_putchar('X');
+    msx_putchar(13);
+    msx_putchar(10);
+    sample((#u16)123, 1)
+}

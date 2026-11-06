@@ -1,0 +1,14 @@
+// Recursive specialization, closed overload selection, versioned local state
+// and residual control all contribute obligations to the same solver.
+&~triangle(n:#u16) {n==0 ? (#u16)0 : n+triangle(n-1)}
+&step(x:#u8) {x+1}
+&step(x:#u16) {x+2}
+
+base=triangle(3);
+&^control(x:#u8) {
+    state:#u16=(#u16)x;
+    before=state;
+    state+=step(base);
+    state=x<128 ? state*2 : state+1;
+    [before,state]
+}

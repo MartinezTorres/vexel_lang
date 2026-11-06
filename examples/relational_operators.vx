@@ -1,0 +1,29 @@
+&^bits(n:#u8) {
+    x:#u8=n;
+    x|=3;x&=127;x^=5;
+    x<<=(#u16)1;x>>=(#u16)1;
+    x/=3;x%=5;
+    [~n,x,|n|,((#u32)n+0x12345600)^0xff00ff00]
+}
+
+&^logical(n:#u8) {
+    total:#u8=0;
+    n<128&&{total+=1;1};
+    n<128||{total+=2;0};
+    flag:#b=n<64;
+    flag||={total+=4;1};
+    [total,(#u8)flag]
+}
+
+&^shift_case(n:#u8) {
+    x:#u8=1;
+    x<<=(#u16)n;
+    7
+}
+
+scratch:#u8[1];
+&^divide_case(n:#u8) {
+    scratch=[7];
+    scratch[0]/=n;
+    7
+}

@@ -1,0 +1,27 @@
+&~pair(n:#u8)->(#u8,#u16) {(n,(#u16)n+300)}
+
+&^swapped(n:#u8) {
+    x:#u8=n;
+    y:#u8=n+1;
+    &~swap() {x,y=(y,x);}
+    i:#u8=0;
+    (i<3)!@{swap();i+=1;};
+    (x,y)
+}
+
+&^packed(n:#u8) {(#u8[3])pair(n)}
+
+&^initialized(n:#u8) {
+    x:#u8;
+    y:#u16;
+    &~init(k:#u8) {x,y=(k,(#u16)k+300);}
+    init(n);
+    (x,y)
+}
+
+&^completed(n:#u8)->(#u8,#u16) {
+    x:#u8=1;
+    y:#u16=2;
+    x,y=(n,{n<128 ? {->(n,(#u16)n+700);};(#u16)n+300});
+    (x,y)
+}

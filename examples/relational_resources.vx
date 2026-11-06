@@ -1,0 +1,8 @@
+[[asset_lookup]] &^byte(n:#u8)->#u8 {
+    ::relational_assets::z.bin[n%4]
+}
+[[asset_catalog]] &^catalog(n:#u8)->#u16 {
+    sum:#u16=n;
+    ::relational_assets@@{sum=sum*3+(#u16)|_.__1|;};
+    sum
+}

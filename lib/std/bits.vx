@@ -1,0 +1,6 @@
+// Portable copies of the canonical IEEE representation. These functions use
+// ordinary Vexel relations, so folding and runtime code share the same rules.
+&f32_as_u32(value:#f32)->#u32 { (#u32)(#u8[4])value }
+&u32_as_f32(value:#u32)->#f32 { (#f32)(#u8[4])value }
+&f64_as_u64(value:#f64)->#u64 { (#u64)(#u8[8])value }
+&u64_as_f64(value:#u64)->#f64 { (#f64)(#u8[8])value }

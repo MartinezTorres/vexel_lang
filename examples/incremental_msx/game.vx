@@ -1,0 +1,12 @@
+// Two sources consume independent assets. The adapter consumes each result
+// before beginning the next activation (the serial boundary contract).
+::motion;
+
+&^frame(tick:#u8) {
+    x=position(tick);
+    y=(#u8)(64+tick%32);
+    color=(#u8)(::palette.txt[tick%4]&15);
+    (x,y,color)
+}
+
+&^tone(tick:#u8) { (#u8)::tones.txt[tick%4] }

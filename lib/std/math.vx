@@ -1,0 +1,19 @@
+// These pure relations are provided when this bundled fallback is selected.
+// A project-local std/math.vx replaces this module using ordinary Vexel.
+&!abs(value);
+&!min(left,right);
+&!max(left,right);
+&!sqrt(value);
+&!floor(value);
+&!ceil(value);
+&!trunc(value);
+&!round(value);
+&!roundeven(value);
+&!copysign(magnitude,sign);
+&!isnan(value);
+&!isinf(value);
+&!isfinite(value);
+&!signbit(value);
+&!isqrt(value);
+&!fmod(left,right);
+&!pow(base,exponent);

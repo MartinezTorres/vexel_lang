@@ -1,0 +1,20 @@
+&!enter(k:#u8)->#u8;
+&~worker(n:#u8)->#u8 {
+    before=n+1;
+    result=enter(n);
+    before+result
+}
+&^entry(n:#u8) { worker(n) }
+
+&~occurrenceSum(n:#u8)->#u16 {
+    total:#u16=0;
+    [1,2]!@ { total+=(#u16)n+_; };
+    total
+}
+&^summed(n:#u8) { occurrenceSum(n) }
+
+&!initial()->#u8;
+&~initializerOuter(n:#u8)->#u16 { occurrenceSum(n)+1 }
+initialCounter:#u16=initializerOuter(initial());
+&^fromInitial(n:#u8) { initialCounter+(#u16)n }
+&^storeInitial(n:#u8) { initialCounter=n;initialCounter }

@@ -1,0 +1,29 @@
+// Both global and constructed-field equations must widen together. Neither
+// argument order nor a backend's preferred representation selects the type.
+a:#[b+1]=(#u8)255;
+b:#[a+1]=(#u16)2;
+#Box(x);
+#Pair(a:#[#Box(b.x+1)],b:#[#Box(a.x+1)]);
+
+&~make(n:#u8)->#Pair {#Pair(#Box(n),#Box((#u16)2))}
+&^next(n:#u8)->#u16 {make(n).a.x+a+1}
+
+// A field-type proof closes even though the containing schema cannot be used
+// as a complete value until its captured unknown is supplied.
+&^partial(n:#u8)->#u16 {
+    unknown:#u8;
+    #Captured(x,data:#u8[x+unknown]);
+    #Joined(a:#[#Captured(b.x+1,b.data)],b:#[#Captured(a.x+1,a.data)]);
+    value:#[#Joined(#Captured((#u8)2,[1,2,3]),
+                   #Captured((#u16)2,[1,2,3])).a.x]=300;
+    value+n
+}
+
+// Both assignments satisfy the cycle. The ordinary consumer of left keeps
+// only (left:#u8,right:#u16); solving the type group early would lose this.
+&flip(x:#u8)->#u16 {0}
+&flip(x:#u16)->#u8 {0}
+left:#[flip(right)]=(#u8)7;
+right:#[flip(left)]=(#u8)9;
+&only_byte(x:#u8) {x}
+&^backtrack(n:#u8)->#u16 {only_byte(left)+(#u16)n+right}

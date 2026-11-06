@@ -1,0 +1,8 @@
+// Force measured bank-size feedback with a large native call graph.
+[[prefer(frame_ram_bytes, 8192)]] policy=0;
+&~mix(a0:#u8,a1:#u8,a2:#u8,a3:#u8,a4:#u8,a5:#u8,a6:#u8,a7:#u8,a8:#u8,a9:#u8,a10:#u8,a11:#u8,a12:#u8,a13:#u8,a14:#u8,a15:#u8)->#u8 {a0 ^ (a1 << 1) ^ (a2 << 2) ^ a3 ^ (a4 << 1) ^ (a5 << 2) ^ a6 ^ (a7 << 1) ^ (a8 << 2) ^ a9 ^ (a10 << 1) ^ (a11 << 2) ^ a12 ^ (a13 << 1) ^ (a14 << 2) ^ a15}
+[[source]] &^entry(n:#u8) {
+    value:#u8=n;
+    0..160@{value=mix(value,value+1,value+2,value+3,value+4,value+5,value+6,value+7,value+8,value+9,value+10,value+11,value+12,value+13,value+14,value+15);};
+    value
+}

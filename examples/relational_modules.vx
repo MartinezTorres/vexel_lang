@@ -1,0 +1,11 @@
+&!initial()->#u8;
+&~step(k) {
+    ::relational_modules::counter;
+    bump((#u8)k)
+}
+&^entry(n:#u8) {
+    first=step(n);
+    second=step((#u16)n);
+    third={::relational_modules::counter;bump(1)};
+    (first,second,third)
+}

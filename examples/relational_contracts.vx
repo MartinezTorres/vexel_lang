@@ -1,0 +1,10 @@
+&!get(n:#u8)->#u8;
+&!put(n:#u8);
+&~stage(n:#u8)->#u8 {put(n);get(n)+1}
+&^first(n:#u8) {stage(n)}
+&^second(n:#u8) {get(n+3)}
+#P(n:#u8,items:#[((#u8)0,(#i16)0)][2]);
+&!exchange(a:#u8[2],p:#P,empty:#u8[0])->(#u8[2],#i16[2]);
+&^arrays(n:#u8) {
+    exchange([n,n+1],#P(n,[(n,(#i16)n-128),(n+1,(#i16)n+300)]),(#u8[0])[])
+}

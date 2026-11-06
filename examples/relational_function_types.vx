@@ -1,0 +1,53 @@
+// Type-only calls prove their result interface without invoking this sink.
+&!probe_sink(n:#u8);
+&infer(flag:#b) {
+    probe_sink(7);
+    flag ? { -> (#u16)1; };
+    (#u16)2
+}
+&array_type(flag:#b) {
+    flag ? { -> (#u8[2])[1,2]; };
+    (#u8[2])[3,4]
+}
+&~rank(n:#u8) {
+    n==0 ? { -> (#u16)1; };
+    rank(n-1)+(#u16)1
+}
+&heterogeneous(flag:#b) {
+    flag ? { -> (#u16)1; };
+    (#u8)2
+}
+
+&^scalar(n:#u8) {
+    unknown:#b;
+    answer:#[infer(unknown)]=n;
+    answer+(#u16)300
+}
+&^aggregate(n:#u8) {
+    unknown:#b;
+    answer:#[array_type(unknown)]=[n,n+1];
+    answer
+}
+&^recursive(n:#u8) {
+    unknown:#u8;
+    answer:#[rank(unknown)]=n;
+    rank(n%8)+answer
+}
+&^selected(n:#u8) {
+    wide:#[heterogeneous(1)]=n;
+    narrow:#[heterogeneous(0)]=n;
+    (wide+300,narrow+1)
+}
+
+// Native graph observations retain demanded leaves and ignore local IDs.
+decision=?{p=?(#b,[0,1]);p};
+&~choice_pair(n:#u8) {?{p=?(#u8,[0,1]);(n,n+p)}}
+&~choice_left(n:#u8) {n+1}
+&~choice_right(n:#u8) {n+1}
+&^partialChoice(n:#u8) {choice_pair(n).__0}
+&^equivalentChoice(n:#u8) {decision?choice_left(n):choice_right(n)}
+&^ignoredType(n:#u8) {
+    x=decision?(#u8)n:(#u16)n;
+    &~local(k:#u8) {out:#[x]=k;out}
+    local(n);n
+}

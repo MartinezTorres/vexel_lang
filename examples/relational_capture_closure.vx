@@ -1,0 +1,58 @@
+#P(x:#u8);
+#Q(x:#u8);
+&~(value:#u16)initialize(n:#u8) { value=(#u16)n+600; }
+
+&^receiver(n:#u8) {
+    answer:#u16;
+    answer.initialize(n);
+    answer
+}
+
+&^selected(n:#u8) {
+    unused:#Missing;
+    count:#u8=0;
+    &(p)#P::+(q:#P) { count+=1; #P(p.x+q.x) }
+    &(p)#Q::+(q:#Q) { unused; #Q(0) }
+    &~leaf(k:#u8) { #P(k)+#P(k); }
+    &~helper(k:#u8) { leaf(k); }
+    helper(n);
+    count
+}
+
+&^initialized(n:#u8) {
+    unused:#Missing;
+    answer:#u16;
+    &save(value:#u8) { unused; }
+    &save(value:#u16) { answer=value; }
+    &~helper(k:#u8) { save((#u16)k+300); }
+    helper(n);
+    answer
+}
+
+&^schema(n:#u8) {
+    text="x";
+    text="abc";
+    &~helper(k:#u8) {
+        #Packet(data:#u8[|text|]);
+        packet=#Packet([k,k,k]);
+        |packet.data|
+    }
+    helper(n)
+}
+
+&^guarded(n:#u8) {
+    flag:#b=0;
+    a:#u8=17;
+    b:#u8=29;
+    &~helper(k:#u8) { flag ? a+k : b+k }
+    x=helper(n);
+    flag=1;
+    y=helper(n);
+    (x,y)
+}
+
+&^branch(n:#u8) {
+    unused:#Missing;
+    &~helper(k:#u8,flag:#b) { flag ? unused : k }
+    helper(n,0)
+}

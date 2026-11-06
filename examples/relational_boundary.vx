@@ -1,0 +1,15 @@
+// Sources and sinks share persistent logical locations; the backend provides
+// their storage and ABI without adding source-language pointers.
+&!sample(tag:#u8)->#u8;
+&!observe(value:#u8);
+counter:#u16=sample(1);
+data:#u8[2]=[sample(2),sample(3)];
+#Packet(total:#u16,data:#u8[2]);
+&~advance(n:#u8)->#u16 {counter+=n;counter}
+&^reset(n:#u8) {counter=n;}
+&^step(n:#u8) {
+    data[n&1]+=n;
+    total:#u16=advance(n);
+    observe((#u8)total);
+    #Packet(total,data)
+}

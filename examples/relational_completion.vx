@@ -1,0 +1,35 @@
+#Packet(total:#u16, data:#u8[2]);
+
+// The runtime loop has fixed storage regardless of its trip count. Continue
+// skips one update; return carries the record out through the loop boundary.
+&^accumulate([[range(0,12)]] n:#u8, seed:#u8) {
+    packet=#Packet((#u16)seed,[seed,seed+1]);
+    i:#u8=0;
+    (i<n)!@{
+        i+=1;
+        i==9 ? {-> packet;};
+        i==3 ? {->>;};
+        packet.total+=(#u16)i;
+        packet.data[0]+=1;
+    };
+    packet
+}
+
+&^condition(n:#u8) {
+    i:#u16=0;s:#u16=0;
+    ({i+=1;i==2?{->>;};i==5?{->|;};i<=(#u16)n})!@{s+=i;};
+    s
+}
+
+&^condition_return(n:#u8) {
+    i:#u16=0;s:#u16=0;
+    ({i+=1;i==3?{->(#u16)99;};i<=(#u16)n})!@{s+=i;};
+    s
+}
+
+&use($body:#u8){$body;}
+&^iterable_exit(n:#u8) {
+    use({n<128?{->(#u16)700;};7});
+    {n<192?{->(#u16)800;};[1,2]}!@{->(#u16)n;};
+    (#u16)9
+}

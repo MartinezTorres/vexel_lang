@@ -1,0 +1,12 @@
+#Leaf(x:#u8,y:#i16);
+#Packet(items:#Leaf[2],scale:#u16);
+&~(p)#Packet::change(k:#u8) {p.items[0].x+=k;p.items[1].y-=1;}
+&^records(p:#Packet,n:#u8) {
+    old=p;p.change(n);
+    (p.items[0].x,p.items[1].y,p.scale,old.items[0].x)
+}
+&^matrix(p:(#u8[2][2],#i8),n:#u8) {(p.__0[n%2][(n/2)%2],p.__1)}
+#Checked(n:#u8,data:#u8[n]);
+&^schema(p:#[#Checked(3,[1,2,3])]) {p.data[0]+p.data[1]+p.data[2]}
+&^small(p:(#b,#u3,#i5)) {p.__0 ? (#i16)p.__1+(#i16)p.__2 : (#i16)0}
+&^empty(items:#u8[0],n:#u8) {n+(#u8)|items|}

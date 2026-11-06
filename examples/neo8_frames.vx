@@ -1,0 +1,10 @@
+// A closed computation used to measure alternative physical frame policies.
+// The experiment's single foreground caller guarantees no overlapping calls.
+&~scramble(x:#u32)->#u32 {
+    (x * 1664525 + 1013904223) ^ (x >> 13)
+}
+&^sample(x:#u32)->#u32 {
+    a = scramble(x);
+    b = scramble(a);
+    (a ^ b) + (x / 7)
+}

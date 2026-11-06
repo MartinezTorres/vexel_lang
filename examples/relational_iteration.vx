@@ -1,0 +1,26 @@
+#Bag(items:#u8[3]);
+&(bag)#Bag::@($body) {
+    i:#u8=0;
+    (i<3)!@ {_=bag.items[i];$body;i+=1;};
+}
+&^loop(limit:#u8)->#u8 {
+    sum:#u8=0;bag=#Bag([1,2,3]);
+    bag@ {_>=limit?{->|;};_==2?{->>;};sum+=_;};
+    sum
+}
+&^returned(limit:#u8)->#u8 {
+    bag=#Bag([1,2,3]);bag@ {_==limit?{->(_+10);};};99
+}
+&^nested(n:#u8)->#u8 {
+    sum:#u8=n;outer=#Bag([1,2,3]);inner=#Bag([1,2,3]);
+    outer@ {_==2?{->>;};first=_;inner@ {_==2?{->|;};sum+=first*10+_;};};
+    sum
+}
+#Counter(value:#u8);
+&(counter)#Counter::@($body) {_=counter.value;$body;counter.value+=1;}
+&^mutated(n:#u8)->#u16 {
+    counter=#Counter(n);counter@ {_==0?{->|;};_==1?{->>;};};
+    i:#u8=0;sum:#u8=0;
+    (i<4)@ {i+=1;i==n?{->>;};sum+=i;};
+    (#u16)counter.value+256*(#u16)sum
+}

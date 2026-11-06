@@ -1,0 +1,17 @@
+#Point(x:#u8);
+
+&~(a:#u8,b:#u8)merge(){a+=1;b+=a;a+b}
+&~(point)#Point::add(value:#u8){point.x+=value;}
+&~(value:#u16)initialize(n:#u8){value=(#u16)n+300;}
+&~(value:#u8)advance(count:#u8)->#u8{
+    count==0 ? value : {value+=1;value.advance(count-1)}
+}
+
+&^shared(n:#u8){value:#u8=n;(value,value).merge()+value}
+&^indexed(n:#u8){
+    points=[#Point(n),#Point(n+1)];
+    points[n%2].add(3);
+    (#u16)points[0].x+256*(#u16)points[1].x
+}
+&^initialized(n:#u8){value:#u16;value.initialize(n);value}
+&^recursive(n:#u8){value:#u8=n;value.advance(3)}

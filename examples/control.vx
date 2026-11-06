@@ -1,0 +1,33 @@
+// Both repeat forms resolve through graph obligations; !@ preserves a loop.
+&constant_sum(n) {
+    i = 0;
+    total = 0;
+    (i < n)@{ total += i; i += 1; };
+    total
+}
+^answer:#u16 = constant_sum(10);
+
+&^sum(n:#u16)->#u16 {
+    i:#u16 = 0;
+    result:#u16 = 0;
+    (i < n)!@{ result += i; i += 1; };
+    result
+}
+
+&^mutate(index:#u8, value:#u16)->#u16 {
+    a:#u16[3] = [10,20,30];
+    b = a;
+    a[index] += value;
+    a[index] + b[index]
+}
+
+&^table_sum(value:#u16)->#u16 {
+    data:#u16[3] = [value,2,3];
+    result:#u16 = 0;
+    data!@{ result += _; };
+    result
+}
+
+&^entry()->#u16 {
+    sum((#u16)10) + mutate((#u8)1,(#u16)7) + table_sum((#u16)123)
+}

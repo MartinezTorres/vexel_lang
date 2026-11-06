@@ -1,0 +1,57 @@
+&^readcapture(n:#u8) {
+    a:#u8=n; b:#u16=(#u16)n+300;
+    &~read(k:#u8) { (#u16)a+b+k }
+    read(n)
+}
+
+&^overwrite(n:#u8) {
+    a:#u16;
+    n<128 ? { a=1; };
+    &~set(k:#u8) { a=(#u16)k+300; }
+    set(n); a
+}
+
+&^loopwrite(n:#u8) {
+    a:#u16;
+    &~set(k:#u8) { [0]!@{a=(#u16)k+300;}; }
+    set(n); a
+}
+
+&^typefact(n:#u8) {
+    size:#u8=2; size=3;
+    data:#u8[size]=[n,n,n];
+    &~helper(k:#u8) { copy:#[data]=[k,k,k]; |copy| }
+    helper(n)
+}
+
+&^nestedtype(n:#u8) {
+    size:#u8=2; size=3;
+    data:#u8[size]=[n,n,n];
+    &~leaf(k:#u8) { copy:#[data]=[k,k,k]; |copy| }
+    &~helper(k:#u8) { leaf(k) }
+    helper(n)
+}
+
+&^loopread(n:#u8) {
+    a:#u16=(#u16)n;
+    &~helper(k:#u8) {
+        i:#u8=0; sum:#u16=0;
+        (i<3)!@{sum+=a; i+=1;};
+        sum+k
+    }
+    helper(n)
+}
+
+&^mixed(n:#u8) {
+    a:#u16=(#u16)n; b:#u16=7;
+    &~update(k:#u8) { a+=k; b=(#u16)k+300; a+b }
+    result=update(n);
+    (result,a,b)
+}
+
+&^nestedwrite(n:#u8) {
+    a:#u16;
+    &~set(k:#u8) { a=(#u16)k+300; }
+    &~outer(k:#u8) { set(k); a+1 }
+    outer(n)
+}

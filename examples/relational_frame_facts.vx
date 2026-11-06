@@ -1,0 +1,27 @@
+&~pair(n:#u8)->(#u8,#s,#u64) {(n+1,"AZ",0x1200000000)}
+&^returned(n:#u8) {
+    p=pair(n);
+    p.__0+p.__1[n%2]+(#u8)(p.__2>>32)
+}
+
+#Packet(tag:#s,value:#u8);
+&~(p)#Packet::change(k:#u8) {p.tag="XYZ";p.value+=k;}
+&^captured(n:#u8) {
+    text:#s;value:#u8;
+    &~init(k:#u8) {text="AB";value=k;}
+    init(n);
+    p=#Packet(text,value);
+    p.change(n);
+    p.tag[1]+p.value
+}
+
+&~sum(n:#u8)->(#u16,#s) {
+    n==0 ? ((#u16)0,"ABC") : {previous=sum(n-1);((#u16)n+previous.__0,"ABC")}
+}
+&^recursive(n:#u8) {p=sum(n%8);p.__0+(#u16)p.__1[n%3]}
+
+&^shared(n:#u8) {
+    text="ABC";total:#u16=0;
+    &~accumulate(k:#u8)->#u16 {k==0 ? total : {total+=(#u16)text[k%3];accumulate(k-1)}}
+    accumulate(n%8);total
+}

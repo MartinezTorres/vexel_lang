@@ -1,0 +1,2 @@
+counter:#u8=initial();
+&bump(n:#u8)->#u8 {counter+=n;counter}

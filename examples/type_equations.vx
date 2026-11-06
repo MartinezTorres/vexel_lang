@@ -1,0 +1,41 @@
+// Supplied widths are candidates. Both original field queries require #u16.
+#Box(value);
+#Pair(left:#[#Box(right.value+1)],right:#[#Box(left.value+1)]);
+
+^widened:#u16 = {
+    pair=#Pair(#Box((#u8)255),#Box((#u16)2));
+    pair.left.value+1 // 256, after the eight-bit candidate is revised.
+};
+
+// Initializers supply shapes; the original dimension equations validate them.
+a:#u8[|b|]=[1,2,3];
+b:#u8[|a|]=[4,5,6];
+^shape:#u8=a[0]+b[0]; // 5
+
+// This query needs one common field type, not the condition or other fields.
+#Fields(x,y);
+^partial:#u8 = {
+    condition:#b;
+    value:#[(condition?#Fields((#u8)1,missing()):#Fields((#u8)2,missing())).x]=7;
+    value
+};
+
+// Ordinary helper bodies can prove a type equality without closing a schema.
+^schema_independent:#u16 = {
+    unknown:#u8;
+    #Captured(x,data:#u8[x+unknown]);
+    &forward(item){item}
+    #Linked(a:#[forward(b)],b:#[forward(a)]);
+    value:#[#Linked(#Captured((#u8)2,[1,2,3]),
+                    #Captured((#u16)2,[1,2,3])).a.x]=300;
+    value
+};
+
+// Transforming field equations retain an unneeded captured schema.
+^transformed:#u16 = {
+    unknown:#u8;
+    #Captured(x,data:#u8[x+unknown]);
+    #Transformed(a:#[#Captured(b.x+1,b.data)],b:#[#Captured(a.x+1,a.data)]);
+    v:#[#Transformed(#Captured((#u8)2,[1,2,3]),#Captured((#u16)2,[1,2,3])).a.x]=300;
+    v
+};

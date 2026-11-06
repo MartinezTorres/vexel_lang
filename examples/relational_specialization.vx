@@ -1,0 +1,16 @@
+&~lookup(text:#s,n:#u8)->#u8 {text[n%|text|]}
+&^strings(n:#u8) {lookup("AZ",n)+lookup("BCD",n)}
+
+#Packet(tag:#s,items:#u8[2]);
+&~pick(p:#Packet,n:#u8) {p.items[n%2]+p.tag[n%2]}
+&^aggregate(n:#u8) {pick(#Packet("AZ",[n,n+1]),n)}
+
+&~choose(n:#u8,mode:#b) {mode ? n : (#u16)n+300}
+&~sized(n:#u8,count:#u8) {values:#u8[count]=[n,n+1];values[1]}
+&~add(n:#u8,wide:#u64) {n+(#u8)(wide>>32)}
+&^dependent(n:#u8) {(choose(n,1),choose(n,0),sized(n,2),add(n,0x1200000000))}
+
+&~sum(n:#u8,text:#s)->#u16 {
+    n==0 ? (#u16)text[0] : (#u16)text[n%|text|]+sum(n-1,text)
+}
+&^recursive(n:#u8) {sum(n%8,"ABC")}

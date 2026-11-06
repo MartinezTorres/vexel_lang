@@ -1,0 +1,44 @@
+# Build directories
+build/
+bin/
+
+# External
+ext/*
+backends/ext/
+
+# Generated C files
+*.c
+!examples/*.c
+!backends/msx-neo8/runtime/*.c
+out.h
+
+# Object files and binaries
+*.o
+*.out
+a.out
+
+# Executables
+example
+/test_*
+
+# Temporary files
+/tmp/
+*_main.c
+summary*.md
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+__pycache__/
+*.pyc
+
+# Agentic artifacts (kept out of version control)
+AUDIT.md
+Assistant.md
+
+# Web build artifacts (embedded into playground.html)
+playground/vexel.js
+playground/vexel.wasm
+docs/playground.html

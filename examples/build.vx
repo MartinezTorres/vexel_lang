@@ -1,0 +1,7 @@
+// A demanded resource is an input to the same resolution graph.
+^palette_bytes:#u32 = |::assets::palette.txt|;
+^bank_size:#u32 = palette_bytes * 4;
+^firmware_tag:#s = "vexel-solver-prototype";
+
+// An undemanded resource is neither read nor entered into the depfile.
+unused_resource = ::assets::not_here.bin;

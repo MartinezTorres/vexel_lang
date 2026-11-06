@@ -1,0 +1,23 @@
+// The source order is deliberately the opposite of the dependency order.
+^answer:#u32 = factorial(6) + total;
+^asset_bytes:#u32 = |message|;
+^selected:#u16 = choose(1);
+^wrapped:#u8 = (#u8)255 + 1;
+^wide:#u128 = 18446744073709551616 * 3;
+^table:#u8[count] = [3, 1, 4, 1, 5];
+
+&choose(flag) { flag ? 42 : missing_only_if_demanded() }
+&~factorial(n) { n == 0 ? 1 : n * factorial(n - 1) }
+&sum(items) {
+    result:#u32 = 0;
+    items@{ result += _; };
+    result
+}
+
+total = sum(table);
+count = 5;
+message = ::assets::message.txt;
+
+// Neither of these regions has an observable sink.
+unused = also_missing;
+&unfinished(x) { x + function_not_written_yet() }

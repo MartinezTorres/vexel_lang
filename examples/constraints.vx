@@ -1,0 +1,9 @@
+// The equations determine x and y jointly. No initializer knows their values.
+^answer:#u8 = ?{
+    x = ?(#u8, 1..10);
+    y = ?(#u8, 1..10);
+    ?(x + y == 10);
+    ?(x * y == 21);
+    ?(x < y);
+    x
+};

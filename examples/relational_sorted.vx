@@ -1,0 +1,15 @@
+#Item(key:#u8,payload:#u8);
+&(item)#Item::<(other:#Item) {
+    key=item.key;
+    item.key=0; // The comparison receiver is a private copy.
+    key<other.key
+}
+&^ordered(n:#u8)->#u16 {
+    items=[#Item(2,n),#Item(1,n+1),#Item(2,n+2)];sum:#u16=0;
+    items@@{sum=sum*3+_.payload;};
+    sum+10000*(#u16)items[0].key
+}
+&^completed(n:#u8)->#u8 {
+    items=[#Item(2,1),#Item(1,2),#Item(2,3)];
+    items@@{_.payload==n?{->_.key;};};99
+}

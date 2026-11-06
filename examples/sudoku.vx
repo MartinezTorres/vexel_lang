@@ -1,0 +1,42 @@
+clues = [
+    5,3,0, 0,7,0, 0,0,0,
+    6,0,0, 1,9,5, 0,0,0,
+    0,9,8, 0,0,0, 0,6,0,
+    8,0,0, 0,6,0, 0,0,3,
+    4,0,0, 8,0,3, 0,0,1,
+    7,0,0, 0,2,0, 0,0,6,
+    0,6,0, 0,0,0, 2,8,0,
+    0,0,0, 4,1,9, 0,0,5,
+    0,0,0, 0,8,0, 0,7,9
+];
+
+solution = ?{
+    cells = ?(#u8[81], 1..10);
+    0..81@{
+        i = _;
+        (clues[i] != 0) ? { ?(cells[i] == clues[i]); };
+    };
+    0..9@{
+        group = _;
+        0..8@{
+            a = _;
+            (a+1)..9@{
+                b = _;
+                    ?(cells[group * 9 + a] != cells[group * 9 + b]);
+                    ?(cells[a * 9 + group] != cells[b * 9 + group]);
+                    base_row = (group / 3) * 3;
+                    base_col = (group % 3) * 3;
+                    ?(cells[(base_row + a / 3) * 9 + base_col + a % 3] !=
+                      cells[(base_row + b / 3) * 9 + base_col + b % 3]);
+            };
+        };
+    };
+    cells
+};
+
+// A solved value is ordinary Vexel data and can enter the MSX backend.
+&^entry()->#u16 {
+    total:#u16 = 0;
+    solution@{ total += _; };
+    total
+}

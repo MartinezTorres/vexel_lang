@@ -1,0 +1,7 @@
+&~leaf(n:#u8)->#u16 {
+    total:#u16=0;i:#u8=0;
+    (i<3)!@{total+=(#u16)n;i+=1;};
+    total
+}
+&~sum(n:#u8)->#u16 {n==0 ? (#u16)0 : leaf(n)+sum(n-1)}
+&^entry(n:#u8) {sum(n%8)+leaf(n)}

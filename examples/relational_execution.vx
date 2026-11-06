@@ -1,0 +1,10 @@
+// Runtime recursion carries the accumulator back through each call boundary.
+// The input contract bounds this demonstration's activation depth.
+&^accumulate([[range(0,8)]] n:#u8, seed:#u8) {
+    acc:#u16=(#u16)seed;
+    &~sum(k:#u8)->#u16 {
+        k==0 ? acc : {acc+=(#u16)k;sum(k-1)}
+    }
+    sum(n);
+    acc
+}

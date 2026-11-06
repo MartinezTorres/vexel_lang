@@ -1,0 +1,9 @@
+#Packet(signed:#i12,flag:#b,float_bits:#f16);
+&^wire(n:#u8) {
+    byte=(#u8)((#b[8])n);
+    packet=#Packet((#i12)(#i8)byte,n<128,(#f16)(#i8)byte);
+    (#u8[5])packet
+}
+&^decode(n:#u8) { (#Packet)((#u8[5])[n,255,n%2,0,128]) }
+&^order(n:#u8) { [n,1]<[(#u16)128,2] }
+&^check(n:#u8) { (#b[1])((#u8[1])[n]);7 }

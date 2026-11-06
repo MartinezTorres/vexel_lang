@@ -1,0 +1,15 @@
+// Unknown input values are runtime facts, never unresolved graph obligations.
+&!read_sensor() -> #u16;
+&!write_sample(value:#u16);
+
+&scale(value, factor) { value * factor }
+
+&^process(input:#u16, enabled:#b) -> #u16 {
+    result:#u16 = scale(input, 3);
+    enabled ? { result += read_sensor(); };
+    write_sample(result);
+    result
+}
+
+// The same schema resolves to a constant for known inputs.
+^calibration:#u16 = scale((#u16)7, 3);

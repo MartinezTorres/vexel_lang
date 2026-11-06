@@ -1,0 +1,12 @@
+&~third(x:#i4.4)->#i4.4 { x/3 }
+stored:#i4.4;
+&^fixed_values(n:#i4.4) {
+    stored=third(n);
+    [stored,n*3,n%3,n>>1,|n|]
+}
+&^float_values(n:#i8) {
+    x=(#f16)n;
+    [x/3,-x,|x|]
+}
+&^float_bits(n:#f16) { [n<0,n>=0,n==n,n!=n] }
+&^finite_cast(n:#f16) { (#i8)n;7 }

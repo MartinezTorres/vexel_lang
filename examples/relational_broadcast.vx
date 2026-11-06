@@ -1,0 +1,22 @@
+#P(x:#u8);
+&~(p)#P::+(q:#P) { p.x+=q.x; (#P(p.x+1)) }
+#Flag(x:#u8);
+&~(p)#Flag::&&(q:#Flag) { (#Flag(p.x+q.x)) }
+
+&^scalar(n:#u8) { p=#P(n); p+=#P(n); p.x }
+&^logical(n:#u8) {
+    p=#Flag(n); q=p && {p.x=7; (#Flag(n))};
+    (#u16)q.x+256*(#u16)p.x
+}
+&^indexed(n:#u8) {
+    arr=[#P(n),#P(n+1)]; i:#u8=n%2;
+    arr[i]+=#P(3);
+    (#u16)arr[0].x+256*(#u16)arr[1].x
+}
+&^lifted(n:#u8) {
+    #Item(x:#u8);
+    count:#u8=0;
+    &~(p)#Item::+(q:#Item) {count+=1;p.x+=q.x;(#Item(p.x+count))}
+    arr=[#Item(n),#Item(n+1)]; values=arr .+ #Item(3);
+    (#u16)values[0].x+256*(#u16)values[1].x
+}

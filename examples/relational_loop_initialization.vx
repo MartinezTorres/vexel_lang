@@ -1,0 +1,92 @@
+&^first(n:#u8) {
+    x:#u16;
+    [1,2,3]!@{ x=(#u16)n+_; };
+    x
+}
+&^guarded(n:#u8) {
+    x:#u16;
+    [1,2,3]!@{ n<128 ? { x=(#u16)n+_; }; };
+    n<128 ? x : (#u16)0
+}
+&^nested(n:#u8) {
+    x:#u16;
+    [1,2]!@{ [3,4]!@{ x=(#u16)n+_; }; };
+    x
+}
+&^captured(n:#u8) {
+    x:#u16;
+    &~fill(k:#u8) { x=(#u16)k+300; }
+    [1,2]!@{ fill(n); };
+    x
+}
+&^exits(n:#u8) {
+    x:#u16;
+    (1)!@{
+        n<128 ? { -> (#u16)7; };
+        x=(#u16)n+300;
+        ->|;
+    };
+    x
+}
+&^aggregate(n:#u8) {
+    x:#i16[2];
+    [1,2,3]!@{ x=[(#i16)n-128,-(#i16)_]; x[0]+=x[1]; };
+    x
+}
+
+&^countedWrite(n:#u8) {
+    x:#u8; i:#u8=0;
+    (i<2)!@ { i==1 ? { x=n; }; i+=1; };
+    x
+}
+
+&^countedNested(n:#u8) {
+    x:#u8; i:#u8=0;
+    (i<2)!@ {
+        j:#u8=0;
+        (j<2)!@ { j==1 ? { x=n+i+j; }; j+=1; };
+        i+=1;
+    };
+    x
+}
+
+&^countedContinue(n:#u8) {
+    x:#u8; i:#u8=0;
+    (i<3)!@ { i+=1; i<3 ? { ->>; }; x=n; };
+    x
+}
+
+&^countedReads(n:#u8) {
+    x:#u8; i:#u8=0; sum:#u8=0;
+    (i<3)!@ { i>0 ? { sum+=x; }; x=n+i; i+=1; };
+    sum
+}
+
+&^countedGuarded(n:#u8) {
+    count=n&7; x:#u8; i:#u8=0;
+    (i<count)!@ { x=i; i+=1; };
+    count>0 ? x : (#u8)0
+}
+
+&^partialGuard(n:#u8) {
+    x:#u8;
+    [1]!@ { (n!=0&&1/n==1) ? { x=n; }; };
+    [1]!@ { (n!=0&&1/n==1) ? { x+=1; }; };
+    (n!=0&&1/n==1) ? x : (#u8)0
+}
+
+&^nestedPartialGuard(n:#u8) {
+    x:#u8;
+    [1]!@ { [1]!@ { (n!=0&&1/n==1) ? { x=n; }; }; };
+    [1]!@ { (n!=0&&1/n==1) ? { x+=1; }; };
+    (n!=0&&1/n==1) ? x : (#u8)0
+}
+
+&^nativePartialGuard(n:#u8) {
+    &~readinessReciprocal(k:#u8)->#u8 { 1/k }
+    x:#u8; g=n!=0&&readinessReciprocal(n)==1;
+    [1]!@ { g ? { x=n; }; };
+    &~readinessBump() { x+=1; }
+    [1]!@ { g ? { readinessBump(); }; };
+    g ? x : (#u8)0
+}

@@ -1,0 +1,24 @@
+// The same relationships can live in an imported project description.
+[[require(payload_bytes, limits.payload)]]
+[[require(stack_bytes, limits.stack)]]
+[[prefer(frame_ram_bytes, 128)]]
+[[prefer(bank_chunk_operations, 16)]]
+[[require(call_depth, 12)]]
+limits = #Limits(64, 1024);
+#Limits(payload:#u16, stack:#u16);
+
+#Packet(size:#u8, data:#u8[size]);
+[[mapper]] saved:#u16[2];
+[[require(mapper_segments, 2)]] mapper_capacity=2;
+
+&~triangle(n:#u8)->#u16 { n==0 ? (#u16)0 : (#u16)n+triangle(n-1) }
+&~score(packet:#[#Packet(4,[0,0,0,0])])->#u16 {
+    total:#u16=0;
+    packet.data!@{ _==2 ? {->>;}; total+=(#u16)_; };
+    total
+}
+[[stream(3)]] &^frame([[range(0,31)]] n:#u8) {
+    p=#Packet(4,[n,n+1,n+2,n+3]);
+    saved=[triangle(n%8), score(p)];
+    (saved[0]+saved[1], n)
+}

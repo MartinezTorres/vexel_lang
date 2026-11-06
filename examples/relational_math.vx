@@ -1,0 +1,17 @@
+::std::math;
+::std::bits;
+&^integer(n:#u8) {(isqrt(n),pow(n,3),min(n,100),max(n,100))}
+&^floating(n:#u8) {
+    x=(#f32)n/2-(#f32)64.5;
+    ((#u8)sqrt((#f32)n),(#i16)floor(x),(#i16)roundeven(x),
+     (#u32)pow((#f32)n/16,3),copysign((#f32)n,(#f32)-0.0))
+}
+&^fixed(n:#u8) {
+    x=(#i4.4)n/2;
+    (floor(x),round(x),roundeven(x),pow(x,n%6))
+}
+&^classified(n:#u8) {
+    patterns:#u32[8]=[0x7f800000,0xff800000,0x7f800001,0xffc12345,0,0x80000000,0x3f800000,0xbf800000];
+    x=u32_as_f32(patterns[n%8]);
+    (isnan(x),isinf(x),isfinite(x),signbit(x),copysign(x,(#f32)-0.0))
+}

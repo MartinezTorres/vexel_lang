@@ -1,0 +1,10 @@
+// Semantic signed values cross compact output storage and native call frames.
+&^arithmetic(n:#i8) { [n/3, n%3, n>>1, |n|] }
+&~advance(n:#i8)->#i8 { n+1 }
+counter:#i8;
+&^state(n:#i8) { counter=n; counter=advance(counter); counter }
+&^comparison(n:#i8) { [n<0, n>=0] }
+&^wide(n:#u8) {
+    x=(#i32)(0x80000000+(#u32)n);
+    [x/-1, x>>7]
+}

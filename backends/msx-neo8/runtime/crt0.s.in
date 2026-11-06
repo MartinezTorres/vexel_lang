@@ -1,0 +1,109 @@
+; Vexel NEO-8 BIOS-compatible cartridge runtime.
+; Derived from megalinker crt0.megalinker.neo8.s, MIT, Manuel Martinez Torres.
+; Changes: explicit RAM/stack contract, zero BSS, guarded LDIR, BIOS kept in
+; page 0, no Y/Z mapping, persistent resident bank wrapper.
+    .module crt0_vexel
+    .globl _main, _vx_segment_b
+    .globl _vx_cartridge_slot
+    .globl ___ML_CONFIG_RAM_START
+    .globl ___ML_CONFIG_INIT_ROM_START, ___ML_CONFIG_INIT_RAM_START
+    .globl ___ML_CONFIG_INIT_SIZE, ___ML_CONFIG_INIT_RAM_SIZE
+    .area _DATA
+___ML_CONFIG_RAM_START = 0xc000
+
+    .area _HEADER (ABS)
+    .org 0x4000
+    .db 0x41,0x42
+    .dw init,0,0,0,0,0,0
+    .ascii "ROM_NEO8"
+startup_fault:
+    di
+    halt
+    jr startup_fault
+init:
+    di
+    ; Use the BIOS stack while selecting page 2. No writes outside page 3.
+    ld sp,(0xfc4a)
+    ld hl,(0xfc4a)
+    ld de,#0xf380
+    or a
+    sbc hl,de
+    jp c,startup_fault
+    ld hl,#0
+    ld (0x6000),hl
+    inc l
+    ld (0x6800),hl
+    inc l
+    ld (0x7000),hl
+    inc l
+    ld (0x7800),hl
+    ; Find the cartridge's page-1 slot, including expanded-slot selection.
+    call 0x0138
+    di
+    rrca
+    rrca
+    and #3
+    ld c,a
+    ld hl,#0xfcc1
+    add a,l
+    ld l,a
+    ld a,(hl)
+    and #0x80
+    or c
+    ld c,a
+    inc l
+    inc l
+    inc l
+    inc l
+    ld a,(hl)
+    and #0x0c
+    or c
+    ld h,#0x80
+    push af
+    call 0x0024
+    pop af
+    di
+    ld sp,#0xf380
+    push af
+    ; Clear all allocated resident storage, then copy HOME + initializers.
+    ld bc,#___ML_CONFIG_INIT_RAM_SIZE
+    ld a,b
+    or c
+    jr z,zero_done
+    ld hl,#0xc000
+    ld (hl),#0
+    dec bc
+    ld a,b
+    or c
+    jr z,zero_done
+    ld de,#0xc001
+    ldir
+zero_done:
+    ld bc,#___ML_CONFIG_INIT_SIZE
+    ld a,b
+    or c
+    jr z,copy_done
+    ld de,#___ML_CONFIG_INIT_RAM_START
+    ld hl,#___ML_CONFIG_INIT_ROM_START
+    ldir
+copy_done:
+    pop af
+    ld (_vx_cartridge_slot),a
+    ld hl,#1
+    ld (_vx_segment_b),hl
+
+    .area _GSINIT
+    .area _GSFINAL
+    ei
+    call _main
+exit_loop:
+    halt
+    jr exit_loop
+
+    .area _HOME
+___sdcc_call_hl::
+    jp (hl)
+___sdcc_call_ix::
+    jp (ix)
+___sdcc_call_iy::
+    jp (iy)

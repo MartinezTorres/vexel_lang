@@ -1,0 +1,1 @@
+&~position(tick:#u8)->#u8 { (#u8)(tick*3+5) }

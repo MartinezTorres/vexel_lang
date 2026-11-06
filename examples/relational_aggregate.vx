@@ -1,0 +1,15 @@
+#Packet(total:#u16, data:#u8[2]);
+
+// The recursive frame carries a record containing both a scalar and an array.
+&^accumulate([[range(0,8)]] n:#u8, seed:#u8) {
+    packet=#Packet((#u16)seed,[seed,seed+1]);
+    &~fold(k:#u8)->#u16 {
+        k==0 ? packet.total : {
+            packet.total+=(#u16)k;
+            packet.data[0]+=1;
+            fold(k-1)
+        }
+    }
+    fold(n);
+    packet
+}

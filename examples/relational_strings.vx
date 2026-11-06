@@ -1,0 +1,2 @@
+&^read_byte(n:#u8) {"A\0B"[n%3]}
+&^discard_byte(n:#u8) {"A\0B"[n];7}

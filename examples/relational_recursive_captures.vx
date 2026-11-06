@@ -1,0 +1,20 @@
+// Recursive interfaces can be explicit without exposing pointers or frames.
+&~count(k:#u8, state:#u16)->#u16 { k==0 ? state : count(k-1,state+1) }
+&^unused(n:#u8) { unavailable:#Missing; count(n%8,0) }
+&^readcapture(n:#u8) {
+    offset:#u16=3;
+    &~read(k:#u8)->#u16 { k==0 ? offset : read(k-1)+1 }
+    read(n%8)
+}
+&~fill(k:#u8)->(#u16,#u16) {
+    k==0 ? ((#u16)0,(#u16)17) : {part=fill(k-1); (part.__0+1,part.__1+1)}
+}
+&^outputcapture(n:#u8) { fill(n%8) }
+&~a(k:#u8, state:#u16)->#u16 { k==0 ? state : b(k-1,state+1) }
+&~b(k:#u8, state:#u16)->#u16 { k==0 ? state : a(k-1,state+1) }
+&^mutual(n:#u8) { a(n%8,0) }
+&~typedCount(k:#u8, example:#u16)->#[example] {
+    value:#[example]=k; k==0 ? value : typedCount(k-1,example)+1
+}
+&^typefact(n:#u8) { typedCount(n%8,0) }
+&^initialize(n:#u8) { count(n%8,11) }

@@ -1,0 +1,30 @@
+// Signature availability is compile-time evidence. The selected body remains
+// ordinary Vexel, with ordinary state, constraints and completion obligations.
+#Device(value:#u8);
+&(device)#Device::add(amount:#u8) { device.value+=amount; }
+&broken(value:#u8) { missing_in_body() }
+
+&^guarded(n:#u8) {
+    device=#Device(n);
+    device.?add(1) ? { device.add(1); };
+    device.?absent() ? { missing(); };
+    device.value
+}
+&^signature(n:#u8) {
+    x=n;
+    exists=?broken(x=3) && ?broken(1/0);
+    (x,(#u8)exists)
+}
+&^skipped(n:#u8) { x=n; ?absent(n) ? { x=3; missing(); }; x }
+
+&~count(k:#u8, state:#u16)->#u16 { k==0 ? state : count(k-1,state+1) }
+&^recursive(n:#u8) { count(n%8,11) }
+
+&~shapedCount(k:#u8, state:#u16, size:#u8)->#u16 {
+    data:#u8[size]=[1,2];
+    k==0 ? state : shapedCount(k-1,state+data[0],size)
+}
+&^shaped(n:#u8) { shapedCount(n%8,11,2) }
+
+choice=?{ x=?(#u8,0..4); ?broken(x) ? { ?(x==2); }; x };
+&^finite(n:#u8) { n+choice }
