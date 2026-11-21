@@ -1,0 +1,10 @@
+// Ordinary arithmetic can choose a specialized calculation or finite ROM.
+// Decimal conversion does not need a general checked 32-bit divide at runtime.
+&^decimal(value:#u8) { (value/10,value%10) }
+
+// Signed quotient truncates toward zero; the remainder keeps the input's sign.
+&^signed_chunks(value:#i16) { (value/(-7),value%(-7)) }
+
+// The logical result stays u32. Its complete range fits a private u16 carrier.
+&~upper_word(value:#u32)->#u32 { value/65536 }
+&^high_word(value:#u32) { upper_word(value) }

@@ -39,12 +39,24 @@ class ClosureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             source = Path(temp)/'main.vx'
             for tag, status in [('require(paylod_bytes,4)', 'error'), ('fact(ram_bytes,32768)', 'contradictory'),
-                                ('require(stack_bytes,"large")', 'contradictory')]:
+                                ('require(stack_bytes,"large")', 'contradictory'),
+                                ('prefer(value_choice_branches,9)', 'contradictory')]:
                 source.write_text('[['+tag+']] ^answer=3;')
                 result = run([EXE, source])
                 self.assertNotEqual(result.returncode, 0)
                 if status == 'error': self.assertIn('unknown configuration', result.stderr)
                 else: self.assertEqual(json.loads(result.stdout)['status'], status)
+
+    def test_value_choice_allowances_combine_without_changing_values(self):
+        with tempfile.TemporaryDirectory() as temp:
+            source=Path(temp)/'main.vx'
+            source.write_text('[[prefer(value_choice_branches,8)]] ^answer=42;')
+            for limit in (0,2,8):
+                result=run([EXE,source,'--query','value:answer','--prefer',f'value_choice_branches={limit}'])
+                self.assertEqual(result.returncode,0,result.stderr+result.stdout)
+                report=json.loads(result.stdout)
+                self.assertEqual(report['queries'][0]['answer'],'42')
+                self.assertEqual(report['configuration']['value_choice_branches']['value'],limit)
 
     def test_backend_requirement_refines_a_source_choice(self):
         with tempfile.TemporaryDirectory() as temp:

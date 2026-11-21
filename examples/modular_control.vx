@@ -1,0 +1,13 @@
+// These identities hold for every 32-bit word, including wrapping arithmetic.
+// The unresolved operation is unreachable only if the relationships are proved.
+// The emitted program needs just one wrapping addition.
+&^algebra(a:#u32,b:#u32,c:#u32) {
+    answer=a;
+    {
+        a*b!=b*a ? unreachable();
+        a*(b+c)!=a*b+a*c ? unreachable();
+        a*b-b*a!=0 ? unreachable();
+        answer+=1;
+    };
+    answer
+}

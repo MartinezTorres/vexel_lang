@@ -1,0 +1,8 @@
+// Successive calls share one implementation, but have different initial facts.
+&^entry(n:#u8) {
+    x:#u32=(#u32)(n&7);
+    &~bump()->#u32 {x+=3;x}
+    first=bump();
+    second=bump();
+    first+16*second
+}

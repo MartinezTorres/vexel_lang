@@ -19,13 +19,21 @@ test: all
 
 test-relational: test
 
+.PHONY: test-examples
+EXAMPLE_OUTPUT ?= $(BUILD)/program-examples
+test-examples: all
+	python3 experimental/relational/tests/check_examples.py $(BUILD)/vexel --output "$(EXAMPLE_OUTPUT)" --msx
+
 test-incremental: all
 	$(MAKE) -C experimental/relational BUILD=$(abspath $(BUILD)/relational) test-incremental
 
 incremental-msx: all
 	python3 examples/incremental_msx.py $(BUILD)/vexel --output $(BUILD)/incremental-msx
 
-.PHONY: test-closure closure-msx bank-pressure-msx msx-project
+.PHONY: test-interface test-closure closure-msx bank-pressure-msx msx-project
+test-interface: all
+	$(MAKE) -C experimental/relational BUILD=$(abspath $(BUILD)/relational) test-interface
+
 test-closure: all
 	$(MAKE) -C experimental/relational BUILD=$(abspath $(BUILD)/relational) test-closure
 
@@ -45,6 +53,48 @@ sanitize:
 
 test-msx: all
 	python3 examples/relational_capabilities_msx.py $(BUILD)/vexel --output $(BUILD)/relational-capabilities-msx
+
+.PHONY: publication-msx
+publication-msx: all
+	@mkdir -p "$(BUILD)/publication-msx"
+	@set -e; publication_dir=$$(mktemp -d "$(BUILD)/publication-msx/run-XXXXXX"); \
+	printf 'Publication evidence: %s\n' "$$publication_dir"; \
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case word --prefer calculation_publication_narrow=0 --prefer calculation_publication_reuse=0 --output "$$publication_dir/wide-separate"; \
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case word --prefer calculation_publication_narrow=0 --prefer calculation_publication_reuse=1 --output "$$publication_dir/wide-shared"; \
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case word --prefer calculation_publication_narrow=1 --prefer calculation_publication_reuse=0 --output "$$publication_dir/narrow-separate"; \
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case word --prefer calculation_publication_narrow=1 --prefer calculation_publication_reuse=1 --output "$$publication_dir/narrow-shared"
+
+.PHONY: value-msx
+value-msx: all
+	python3 experimental/relational/tests/test_division_unroll.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_transport_domains.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_ranges.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case rotations --prefer calculation_rotation_helpers=1 --prefer value_rotation_helpers=1
+	python3 experimental/relational/tests/test_value_widths.py $(BUILD)/vexel --msx --case stored_rotations --prefer calculation_rotation_helpers=1 --prefer value_rotation_helpers=1
+	python3 experimental/relational/tests/test_bit_demand.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_constant_division.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_boundary_expansion.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_region_predicates.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_runtime_components.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_products.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_sparse_products.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_finite_cuts.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_table_policy.py $(BUILD)/vexel
+	python3 experimental/relational/tests/test_finite_storage.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_finite_context.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_frontiers.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_finite_thresholds.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_finite_native.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_branch_facts.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_literal_operands.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_case_facts.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_case_partitions.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_projection.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_result_demand.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_interface_demand.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_value_facts.py $(BUILD)/vexel --msx
+	python3 experimental/relational/tests/test_equalities.py $(BUILD)/vexel --msx
 
 relational-msx: relational-source-msx
 
@@ -190,3 +240,7 @@ examples: all
 
 clean:
 	rm -rf $(BUILD)
+
+.PHONY: calculation-msx
+calculation-msx: all
+	python3 experimental/relational/tests/test_calculation_scheduling.py $(BUILD)/vexel --msx

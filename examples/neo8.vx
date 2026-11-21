@@ -1,6 +1,7 @@
-// These constants are supplied by the selected target before resolution.
-^physical_ram:#u16 = __target_ram_bytes;
-^rom_window:#u16 = __target_rom_bank_bytes;
+// These source facts must agree with the selected target's facts. They enter
+// the same request; the retired frontend's implicit target globals are gone.
+[[fact(ram_bytes,physical_ram)]] ^physical_ram:#u16 = 16384;
+[[fact(rom_bank_bytes,rom_window)]] ^rom_window:#u16 = 8192;
 
 &!msx_putchar(character:#u8);
 

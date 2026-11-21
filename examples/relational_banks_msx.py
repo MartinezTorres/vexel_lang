@@ -21,7 +21,10 @@ def main():
     evidence={'machine_sha256':sha(machine),'source_sha256':sha(source),'driver_sha256':sha(__file__),'cases':[]}
     for mode in ('generated','c','assembly'):
         project=directory/mode;report=support.backend.package(generated,project,source,machine)
-        assert report['bank_modules']==[{'name':'vx_entry','module':'vxp_source_entry','window':'B','frame_policy':'automatic'}],report
+        expected={'name':'vx_entry','module':'vxp_source_entry','window':'B','frame_policy':'automatic',
+                  'partition_owner':'vx_entry','partition_role':'whole','chunk_operations':128}
+        assert len(report['bank_modules'])==1,report['bank_modules']
+        assert all(report['bank_modules'][0].get(key)==value for key,value in expected.items()),report['bank_modules']
         if mode=='c':
             (project/'user/vxp_source_entry.c').write_text('''#include "vexel.h"
 void vxi_vx_entry(VX_STABLE uint8_t vxp_n) VX_ABI {

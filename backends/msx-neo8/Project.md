@@ -1,9 +1,39 @@
 # Editable Vexel NEO-8 project
 
+The whole program is resolved together, then emitted as independent bank
+allocations. Each allocation's machine code and constants must fit 8192 bytes;
+the size of its C text is not that measurement. Generated `bank_modules` records
+identify the original `partition_owner`, its `partition_role` and effective
+`chunk_operations`. Initial realization uses these facts to retry only rejected
+partitions. `realization.json` records the decisions and measured failures;
+its `realization_preferences` also records a rejected owner's compact division
+choice when unrolled helpers exceed the bank or compiler resource budget.
+Ordinary rebuilds preserve your project edits.
+
 Run `make` with SDCC, sdasz80, Python 3 and a C++ compiler. No network or Vexel
 executable is needed. The result is `build/game.rom`, SDCC assembly/listings,
 megalinker maps and `build/resolution.json`. `local.mk` controls local toolchain
 settings. The report fingerprints the ROM, inputs and objects.
+
+C compilations also write Make dependency files using SDCC's preprocessor.
+Incremental builds follow transitive includes, including nested headers in
+`user/` and individual generated support components. Unrelated header edits do
+not rebuild every module. A dependency-only preprocessor pass supplies empty
+rules for removed headers (SDCC 4.2 omits them in its side-effect dependency
+mode), and a missing dependency file forces its C object to be rebuilt.
+
+SDCC runs are serialized across exported projects for the current user. The
+default guard limits each invocation to 2 GiB of address space and 180 seconds,
+and records peak RSS and status in `build/sdcc-resources.jsonl`. Explicit
+`SDCC_MEMORY_MB` and `SDCC_TIMEOUT` settings belong in `local.mk`; build failure
+does not automatically increase them. Smaller generated chunks are usually the
+appropriate response to compiler resource exhaustion.
+Default `SDCCFLAGS` also cap register-allocation search at 2,000 attempts per
+node. Replacing those flags is a toolchain choice requiring fresh validation.
+
+`generated/program-image.json` inventories the closed projection and its code
+fragments. Packaging checks these products before export. Use `user/` overrides
+for subsequent hand edits and validate their behavior against the source.
 
 Implement your adapter in `user/main.c`. `generated/vexel.h` describes the ABI;
 `generated/source-plan.json` records source roots, flattened parameters, result

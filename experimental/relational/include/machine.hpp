@@ -10,6 +10,8 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace vx::relational {
@@ -31,12 +33,18 @@ struct Term {
 };
 class Terms {
     Id next = 0;
+    Ref zero,one;
 public:
     Ref variable(std::string name = {});
     Ref number(Integer value);
     Ref make(std::string name, std::vector<Ref> arguments = {});
 };
 std::string show(const Ref& term);
+// A bounded display appends "..." when truncated. Ordering streams the exact
+// display and skips shared ground subgraphs without expanding their text.
+std::string show(const Ref& term,std::size_t limit);
+int compareTermText(const Ref& first,std::string_view firstPrefix,
+                    const Ref& second,std::string_view secondPrefix);
 bool identical(const Ref& left, const Ref& right);
 bool ground(const Ref& term);
 
@@ -57,7 +65,9 @@ struct Bindings {
     void setValue(Id id,Ref value);
     void setDomain(Id id,std::optional<std::set<Integer>> domain);
     void setInteger(Id id);
-    std::map<Id, Ref> values;
+    // Bindings are queried by exact variable identity, never traversed to
+    // choose proof order. Patches and touched-variable worklists stay ordered.
+    std::unordered_map<Id, Ref> values;
     std::set<Id> integers;
     std::map<Id,std::set<Integer>> domains;
     std::set<Id> touched;
@@ -177,6 +187,15 @@ struct Request {
 };
 struct SearchBudget {
     std::size_t maxWork=1000000,maxDecisions=100000,work=0,decisions=0;
+};
+// Optional proofs may need more fuel to finish, but increasing every failed
+// attempt is expensive. Powers-of-two attempts receive bounded larger fuel;
+// ordinary attempts continue to observe current inputs. This stores effort,
+// never answers, bindings, missing inputs or a claim that failure is stable.
+class RetryEffort {
+    std::size_t attempts=0;
+public:
+    std::size_t next(std::size_t ordinary,std::size_t ceiling);
 };
 struct Options {
     std::string schedule = "fifo", branches = "forward";

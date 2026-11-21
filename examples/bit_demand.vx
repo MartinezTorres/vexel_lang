@@ -1,0 +1,16 @@
+// Public inputs and logical arithmetic remain 32-bit. Both consumers observe
+// only a byte, so private call interfaces and the carried state can use bytes.
+&~mix(a:#u32,b:#u32)->#u32 {(a+17)*(b-3)}
+&~relay(a:#u32,b:#u32)->#u32 {mix(a,b)}
+
+&^sample(a:#u32,b:#u32) {(#u8)relay(a,b)}
+
+&^evolve(a:#u32,b:#u32) {
+    x:#u32=a;
+    i:#u8=0;
+    (i<3)!@{x=relay(x,b);i+=1;};
+    (#u8)x
+}
+
+// A further exported caller returning the full relay result would keep that
+// shared result and its producer wide, regardless of declaration order.

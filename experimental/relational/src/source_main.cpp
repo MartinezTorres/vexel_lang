@@ -31,6 +31,7 @@ Command parse(const std::vector<std::string>& args,bool session=false) {
         for(std::size_t i=1;i<args.size();++i) {
             std::string flag=args[i];auto value=[&]() -> std::string {if(++i==args.size()) throw std::invalid_argument("missing value for "+flag);return args[i];};
             if(flag=="--query") options.queries.push_back(value());
+            else if(flag=="--program") options.wholeProgram=true;
             else if(flag=="--source") options.sources.push_back(value());
             else if(flag=="--stream") {
                 auto [name,count]=pairOption(value());auto size=natural(count);
@@ -55,6 +56,9 @@ Command parse(const std::vector<std::string>& args,bool session=false) {
                 options.configuration.push_back({flag.substr(2),text.substr(0,equals),natural(text.substr(equals+1))});
             }
             else if(flag=="--sink-no-feedback") options.boundaries[value()].noFeedback=true;
+            else if(flag=="--boundary-expansion") {
+                auto [symbol,macro]=pairOption(value());options.boundaries[symbol].offerExpansion(macro);
+            }
             else if(flag=="--resource-read" || flag=="--resource-write") {
                 auto [symbol,resource]=pairOption(value());auto& contract=options.boundaries[symbol];
                 (flag=="--resource-read" ? contract.reads : contract.writes).insert(resource);
@@ -122,6 +126,7 @@ int main(int argc,char** argv) {
         "       vexel --session [--verify-incremental]\n"
         "  --query type:NAME | value:NAME | length:NAME\n"
         "  --source NAME             Resolve a source activation\n"
+        "  --program                 Resolve all exported entries and build values together\n"
         "  --stream NAME:CAPACITY    Repeated serial activations with leased results\n"
         "  --emit-c DIRECTORY        Emit into a new or empty directory\n"
         "  --mode serial|overlap|retained|graph|open\n"
@@ -132,6 +137,7 @@ int main(int argc,char** argv) {
         "  --event-order A.begin:B.produce | --access-order A:B\n"
         "  --sink-no-feedback NAME   Close a sink's activation feedback\n"
         "  --resource-read NAME:RESOURCE | --resource-write NAME:RESOURCE\n"
+        "  --boundary-expansion NAME:MACRO  Offer a native region statement\n"
         "  --schedule fifo|lifo|random --branch-order forward|reverse\n"
         "  --max-work N --max-decisions N --max-nodes N\n"
         "  --allow-processes --process-timeout-ms N --max-file-bytes N\n"

@@ -5,6 +5,7 @@ No stack proof is inferred from C locals or object size. Facts in resolution.jso
 apply to this ROM only; they are not speculative source-language constants.
 """
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -47,7 +48,11 @@ def check_bindings(plan, areas):
 
 
 def check(plan_path, rom_path, output_path):
-    from stack_usage import analyze as analyze_stack
+    # Also usable through importlib by external validation drivers.
+    spec = importlib.util.spec_from_file_location('vexel_stack_usage', Path(__file__).with_name('stack_usage.py'))
+    stack_usage = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(stack_usage)
+    analyze_stack = stack_usage.analyze
     output_path.unlink(missing_ok=True)  # A failed candidate has no current report.
     plan = json.loads(plan_path.read_text())
     rom = rom_path.read_bytes()

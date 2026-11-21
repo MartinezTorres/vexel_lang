@@ -1,0 +1,6 @@
+// Logical arithmetic stays 32-bit; private arguments and results fit in bytes.
+&~adjust(n:#u32)->#u32 {
+    (n+1)>255 ? (#u32)7 : (n&127)+1
+}
+&~relay(n:#u32)->#u32 {adjust(n)}
+&^entry(n:#u8) {relay((#u32)n)}

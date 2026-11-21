@@ -1,48 +1,170 @@
 #include "machine.hpp"
 #include <algorithm>
+#include <array>
+#include <limits>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace vx::relational {
+namespace {
+using TermPair=std::pair<const Term*,const Term*>;
+struct TermPairHash {
+    std::size_t operator()(const TermPair& pair) const {
+        auto a=std::hash<const Term*>{}(pair.first),b=std::hash<const Term*>{}(pair.second);
+        return a^(b+0x9e3779b9U+(a<<6)+(a>>2));
+    }
+};
+// Shallow patterns dominate clause matching and unification. Keep their few
+// exact pairs inline; larger shared graphs still use a complete hash set.
+// This memo is local to one binding view, just like the traversal it serves.
+class TermPairs {
+    std::array<TermPair,8> small;
+    std::size_t count=0;
+    std::unordered_set<TermPair,TermPairHash> large;
+public:
+    bool insert(const Term* a,const Term* b) {
+        const TermPair pair{a,b};
+        if(count<=small.size()) {
+            if(std::find(small.begin(),small.begin()+static_cast<std::ptrdiff_t>(count),pair)!=
+               small.begin()+static_cast<std::ptrdiff_t>(count)) return false;
+            if(count<small.size()) {small[count++]=pair;return true;}
+            large.insert(small.begin(),small.end());++count;
+        }
+        return large.insert(pair).second;
+    }
+    void clear() {
+        if(count>small.size()) large.clear();
+        count=0;
+    }
+};
+// A rewrite owns its memo only for one immutable binding view or clause
+// instantiation. Shared inputs produce shared outputs; untouched structure is
+// retained. No result can survive rollback into a different binding context.
+template<class Prepare>
+Ref rewriteTerms(const Ref& input,Prepare prepare) {
+    auto root=prepare(input);
+    auto leaf=[](const Ref& value){return value->closed || value->kind!=Term::Constructor || value->arguments.empty();};
+    if(leaf(root)) return root;
+    struct Frame {Ref term;std::vector<Ref> arguments;};
+    auto finish=[](Frame& frame)->Ref {
+        if(frame.arguments==frame.term->arguments) return frame.term;
+        auto changed=std::make_shared<Term>(*frame.term);
+        changed->arguments=std::move(frame.arguments);
+        changed->closed=std::all_of(changed->arguments.begin(),changed->arguments.end(),ground);
+        return changed;
+    };
+    // Most relation patterns are shallow. They need no traversal stack or
+    // hash allocation when every rewritten child is already a leaf.
+    Frame first{root,{}};
+    for(const auto& argument:root->arguments) {
+        auto child=prepare(argument);
+        if(!leaf(child)) break;
+        first.arguments.push_back(std::move(child));
+    }
+    if(first.arguments.size()==root->arguments.size()) return finish(first);
+    std::vector<Frame> pending;pending.push_back(std::move(first));
+    std::unordered_map<const Term*,Ref> memo;
+    while(!pending.empty()) {
+        auto& frame=pending.back();
+        if(frame.arguments.size()<frame.term->arguments.size()) {
+            auto child=prepare(frame.term->arguments[frame.arguments.size()]);
+            if(leaf(child)) frame.arguments.push_back(std::move(child));
+            else if(auto found=memo.find(child.get());found!=memo.end()) frame.arguments.push_back(found->second);
+            else pending.push_back({std::move(child),{}});
+            continue;
+        }
+        auto result=finish(frame);
+        if(pending.size()==1) return result;
+        memo.emplace(frame.term.get(),result);pending.pop_back();
+        pending.back().arguments.push_back(std::move(result));
+    }
+    throw std::logic_error("empty term rewrite");
+}
+}
 Ref Terms::variable(std::string name) {
     auto term = std::make_shared<Term>(); term->kind = Term::Variable;
     term->variable = next++; term->name = std::move(name); return term;
 }
 Ref Terms::number(Integer value) {
+    Ref* cached=value==0 ? &zero : value==1 ? &one : nullptr;
+    if(cached && *cached) return *cached;
     auto term = std::make_shared<Term>(); term->kind = Term::Number;term->closed=true;
-    term->number = std::move(value); return term;
+    term->number = std::move(value);
+    if(cached) *cached=term;
+    return term;
 }
 Ref Terms::make(std::string name, std::vector<Ref> arguments) {
     auto term = std::make_shared<Term>(); term->kind = Term::Constructor;
     term->name = std::move(name); term->arguments = std::move(arguments);term->closed=std::all_of(term->arguments.begin(),term->arguments.end(),ground);return term;
 }
-std::string show(const Ref& term) {
-    if (term->kind == Term::Variable) return "?" + term->name + ":" + std::to_string(term->variable);
-    if (term->kind == Term::Number) return term->number.str();
-    std::string result = term->name;
-    if (!term->arguments.empty()) {
-        result += '(';
-        for (std::size_t i = 0; i < term->arguments.size(); ++i) {
-            if (i) result += ',';
-            result += show(term->arguments[i]);
+namespace {
+std::string renderTerm(const Ref& root,std::size_t limit) {
+    struct Frame {const Term* term;std::size_t next=0;};
+    std::vector<Frame> pending;std::string result;bool truncated=false;
+    auto append=[&](std::string_view text) {
+        const auto count=std::min(text.size(),limit-result.size());
+        result.append(text.data(),count);truncated|=count!=text.size();
+    };
+    auto begin=[&](const Term* term) {
+        if(term->kind==Term::Variable) append("?"+term->name+":"+std::to_string(term->variable));
+        else if(term->kind==Term::Number) append(term->number.str());
+        else {
+            append(term->name);
+            if(!truncated && !term->arguments.empty()) {append("(");pending.push_back({term});}
         }
-        result += ')';
+    };
+    begin(root.get());
+    while(!pending.empty() && !truncated) {
+        auto& frame=pending.back();
+        if(frame.next==frame.term->arguments.size()) {append(")");pending.pop_back();continue;}
+        if(frame.next) append(",");
+        const auto child=frame.term->arguments[frame.next++].get();
+        if(!truncated) begin(child);
     }
+    if(truncated) result+="...";
     return result;
 }
+}
+std::string show(const Ref& term) {
+    return renderTerm(term,std::numeric_limits<std::size_t>::max());
+}
+std::string show(const Ref& term,std::size_t limit) {return renderTerm(term,limit);}
 bool identical(const Ref& left, const Ref& right) {
     if (left == right) return true;
     if (left->kind != right->kind) return false;
     if (left->kind == Term::Variable) return left->variable == right->variable;
     if (left->kind == Term::Number) return left->number == right->number;
     if (left->name != right->name || left->arguments.size() != right->arguments.size()) return false;
-    for (std::size_t i = 0; i < left->arguments.size(); ++i)
-        if (!identical(left->arguments[i], right->arguments[i])) return false;
+    if (left->arguments.empty()) return true;
+    std::vector<TermPair> pending;
+    TermPairs visited;
+    pending.emplace_back(left.get(),right.get());
+    while(!pending.empty()) {
+        auto [a,b]=pending.back();pending.pop_back();
+        if(a==b) continue;
+        if(a->kind!=b->kind) return false;
+        if(a->kind==Term::Variable) {if(a->variable!=b->variable) return false;continue;}
+        if(a->kind==Term::Number) {if(a->number!=b->number) return false;continue;}
+        if(a->name!=b->name || a->arguments.size()!=b->arguments.size()) return false;
+        if(!visited.insert(a,b)) continue;
+        for(std::size_t i=a->arguments.size();i>0;--i)
+            pending.emplace_back(a->arguments[i-1].get(),b->arguments[i-1].get());
+    }
     return true;
 }
 bool ground(const Ref& term) {
     return term->closed;
+}
+std::size_t RetryEffort::next(std::size_t ordinary,std::size_t ceiling) {
+    if(attempts<std::numeric_limits<std::size_t>::max()) ++attempts;
+    if(!ordinary || !ceiling) return 0;
+    if(ordinary>=ceiling) return ceiling;
+    if(attempts&(attempts-1)) return ordinary;
+    return attempts>ceiling/ordinary ? ceiling : attempts*ordinary;
 }
 void Bindings::Transaction::value(Id id) {
     if(old.values.contains(id)) return;
@@ -92,18 +214,23 @@ Ref Bindings::walk(Ref term) const {
     return term;
 }
 Ref Bindings::resolve(const Ref& input) const {
-    auto term = walk(input);
-    if (term->kind != Term::Constructor || term->arguments.empty() || term->closed) return term;
-    auto result = std::make_shared<Term>(*term);
-    for (auto& argument : result->arguments) argument = resolve(argument);
-    result->closed=std::all_of(result->arguments.begin(),result->arguments.end(),ground);
-    return result;
+    return rewriteTerms(input,[&](const Ref& term){return walk(term);});
 }
 bool Bindings::occurs(Id variable, const Ref& input) const {
     auto term = walk(input);
+    // Immutable ground structure contains no promise, including through a
+    // shared subgraph. Its contents cannot acquire bindings in a later branch.
+    if (term->closed) return false;
     if (term->kind == Term::Variable) return term->variable == variable;
-    return std::any_of(term->arguments.begin(), term->arguments.end(),
-                       [&](const Ref& argument) { return occurs(variable, argument); });
+    std::vector<Ref> pending{term};std::unordered_set<const Term*> visited;
+    while(!pending.empty()) {
+        auto value=walk(pending.back());pending.pop_back();
+        if(value->closed) continue;
+        if(value->kind==Term::Variable) {if(value->variable==variable) return true;continue;}
+        if(!visited.insert(value.get()).second) continue;
+        pending.insert(pending.end(),value->arguments.begin(),value->arguments.end());
+    }
+    return false;
 }
 bool Bindings::integer(const Ref& input) {
     auto term = walk(input);
@@ -132,30 +259,47 @@ bool Bindings::constrain(Ref term,const std::set<Integer>& domain) {
     return true;
 }
 bool Bindings::unify(Ref left, Ref right) {
-    left = walk(left); right = walk(right);
-    if (identical(left, right)) return true;
-    // A fresh interface aliases the existing promise, preserving its root.
-    // Linking old array leaves to every new projection made repeated indexing
-    // build linear alias chains and quadratic dependency subscriptions.
-    if(left->kind==Term::Variable && right->kind==Term::Variable && left->variable<right->variable) std::swap(left,right);
-    if (left->kind == Term::Variable) {
-        if (integers.contains(left->variable) && !integer(right)) return false;
-        if (occurs(left->variable, right)) return false;
-        if(auto found=domains.find(left->variable);found!=domains.end()) {
-            auto domain=found->second;
-            if(!constrain(right,domain)) return false;
-            right=walk(right);setDomain(left->variable,std::nullopt);
+    if(left==right) return true;
+    // Retain the roots while raw pointer pairs are memoized. Constraint work
+    // may allocate new terms; allocator address reuse must never alias a pair.
+    std::vector<std::pair<Ref,Ref>> pending;
+    TermPairs visited;
+    auto merge=[&](Ref a,Ref b) {
+        a=walk(std::move(a));b=walk(std::move(b));
+        if(a==b || (a->kind==Term::Variable && b->kind==Term::Variable && a->variable==b->variable)) return true;
+        if(a->kind!=Term::Variable && b->kind==Term::Variable) std::swap(a,b);
+        // A fresh interface aliases the existing promise, preserving its root.
+        if(a->kind==Term::Variable && b->kind==Term::Variable && a->variable<b->variable) std::swap(a,b);
+        if(a->kind==Term::Variable) {
+            if(integers.contains(a->variable) && !integer(b)) return false;
+            if(occurs(a->variable,b)) return false;
+            if(auto found=domains.find(a->variable);found!=domains.end()) {
+                auto domain=found->second;
+                if(!constrain(b,domain)) return false;
+                b=walk(b);setDomain(a->variable,std::nullopt);
+            }
+            setValue(a->variable,b);return true;
         }
-        setValue(left->variable,right);return true;
+        if(a->kind!=b->kind) return false;
+        if(a->kind==Term::Number) {if(a->number!=b->number) return false;return true;}
+        if(a->name!=b->name || a->arguments.size()!=b->arguments.size()) return false;
+        if(a->arguments.empty()) return true;
+        // Within one call bindings only accumulate constraints. A pair whose
+        // children have already unified cannot become unequal without a later
+        // binding itself failing. Never retain this memo across transactions.
+        if(!visited.insert(a.get(),b.get())) return true;
+        for(std::size_t i=a->arguments.size();i>0;--i)
+            pending.emplace_back(a->arguments[i-1],b->arguments[i-1]);
+        return true;
+    };
+    if(!merge(left,right)) return false;
+    while(!pending.empty()) {
+        auto [a,b]=std::move(pending.back());pending.pop_back();
+        if(!merge(std::move(a),std::move(b))) return false;
     }
-    if (right->kind == Term::Variable) return unify(right, left);
-    if (left->kind != right->kind) return false;
-    if (left->kind == Term::Number) return left->number == right->number;
-    if (left->name != right->name || left->arguments.size() != right->arguments.size()) return false;
-    for (std::size_t i = 0; i < left->arguments.size(); ++i)
-        if (!unify(left->arguments[i], right->arguments[i])) return false;
     return true;
 }
+
 Goal equal(Ref a, Ref b) { return {Goal::Equal, {a,b}, "equality"}; }
 Goal finite(Ref value,const std::vector<Ref>& domain) {auto args=domain;args.insert(args.begin(),std::move(value));return {Goal::Finite,std::move(args),"finite domain"};}
 Goal different(Ref a, Ref b) { return {Goal::Different, {a,b}, "difference"}; }
@@ -181,7 +325,10 @@ void Program::define(std::string name, std::size_t arity, std::vector<Clause> cl
 }
 void Program::domain(std::string name, const std::vector<Ref>& values) {
     std::vector<Clause> clauses;
-    for (const auto& value : values) clauses.push_back({{value}, {}, show(value)});
+    // Labels explain a choice; they do not identify or compare its value.
+    // A shared term may have exponentially many printed paths. Bound only
+    // this diagnostic rendering, retaining the complete head for solving.
+    for (const auto& value : values) clauses.push_back({{value}, {}, renderTerm(value,256)});
     define(std::move(name), 1, std::move(clauses));
 }
 std::string outcomeName(Outcome outcome) {
@@ -206,15 +353,12 @@ bool Machine::tick() {
     ++result.stats.work;if(options.budget) ++options.budget->work;return true;
 }
 Ref Machine::fresh(const Ref& term, std::map<Id, Ref>& variables) {
-    if (term->kind == Term::Variable) {
-        auto [entry, inserted] = variables.try_emplace(term->variable);
-        if (inserted) entry->second = program.terms.variable(term->name);
+    return rewriteTerms(term,[&](const Ref& value) {
+        if(value->kind!=Term::Variable) return value;
+        auto [entry,inserted]=variables.try_emplace(value->variable);
+        if(inserted) entry->second=program.terms.variable(value->name);
         return entry->second;
-    }
-    if (term->kind != Term::Constructor || term->arguments.empty()) return term;
-    std::vector<Ref> arguments;
-    for (const auto& argument : term->arguments) arguments.push_back(fresh(argument, variables));
-    return program.terms.make(term->name, std::move(arguments));
+    });
 }
 std::vector<Machine::Expansion> Machine::expand(Context& context, std::size_t index) {
     const auto& goal=context.goals.at(index);std::vector<Expansion> alternatives;
@@ -222,18 +366,21 @@ std::vector<Machine::Expansion> Machine::expand(Context& context, std::size_t in
     if(found!=program.relations.end()) {
         const auto& relation=found->second;
         if(relation.arity!=goal.arguments.size()) throw std::invalid_argument("call arity: "+goal.label);
+        TermPairs compatiblePairs;
         std::function<bool(Ref,const Ref&)> compatible=[&](Ref supplied,const Ref& pattern) {
             supplied=context.bindings.walk(supplied);
             if(supplied->kind==Term::Variable || pattern->kind==Term::Variable) return true;
+            if(supplied==pattern) return true;
             if(supplied->kind!=pattern->kind) return false;
             if(supplied->kind==Term::Number) return supplied->number==pattern->number;
             if(supplied->name!=pattern->name || supplied->arguments.size()!=pattern->arguments.size()) return false;
+            if(!compatiblePairs.insert(supplied.get(),pattern.get())) return true;
             for(std::size_t i=0;i<supplied->arguments.size();++i) if(!compatible(supplied->arguments[i],pattern->arguments[i])) return false;
             return true;
         };
         for(const auto& clause:relation.clauses) {
             if(!tick()) return {};
-            bool matches=true;
+            bool matches=true;compatiblePairs.clear();
             for(std::size_t i=0;i<clause.head.size();++i) if(!compatible(goal.arguments[i],clause.head[i])) {matches=false;break;}
             if(!matches) continue;
             auto& bindings=context.bindings;Bindings::Transaction transaction(bindings);std::map<Id,Ref> variables;std::vector<Goal> added;
@@ -475,11 +622,71 @@ bool same(const std::vector<Ref>& first, const std::vector<Ref>& second) {
     for (std::size_t i = 0; i < first.size(); ++i) if (!identical(first[i],second[i])) return false;
     return true;
 }
-std::string key(const std::vector<Ref>& values) {
-    std::string text;
-    for (const auto& value : values) text += show(value) + '\n';
-    return text;
+// A cursor streams the historical display order. Shared ground subgraphs
+// compare as one piece; names may themselves contain delimiters, so tokens
+// cannot simply be compared as structural tuples.
+struct TextCursor {
+    struct Piece {Ref term;std::string text;std::size_t offset=0;};
+    std::vector<Piece> pending;
+    explicit TextCursor(const std::vector<Ref>& terms) {
+        for(auto it=terms.rbegin();it!=terms.rend();++it) {
+            text("\n");pending.push_back({*it,{}});
+        }
+    }
+    TextCursor(Ref term,std::string_view prefix) {
+        pending.push_back({std::move(term),{}});text(std::string(prefix));
+    }
+    void text(std::string value) {
+        if(!value.empty()) pending.push_back({{},std::move(value)});
+    }
+    void expand() {
+        auto term=pending.back().term;pending.pop_back();
+        if(term->kind!=Term::Constructor) {text(show(term));return;}
+        if(!term->arguments.empty()) {
+            text(")");
+            for(std::size_t i=term->arguments.size();i>0;--i) {
+                pending.push_back({term->arguments[i-1],{}});
+                if(i>1) text(",");
+            }
+            text("(");
+        }
+        text(term->name);
+    }
+    void consume(std::size_t length) {
+        auto& piece=pending.back();piece.offset+=length;
+        if(piece.offset==piece.text.size()) pending.pop_back();
+    }
+};
+int compareText(TextCursor a,TextCursor b) {
+    while(!a.pending.empty() && !b.pending.empty()) {
+        const auto& left=a.pending.back();const auto& right=b.pending.back();
+        if(left.term || right.term) {
+            // Variable names occur in displays but not in structural identity.
+            if(left.term && right.term && (left.term==right.term ||
+               (ground(left.term) && ground(right.term) && identical(left.term,right.term)))) {
+                a.pending.pop_back();b.pending.pop_back();
+            } else {
+                if(left.term) a.expand();
+                if(right.term) b.expand();
+            }
+            continue;
+        }
+        std::string_view x(left.text.data()+left.offset,left.text.size()-left.offset);
+        std::string_view y(right.text.data()+right.offset,right.text.size()-right.offset);
+        auto length=std::min(x.size(),y.size());
+        auto order=x.substr(0,length).compare(y.substr(0,length));
+        if(order) return order;
+        a.consume(length);b.consume(length);
+    }
+    return a.pending.empty() ? (b.pending.empty() ? 0 : -1) : 1;
 }
+bool realizationLess(const std::vector<Ref>& first,const std::vector<Ref>& second) {
+    return compareText(TextCursor(first),TextCursor(second))<0;
+}
+}
+int compareTermText(const Ref& first,std::string_view firstPrefix,
+                    const Ref& second,std::string_view secondPrefix) {
+    return compareText(TextCursor(first,firstPrefix),TextCursor(second,secondPrefix));
 }
 void Machine::finish(const Context& context, const Request& request) {
     Model model;
@@ -535,7 +742,7 @@ void Machine::finish(const Context& context, const Request& request) {
         result.outcome = Outcome::Ambiguous; result.alternative = std::move(model); return;
     }
     if (!result.selected || model.cost < result.selected->cost ||
-        (model.cost == result.selected->cost && key(model.realization) < key(result.selected->realization)))
+        (model.cost == result.selected->cost && realizationLess(model.realization,result.selected->realization)))
         result.selected = std::move(model);
 }
 void Machine::search(Context context, const Request& request, std::size_t depth) {
@@ -552,11 +759,13 @@ void Machine::search(Context context, const Request& request, std::size_t depth)
     };
     auto subscribe=[&](Id id,const Goal& goal) {
         std::set<Id> variables;
+        std::unordered_set<const Term*> visited;
         std::function<void(const Ref&)> visit=[&](const Ref& term) {
             if(term->kind==Term::Variable) {
                 if(!variables.insert(term->variable).second) return;
                 auto found=context.bindings.values.find(term->variable);if(found!=context.bindings.values.end()) visit(found->second);
-            } else if(!term->closed) for(const auto& argument:term->arguments) visit(argument);
+            } else if(!term->closed && visited.insert(term.get()).second)
+                for(const auto& argument:term->arguments) visit(argument);
         };
         for(const auto& argument:goal.arguments) visit(argument);
         for(Id variable:variables) context.watchers[variable].insert(id);

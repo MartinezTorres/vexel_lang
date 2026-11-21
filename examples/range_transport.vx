@@ -1,0 +1,8 @@
+// The declared interface accepts any byte. In this closed program every
+// caller supplies only 0..7, so the predicate result needs no transport.
+&~bounded(n:#u8)->(#u8,#b) {(n+1,n<8)}
+&~forward(n:#u8)->(#u8,#b) {bounded(n&7)}
+&^entry(n:#u8) {
+    value,valid=forward(n);
+    valid ? value : (#u8)99
+}

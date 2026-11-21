@@ -1,0 +1,19 @@
+// A known or unused result does not by itself make an execution optional.
+// The whole-program demand and execution facts distinguish these calls.
+&!observe(value:#u8);
+
+&~pure(value:#u8) { value+1 }
+
+&~observed(value:#u8) {
+    observe(value);
+    value+1
+}
+
+&~checked(value:#u8) { (#u8)100/value }
+
+&^entry(value:#u8) {
+    pure(value);          // Unused result, finite pure execution: removable.
+    observed(value);      // The sink must still observe the input.
+    checked(value);       // A zero input must still trap, after the sink.
+    pure(value+1)         // This invocation's result is needed.
+}

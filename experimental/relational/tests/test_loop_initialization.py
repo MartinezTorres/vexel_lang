@@ -17,12 +17,16 @@ def run(args):
     return subprocess.run([str(a) for a in args],text=True,capture_output=True,timeout=120)
 
 class LoopInitializationTests(unittest.TestCase):
-    def execution(self,source,oracle):
+    def execution(self,source,oracle,bounded_report=False):
         for schedule,branch in ORDERS:
             with self.subTest(source=source,schedule=schedule,branch=branch),tempfile.TemporaryDirectory(prefix='vexel-loop-init-') as temp:
                 temp=Path(temp);path=temp/'source.vx';path.write_text(source);out=temp/'generated'
                 result=run([EXE,path,'--source','entry','--budget','16','--emit-c',out,'--schedule',schedule,'--branch-order',branch])
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                if bounded_report:
+                    self.assertLess(len(result.stdout),65536)
+                    report=json.loads(result.stdout)
+                    self.assertTrue(any(leaf.get('value_truncated') for leaf in report['sources'][0]['leaves']))
                 library=temp/'program.so'
                 compiled=run(['cc','-std=c11','-O2','-shared','-fPIC','-I'+str(out),'-I'+str(ROOT/'backends/msx-neo8/runtime'),out/'vx_bridges.c',ROOT/'backends/msx-neo8/runtime/vx_runtime.c','-o',library])
                 self.assertEqual(compiled.returncode,0,compiled.stderr)
@@ -33,6 +37,13 @@ class LoopInitializationTests(unittest.TestCase):
                     expected=oracle(n)
                     if not isinstance(expected,list):expected=[expected]
                     self.assertEqual([dll.vx_entry_read(i) for i in range(len(expected))],[v&0xffffffff for v in expected],(n,source))
+
+    def test_shared_loop_facts_and_report_previews(self):
+        # The safety graph retains these updates before physical demand drops
+        # the unused slot. Its shared expression has millions of printed paths.
+        source=('&^entry(n:#u8){key:#u8=n;x:#u8=n;i:#u8=0;(i<1)!@{'
+                +'x=x*x+key;'*18+'i+=1;};n}')
+        self.execution(source,lambda n:n,bounded_report=True)
 
     def test_first_writes_and_aggregate_storage(self):
         for source,oracle in [

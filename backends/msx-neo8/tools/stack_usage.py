@@ -24,8 +24,17 @@ def assembly(path):
         if line.lower().startswith('.area'):
             executable=any(name in line.upper() for name in ('_CODE','_HOME','_GSINIT','_GSFINAL','_HEADER'))
             continue
-        if not line or line.startswith('.') or '=' in line:
+        if not line:
             continue
+        if line.startswith('.'):
+            # Raw bytes (including inline assembly) may be executable. Keep an
+            # opaque instruction at this position so reachable data/directives
+            # cannot silently acquire a zero stack cost. Metadata emits no code.
+            metadata={'.module','.globl','.optsdcc','.list','.nlist','.end'}
+            if executable and line.split()[0].lower() not in metadata:
+                instructions.append(('opaque',line,raw.strip()))
+            continue
+        if '=' in line: continue
         label = re.fullmatch(r'([\w$]+):{1,2}', line)
         if label:
             name = label[1]
@@ -61,6 +70,16 @@ def local_usage(code, labels, start, allow_tables=True):
     while queue:
         pc, (sp, registers) = queue.popleft()
         if pc >= len(code): raise OpenStack('execution falls out of assembly')
+        # A common epilogue may arrive with different temporary stack depths.
+        # Its saved frame address, rather than the discarded incoming SP, is
+        # the input that must agree. Account for the old depth before joining
+        # the state after this unconditional, known-address restoration.
+        op, operands, raw = code[pc]
+        if op == 'ld' and operands in ('sp,hl', 'sp,ix', 'sp,iy'):
+            saved = registers.get(operands[3:])
+            if saved is not None and saved[0] == 's':
+                high = max(high, -sp)
+                sp = signed_word(saved[1])
         old = seen.get(pc)
         if old is not None:
             if old[0] != sp: raise OpenStack('unbalanced or unknown stack at a control join: '+code[pc][2])
@@ -127,6 +146,11 @@ def local_usage(code, labels, start, allow_tables=True):
                 # followed immediately by uniform JR/JP entries. The C switch
                 # contract supplies the index range; visit every alternative.
                 cursor=pc-1; stride=0; pair=None
+                # SDCC can restore a saved index register after computing HL.
+                # These POPs have already contributed their stack effects and
+                # cannot change the checked table address. POP HL is excluded.
+                while cursor>=0 and code[cursor][0]=='pop' and code[cursor][1] in ('af','bc','de','ix','iy'):
+                    cursor-=1
                 while cursor>=0 and code[cursor][0]=='add' and code[cursor][1] in ('hl,de','hl,bc'):
                     if pair is not None and pair!=code[cursor][1]: break
                     pair=code[cursor][1];stride+=1;cursor-=1
@@ -238,8 +262,28 @@ def analyze(project, plan):
             roots[root]={'bytes':None,'reason':str(error)};active.clear()
     known=bool(roots) and all(root['bytes'] is not None for root in roots.values())
     maximum=max((root['bytes'] for root in roots.values() if root['bytes'] is not None),default=0)
+    # Fixed Vexel fields do not imply a stack-free SDCC function. Report the
+    # actual helpers separately from source-entry proofs. Header functions may
+    # have different code in each translation unit; never merge those copies.
+    bindings={}
+    for binding in plan.get('value_bindings',{}).get('bindings',[]):
+        name=binding['name']
+        symbol='_vx_bind_'+name+('_run' if binding['storage']=='fixed' else '_compute')
+        instances={}
+        for target in locations.get(symbol,[]):
+            owner=target.rsplit(':',1)[0]
+            try: instances[str(Path(owner).relative_to(project))]={'bytes':2+total(symbol,owner)}
+            except (OpenStack,RecursionError) as error:
+                instances[str(Path(owner).relative_to(project))]={'bytes':None,'reason':str(error)}
+                active.clear()
+        bindings[name]={'storage':binding['storage'],'frame_bytes':binding['bytes'],
+                        'instances':instances,'status':'not-emitted' if not instances else
+                        ('bounded' if all(i['bytes'] is not None for i in instances.values()) else 'unproven')}
     return {'status':'bounded' if known else 'unproven','bytes':maximum if known else None,
             'roots':roots,'environment_bytes':environment,'call_depth':depth,
+            'value_bindings':bindings,
+            'value_binding_scope':'helper invocation including return address and callees; '
+                'caller-owned frame, argument publication and embedding frames excluded',
             'external_contracts':{name:external[name] for name in sorted(assumptions)},
             'scope':'one source invocation including its return address; embedding frames excluded',
             'assumptions':['SDCC ABI 0, valid return addresses and checked switch dispatch',

@@ -1,4 +1,4 @@
-void Session::projectBoundary(const Model& model,std::ostream& header,std::ostream& code) {
+void Session::projectBoundary(const Model& model,std::ostream& header,std::ostream& code,InterfaceDemand& demand,ProgramImage& image,std::map<std::string,CCalculations>& calculations) {
     std::vector<Ref> storage;
     auto validateScalar=[&](const Ref& type,const std::string& value) {
         unsigned bits=scalarBits(type);
@@ -17,6 +17,7 @@ void Session::projectBoundary(const Model& model,std::ostream& header,std::ostre
     };
     for(const auto& [key,artifact]:model.witnesses) {
         if(key.starts_with("external_")) {
+            auto begin=static_cast<std::size_t>(code.tellp());
             std::string arguments="uint32_t *result",actual="result";std::size_t i=0;
             for(const auto& type:artifact->arguments[1]->arguments)
                 for(const auto& leaf:leaves(type)) {auto name="p"+std::to_string(i++);arguments+=", "+cScalarType(leaf.type)+" "+name;actual+=", "+name;}
@@ -28,6 +29,7 @@ void Session::projectBoundary(const Model& model,std::ostream& header,std::ostre
                 ++i;
             }
             code<<"}\n";
+            image.units.push_back({"vx_invoke_external_"+artifact->arguments[0]->name,"boundary",begin,static_cast<std::size_t>(code.tellp()),{},{"vx_external_"+artifact->arguments[0]->name}});
         } else if(key.starts_with("storage_")) storage.push_back(artifact);
     }
     // Declare all helpers before emitting any initializer: dependency cycles
@@ -76,10 +78,12 @@ void Session::projectBoundary(const Model& model,std::ostream& header,std::ostre
             code<<"static uint8_t vxs_ready_"<<id<<"; /* 0 absent, 1 ready, 2 initializing */\n";
             if(lazy) {
                 code<<"static void vx_ensure_"<<id<<"(void) VX_ABI VX_RESIDENT {\n";
-                cTemporaries(code,item->arguments[4]);
+                auto trace=demand.rewrite(item->arguments[4]);
+                auto& plan=calculations.at("vx_ensure_"+id);
+                cTemporaries(code,trace);plan.declarations(code,false);
                 code<<"    if (vxs_ready_"<<id<<" == 1) return;\n    if (vxs_ready_"<<id<<" == 2) vx_trap(18);\n    vxs_ready_"<<id<<" = 2;\n";
-                cExecution(code,item->arguments[4]);auto initial=leaves(type,item->arguments[5]);
-                for(std::size_t i=0;i<flat.size();++i) store(i,cExpression(initial[i].value),"    ");
+                cExecution(code,trace,plan);auto initial=leaves(type,item->arguments[5]);
+                for(std::size_t i=0;i<flat.size();++i) {plan.statement();store(i,plan.expression(demand.rewrite(initial[i].value)),"    ");}
                 code<<"    vxs_ready_"<<id<<" = 1;\n}\n";
             }
         }

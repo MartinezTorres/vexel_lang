@@ -21,7 +21,10 @@ def main():
              'returned':lambda n:n+10 if n in (1,2,3) else 99,
              'nested':lambda n:(n+42)%256,
              'mutated':lambda n:((n+1)%256 if n else 0)+256*(10-n if 1<=n<=4 else 10)}
-    support.run([machine,source,*[arg for name in oracles for arg in ['--source',name]],'--budget','4','--emit-c',generated])
+    # The nested iterator lowers to a large straight-line graph. Smaller bank
+    # groups also keep SDCC's scratch memory within the host compiler limit.
+    support.run([machine,source,*[arg for name in oracles for arg in ['--source',name]],
+                 '--budget','4','--prefer','bank_chunk_operations=16','--emit-c',generated])
     report=support.backend.package(generated,project,source,machine)
     library=directory/'host.so'
     support.run(['cc','-O2','-std=c11','-shared','-fPIC','-I'+str(generated),'-I'+str(project/'runtime'),

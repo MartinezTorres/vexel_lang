@@ -1,0 +1,19 @@
+// The declarations retain their full integer types. Closed call and loop
+// facts let the backend select smaller arithmetic without source annotations
+// describing registers, scratch storage, or a particular CPU.
+&~divide(n:#u32,d:#u32)->#u32 {n/d}
+&~divisor(n:#u8)->#u32 {(#u32)(n&15)+1}
+
+&^from_arguments(n:#u8) {divide((#u32)n,(#u32)(n&15)+1)}
+&^from_result(n:#u8) {d=divisor(n);(#u32)n/d}
+&^from_loop(n:#u8) {
+    d:#u32=(#u32)(n&15)+1;
+    sum:#u32=0;
+    i:#u8=0;
+    (i<3)!@ {sum+=(#u32)n/d;d=((d+2)&15)+1;i+=1;};
+    sum
+}
+
+// This is a source contract: invalid callers still trap. Table search must
+// not evaluate the excluded n=0 while considering a finite realization.
+&^from_contract([[range(1,15)]] n:#u8) {(#u32)255/(#u32)n}

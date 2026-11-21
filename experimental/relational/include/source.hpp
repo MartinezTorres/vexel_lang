@@ -7,6 +7,17 @@ namespace vx::relational {
 struct BoundaryContract {
     bool noFeedback=false;
     std::set<std::string> reads,writes;
+    // An adapter-supplied, equivalent statement macro for an ordered region
+    // call. Availability says nothing about purity, feedback or bank residency.
+    std::string expansion;
+    void offerExpansion(const std::string& macro) {
+        if(macro.empty() || macro.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")!=std::string::npos ||
+           (macro.front()>='0' && macro.front()<='9'))
+            throw std::invalid_argument("boundary expansion needs a C macro identifier: "+macro);
+        if(!expansion.empty() && expansion!=macro)
+            throw std::invalid_argument("conflicting boundary expansions: "+expansion+" and "+macro);
+        expansion=macro;
+    }
     bool operator==(const BoundaryContract&) const = default;
 };
 struct SourceOptions {
@@ -19,6 +30,9 @@ struct SourceOptions {
     Options search = [] {Options options;options.maxWork=10000000;return options;}();
     std::vector<std::string> queries;
     std::vector<std::string> sources;
+    // One closed request for every exported entry and exported build value in
+    // the root module/import closure. Scheduling remains an explicit contract.
+    bool wholeProgram=false;
     std::map<std::string,unsigned> streams;
     // Boundary occurrence names are adapter identities, independent of the
     // source definition. Every occurrence owns one execution/result lifetime.

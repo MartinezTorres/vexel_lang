@@ -22,6 +22,17 @@ class DefinedArithmeticTests(unittest.TestCase):
             self.execute('&^entry(n:#u8){r=n;{('+predicate+')?{r+=1;}:missing();};r}',lambda n:[(n+1)&255])
         self.check('&^entry(n:#u8){r=n;{(n>>(n&7))==n?{r+=1;}:missing();};r}',status="unresolved",query="value:entry")
 
+    def test_residual_constants_keep_signed_arithmetic(self):
+        # n-n becomes constant in the shared physical facts, after the source
+        # arithmetic has already produced its evaluation obligations.
+        for value in (-128, -127, 127):
+            quotient = -value if value != -128 else -128
+            remainder = value-int(value/3)*3
+            source = '&^entry(n:#u8){s:#i8=(#i8)(n-n)+(#i8)('+str(value)+');'
+            source += '(s/(-1),s>>1,s%3,(#u8)s<<2)}'
+            self.execute(source,lambda n,q=quotient,r=remainder,v=value:
+                         [q&0xffffffff,(v>>1)&0xffffffff,r&0xffffffff,(v<<2)&255],4)
+
     def test_unsafe_operands_and_real_traps(self):
         for predicate in ('(1/n)>0', '(n<<n)>0'):
             self.check('&^entry(n:#u8){r=n;{'+predicate+'?missing();r+=1;};r}',status='unresolved',query='value:entry')

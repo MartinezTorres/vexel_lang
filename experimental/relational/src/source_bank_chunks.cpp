@@ -33,7 +33,8 @@ struct Builder {
         return result;
     }
     bool declaration(std::string& text,bool parameter=false) {
-        static const std::regex pattern(R"(^(?:static\s+)?(VX_STABLE\s+)?((?:u?int(?:8|16|32)_t)\s*\*?\s+|(?:u?int(?:8|16|32)_t)\s+\*?)(.*?);?$)");
+        static const std::string scalar=R"((?:u?int(?:8|16|32)_t|vx_flow_[0-9]+_result))";
+        static const std::regex pattern("^(?:static\\s+)?(VX_STABLE\\s+)?("+scalar+"\\s*\\*?\\s+|"+scalar+"\\s+\\*?)(.*?);?$");
         std::smatch match;if(!std::regex_match(text,match,pattern)) return false;
         std::string type=match[1].str()+match[2].str(),variables=match[3];
         variables=trim(variables);

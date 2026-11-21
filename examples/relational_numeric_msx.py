@@ -34,7 +34,7 @@ def main():
     names=['fixed_values','float_values','float_bits','finite_cast']
     support.run([machine,source,*[item for n in names for item in ['--source',n]],'--budget','16','--emit-c',generated])
     report=support.backend.package(generated,project,source,machine)
-    assert report['runtime_features']=={'fixed':True,'float':True},report
+    assert report['runtime_features']=={'fixed':True,'float':True,'math':False},report
     runtime=directory/'runtime.c';runtime.write_text((project/'runtime/vx_runtime.c').read_text().replace('void vx_trap(uint8_t reason)','void vx_unused_trap(uint8_t reason)',1))
     harness=directory/'host.c';harness.write_text('#include "vexel.h"\n#include <setjmp.h>\nstatic jmp_buf trapped;\nvoid vx_trap(uint8_t r){longjmp(trapped,r);}\nunsigned checked(uint16_t n){int r=setjmp(trapped);if(r)return r;vx_finite_cast(n);return 0;}\n')
     library=directory/'host.so';rt=project/'runtime'

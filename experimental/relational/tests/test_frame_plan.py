@@ -40,8 +40,8 @@ class FramePlanTests(unittest.TestCase):
     def test_open_edges_overlap_and_ram_budget(self):
         sources=[
             ('&^entry(n:#u8){n+1}',1,'serial',0),
-            ('&^entry(n:#u8){n+1}',4,'serial',4),
-            ('&^entry(n:#u8){n+1}',4,'retained',4),
+            ('&^entry(n:#u8){n+1}',4,'serial','allocated'),
+            ('&^entry(n:#u8){n+1}',4,'retained','allocated'),
             ('&^entry(n:#u8){n+1}',1024,'overlap',0),
             ('&^entry(n:#u8){n+1}',1024,'open',0),
             ('&!read(n:#u8)->#u8;&~wrap(n:#u8)->#u8{read(n)}&^entry(n:#u8){wrap(n)}',1024,'serial',0),
@@ -56,7 +56,12 @@ class FramePlanTests(unittest.TestCase):
                     self.assertEqual(json.loads(r.stdout)['status'],'unresolved',r.stdout+r.stderr)
                     continue
                 self.assertEqual(r.returncode,0,r.stdout+r.stderr);plan=json.loads(r.stdout)['frame_planning']
-                if size is not None:self.assertEqual(plan['static_local_bytes'],size)
+                if size=='allocated':
+                    # The physical carrier may shrink as long as this closed
+                    # activation still receives storage within the allowance.
+                    self.assertGreater(plan['static_local_bytes'],0)
+                    self.assertLessEqual(plan['static_local_bytes'],budget)
+                elif size is not None:self.assertEqual(plan['static_local_bytes'],size)
                 else:
                     recursive=[fn for fn in plan['functions'] if fn['recursive']]
                     self.assertEqual(len(recursive),2);self.assertTrue(all(fn['frame_policy']=='automatic' for fn in recursive))

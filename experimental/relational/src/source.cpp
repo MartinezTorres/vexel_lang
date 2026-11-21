@@ -2,7 +2,12 @@
 #include "source_numeric.hpp"
 #include "source_observation.hpp"
 #include "source_control_proof.hpp"
+#include "source_conditional.hpp"
 #include "source_bank_chunks.hpp"
+#include "source_value.hpp"
+#include "source_demand.hpp"
+#include "source_image.hpp"
+#include "term_index.hpp"
 #include "floating.hpp"
 #include "vexel.hpp"
 #include "process.hpp"
@@ -229,16 +234,29 @@ std::string typeText(const Ref& type) {
 // to decide a source type, selects a physical type, or evaluates arithmetic.
 // A memoized property is a promise, not an answer. Cycles become ordinary
 // simultaneous obligations in Request; Machine is the only answer engine.
+struct CCalculations;
 class Session {
     Graph& graph;
     SourceOptions options;
     std::map<std::string,Ref> configuration;
     std::map<std::string,std::vector<std::string>> configurationOrigins;
+    struct ValueBinding {
+        std::string source,entry,contract,origin;
+        Ref weight;
+    };
+    std::map<std::string,ValueBinding> valueBindings;
+    struct BindingExclusion {
+        std::vector<std::string> names;
+        std::string origin;
+    };
+    std::vector<BindingExclusion> bindingExclusions;
     std::map<std::string,Ref> streamCapacities;
     std::map<Id,Ref> mapperSizes;
     std::map<Id,unsigned> mapperOffsets;
     Ref mapperExtent;
     Program program;
+    TermIndex builderInputs;
+    ConditionalProofs conditionalProofs;
     Request request;
     std::vector<std::string> observableArtifacts;
     std::deque<Environment> environments;
@@ -276,6 +294,10 @@ class Session {
     std::map<Id,Ref> frameCodes;
     std::map<Id,NativeControlCall> nativeControlCalls;
     std::map<Id,std::vector<Ref>> nativeControlResults;
+    struct NativeControlRequest {Request proof;RetryEffort effort;};
+    std::map<Id,NativeControlRequest> nativeControlRequests;
+    std::size_t nativeProofAttempts=0,nativeProofConstructions=0,nativeProofReuses=0,nativeProofExhausted=0;
+    std::size_t nativeProofWork=0,nativeProofBoosts=0;
     std::set<Id> preparedAliasGroups;
     std::map<Id,std::string> aliasBundles;
     std::map<Id,std::vector<Id>> aliasComponents;
@@ -317,9 +339,10 @@ class Session {
         if(supportInputs) {support=fresh("delayed dependency support");supportInputs->push_back(support);}
         if(effectInputs) {effect=fresh("delayed effect");effectInputs->push_back(effect);}
         if(runtimeInputs) {runtime=fresh("delayed runtime requirement");runtimeInputs->push_back(runtime);}
-        auto cache=std::make_shared<std::map<std::string,std::vector<Goal>>>();
+        auto cache=std::make_shared<std::map<std::vector<Id>,std::vector<Goal>>>();
         program.builders.emplace(name,Program::Builder{inputs.size(),inputs.size(),[this,action,cache,support,effect,runtime](const auto& args){
-            std::string key;for(const auto& arg:args) key+=show(arg)+"\n";
+            std::vector<Id> key;key.reserve(args.size());
+            for(const auto& arg:args) key.push_back(builderInputs.intern(arg));
             if(auto found=cache->find(key);found!=cache->end()) return found->second;
             auto goals=constructed([&]{
                 std::vector<Ref> edges;SupportScope collecting(supportInputs,&edges);
@@ -1513,7 +1536,7 @@ class Session {
     void project(SourceResult& answer,const Model& model,std::size_t observationCount);
     void projectStream(const Output&,const std::string&,const std::string&,unsigned,unsigned,unsigned,std::ostream&,std::ostream&);
     std::optional<std::vector<Ref>> closeObservation(const std::vector<Ref>& observations,const std::map<std::string,Ref>& artifacts);
-    void projectBoundary(const Model& model,std::ostream& header,std::ostream& code);
+    void projectBoundary(const Model& model,std::ostream& header,std::ostream& code,InterfaceDemand& demand,ProgramImage& image,std::map<std::string,CCalculations>& calculations);
     bool needsFlow(Id id);
     Id known(Ref type,Ref value,Id site=none);
     Id state(FlowState value);
@@ -1858,7 +1881,9 @@ std::string powerName(const Ref& type) {
     auto format=scalarFormat(type).value();
     return "vxm_power_"+type->name+"_"+std::to_string(format.bits)+"_"+std::to_string(format.fraction)+(format.sign ? "_signed" : "_unsigned");
 }
-std::string cExpression(const Ref& value) {
+#include "source_calculations.inc"
+std::string CCalculations::raw(const Ref& value) {
+    auto cExpression=[&](const Ref& child){return expression(child);};
     if(value->kind==Term::Number) return value->number.str()+"UL";
     if(value->kind!=Term::Constructor) throw std::logic_error("unresolved C expression");
     if(value->name=="Runtime") return cExpression(value->arguments.at(0));
@@ -1882,6 +1907,11 @@ std::string cExpression(const Ref& value) {
         std::string(value->name=="LoopFlag" ? "VX_SNAPSHOT8(" : "VX_SNAPSHOT32(")+
         (value->name=="LoopFlag" ? "vxlf_" : "vxlr_")+show(value->arguments.at(0))+"["+show(value->arguments.at(1))+"])";
     if(value->name=="CallValue") return "VX_SNAPSHOT32(vxt_"+show(value->arguments.at(0))+"["+show(value->arguments.at(1))+"])";
+    if(value->name=="CResult") {
+        const auto& type=value->arguments.at(2);
+        auto load="VX_SNAPSHOT"+std::to_string(nativeBytes(type)*8)+"(vxt_"+show(value->arguments[0])+".v"+show(value->arguments[1])+")";
+        return scalarSigned(type) ? "(("+cScalarType(type)+")"+load+")" : load;
+    }
     if(value->name=="After") return cExpression(value->arguments.at(1));
     if(value->name=="Index") {
         std::string result="(vx_trap(16), 0UL)";const auto& choices=value->arguments[1]->arguments;
@@ -1978,17 +2008,18 @@ std::string cExpression(const Ref& value) {
         bool cast=value->name=="Cast";auto at=cast ? 0u : 1u;
         unsigned bits=value->arguments.at(at)->number.convert_to<unsigned>();
         std::string mask=Integer((Integer(1)<<bits)-1).str()+"UL";
-        std::string expression="(uint32_t)("+cExpression(value->arguments.at(at+1))+")";
-        if(!cast) {
+        std::string expression;
+        if(cast) expression="(uint32_t)("+cExpression(value->arguments.at(at+1))+")";
+        else {
             const auto& op=value->arguments[0]->name;auto a=cExpression(value->arguments[2]),b=cExpression(value->arguments[3]);
             if(op=="/" || op=="%") return "vx_divmod("+a+", "+b+", "+std::to_string(bits)+", 0, "+(op=="%" ? "1" : "0")+")";
             if(op=="<<" || op==">>") return "vx_shift("+a+", "+b+", "+std::to_string(bits)+", "+(op==">>" ? "1" : "0")+", 0)";
             if(op=="*") return "(vx_mul("+a+", "+b+") & "+mask+")";
-            expression+=" "+op+" (uint32_t)("+b+")";
+            expression="(uint32_t)("+a+") "+op+" (uint32_t)("+b+")";
         }
         return "(("+expression+") & "+mask+")";
     }
-    throw std::logic_error("unsupported residual C expression: "+show(value));
+    throw std::logic_error("unsupported residual C expression: "+show(value,4096));
 }
 std::string cType(unsigned bits) {return bits<=8 ? "uint8_t" : bits<=16 ? "uint16_t" : "uint32_t";}
 std::string cScalarType(const Ref& type) {
@@ -1997,9 +2028,15 @@ std::string cScalarType(const Ref& type) {
 }
 std::size_t cTemporaries(std::ostream& code,const Ref& trace,bool staticFrame=false) {
     std::map<std::string,std::size_t> temporaries;
+    std::map<std::string,std::pair<std::string,std::size_t>> nativeTemporaries;
     std::size_t bytes=0;const auto storage=staticFrame ? "static " : "";
     std::function<void(const Ref&)> visit=[&](const Ref& item) {
-        if(item->name=="Invoke") temporaries.emplace(show(item->arguments[0]),item->arguments[4]->number.convert_to<std::size_t>());
+        if(item->name=="Invoke") {
+            if(item->arguments.size()>5) {
+                std::size_t size=0;for(const auto& type:item->arguments[5]->arguments) size+=nativeBytes(type);
+                if(size) nativeTemporaries.emplace(show(item->arguments[0]),std::make_pair("vx_flow_"+show(item->arguments[1])+"_result",size));
+            } else temporaries.emplace(show(item->arguments[0]),item->arguments[4]->number.convert_to<std::size_t>());
+        }
         else if(item->name=="Load" || item->name=="ExternalCall") temporaries.emplace(show(item->arguments[0]),item->arguments.back()->number.convert_to<std::size_t>());
         else if(item->name=="Loop") {
             auto id=show(item->arguments[0]);const auto& types=item->arguments.at(10)->arguments;
@@ -2011,9 +2048,13 @@ std::size_t cTemporaries(std::ostream& code,const Ref& trace,bool staticFrame=fa
                     code<<"    "<<storage<<cScalarType(types.at(at))<<" vxl_"<<suffix<<", vxln_"<<suffix<<";\n";
                     bytes+=2*nativeBytes(types[at++]);
                 }
-                code<<"    "<<storage<<"uint8_t vxlq_"<<id<<"_s"<<root<<", vxlqn_"<<id<<"_s"<<root<<";\n";bytes+=2;
+                if(slot->arguments.size()<3 || slot->arguments[2]->number!=0) {
+                    code<<"    "<<storage<<"uint8_t vxlq_"<<id<<"_s"<<root<<", vxlqn_"<<id<<"_s"<<root<<";\n";bytes+=2;
+                }
             }
-            code<<"    "<<storage<<"uint32_t vxi_"<<id<<";\n";bytes+=4;
+            if(item->arguments.size()<16 || item->arguments[15]->number!=0) {
+                code<<"    "<<storage<<"uint32_t vxi_"<<id<<";\n";bytes+=4;
+            }
             auto count=item->arguments[8]->arguments.size();std::size_t resultSize=0;
             for(const auto& result:item->arguments[8]->arguments) resultSize+=result->arguments[1]->arguments.size();
             if(count) code<<"    "<<storage<<"uint8_t vxlf_"<<id<<"["<<count<<"];\n";
@@ -2025,10 +2066,13 @@ std::size_t cTemporaries(std::ostream& code,const Ref& trace,bool staticFrame=fa
         else if(item->name=="If") {visit(item->arguments[1]);visit(item->arguments[2]);}
     };
     visit(trace);
-    for(const auto& [name,size]:temporaries) {code<<"    "<<storage<<"uint32_t vxt_"<<name<<"["<<size<<"];\n";bytes+=4*size;}
+    for(const auto& [name,size]:temporaries) if(size) {code<<"    "<<storage<<"uint32_t vxt_"<<name<<"["<<size<<"];\n";bytes+=4*size;}
+    for(const auto& [name,layout]:nativeTemporaries) {code<<"    "<<storage<<layout.first<<" vxt_"<<name<<";\n";bytes+=layout.second;}
     return bytes;
 }
-void cExecution(std::ostream& code,const Ref& trace,const std::string& indent="    ") {
+void cExecution(std::ostream& code,const Ref& trace,CCalculations& calculations,const std::string& indent="    ") {
+    calculations.statement();
+    auto cExpression=[&](const Ref& value){return calculations.expression(value);};
     if(trace->name=="Done") return;
     if(trace->name=="Load") {code<<indent<<"vx_load_"<<show(trace->arguments[1])<<"(vxt_"<<show(trace->arguments[0])<<");\n";return;}
     if(trace->name=="Store") {
@@ -2055,11 +2099,11 @@ void cExecution(std::ostream& code,const Ref& trace,const std::string& indent=" 
         code<<indent<<"if ((uint32_t)("<<cExpression(trace->arguments[0])<<") >= "<<show(trace->arguments[1])<<"UL) vx_trap(16);\n";return;
     }
     if(trace->name=="CheckSchema") {code<<indent<<"if (!("<<cExpression(trace->arguments[0])<<")) vx_trap(19);\n";return;}
-    if(trace->name=="Sequence") {for(const auto& part:trace->arguments) cExecution(code,part,indent);return;}
+    if(trace->name=="Sequence") {for(const auto& part:trace->arguments) cExecution(code,part,calculations,indent);return;}
     if(trace->name=="If") {
         code<<indent<<"if ("<<cExpression(trace->arguments[0])<<") {\n";
-        cExecution(code,trace->arguments[1],indent+"    ");code<<indent<<"} else {\n";
-        cExecution(code,trace->arguments[2],indent+"    ");code<<indent<<"}\n";return;
+        cExecution(code,trace->arguments[1],calculations,indent+"    ");code<<indent<<"} else {\n";
+        cExecution(code,trace->arguments[2],calculations,indent+"    ");code<<indent<<"}\n";return;
     }
     if(trace->name=="Loop") {
         auto id=show(trace->arguments[0]);
@@ -2073,22 +2117,28 @@ void cExecution(std::ostream& code,const Ref& trace,const std::string& indent=" 
             std::vector<Ref> flat;flatten(values,flat);std::size_t at=0;
             for(std::size_t s=0;s<slots.size();++s) {
                 auto root=id+"_s"+show(slots[s]->arguments[0]);
-                code<<pad<<"vxlqn_"<<root<<" = "<<cExpression(readiness->arguments.at(s))<<";\n";
+                bool ready=slots[s]->arguments.size()<3 || slots[s]->arguments[2]->number!=0;
+                calculations.statement();
+                if(ready) code<<pad<<"vxlqn_"<<root<<" = "<<cExpression(readiness->arguments.at(s))<<";\n";
                 auto count=slots[s]->arguments[1]->number.convert_to<std::size_t>();
-                for(std::size_t i=0;i<count;++i)
-                    code<<pad<<"vxln_"<<root<<"_l"<<i<<" = vxlqn_"<<root<<" ? ("<<cExpression(flat.at(at++))<<") : 0;\n";
+                for(std::size_t i=0;i<count;++i) {
+                    calculations.statement();
+                    code<<pad<<"vxln_"<<root<<"_l"<<i<<" = "<<(ready ? "vxlqn_"+root+" ? (" : "(")<<cExpression(flat.at(at++))<<(ready ? ") : 0;\n" : ");\n");
+                }
             }
             for(const auto& slot:slots) {
                 auto root=id+"_s"+show(slot->arguments[0]);auto count=slot->arguments[1]->number.convert_to<std::size_t>();
                 for(std::size_t i=0;i<count;++i) code<<pad<<"vxl_"<<root<<"_l"<<i<<" = vxln_"<<root<<"_l"<<i<<";\n";
-                code<<pad<<"vxlq_"<<root<<" = vxlqn_"<<root<<";\n";
+                if(slot->arguments.size()<3 || slot->arguments[2]->number!=0) code<<pad<<"vxlq_"<<root<<" = vxlqn_"<<root<<";\n";
             }
         };
         update(trace->arguments[1],trace->arguments[12],indent);
         const auto& returns=trace->arguments[8]->arguments;
         for(std::size_t i=0;i<returns.size();++i) code<<indent<<"vxlf_"<<id<<"["<<i<<"] = 0;\n";
-        code<<indent<<"vxi_"<<id<<" = 0;\n"<<indent<<"for (;;) {\n";
-        auto pad=indent+"    ";cExecution(code,trace->arguments[2],pad);
+        bool index=trace->arguments.size()<16 || trace->arguments[15]->number!=0;
+        if(index) code<<indent<<"vxi_"<<id<<" = 0;\n";
+        code<<indent<<"for (;;) {\n";
+        auto pad=indent+"    ";cExecution(code,trace->arguments[2],calculations,pad);
         code<<pad<<"if (!("<<cExpression(trace->arguments[3])<<")) {\n";
         std::size_t checkOffset=0;
         for(std::size_t i=0;i<returns.size();++i) {
@@ -2104,7 +2154,7 @@ void cExecution(std::ostream& code,const Ref& trace,const std::string& indent=" 
         update(trace->arguments[4],trace->arguments[13],pad+"        ");code<<pad<<"        continue;\n"<<pad<<"    }\n";
         update(trace->arguments[4],trace->arguments[13],pad+"    ");
         code<<pad<<"    break;\n"<<pad<<"}\n";
-        cExecution(code,trace->arguments[5],pad);std::size_t offset=0;
+        cExecution(code,trace->arguments[5],calculations,pad);std::size_t offset=0;
         for(std::size_t i=0;i<returns.size();++i) {
             code<<pad<<"if ("<<cExpression(returns[i]->arguments[0])<<") {\n"<<pad<<"    vxlf_"<<id<<"["<<i<<"] = 1;\n";
             for(const auto& value:returns[i]->arguments[1]->arguments) code<<pad<<"    vxlr_"<<id<<"["<<offset++<<"] = "<<cExpression(value)<<";\n";
@@ -2113,28 +2163,74 @@ void cExecution(std::ostream& code,const Ref& trace,const std::string& indent=" 
         // Test the exit before overwriting carried values used by its guard.
         code<<pad<<"if ("<<cExpression(trace->arguments[7])<<") {\n";
         update(trace->arguments[6],trace->arguments[14],pad+"    ");code<<pad<<"    break;\n"<<pad<<"}\n";
-        update(trace->arguments[6],trace->arguments[14],pad);code<<pad<<"++vxi_"<<id<<";\n"<<indent<<"}\n";return;
+        update(trace->arguments[6],trace->arguments[14],pad);
+        if(index) code<<pad<<"++vxi_"<<id<<";\n";
+        code<<indent<<"}\n";return;
     }
     if(trace->name=="Invoke") {
-        code<<indent<<"vx_flow_"<<show(trace->arguments[1])<<"(vxt_"<<show(trace->arguments[0]);
+        bool typed=trace->arguments.size()>5,first=true;
+        code<<indent<<"vx_flow_"<<show(trace->arguments[1])<<'(';
+        if(!typed || trace->arguments[4]->number!=0) {
+            code<<(trace->arguments[4]->number==0 ? "0" : (typed ? "&vxt_" : "vxt_")+show(trace->arguments[0]));first=false;
+        }
         std::function<void(const Ref&)> argument=[&](const Ref& value){
             if(value->name=="Values") for(const auto& item:value->arguments) argument(item);
             else if(value->name=="RecordValue") argument(value->arguments[1]);
-            else code<<", "<<cExpression(value);
+            else {if(!first) code<<", ";first=false;code<<cExpression(value);}
         };
         for(std::size_t i=2;i<4;++i) argument(trace->arguments[i]);
         code<<");\n";return;
     }
-    throw std::logic_error("unclosed execution projection: "+show(trace));
+    throw std::logic_error("unclosed execution projection: "+show(trace,4096));
 }
 #include "source_boundary_project.inc"
 #include "source_banks.inc"
 #include "source_frame_plan.inc"
 #include "source_streams.inc"
 void Session::project(SourceResult& answer,const Model& model,std::size_t observationCount) {
+    bool needsValueRuntime=false;
     std::ostringstream header,code,report;
+    struct BindingPlan {
+        ValueBindingProjection projection;
+        unsigned weight=0;
+        bool eligible=false,selected=false;
+        std::size_t slot=0;
+        std::string reason;
+    };
+    std::map<std::string,BindingPlan> bindingPlans;
     BankProjection banks;
+    ProgramImage image;
     FramePlanning framesPlan;
+    std::map<std::string,CCalculations> calculations;
+    InterfaceDemand interfaceDemand(terms());
+    for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_")) {
+        const auto& a=artifact->arguments;InterfaceDemand::Function fn;fn.trace=a[4];
+        for(const auto& leaf:leaves(a[3],a[5])) if(nativeScalar(leaf.type)) {fn.results.push_back(leaf.value);fn.resultTypes.push_back(leaf.type);}
+        // Logical captures follow the original dummy return slot for NoValue.
+        // The demand plan may remove that slot, without moving logical leaves.
+        if(fn.results.empty()) {fn.results.push_back(number(0));fn.resultTypes.push_back(terms().make("UInt",{number(32)}));}
+        for(std::size_t i=0;i<a[6]->arguments.size();++i) if(a[8]->arguments[i]->number!=0)
+            for(const auto& leaf:leaves(a[2]->arguments[i],a[6]->arguments[i]))
+                if(nativeScalar(leaf.type)) {fn.results.push_back(leaf.value);fn.resultTypes.push_back(leaf.type);}
+        for(unsigned kind=1;kind<=2;++kind) for(std::size_t i=0;i<a[kind]->arguments.size();++i) {
+            if(kind==2 && a[7]->arguments[i]->number==0) continue;
+            for(const auto& leaf:leaves(a[kind]->arguments[i])) if(nativeScalar(leaf.type))
+                (kind==1 ? fn.argumentTypes : fn.captureTypes).push_back(leaf.type);
+        }
+        interfaceDemand.function(a[0]->number.convert_to<Id>(),std::move(fn));
+    }
+    for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("storage_") && artifact->arguments[3]->name=="Lazy") {
+        std::vector<Ref> values;
+        for(const auto& leaf:leaves(artifact->arguments[2],artifact->arguments[5])) values.push_back(leaf.value);
+        interfaceDemand.root(artifact->arguments[4],std::move(values));
+    }
+    for(std::size_t i=0;i<outputs.size();++i) {
+        const auto& output=outputs[i];auto trace=model.witnesses.at("source_checks_"+std::to_string(output.cell));
+        if(auto executed=model.witnesses.find("execution_"+std::to_string(output.cell));executed!=model.witnesses.end())
+            trace=terms().make("Sequence",{trace,executed->second});
+        interfaceDemand.root(trace,model.realization[i*6+4]->arguments);
+    }
+    interfaceDemand.close();
     unsigned mapperBytes=0;
     // Stable declaration identities determine physical offsets; obligation
     // discovery order never determines ownership.
@@ -2152,21 +2248,172 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("storage_") && artifact->arguments[3]->name=="Lazy")
         // The resident initializer emitter retains automatic temporaries. Its
         // real calls still participate in ownership, recursion and feedback.
-        framesPlan.add("vx_ensure_"+show(artifact->arguments[0]),artifact->arguments[4],0,false);
+        framesPlan.add("vx_ensure_"+show(artifact->arguments[0]),interfaceDemand.rewrite(artifact->arguments[4]),0,false);
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_"))
-        framesPlan.add("vx_flow_"+show(artifact->arguments[0]),artifact->arguments[4]);
+        framesPlan.add("vx_flow_"+show(artifact->arguments[0]),interfaceDemand.rewrite(artifact->arguments[4],artifact->arguments[0]->number.convert_to<Id>()));
     for(std::size_t i=0;i<outputs.size();++i) {
         const auto& output=outputs[i];auto trace=model.witnesses.at("source_checks_"+std::to_string(output.cell));
         if(auto executed=model.witnesses.find("execution_"+std::to_string(output.cell));executed!=model.witnesses.end())
             trace=terms().make("Sequence",{trace,executed->second});
-        std::size_t snapshots=0;
-        if(model.realization[i*6]->number>8) for(const auto& leaf:model.realization[i*6+4]->arguments) if(leaf->kind!=Term::Number) snapshots+=4;
-        framesPlan.add("vx_"+output.name,trace,snapshots);
-        framesPlan.roots.insert("vx_"+output.name);
+        const auto symbol="vx_"+output.name;
+        const auto preference="calculation_publication_reuse."+symbol;
+        const bool reusePublication=configured(model,"calculation_publication_reuse")!=0 &&
+            (!configuration.contains(preference) || configured(model,preference)!=0);
+        const auto widthPreference="calculation_publication_narrow."+symbol;
+        const bool narrowPublication=configured(model,"calculation_publication_narrow")!=0 &&
+            (!configuration.contains(widthPreference) || configured(model,widthPreference)!=0);
+        const auto payloadBits=model.realization[i*6]->number.convert_to<unsigned>();
+        const auto publicationValues=payloadBits>8 ? static_cast<std::size_t>(std::count_if(
+            model.realization[i*6+4]->arguments.begin(),model.realization[i*6+4]->arguments.end(),
+            [](const Ref& leaf){return leaf->kind!=Term::Number;})) : 0u;
+        const auto carrierBits=publicationValues ? (narrowPublication ? payloadBits : 32u) : 0u;
+        const auto snapshots=(reusePublication && publicationValues ? 1u : publicationValues)*(carrierBits/8);
+        framesPlan.add(symbol,interfaceDemand.rewrite(trace),snapshots);
+        framesPlan.nodes.at(symbol).publicationValues=publicationValues;
+        framesPlan.nodes.at(symbol).publicationBytes=snapshots;
+        framesPlan.nodes.at(symbol).publicationBits=carrierBits;
+        framesPlan.roots.insert(symbol);
+    }
+    // Plan the same evaluation sites before choosing physical storage. The
+    // resulting typed lanes are part of both automatic and fixed frames.
+    for(const auto& [key,value]:configuration) {
+        (void)value;const std::string prefix="calculation_scratch_reuse.";
+        if(key.starts_with(prefix) && !framesPlan.nodes.contains(key.substr(prefix.size())))
+            throw std::invalid_argument("unknown scratch reuse function scope: "+key);
+        const std::string linearPrefix="calculation_linear_terms.";
+        if(key.starts_with(linearPrefix) && !framesPlan.nodes.contains(key.substr(linearPrefix.size())))
+            throw std::invalid_argument("unknown linear combination function scope: "+key);
+        const std::string resultPrefix="calculation_result_sharing.";
+        if(key.starts_with(resultPrefix) && !framesPlan.nodes.contains(key.substr(resultPrefix.size())))
+            throw std::invalid_argument("unknown result sharing function scope: "+key);
+        const std::string publicationPrefix="calculation_publication_reuse.";
+        if(key.starts_with(publicationPrefix) && !framesPlan.nodes.contains(key.substr(publicationPrefix.size())))
+            throw std::invalid_argument("unknown publication reuse function scope: "+key);
+        const std::string publicationWidthPrefix="calculation_publication_narrow.";
+        if(key.starts_with(publicationWidthPrefix) && !framesPlan.nodes.contains(key.substr(publicationWidthPrefix.size())))
+            throw std::invalid_argument("unknown publication width function scope: "+key);
+        const std::string divisionPrefix="calculation_division_sharing.";
+        if(key.starts_with(divisionPrefix) && !framesPlan.nodes.contains(key.substr(divisionPrefix.size())))
+            throw std::invalid_argument("unknown division sharing function scope: "+key);
+        const std::string unrollPrefix="calculation_division_unroll.";
+        if(key.starts_with(unrollPrefix) && !framesPlan.nodes.contains(key.substr(unrollPrefix.size())))
+            throw std::invalid_argument("unknown division unroll function scope: "+key);
+        const std::string rotationPrefix="calculation_rotation_helpers.";
+        if(key.starts_with(rotationPrefix) && !framesPlan.nodes.contains(key.substr(rotationPrefix.size())))
+            throw std::invalid_argument("unknown rotation helper function scope: "+key);
+    }
+    for(const auto& [symbol,node]:framesPlan.nodes) {
+        auto& plan=calculations.try_emplace(symbol,terms()).first->second;
+        const auto publicationPreference="calculation_publication_reuse."+symbol;
+        framesPlan.nodes.at(symbol).reusePublication=configured(model,"calculation_publication_reuse")!=0 &&
+            (!configuration.contains(publicationPreference) || configured(model,publicationPreference)!=0);
+        const auto publicationWidthPreference="calculation_publication_narrow."+symbol;
+        framesPlan.nodes.at(symbol).narrowPublication=configured(model,"calculation_publication_narrow")!=0 &&
+            (!configuration.contains(publicationWidthPreference) || configured(model,publicationWidthPreference)!=0);
+        std::optional<Id> calculationOwner;
+        const auto scratchPreference="calculation_scratch_reuse."+symbol;
+        plan.reuseScratch=configured(model,"calculation_scratch_reuse")!=0 &&
+            (!configuration.contains(scratchPreference) || configured(model,scratchPreference)!=0);
+        const auto resultPreference="calculation_result_sharing."+symbol;
+        plan.shareResults=configured(model,"calculation_result_sharing")!=0 &&
+            (!configuration.contains(resultPreference) || configured(model,resultPreference)!=0);
+        const auto divisionPreference="calculation_division_sharing."+symbol;
+        plan.shareDivisions=configured(model,"calculation_division_sharing")!=0 &&
+            (!configuration.contains(divisionPreference) || configured(model,divisionPreference)!=0);
+        const auto unrollPreference="calculation_division_unroll."+symbol;
+        plan.unrollDivisions=configured(model,"calculation_division_unroll")!=0 &&
+            (!configuration.contains(unrollPreference) || configured(model,unrollPreference)!=0);
+        const auto rotationPreference="calculation_rotation_helpers."+symbol;
+        plan.rotationHelpers=configured(model,"calculation_rotation_helpers")!=0 &&
+            (!configuration.contains(rotationPreference) || configured(model,rotationPreference)!=0);
+        plan.linearTerms=configured(model,"calculation_linear_terms");
+        const auto linearPreference="calculation_linear_terms."+symbol;
+        if(configuration.contains(linearPreference)) plan.linearTerms=std::min(plan.linearTerms,configured(model,linearPreference));
+        for(const auto& [key,artifact]:model.witnesses) {
+            if(key.starts_with("runtime_frame_") && symbol=="vx_flow_"+show(artifact->arguments[0])) {
+                calculationOwner=artifact->arguments[0]->number.convert_to<Id>();
+                const auto& fn=interfaceDemand.at(artifact->arguments[0]->number.convert_to<Id>());
+                for(std::size_t i=0;i<fn.argumentStorageTypes.size();++i)
+                    plan.inputs.emplace("FrameArg:"+std::to_string(i),fn.argumentStorageTypes[i]);
+                for(std::size_t i=0;i<fn.captureStorageTypes.size();++i)
+                    plan.inputs.emplace("CaptureArg:"+std::to_string(i),fn.captureStorageTypes[i]);
+            }
+        }
+        // Source ABI types belong to this function, independently of input
+        // numbering. Do not import unrelated source representations.
+        for(const auto& output:outputs) if(symbol=="vx_"+output.name)
+            for(auto id:output.parameters)
+                for(const auto& leaf:model.witnesses.at("source_input_"+std::to_string(id))->arguments[2]->arguments) {
+                    plan.inputs.emplace("Input:"+show(leaf->arguments[0]),leaf->arguments[2]);
+                    plan.inputRanges.emplace("Input:"+show(leaf->arguments[0]),
+                        IntegerRange{leaf->arguments[3]->number,leaf->arguments[4]->number});
+                }
+        plan.transportRange=[&interfaceDemand,calculationOwner](const Ref& value) {
+            return interfaceDemand.transportRange(value,calculationOwner);
+        };
+        std::ostringstream unused;cExecution(unused,node.trace,plan);
+        for(const auto& [key,artifact]:model.witnesses) {
+            if(key.starts_with("runtime_frame_") && symbol=="vx_flow_"+show(artifact->arguments[0])) {
+                const auto owner=artifact->arguments[0]->number.convert_to<Id>();
+                const auto& fn=interfaceDemand.at(owner);
+                std::vector<Ref> resultValues;
+                for(std::size_t i=0;i<fn.results.size();++i) if(fn.slots.contains(i) || !fn.discardableResults.at(i)) {
+                    resultValues.push_back(interfaceDemand.transportedResult(owner,i));
+                }
+                plan.results(resultValues);
+            }
+            if(key.starts_with("storage_") && symbol=="vx_ensure_"+show(artifact->arguments[0]))
+                for(const auto& leaf:leaves(artifact->arguments[2],artifact->arguments[5])) {
+                    plan.statement();plan.expression(interfaceDemand.rewrite(leaf.value));
+                }
+        }
+        for(std::size_t i=0;i<outputs.size();++i) if(symbol=="vx_"+outputs[i].name) {
+            std::vector<Ref> resultValues;
+            for(const auto& value:model.realization[i*6+4]->arguments) if(value->kind!=Term::Number) {
+                resultValues.push_back(interfaceDemand.rewrite(value));
+            }
+            plan.results(resultValues);
+        }
+        plan.sealed=true;
+        framesPlan.nodes.at(symbol).localBytes+=plan.bytes();
+        framesPlan.nodes.at(symbol).calculationBytes=plan.bytes();
+        framesPlan.nodes.at(symbol).calculationIntervals=plan.intervals;
+        framesPlan.nodes.at(symbol).shareResults=plan.shareResults;
+        framesPlan.nodes.at(symbol).resultGroups=plan.resultGroups;
+        framesPlan.nodes.at(symbol).shareDivisions=plan.shareDivisions;
+        framesPlan.nodes.at(symbol).sharedDivisions=plan.sharedDivisions;
+        framesPlan.nodes.at(symbol).unrollDivisions=plan.unrollDivisions;
+        framesPlan.nodes.at(symbol).rotationHelpers=plan.rotationHelpers;
+        framesPlan.nodes.at(symbol).unrolledDivisionHelpers=static_cast<std::size_t>(std::count_if(plan.helpers.begin(),plan.helpers.end(),
+            [](const auto& name){return (name.starts_with("div") || name.starts_with("rem")) && !name.ends_with("_runtime");}));
+        framesPlan.nodes.at(symbol).retainedCalculations=plan.retained;
+        framesPlan.nodes.at(symbol).reuseScratch=plan.reuseScratch;
+        framesPlan.nodes.at(symbol).scratchReuses=plan.scratchReuses;
+        framesPlan.nodes.at(symbol).narrowedValues=plan.narrowedValues;
+        framesPlan.nodes.at(symbol).narrowedOperations=plan.narrowedOperations;
+        framesPlan.nodes.at(symbol).linearCombinations=plan.linearCombinations;
+        framesPlan.nodes.at(symbol).linearTerms=plan.linearTerms;
     }
     framesPlan.close(executionExclusive,options.activation=="graph",overlappingExecutions,configured(model,"frame_ram_bytes"));
     header<<"#ifndef VX_RELATIONAL_SOURCE_H\n#define VX_RELATIONAL_SOURCE_H\n#include \"vx_runtime.h\"\n";
     code<<"/* Generated from relational source obligations and a closed activation contract. */\n#include \"vexel.h\"\n";
+    std::set<std::string> calculationHelpers;
+    for(const auto& [symbol,plan]:calculations) {
+        (void)symbol;if(plan.intervals) needsValueRuntime=true;
+        calculationHelpers.insert(plan.helpers.begin(),plan.helpers.end());
+    }
+    auto residentSupport=[](const std::set<std::string>& helpers) {
+        return "#undef VX_VALUE_LOCATION\n#define VX_VALUE_LOCATION VX_RESIDENT\n"+calculationRuntimeIncludes(helpers)+
+               "#undef VX_VALUE_LOCATION\n#define VX_VALUE_LOCATION\n";
+    };
+    if(needsValueRuntime) {
+        banks.calculationSupport=residentSupport(calculationHelpers);code<<banks.calculationSupport;
+        std::set<std::string> residentHelpers;bool residentCalculations=false;
+        for(const auto& [symbol,plan]:calculations) if(symbol.starts_with("vx_ensure_") && plan.intervals) {
+            residentCalculations=true;residentHelpers.insert(plan.helpers.begin(),plan.helpers.end());
+        }
+        if(residentCalculations) banks.residentCalculationSupport=residentSupport(residentHelpers);
+    }
     if(!options.streams.empty()) code<<"static uint8_t vx_stream_running;\nstatic uint32_t vx_stream_sequence;\n";
     // SDCC 4.2/4.5/4.6 can clobber a still-live byte operand in A while
     // narrowing related expressions (e.g. save(x,x+1,x+2)). Keep residual
@@ -2208,42 +2455,82 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
             <<"        power >>= 1;\n        if (power) base = "<<multiply("base","base")<<";\n    }\n    return result;\n}\n";
         banks.cut(code,begin,name,"vxp_"+name,"base, power");
     }
-    auto framePrototype=[](const Ref& artifact) {
-        std::string text="void vx_flow_"+show(artifact->arguments[0])+"(uint32_t *vxo";
+    auto framePrototype=[&](const Ref& artifact) {
+        const auto& demand=interfaceDemand.at(artifact->arguments[0]->number.convert_to<Id>());
+        std::string parameters=demand.slots.empty() ? "" : "vx_flow_"+show(artifact->arguments[0])+"_result *vxo";
         for(std::size_t kind=1;kind<=2;++kind) {
             std::size_t offset=0;
             for(std::size_t i=0;i<artifact->arguments[kind]->arguments.size();++i) {
                 if(kind==2 && artifact->arguments[7]->arguments[i]->number==0) continue;
-                for(const auto& leaf:leaves(artifact->arguments[kind]->arguments[i])) if(nativeScalar(leaf.type))
-                    text+=", VX_STABLE "+cScalarType(leaf.type)+(kind==1 ? " vxa_" : " vxc_")+std::to_string(offset++);
+                for(const auto& leaf:leaves(artifact->arguments[kind]->arguments[i])) if(nativeScalar(leaf.type)) {
+                    if((kind==1 ? demand.arguments : demand.captures).contains(offset))
+                        parameters+=(parameters.empty() ? "" : ", ")+std::string("VX_STABLE ")+cScalarType((kind==1 ? demand.argumentStorageTypes : demand.captureStorageTypes).at(offset))+(kind==1 ? " vxa_" : " vxc_")+std::to_string(offset);
+                    ++offset;
+                }
             }
         }
-        return text+") VX_ABI VX_RESIDENT";
+        return "void vx_flow_"+show(artifact->arguments[0])+"("+(parameters.empty() ? "void" : parameters)+") VX_ABI VX_RESIDENT";
     };
+    for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_")) {
+        const auto& demand=interfaceDemand.at(artifact->arguments[0]->number.convert_to<Id>());
+        if(demand.slots.empty()) continue;
+        auto type="vx_flow_"+show(artifact->arguments[0])+"_result";std::size_t bytes=0;
+        header<<"/* Private native interface; logical leaf mapping is in runtime_functions. */\ntypedef struct {\n";
+        for(const auto& [logical,physical]:demand.slots) {
+            const auto& scalar=demand.resultStorageTypes.at(logical);bytes+=nativeBytes(scalar);
+            header<<"    "<<cScalarType(scalar)<<" v"<<physical<<";\n";
+        }
+        header<<"} "<<type<<";\n#ifdef __SDCC_z80\ntypedef char "<<type<<"_size[sizeof("<<type<<")=="<<bytes<<" ? 1 : -1];\n#endif\n";
+    }
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_")) header<<framePrototype(artifact)<<";\n";
-    projectBoundary(model,header,code);
+    projectBoundary(model,header,code,interfaceDemand,image,calculations);
+    for(auto& unit:image.units) if(unit.kind=="boundary") for(const auto& [name,node]:framesPlan.nodes) {
+        (void)name;
+        std::function<void(const Ref&)> visit=[&](const Ref& trace) {
+            const auto& a=trace->arguments;
+            if(trace->name=="ExternalCall" && "vx_invoke_external_"+a[1]->name==unit.symbol) unit.owners.insert(node.sources.begin(),node.sources.end());
+            else if(trace->name=="Sequence") for(const auto& child:a) visit(child);
+            else if(trace->name=="If") {visit(a[1]);visit(a[2]);}
+            else if(trace->name=="Loop") {visit(a[2]);visit(a[5]);}
+        };visit(node.trace);
+    }
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_")) {
         auto begin=static_cast<std::size_t>(code.tellp());
         auto symbol="vx_flow_"+show(artifact->arguments[0]);
-        code<<framePrototype(artifact)<<" {\n";cTemporaries(code,artifact->arguments[4],framesPlan.shared(symbol));cExecution(code,artifact->arguments[4]);
-        auto resultLeaves=leaves(artifact->arguments[3],artifact->arguments[5]);std::size_t offset=0;
-        for(const auto& leaf:resultLeaves) if(nativeScalar(leaf.type)) code<<"    vxo["<<offset++<<"] = "<<cExpression(leaf.value)<<";\n";
-        if(offset==0) code<<"    vxo["<<offset++<<"] = 0UL;\n";
-        for(std::size_t i=0;i<artifact->arguments[6]->arguments.size();++i) if(artifact->arguments[8]->arguments[i]->number!=0)
-            for(const auto& leaf:leaves(artifact->arguments[2]->arguments[i],artifact->arguments[6]->arguments[i])) if(nativeScalar(leaf.type))
-                code<<"    vxo["<<offset++<<"] = "<<cExpression(leaf.value)<<";\n";
+        const auto& trace=framesPlan.nodes.at(symbol).trace;
+        auto& plan=calculations.at(symbol);
+        code<<framePrototype(artifact)<<" {\n";cTemporaries(code,trace,framesPlan.shared(symbol));
+        plan.declarations(code,framesPlan.shared(symbol));cExecution(code,trace,plan);
+        const auto owner=artifact->arguments[0]->number.convert_to<Id>();
+        const auto& demand=interfaceDemand.at(owner);
+        std::vector<Ref> resultValues;
+        for(std::size_t i=0;i<demand.results.size();++i)
+            if(demand.slots.contains(i) || !demand.discardableResults.at(i))
+                resultValues.push_back(interfaceDemand.transportedResult(owner,i));
+        const auto resultExpressions=plan.results(resultValues);std::size_t resultIndex=0;
+        for(std::size_t i=0;i<demand.results.size();++i) {
+            auto slot=demand.slots.find(i);
+            if(slot!=demand.slots.end()) code<<"    vxo->v"<<slot->second<<" = "<<resultExpressions.at(resultIndex++)<<";\n";
+            else if(!demand.discardableResults.at(i))
+                code<<"    (void)("<<resultExpressions.at(resultIndex++)<<"); /* preserve evaluation */\n";
+        }
         code<<"}\n";
-        std::string arguments="vxo";
+        std::string arguments=demand.slots.empty() ? "" : "vxo";
         for(std::size_t kind=1;kind<=2;++kind) {
             std::size_t index=0;
             for(std::size_t i=0;i<artifact->arguments[kind]->arguments.size();++i) {
                 if(kind==2 && artifact->arguments[7]->arguments[i]->number==0) continue;
                 for(const auto& leaf:leaves(artifact->arguments[kind]->arguments[i])) {
-                    if(nativeScalar(leaf.type)) arguments+=std::string(kind==1 ? ", vxa_" : ", vxc_")+std::to_string(index++);
+                    if(nativeScalar(leaf.type)) {
+                        if((kind==1 ? demand.arguments : demand.captures).contains(index))
+                            arguments+=(arguments.empty() ? "" : ", ")+std::string(kind==1 ? "vxa_" : "vxc_")+std::to_string(index);
+                        ++index;
+                    }
                 }
             }
         }
         banks.cut(code,begin,symbol,"vxp_flow_"+show(artifact->arguments[0]),arguments,framesPlan.policy(symbol));
+        if(plan.intervals) banks.parts.back().support=calculationRuntimeIncludes(plan.helpers);
     }
     auto size=model.realization.back()->number.convert_to<unsigned>();
     if(size) {header<<"extern uint8_t vx_payload["<<size<<"];\n";code<<"uint8_t vx_payload["<<size<<"];\n";}
@@ -2274,6 +2561,9 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
         auto execution=model.witnesses.find("execution_"+std::to_string(output.cell));
         const auto& inputChecks=model.witnesses.at("source_checks_"+std::to_string(output.cell));
         bool staticLocals=framesPlan.shared("vx_"+output.name);
+        const bool reusePublication=framesPlan.nodes.at("vx_"+output.name).reusePublication;
+        auto& calculationPlan=calculations.at("vx_"+output.name);
+        calculationPlan.declarations(code,staticLocals);
         cTemporaries(code,framesPlan.nodes.at("vx_"+output.name).trace,staticLocals);
         for(const auto& leaf:inputLeaves) {
             const auto& input=leaf->arguments;auto width=scalarBits(input[2]);bool sign=scalarSigned(input[2]);
@@ -2285,21 +2575,34 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
             if(minimum>lower) code<<"vxp_"<<input[0]->name<<" < "<<minimum<<(sign ? "L" : "UL")<<" || ";
             code<<"vxp_"<<input[0]->name<<" > "<<maximum<<(sign ? "L" : "UL")<<") vx_trap(16);\n";
         }
-        cExecution(code,inputChecks);
-        if(execution!=model.witnesses.end()) cExecution(code,execution->second);
+        cExecution(code,interfaceDemand.rewrite(inputChecks),calculationPlan);
+        if(execution!=model.witnesses.end()) cExecution(code,interfaceDemand.rewrite(execution->second),calculationPlan);
+        std::vector<Ref> resultValues;
+        for(const auto& value:values) if(value->kind!=Term::Number) resultValues.push_back(interfaceDemand.rewrite(value));
+        const auto resultExpressions=calculationPlan.results(resultValues);std::size_t resultIndex=0;
         std::vector<unsigned> locations;unsigned used=0;
+        const auto publicationBits=framesPlan.nodes.at("vx_"+output.name).publicationBits;
+        const auto publicationCarrier="uint"+std::to_string(publicationBits)+"_t";
+        if(reusePublication && bits>8 && !resultValues.empty())
+            code<<"    "<<(staticLocals ? "static " : "")<<"VX_STABLE "<<publicationCarrier<<" vxo_0;\n";
         for(const auto& value:values) {
             locations.push_back(offset+used);
             if(value->kind==Term::Number) continue;
-            std::string expression=cExpression(value);
+            std::string expression=resultExpressions.at(resultIndex++);
             if(bits>8) {
                 // A logical leaf is evaluated once. Serializing its bytes must
                 // not duplicate a residual computation, including numeric
                 // helper calls and bounds checks, in every stored byte.
-                auto local="vxo_"+std::to_string(locations.size()-1);
-                if(staticLocals) code<<"    static VX_STABLE uint32_t "<<local<<";\n    "<<local<<" = (uint32_t)("<<expression<<");\n";
-                else code<<"    VX_STABLE uint32_t "<<local<<" = (uint32_t)("<<expression<<");\n";
-                expression="VX_SNAPSHOT32("+local+")";
+                // Each image is fully serialized before the next value is
+                // evaluated, so publication snapshots have disjoint lifetimes.
+                const auto local="vxo_"+std::to_string(reusePublication ? 0 : locations.size()-1);
+                // Only these payload bits are serialized. Preserve the full
+                // expression evaluation, then retain its exact physical image;
+                // signed interpretation remains the reader's responsibility.
+                if(!reusePublication)
+                    code<<"    "<<(staticLocals ? "static " : "")<<"VX_STABLE "<<publicationCarrier<<" "<<local<<";\n";
+                code<<"    "<<local<<" = ("<<publicationCarrier<<")("<<expression<<");\n";
+                expression="VX_SNAPSHOT"+std::to_string(publicationBits)+"("+local+")";
             }
             code<<"    vx_payload["<<offset+used<<"] = (uint8_t)("<<expression<<");\n";
             for(unsigned byte=1;byte<bits/8;++byte)
@@ -2311,6 +2614,7 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
         std::string arguments;
         for(const auto& leaf:inputLeaves) {if(!arguments.empty()) arguments+=", ";arguments+="vxp_"+leaf->arguments[0]->name;}
         banks.cut(code,begin,"vx_"+output.name,"vxp_source_"+output.name,arguments,framesPlan.policy("vx_"+output.name));
+        if(calculationPlan.intervals) banks.parts.back().support=calculationRuntimeIncludes(calculationPlan.helpers);
         const bool stream=options.streams.contains(output.name);
         code<<(stream ? "static " : "")<<"uint32_t vx_"<<output.name<<(stream ? "_read_at(uint16_t index, uint16_t shift)" : "_read(uint16_t index)")
             <<" VX_ABI VX_RESIDENT {\n    switch(index) {\n";
@@ -2328,6 +2632,8 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
         code<<"    default: vx_trap(16); return 0;\n    }\n}\n";
         unsigned streamSlots=stream ? model.witnesses.at("stream_"+output.name)->number.convert_to<unsigned>() : 0;
         if(stream) projectStream(output,parameters,arguments,offset,bytes,streamSlots,header,code);
+        image.roots.push_back({output.name,output.source});
+        image.units.push_back({"vx_"+output.name,"source",begin,static_cast<std::size_t>(code.tellp()),{"vx_"+output.name},framesPlan.nodes.at("vx_"+output.name).calls});
         if(i) report<<',';
         report<<"{\"name\":"<<vx::quote(output.name)<<",\"source\":"<<vx::quote(output.source)<<",\"logical_type\":"<<vx::quote(typeText(model.observation[observationCount+i*2]))
               <<",\"element_bits\":"<<bits<<",\"bytes\":"<<bytes<<",\"offset\":"<<offset<<",\"parameters\":[";
@@ -2347,27 +2653,390 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
         }
         report<<"],\"leaves\":[";
         for(std::size_t j=0;j<values.size();++j) {
+            // Diagnostic text must stay bounded even when a small value DAG
+            // has exponentially many printed paths. Realizations use the term.
+            auto description=show(values[j],4096);
             if(j) report<<',';
             report<<"{\"path\":"<<vx::quote(model.realization[at+5]->arguments[j]->name)<<",\"logical_type\":"<<vx::quote(typeText(types[j]))<<",\"stored\":"<<(values[j]->kind==Term::Number ? "false" : "true")
-                  <<",\"value\":"<<vx::quote(show(values[j]))<<"}";
+                  <<",\"value\":"<<vx::quote(description);
+            if(description.size()>4096) report<<",\"value_truncated\":true";
+            report<<"}";
         }
         report<<']';
+        // Each realization starts from semantic identities. Ordinary C alone
+        // uses interfaceDemand's compacted call-buffer numbering.
+        auto semanticTrace=execution==model.witnesses.end() ? inputChecks : terms().make("Sequence",{inputChecks,execution->second});
+        std::vector<Ref> factValues;
+        for(const auto& value:values) factValues.push_back(interfaceDemand.facts(value));
+        auto factTrace=interfaceDemand.facts(semanticTrace);
+        ValueOptions valueOptions{configured(model,"value_choice_branches"),
+            configured(model,"value_table_bytes"),configured(model,"value_table_search"),configured(model,"value_scratch_reuse")!=0,
+            configured(model,"value_linear_terms"),configured(model,"value_output_schedule")!=0,
+            configured(model,"value_division_sharing")!=0,configured(model,"value_division_unroll")!=0,configured(model,"value_rotation_helpers")!=0};
+        auto valueProjection=projectValue(output.name,inputLeaves,types,factValues,
+            model.realization[at+5]->arguments,factTrace,
+            framesPlan.exclusive("vx_"+output.name),valueOptions);
+        for(const auto& [name,binding]:valueBindings) if(binding.source==output.name) {
+            bool region=binding.entry=="region";
+            if(!region && valueProjection.header.empty()) throw std::invalid_argument("C binding "+name+": "+valueProjection.reason);
+            if(!region && binding.entry!="full" && valueProjection.casesHeader.empty())
+                throw std::invalid_argument("C binding "+name+": source has no certified case interface");
+            BindingPlan plan;
+            const auto& node=framesPlan.nodes.at("vx_"+output.name);
+            const auto scratchPreference="value_scratch_reuse."+name;
+            const bool reuseScratch=valueOptions.reuseScratch &&
+                (!configuration.contains(scratchPreference) || configured(model,scratchPreference)!=0);
+            auto linearTerms=valueOptions.linearTerms;const auto linearPreference="value_linear_terms."+name;
+            if(configuration.contains(linearPreference)) linearTerms=std::min(linearTerms,configured(model,linearPreference));
+            if(region) {
+                std::vector<RegionBoundary> boundaries;
+                for(const auto& [key,artifact]:model.witnesses) if(key.starts_with("external_")) {
+                    RegionBoundary boundary;boundary.name=artifact->arguments[0]->name;
+                    auto contract=options.boundaries.find(boundary.name);
+                    const auto preference="boundary_expansion."+boundary.name;
+                    if(contract!=options.boundaries.end() && configured(model,"region_boundary_expansion") &&
+                       (!configuration.contains(preference) || configured(model,preference)))
+                        boundary.expansion=contract->second.expansion;
+                    for(const auto& type:artifact->arguments[1]->arguments)
+                        for(const auto& leaf:leaves(type)) boundary.inputs.push_back(leaf.type);
+                    for(const auto& leaf:leaves(artifact->arguments[2])) boundary.outputs.push_back(leaf.type);
+                    boundaries.push_back(std::move(boundary));
+                }
+                plan.projection=projectRegionBinding(name,output.name,inputLeaves,types,factValues,
+                    model.realization[at+5]->arguments,factTrace,boundaries,configured(model,"region_copy_schedule")!=0,
+                    configured(model,"region_transfer_functions")!=0,static_cast<unsigned>(configured(model,"region_boundary_overlay")),
+                    configured(model,"region_predicate_functions")!=0,reuseScratch,linearTerms);
+                // Region projection admits no native/recursive calls. Its
+                // embedding contract covers the whole occurrence, including
+                // callbacks; open boundaries may activate OTHER workspaces.
+                plan.eligible=binding.contract=="exclusive" && !node.recursive && !node.overlapping;
+                plan.reason=plan.eligible ? "exclusive region lifetime including boundary calls" : "region lifetime remains open or overlapping";
+                needsValueRuntime=true;
+            } else {
+                auto bindingOptions=valueOptions;
+                bindingOptions.reuseScratch=reuseScratch;
+                bindingOptions.linearTerms=linearTerms;
+                const auto outputPreference="value_output_schedule."+name;
+                bindingOptions.scheduleOutputs=valueOptions.scheduleOutputs &&
+                    (!configuration.contains(outputPreference) || configured(model,outputPreference)!=0);
+                const auto divisionPreference="value_division_sharing."+name;
+                bindingOptions.shareDivisions=valueOptions.shareDivisions &&
+                    (!configuration.contains(divisionPreference) || configured(model,divisionPreference)!=0);
+                const auto unrollPreference="value_division_unroll."+name;
+                bindingOptions.unrollDivisions=valueOptions.unrollDivisions &&
+                    (!configuration.contains(unrollPreference) || configured(model,unrollPreference)!=0);
+                const auto rotationPreference="value_rotation_helpers."+name;
+                bindingOptions.rotationHelpers=valueOptions.rotationHelpers &&
+                    (!configuration.contains(rotationPreference) || configured(model,rotationPreference)!=0);
+                const auto bytesPreference="value_table_bytes."+name,searchPreference="value_table_search."+name;
+                if(configuration.contains(bytesPreference)) bindingOptions.tableBytes=std::min(bindingOptions.tableBytes,configured(model,bytesPreference));
+                if(configuration.contains(searchPreference)) bindingOptions.tableSearch=std::min(bindingOptions.tableSearch,configured(model,searchPreference));
+                plan.projection=projectValueBinding(name,output.name,binding.entry,inputLeaves,types,factValues,
+                    model.realization[at+5]->arguments,factTrace,bindingOptions);
+                plan.eligible=binding.contract=="exclusive" && !valueProjection.fixedHeader.empty();
+                plan.reason=binding.contract!="exclusive" ? "embedding lifetime remains open" : valueProjection.fixedReason;
+            }
+            plan.weight=model.witnesses.at("value_binding_weight_"+name)->number.convert_to<unsigned>();
+            const auto frequency="binding_frequency."+name;
+            if(configuration.contains(frequency)) plan.weight=std::min(plan.weight,configured(model,frequency));
+            if(!plan.weight) plan.reason="zero frequency preference; automatic workspace";
+            bindingPlans.emplace(name,std::move(plan));
+        }
+        report<<",\"value_projection\":{\"available\":"<<(valueProjection.header.empty() ? "false" : "true")
+              <<",\"reason\":"<<vx::quote(valueProjection.reason);
+        if(!valueProjection.header.empty()) {
+            auto file="vx_value_"+output.name+".h";
+            answer.files[file]=std::move(valueProjection.header);
+            needsValueRuntime=true;
+            report<<",\"header\":"<<vx::quote(file)<<",\"function\":"<<vx::quote("vx_"+output.name+"_value")
+                  <<",\"shared_values\":"<<valueProjection.sharedValues<<",\"declared_local_bytes\":"<<valueProjection.localBytes
+                  <<",\"scratch_reuse\":"<<(valueOptions.reuseScratch ? "true" : "false")
+                  <<",\"scratch_reuses\":"<<valueProjection.scratchReuses
+                  <<",\"narrowed_values\":"<<valueProjection.narrowedValues
+                  <<",\"narrowed_operations\":"<<valueProjection.narrowedOperations
+                  <<",\"early_outputs\":"<<valueProjection.earlyOutputs
+                  <<",\"output_schedule\":"<<(valueOptions.scheduleOutputs ? "true" : "false")
+                  <<",\"linear_combinations\":"<<valueProjection.linearCombinations
+                  <<",\"division_sharing\":"<<(valueOptions.shareDivisions ? "true" : "false")
+                  <<",\"division_unroll\":"<<(valueOptions.unrollDivisions ? "true" : "false")
+                  <<",\"rotation_helpers\":"<<(valueOptions.rotationHelpers ? "true" : "false")
+                  <<",\"shared_divisions\":"<<valueProjection.sharedDivisions
+                  <<",\"linear_terms\":"<<valueOptions.linearTerms;
+            report<<",\"fixed_frame\":{\"available\":"<<(valueProjection.fixedHeader.empty() ? "false" : "true")
+                  <<",\"reason\":"<<vx::quote(valueProjection.fixedReason);
+            if(!valueProjection.fixedHeader.empty()) {
+                auto fixedFile="vx_fixed_"+output.name+".h";
+                answer.files[fixedFile]=std::move(valueProjection.fixedHeader);
+                report<<",\"header\":"<<vx::quote(fixedFile)<<",\"function\":"<<vx::quote("vx_"+output.name+"_fixed")
+                      <<",\"frame\":"<<vx::quote("vx_"+output.name+"_fixed_frame")
+                      <<",\"bytes\":"<<valueProjection.fixedBytes<<",\"allocation\":\"embedding-selected\"";
+            }
+            report<<'}';
+            if(!valueProjection.casesHeader.empty()) {
+                auto casesFile="vx_value_"+output.name+"_cases.h";
+                answer.files[casesFile]=std::move(valueProjection.casesHeader);
+                auto indices=[&](const auto& entries) {
+                    report<<'[';bool first=true;for(auto entry:entries) {if(!first) report<<',';first=false;report<<entry;}report<<']';
+                };
+                report<<",\"cases_header\":"<<vx::quote(casesFile)<<",\"branch_inputs\":";indices(valueProjection.branchInputs);
+                report<<",\"case_inputs\":[";indices(valueProjection.caseInputs[0]);report<<',';indices(valueProjection.caseInputs[1]);report<<']';
+            }
+        }
+        report<<'}';
         if(stream) report<<",\"stream\":{\"slots\":"<<streamSlots<<",\"metadata_bytes\":"<<4*streamSlots
             <<",\"execution\":\"serial-guarded\",\"ownership\":\"lease-until-release\",\"token_wrap\":\"refuse\"}";
         report<<'}';
     }
-    report<<"],\"runtime_functions\":[";bool firstFrame=true;
+    report<<']';
+    if(!valueBindings.empty()) {
+        if(bindingPlans.size()!=valueBindings.size()) throw std::logic_error("C binding lacks its source projection");
+        const auto budget=configured(model,"value_frame_bytes");std::size_t used=0,unshared=0;
+        struct Slot {std::size_t bytes;std::vector<std::string> members;};
+        std::vector<Slot> slots;
+        std::set<std::pair<std::string,std::string>> disjoint;
+        for(const auto& group:bindingExclusions)
+            for(std::size_t i=0;i<group.names.size();++i)
+                for(std::size_t j=i+1;j<group.names.size();++j)
+                    disjoint.emplace(group.names[i],group.names[j]);
+        std::vector<std::string> order;
+        for(const auto& [name,plan]:bindingPlans) if(plan.eligible && plan.weight) order.push_back(name);
+        std::sort(order.begin(),order.end(),[&](const auto& a,const auto& b) {
+            const auto& x=bindingPlans.at(a);const auto& y=bindingPlans.at(b);
+            if(x.weight!=y.weight) return x.weight>y.weight;
+            if(x.projection.bytes!=y.projection.bytes) return x.projection.bytes<y.projection.bytes;
+            return a<b;
+        });
+        for(const auto& name:order) {
+            auto& plan=bindingPlans.at(name);
+            auto cost=plan.projection.bytes;plan.slot=slots.size();
+            for(std::size_t i=0;i<slots.size();++i) {
+                const auto& slot=slots[i];
+                if(!std::all_of(slot.members.begin(),slot.members.end(),[&](const auto& member) {
+                    return disjoint.contains(std::minmax(name,member));
+                })) continue;
+                const auto extra=std::max(slot.bytes,plan.projection.bytes)-slot.bytes;
+                if(extra<cost) {cost=extra;plan.slot=i;}
+            }
+            plan.selected=cost<=budget-used;
+            plan.reason=plan.selected ? "exclusive lifetime within RAM budget" : "RAM budget";
+            if(plan.selected) {
+                used+=cost;unshared+=plan.projection.bytes;
+                if(plan.slot==slots.size()) slots.push_back({plan.projection.bytes,{name}});
+                else {auto& slot=slots[plan.slot];slot.bytes=std::max(slot.bytes,plan.projection.bytes);slot.members.push_back(name);}
+            }
+        }
+        std::ostringstream definitions,types,storage;
+        definitions<<"/* Compile exactly once for selected C binding workspaces. */\n#include \"vx_binding_storage.h\"\n";
+        types<<"#ifndef VX_BINDING_TYPES_H\n#define VX_BINDING_TYPES_H\n#include \"vexel.h\"\n";
+        storage<<"#ifndef VX_BINDING_STORAGE_H\n#define VX_BINDING_STORAGE_H\n#include \"vx_binding_types.h\"\n";
+        report<<",\"value_bindings\":{\"ram_budget\":"<<budget<<",\"static_bytes\":"<<used
+              <<",\"unshared_static_bytes\":"<<unshared
+              <<",\"policy\":\"descending frequency, ascending bytes, identity; least incremental RAM among pairwise-disjoint slots\",\"exclusions\":[";
+        bool firstGroup=true;
+        for(const auto& group:bindingExclusions) {
+            if(!firstGroup) report<<',';
+            firstGroup=false;
+            report<<"{\"origin\":"<<vx::quote(group.origin)<<",\"members\":[";
+            for(std::size_t i=0;i<group.names.size();++i) {if(i) report<<',';report<<vx::quote(group.names[i]);}
+            report<<"]}";
+        }
+        report<<"],\"slots\":[";
+        for(std::size_t i=0;i<slots.size();++i) {
+            const auto symbol="vx_binding_slot_"+std::to_string(i),type=symbol+"_type";
+            const auto& slot=slots[i];
+            storage<<"typedef union {\n";
+            for(const auto& member:slot.members) storage<<"    vx_bind_"<<member<<"_frame_type binding_"<<member<<";\n";
+            storage<<"} "<<type<<";\nextern "<<type<<' '<<symbol<<";\n"
+                   <<"#ifdef __SDCC_z80\ntypedef char "<<symbol<<"_size[sizeof("<<type<<")=="<<slot.bytes<<" ? 1 : -1];\n#endif\n";
+            definitions<<type<<' '<<symbol<<";\n";
+            if(i) report<<',';
+            report<<"{\"id\":"<<i<<",\"bytes\":"<<slot.bytes<<",\"symbol\":"<<vx::quote(symbol)<<",\"members\":[";
+            for(std::size_t j=0;j<slot.members.size();++j) {if(j) report<<',';report<<vx::quote(slot.members[j]);}
+            report<<"]}";
+        }
+        report<<"],\"bindings\":[";
+        bool first=true;
+        for(const auto& [name,plan]:bindingPlans) {
+            const auto& binding=valueBindings.at(name);const auto& p=plan.projection;
+            const auto file="vx_bind_"+name+".h";
+            types<<p.types;
+            answer.files[file]=plan.selected ? p.headerPrefix+"#include \"vx_binding_storage.h\"\n"
+                +"#define vx_bind_"+name+"_frame (vx_binding_slot_"+std::to_string(plan.slot)+".binding_"+name+")\n"
+                +"#define VX_BIND_"+name+"_LOCAL /* fixed workspace */\n"+p.fixedFunction+"#endif\n" : p.automaticHeader;
+            if(!first) report<<',';
+            first=false;
+            report<<"{\"name\":"<<vx::quote(name)<<",\"source\":"<<vx::quote(binding.source)
+                  <<",\"entry\":"<<vx::quote(binding.entry)<<",\"contract\":"<<vx::quote(binding.contract)
+                  <<",\"origin\":"<<vx::quote(binding.origin)<<",\"frequency\":"<<plan.weight
+                  <<",\"eligible\":"<<(plan.eligible ? "true" : "false")<<",\"storage\":"<<vx::quote(plan.selected ? "fixed" : "automatic")
+                  <<",\"slot\":"<<(plan.selected ? std::to_string(plan.slot) : "null")
+                  <<",\"scratch_policy\":"<<vx::quote("value_scratch_reuse."+name)
+                  <<",\"output_policy\":"<<vx::quote("value_output_schedule."+name)
+                  <<",\"linear_policy\":"<<vx::quote("value_linear_terms."+name)
+                  <<",\"division_policy\":"<<vx::quote("value_division_sharing."+name)
+                  <<",\"division_unroll_policy\":"<<vx::quote("value_division_unroll."+name)
+                  <<",\"rotation_policy\":"<<vx::quote("value_rotation_helpers."+name)
+                  <<",\"codegen\":{\"scratch_reuse\":"<<(p.reuseScratch ? "true" : "false")
+                  <<",\"scratch_reuses\":"<<p.scratchReuses
+                  <<",\"narrowed_values\":"<<p.narrowedValues
+                  <<",\"narrowed_operations\":"<<p.narrowedOperations
+                  <<",\"early_outputs\":"<<p.earlyOutputs
+                  <<",\"output_schedule\":"<<(p.scheduleOutputs ? "true" : "false")
+                  <<",\"linear_combinations\":"<<p.linearCombinations
+                  <<",\"division_sharing\":"<<(p.shareDivisions ? "true" : "false")
+                  <<",\"division_unroll\":"<<(p.unrollDivisions ? "true" : "false")
+                  <<",\"rotation_helpers\":"<<(p.rotationHelpers ? "true" : "false")
+                  <<",\"shared_divisions\":"<<p.sharedDivisions
+                  <<",\"linear_terms\":"<<p.linearTerms
+                  <<",\"wide_select_branches\":"<<p.wideSelectBranches
+                  <<",\"finite_tables\":"<<p.finiteTables<<",\"finite_table_bytes\":"<<p.finiteTableBytes
+                  <<",\"finite_lookups\":"<<p.finiteLookups
+                  <<",\"finite_constants\":"<<p.finiteConstants<<",\"finite_guards\":"<<p.finiteGuards
+                  <<",\"finite_arithmetic\":"<<p.finiteArithmetic
+                  <<",\"shared_select_branches\":"<<p.sharedSelectBranches
+                  <<",\"predicate_branches\":"<<p.predicateBranches
+                  <<",\"region_loops\":"<<p.regionLoops<<",\"region_boundaries\":"<<p.regionBoundaries
+                  <<",\"region_state_bytes\":"<<p.regionStateBytes<<",\"region_scratch_bytes\":"<<p.regionScratchBytes
+                  <<",\"region_coalesced_bytes\":"<<p.regionCoalescedBytes<<",\"region_zero_bytes\":"<<p.regionZeroBytes
+                  <<",\"region_direct_decisions\":"<<p.regionDirectDecisions
+                  <<",\"region_predicate_functions\":"<<p.regionPredicateFunctions
+                  <<",\"region_predicate_calls\":"<<p.regionPredicateCalls
+                  <<",\"region_boundary_bytes\":"<<p.regionBoundaryBytes
+                  <<",\"region_boundary_unshared_bytes\":"<<p.regionBoundaryUnsharedBytes
+                  <<",\"wide_byte_copies\":"<<p.wideByteCopies<<",\"backend_stack_bound\":null,\"region_expansions\":{";
+            bool firstExpansion=true;
+            for(const auto& [symbol,macro]:p.regionExpansions) {
+                if(!firstExpansion) report<<',';
+                firstExpansion=false;report<<vx::quote(symbol)<<':'<<vx::quote(macro);
+            }
+            report<<"},\"region_expansion_barriers\":[";
+            for(std::size_t i=0;i<p.regionExpansionBarriers.size();++i) {
+                if(i) report<<',';
+                report<<vx::quote(p.regionExpansionBarriers[i]);
+            }
+            report<<"],\"region_boundary_dedicated\":[";
+            for(std::size_t i=0;i<p.regionBoundaryDedicated.size();++i) {
+                if(i) report<<',';
+                report<<vx::quote(p.regionBoundaryDedicated[i]);
+            }
+            report<<"],\"region_boundary_slots\":[";
+            for(std::size_t i=0;i<p.regionBoundarySlots.size();++i) {
+                if(i) report<<',';
+                const auto& slot=p.regionBoundarySlots[i];report<<"{\"bytes\":"<<slot.bytes<<",\"members\":[";
+                for(std::size_t j=0;j<slot.members.size();++j) {if(j) report<<',';report<<vx::quote(slot.members[j]);}
+                report<<"]}";
+            }
+            report<<"],\"region_boundary_conflicts\":[";
+            for(std::size_t i=0;i<p.regionBoundaryConflicts.size();++i) {
+                if(i) report<<',';
+                const auto& [a,b]=p.regionBoundaryConflicts[i];report<<'['<<vx::quote(a)<<','<<vx::quote(b)<<']';
+            }
+            report<<"]}"
+                  <<",\"reason\":"<<vx::quote(plan.reason)<<",\"bytes\":"<<p.bytes<<",\"header\":"<<vx::quote(file)<<",\"inputs\":[";
+            for(std::size_t i=0;i<p.inputs.size();++i) {if(i) report<<',';report<<p.inputs[i];}
+            report<<"]}";
+        }
+        types<<"#endif\n";storage<<"#endif\n";
+        answer.files["vx_binding_types.h"]=types.str();answer.files["vx_binding_storage.h"]=storage.str();
+        report<<"]}";answer.files["vx_binding_frames.c"]=definitions.str();
+    }
+    report<<",\"runtime_functions\":[";bool firstFrame=true;
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("runtime_frame_")) {
         if(!firstFrame) report<<',';
         firstFrame=false;
+        const auto& demand=interfaceDemand.at(artifact->arguments[0]->number.convert_to<Id>());
+        std::size_t resultBytes=0,argumentBytes=0,captureBytes=0;
+        for(const auto& [logical,physical]:demand.slots) {(void)physical;resultBytes+=nativeBytes(demand.resultStorageTypes.at(logical));}
+        for(auto index:demand.arguments) argumentBytes+=nativeBytes(demand.argumentStorageTypes.at(index));
+        for(auto index:demand.captures) captureBytes+=nativeBytes(demand.captureStorageTypes.at(index));
         report<<"{\"id\":"<<show(artifact->arguments[0])<<",\"result_type\":"<<vx::quote(typeText(artifact->arguments[3]))
               <<",\"captures\":"<<artifact->arguments[2]->arguments.size()
               <<",\"input_captures\":"<<std::count_if(artifact->arguments[7]->arguments.begin(),artifact->arguments[7]->arguments.end(),[](const Ref& flag){return flag->number!=0;})
               <<",\"output_captures\":"<<std::count_if(artifact->arguments[8]->arguments.begin(),artifact->arguments[8]->arguments.end(),[](const Ref& flag){return flag->number!=0;})
               <<",\"automatic_frame\":"
-              <<(framesPlan.shared("vx_flow_"+show(artifact->arguments[0])) ? "false" : "true")<<"}";
+              <<(framesPlan.shared("vx_flow_"+show(artifact->arguments[0])) ? "false" : "true")
+              <<",\"logical_result_slots\":"<<demand.results.size()<<",\"transported_result_slots\":"<<demand.slots.size()
+              <<",\"discardable_execution\":"<<(demand.discardableExecution ? "true" : "false")
+              <<",\"transported_result_bytes\":"<<resultBytes<<",\"transported_argument_bytes\":"<<argumentBytes
+              <<",\"transported_capture_bytes\":"<<captureBytes
+              <<",\"transported_logical_leaves\":[";
+        bool firstLeaf=true;
+        for(const auto& [leaf,slot]:demand.slots) {(void)slot;if(!firstLeaf) report<<',';firstLeaf=false;report<<leaf;}
+        report<<"],\"logical_argument_leaves\":"<<demand.argumentTypes.size()<<",\"transported_arguments\":[";
+        firstLeaf=true;for(auto index:demand.arguments) {if(!firstLeaf) report<<',';firstLeaf=false;report<<index;}
+        report<<"],\"logical_capture_leaves\":"<<demand.captureTypes.size()<<",\"transported_captures\":[";
+        firstLeaf=true;for(auto index:demand.captures) {if(!firstLeaf) report<<',';firstLeaf=false;report<<index;}
+        report<<"],\"known_results\":[";firstLeaf=true;
+        for(const auto& [index,value]:demand.knownResults) {
+            if(!firstLeaf) report<<',';
+            firstLeaf=false;report<<"{\"leaf\":"<<index<<",\"value\":"<<vx::quote(show(value))<<"}";
+        }
+        report<<"],\"result_aliases\":[";firstLeaf=true;
+        for(const auto& [leaf,representative]:demand.resultAliases) {
+            if(!firstLeaf) report<<',';
+            firstLeaf=false;report<<"{\"leaf\":"<<leaf<<",\"representative\":"<<representative<<"}";
+        }
+        report<<"],\"discardable_results\":[";
+        for(std::size_t i=0;i<demand.discardableResults.size();++i) {
+            if(i) report<<',';
+            report<<(demand.discardableResults[i] ? "true" : "false");
+        }
+        report<<"],\"demanded_bits\":{\"arguments\":[";
+        auto bits=[&](const std::vector<unsigned>& requirements) {
+            for(std::size_t i=0;i<requirements.size();++i) {if(i) report<<',';report<<requirements[i];}
+        };
+        bits(demand.argumentBits);report<<"],\"captures\":[";bits(demand.captureBits);
+        report<<"],\"results\":[";bits(demand.resultBits);
+        report<<"]},\"transport_types\":{\"arguments\":[";
+        auto transport=[&](const auto& logical,const auto& storage,const auto& retained) {
+            bool first=true;
+            for(std::size_t i=0;i<logical.size();++i) if(retained.contains(i)) {
+                if(!first) report<<',';
+                first=false;report<<"{\"leaf\":"<<i<<",\"logical\":"<<vx::quote(typeText(logical[i]))
+                    <<",\"storage\":"<<vx::quote(typeText(storage[i]))<<"}";
+            }
+        };
+        transport(demand.argumentTypes,demand.argumentStorageTypes,demand.arguments);
+        report<<"],\"captures\":[";transport(demand.captureTypes,demand.captureStorageTypes,demand.captures);
+        report<<"],\"results\":[";transport(demand.resultTypes,demand.resultStorageTypes,demand.slots);
+        report<<"]}}";
     }
-    report<<"],\"boundary_storage\":[";bool firstStorage=true;
+    report<<"],\"value_ranges\":";interfaceDemand.reportRanges(report);
+    report<<",\"interface_demand\":{\"nodes\":"<<interfaceDemand.nodes<<",\"edges\":"<<interfaceDemand.edges
+          <<",\"discarded_calls\":"<<interfaceDemand.discardedCalls()
+          <<",\"required\":"<<interfaceDemand.required<<",\"loops\":[";bool firstLoop=true;
+    for(const auto& [id,loop]:interfaceDemand.loops()) {
+        if(!firstLoop) report<<',';
+        firstLoop=false;std::size_t original=0,retained=0,invariants=0,ready=0,flags=0;
+        for(const auto& slot:loop.slots) {
+            original+=slot.count;retained+=slot.leaves.size();invariants+=slot.invariantLeaves;
+            if(slot.alwaysReady) ++ready;
+            if(slot.ready) ++flags;
+        }
+        report<<"{\"id\":"<<id<<",\"function\":"<<(loop.owner ? std::to_string(*loop.owner) : "null")
+              <<",\"logical_carried_leaves\":"<<original<<",\"retained_carried_leaves\":"<<retained
+              <<",\"invariant_leaves\":"<<invariants<<",\"always_ready_slots\":"<<ready<<",\"retained_readiness_flags\":"<<flags
+              <<",\"iteration_counter\":"<<(loop.index ? "true" : "false")
+              <<",\"coalesced_carried_leaves\":"<<loop.aliases.size()<<",\"carried_aliases\":[";
+        bool firstAlias=true;
+        for(const auto& [leaf,representative]:loop.aliases) {
+            if(!firstAlias) report<<',';
+            firstAlias=false;report<<"{\"root\":"<<leaf.first<<",\"leaf\":"<<leaf.second
+                <<",\"representative_root\":"<<representative.first<<",\"representative_leaf\":"<<representative.second<<"}";
+        }
+        report<<"],\"transport_types\":[";firstAlias=true;std::size_t at=0,logicalBytes=0,storageBytes=0;
+        for(const auto& slot:loop.slots) for(std::size_t i=0;i<slot.count;++i,++at) if(slot.leaves.contains(i)) {
+            const auto& logical=loop.trace->arguments[10]->arguments.at(at);const auto& storage=loop.storageTypes.at(at);
+            logicalBytes+=nativeBytes(logical);storageBytes+=nativeBytes(storage);
+            if(!firstAlias) report<<',';
+            firstAlias=false;report<<"{\"root\":"<<slot.root<<",\"leaf\":"<<i<<",\"logical\":"<<vx::quote(typeText(logical))
+                <<",\"storage\":"<<vx::quote(typeText(storage))<<"}";
+        }
+        report<<"],\"demanded_bits\":[";
+        for(std::size_t i=0;i<loop.bits.size();++i) {if(i) report<<',';report<<loop.bits[i];}
+        report<<"],\"retained_logical_bytes\":"<<logicalBytes<<",\"retained_storage_bytes\":"<<storageBytes<<"}";
+    }
+    report<<"]},\"boundary_storage\":[";bool firstStorage=true;
     for(const auto& [name,artifact]:model.witnesses) if(name.starts_with("storage_")) {
         if(!firstStorage) report<<',';
         firstStorage=false;unsigned bytes=0;
@@ -2404,7 +3073,27 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
     }
     report<<"]}";
     answer.header=header.str();answer.implementation=code.str();
-    banks.emit(answer,report,configured(model,"call_depth"),configured(model,"bank_chunk_operations"));
+    std::map<std::string,unsigned> scopedBankOperations;
+    const std::string bankScope="bank_chunk_operations.";
+    for(const auto& [key,value]:configuration) {
+        (void)value;
+        if(key.starts_with(bankScope)) scopedBankOperations.emplace(key.substr(bankScope.size()),configured(model,key));
+    }
+    banks.emit(answer,report,configured(model,"call_depth"),configured(model,"bank_chunk_operations"),scopedBankOperations);
+    for(const auto& part:banks.parts) {
+        auto owner=std::find_if(image.units.begin(),image.units.end(),[&](const auto& unit){return part.begin>=unit.begin && part.end<=unit.end;});
+        if(owner!=image.units.end()) {owner->support+=part.support;continue;}
+        ProgramImage::Unit unit{part.name,"helper",part.begin,part.end,{},{}};
+        unit.support=part.support;
+        if(auto node=framesPlan.nodes.find(part.name);node!=framesPlan.nodes.end()) {
+            unit.kind="native";unit.owners=node->second.sources;unit.calls=node->second.calls;
+        }
+        image.units.push_back(std::move(unit));
+    }
+    if(needsValueRuntime) {
+        auto runtime=valueRuntimeFiles();answer.files.insert(runtime.begin(),runtime.end());
+    }
+    report<<",\"program_image\":"<<image.emit(answer,options);
     framesPlan.report(report);
     report<<",\"boundary_contracts\":[";bool firstContract=true;
     for(const auto& [name,contract]:options.boundaries) {
@@ -2413,7 +3102,7 @@ void Session::project(SourceResult& answer,const Model& model,std::size_t observ
         bool first=true;for(const auto& resource:contract.reads) {if(!first) report<<',';first=false;report<<vx::quote(resource);}
         report<<"],\"writes\":[";first=true;
         for(const auto& resource:contract.writes) {if(!first) report<<',';first=false;report<<vx::quote(resource);}
-        report<<"]}";
+        report<<"],\"c_expansion\":"<<(contract.expansion.empty() ? "null" : vx::quote(contract.expansion))<<"}";
     }
     report<<"],\"access_order\":[";
     for(std::size_t i=0;i<options.accessOrder.size();++i) {
@@ -2477,6 +3166,22 @@ SourceResult Session::run() {
         return digest.str();
     };
     json<<']';
+    const auto& conditional=conditionalProofs.stats();
+    const auto retainedProofs=conditionalProofs.proofRetention();
+    json<<",\"conditional_proofs\":{\"queries\":"<<conditional.queries<<",\"hits\":"<<conditional.hits
+        <<",\"misses\":"<<conditional.misses<<",\"invalidated\":"<<conditional.invalidated
+        <<",\"validated_interpretations\":"<<conditional.validated<<",\"nodes\":"<<conditional.nodes
+        <<",\"exhausted\":"<<conditional.exhausted<<",\"resets\":"<<conditional.resets
+        <<",\"graphs_built\":"<<conditional.graphs<<",\"graphs_reused\":"<<conditional.graphReuses
+        <<",\"graph_retries\":"<<conditional.graphRetries<<",\"retained_graphs\":"<<retainedProofs.graphs
+        <<",\"retained_graph_nodes\":"<<retainedProofs.nodes<<",\"retained_graph_terms\":"<<retainedProofs.terms
+        <<",\"retained_graph_operations\":"<<retainedProofs.operations
+        <<",\"retained_answers\":"<<conditionalProofs.retained()<<",\"identities\":"<<conditionalProofs.keys()<<'}';
+    json<<",\"native_proofs\":{\"attempts\":"<<nativeProofAttempts
+        <<",\"constructions\":"<<nativeProofConstructions<<",\"reuses\":"<<nativeProofReuses
+        <<",\"exhausted\":"<<nativeProofExhausted<<",\"resolved\":"<<nativeControlResults.size()
+        <<",\"work\":"<<nativeProofWork<<",\"boosted_attempts\":"<<nativeProofBoosts
+        <<",\"retained_requests\":"<<nativeControlRequests.size()<<'}';
     json<<",\"interface_inputs\":[";bool firstInterface=true;
     for(const auto& input:result.inputs) {if(!firstInterface) json<<',';firstInterface=false;json<<vx::quote(input);}
     json<<']';
@@ -2538,7 +3243,7 @@ SourceResult Session::run() {
         }
         json<<'}';
         json<<",\"queries\":[";
-        for(std::size_t i=0;i<queries.size();++i) {if(i) json<<',';json<<"{\"query\":"<<vx::quote(queries[i].name)<<",\"answer\":"<<vx::quote(queries[i].type ? typeText(result.selected->observation[i]) : show(result.selected->observation[i]))<<"}";}
+        for(std::size_t i=0;i<queries.size();++i) {if(i) json<<',';json<<"{\"query\":"<<vx::quote(queries[i].name)<<",\"answer\":"<<vx::quote(queries[i].type ? typeText(result.selected->observation[i]) : show(result.selected->observation[i]))<<",\"term\":"<<termJson(result.selected->observation[i])<<"}";}
         json<<"]";
     }
     answer.json=json.str();

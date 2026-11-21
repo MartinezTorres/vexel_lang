@@ -37,7 +37,9 @@ def main():
     for budget in (0,128):
         generated=directory/('projection-'+str(budget));project=directory/('project-'+str(budget))
         sources=[part for name in ORACLES for part in ('--source',name)]
-        support.run([machine,source,*sources,'--budget','4','--frame-ram-bytes',str(budget),'--emit-c',generated])
+        # The nested readiness trace needs smaller groups to fit an 8 KiB bank.
+        support.run([machine,source,*sources,'--budget','4','--frame-ram-bytes',str(budget),
+                     '--prefer','bank_chunk_operations=16','--emit-c',generated])
         report=support.backend.package(generated,project,source,machine)
         if budget:assert report['frame_planning']['static_local_bytes']>0
         library=directory/('host-'+str(budget)+'.so')
@@ -90,7 +92,9 @@ void main(void) VX_ABI VX_RESIDENT {
     __asm halt __endasm;
 }
 ''')
-        built=support.run(['make','-C',project,'-j2','simulate','SIMFLAGS=--max-ticks=1000000000'])
+        # This multi-entry project can wait behind other serialized SDCC
+        # builds. Its compiler invocations retain the 180-second guard.
+        built=support.run(['make','-C',project,'-j2','simulate','SIMFLAGS=--max-ticks=1000000000'],timeout=1200)
         (directory/('build-'+str(budget)+'.log')).write_text(built.stdout+built.stderr)
         execution=json.loads((project/'build/execution.json').read_text())
         assert execution['observation']['last_result']==execution['observation']['fault']==0,execution

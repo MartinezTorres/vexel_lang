@@ -1,0 +1,6 @@
+// Both public inputs remain unchanged. Every actual helper invocation carries
+// n in 0..127, including through the shared forwarding function.
+&~advance(n:#u32)->#u32 {n+1}
+&~forward(n:#u32)->#u32 {advance(n)}
+&^entry(n:#u8) {n<128 ? forward((#u32)n) : (#u32)0}
+&^wide(n:#u32) {n<128 ? forward(n) : (#u32)0}

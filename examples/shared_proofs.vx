@@ -1,0 +1,17 @@
+// Each field is observed under the same eligibility facts. The solver can
+// reuse their proof environment while retaining the shared native function.
+&~packet(n:#u32)->(#u32,#u32,#u32,#u32) {
+    inside=n>=8 && n<128;
+    (inside ? n-8 : (#u32)0,
+     inside ? n+1 : (#u32)0,
+     inside ? n*2 : (#u32)0,
+     inside ? 127-n : (#u32)0)
+}
+&^entry(n:#u8) {
+    p=packet((#u32)n);
+    p.__0+p.__1+p.__2+p.__3
+}
+&^wide(n:#u32) {
+    p=packet(n);
+    p.__0+p.__1+p.__2+p.__3
+}

@@ -53,6 +53,37 @@ operations; project-local modules may replace them.
 
 **Compilation model**: Backend specifications define target language, type mappings, calling conventions, code organization. Compiler can generate executables, libraries, or C source for integration.
 
+### Program observation boundary
+
+A program request names a root module and closes its static import graph. In
+whole-program mode, every exported defined function in that graph is a runtime
+entry and every exported value is a build observation. They participate in one
+resolution together with target facts, boundary contracts and requirements.
+An exported function is required even if another entry never calls it; a private
+declaration remains demand-driven. An unresolved exported observation prevents
+publication of the whole program. Selective requests remain useful for queries,
+tools and partial development; they do not establish closure of other exports.
+
+The current CLI spells this request `--program`. It introduces no source keyword
+and preserves `&^`/`^` as the visibility boundary. Imports contribute exports to
+the program; creating a separate library image requires a separate request.
+Named occurrences can provide multiple activation instances of one export
+without also creating an implicit default instance.
+
+One program need not become one C translation unit or ROM bank. The backend can
+publish multiple implementations and storage layouts from the same closed
+model. A program image records the selected entries, build observations, code
+units, activation owners and generated artifacts. Packaging consumes this
+description instead of rediscovering function boundaries from generated text.
+Source or target changes require a new resolution; a published image is not a
+barrier against reconsidering earlier choices in that new request.
+
+Program membership alone says nothing about overlap. Serial execution, retained
+results, nested callbacks and recursion still need their boundary contracts.
+In particular, a single-threaded game may hold a motion workspace across a
+collision callback that invokes another entry. Seeing both entries together
+makes that constraint available; it does not justify aliasing their live data.
+
 ### Sources, sinks and activation overlap
 
 Concurrency is described at graph boundaries. Sources and sinks have contracts
@@ -69,6 +100,73 @@ and ordering relationships.
 A realization may reuse distinct mutable storage only when its required
 lifetimes do not overlap. Unknown overlap is not evidence of exclusion, and a
 result reaching a sink need not end the lifetime of all work or storage involved.
+Local values do not imply stack allocation. A backend may place inputs,
+temporaries and results in fixed RAM when it proves exclusive ownership for
+their entire live interval, within the supplied target RAM budget. Such storage
+is overwritten for each activation; it does not introduce persistent language
+state. Callers must copy a result before releasing or reusing its frame. Values
+live across a nested call require distinct storage even when both calls belong
+to one serial source. Fixed storage is a realization choice and does not require
+another source keyword. Return addresses and ABI spills can still use a stack.
+An external embedding may supply lifetime contracts and relative execution
+frequencies through backend metadata. These facts permit storage selection
+within a RAM allowance; they do not change source values or discharge unknown
+activation edges. The current C backend's `c_binding` metadata distinguishes
+an exclusive input-through-result interval from an open lifetime and emits the
+selected interface without requiring storage choices in the C caller.
+A certified pure source may also expose a branch inspector and two partial
+interfaces. The first selected result leaf provides the partition; other
+results may be invariant or depend on independent conditions. Each partial
+interface demands only its remaining inputs, but it is valid only for the
+matching inspector result from the same input snapshot, with no intervening
+effects. This is a physical interface decomposition of one source activation,
+not independent resolution of fragments or permission to assume facts about
+later invocations. The full interface remains available.
+The embedding may cap a binding's estimated frequency through the ordinary
+`prefer("binding_frequency.IDENTITY",N)` relationship, also available on the
+command line. Multiple caps combine by their minimum with the source estimate.
+Zero selects automatic storage for an unused or cold alternative while retaining
+its callable interface and semantics. Such a hint grants no activation or
+ownership proof. Native build choices can therefore inform placement without
+changing what a source computes.
+Its `region` entry covers a complete ordered execution, including synchronous
+sink calls and the continuation after each reply. An exclusive region contract
+excludes reentry of that binding throughout this interval; it does not exclude
+callbacks into other bindings with separate live storage. This scoped embedding
+fact is weaker than `no_feedback`, which excludes source activation at the
+boundary. Known overlap still prevents a fixed region frame. A region retained
+across a callback must not share a workspace with a binding that callback may
+activate. Native loops and boundary replies do not require a new source keyword.
+An external adapter can offer an equivalent native statement through
+`c_expansion(MACRO)` metadata or `--boundary-expansion SYMBOL:MACRO`.
+The C region backend selects offered alternatives with the ordinary
+`region_boundary_expansion` and `boundary_expansion.SYMBOL` preferences.
+Expansion changes the physical call boundary, preserving the ordered source
+operation, typed publication fields, result checks and snapshot lifetimes.
+It grants no additional purity, feedback or memory-residency fact. The embedding
+must supply an equivalent statement and honor its native address-space and bank
+requirements. Missing selected implementations fail emission's C build. Offers
+and selections are recorded in the physical plan; cost estimates and arbitrary
+C layout proofs are not inferred. See the [native boundary contract](../experimental/relational/SOURCE.md#external-boundary-facts).
+Region boundary objects are synchronous borrows, not persistent native storage.
+The adapter reads this invocation's arguments, initializes its results and
+preserves arguments until return; it cannot retain the object address, depend
+on its identity, or read results from an earlier invocation. A live reply
+remains available to the Vexel continuation. Once all fields are dead, the
+physical planner may reuse that storage for another boundary. This is a
+liveness proof over the complete region, including callbacks and loop backedges;
+declaration order does not establish or end a lifetime.
+Within such an interval, a pure decision may be realized as a separate native
+function borrowing the live owned fields. This changes neither its observation
+point nor its dependencies: later invocations read the current fields, and no
+effect or native reply is cached by sharing the generated function. Backend
+preferences choose this physical realization without adding source keywords.
+Its `c_disjoint(a,b,...)` metadata states that every pair of named bindings has
+disjoint complete input-through-result lifetimes. These external facts may
+permit fixed frames to share a workspace. Exclusion is not transitive, does
+not establish a binding's self exclusion, and cannot override unknown or
+overlapping source activations. Values retained after the interval must live
+elsewhere; releasing a computation alone does not release a retained result.
 The [activation contract](activation-contracts.md) develops these rules without
 adding source keywords. Its finite relational realization distinguishes source
 definitions from named activation occurrences, and execution completion from
@@ -245,6 +343,294 @@ No globally optimal placement is required. An arbitrary physical choice may
 not silently select different observable source behavior; any target property
 used to select such behavior needs a declared input or language-defined policy.
 
+A closed finite rule may be realized as computation or as immutable data. For
+example, the backend can evaluate a pure byte-dependent rule over all 256 input
+patterns and replace its decision tree with a ROM table. Compressing its index
+or stored representation requires preserving every result, including integer
+wrapping. This does not make source behavior heuristic: only the physical
+representation is selected. The current typed C projection implements a bounded
+form of this alternative, with tables placed alongside their consuming code so
+that no table address escapes across a mapper transition.
+
+Closing a program's semantic graph does not require emitting one physical code
+module. Target measurements attach to named implementation units within that
+input revision. A rejected bank partition or host compiler resource limit may
+refine the affected unit's realization preference without changing unrelated
+units' policies. The current NEO-8 implementation exposes this as
+`bank_chunk_operations.SYMBOL`, using the ordinary `prefer` relationship from
+metadata or the command line. The global allowance remains an upper bound.
+Machine-code byte counts decide bank fit; generated C text sizes do not.
+Feedback from a previous input revision cannot be carried forward without
+revalidation, and resource exhaustion must not be accepted as a successful solve.
+
+An implementation may also derive value envelopes from the closed program
+without narrowing its declared types. All callers of a physical function must
+participate, including recursive calls and captures. A loop envelope needs an
+initialized entry and preservation across its possible transfers. The current
+integer analysis uses these facts across call and loop boundaries to simplify
+determined predicates and eliminate unnecessary transport. Its bounded analysis
+may stop with less precise, still valid envelopes. Facts about successful values
+never establish completion or authorize removal of a possibly trapping
+evaluation, source-domain check, or foreign reply validation.
+
+Such envelopes may help prove an individual operation's execution domain when
+its operands also have independent completion proofs. Every caller contributes
+to a shared private function's envelope; one possible zero divisor prevents
+using a nonzero-divisor certificate for that function. Lazy arms may use their
+guard premises, but the guard itself must complete. A range fact about a
+successful result alone never establishes that its producer terminates or has
+no effects. Removing a result's transport and removing its execution therefore
+remain separate questions that consume the same established certificates.
+
+Facts at a function boundary may describe its response to a particular set of
+initial facts, as well as an envelope over all calls. The implementation can
+query the same value graph separately for each call context while retaining
+one shared executable body. Such facts belong to that invocation's result
+snapshot. They cannot alias separate invocations, turn equal ranges into equal
+values, replace a captured snapshot with a later mutable read, or suppress
+required execution. The current bounded interval queries fall back to general
+return envelopes for recursive queries and resource exhaustion.
+
+Proof answers may be reused when their expression identity, scope and fact
+environment agree. Such reuse does not memoize runtime execution. The current
+implementation shares structural range queries within one selected program,
+including repeated queries from different result fields and branch visits.
+Answers are invalidated between refinement rounds and when the readiness
+induction hypothesis set changes; a rejected hypothesis cannot survive through
+a cached answer. Analysis budgets still permit conservative fallback, and no
+proof cache persists across source solves.
+
+Conditional proof reuse also requires the same ordered premises and the same
+interpretation of every native relationship used by the proof. Retaining a
+structural proof graph does not retain the truth of an earlier query's
+assumptions: each query establishes its own premise. A constructed native proof
+may be solved again with fresh bindings as more facts become available. Failed,
+ambiguous or exhausted attempts cannot be reused as positive facts. These are
+implementation allowances within the existing revision and observation rules,
+not a source-order commitment to the first answer discovered.
+
+A realization may retain a calculation only within an evaluation interval
+where its input snapshots remain valid. Value identity alone does not permit
+moving work across a lazy guard, a call, a mutable transfer or a possible trap.
+Retaining a value is a physical choice: its width, lifetime and activation
+ownership contribute to the same RAM and bank constraints as other local state.
+Concurrent occurrences require separate storage unless their exclusion is proved.
+
+The ordinary C realization now shares the typed calculation graph and scheduler
+with value and region bindings. It retains repeated total native-integer
+calculations inside their original expression, using sequenced assignments.
+Conditional arms and operations that require runtime checks end an interval;
+their children may still be optimized inside the original guards. Scratch is
+reused after its last complete consumer within an interval and between completed
+C statements. Reuse requires the same integer width and signedness; a bytewise
+store must finish reading all its operands before any of their storage is reused.
+Values needed by later outputs or guards remain live, and inherited branch
+values retain their enclosing ownership. Separately evaluated arguments of one
+call receive disjoint storage. This bounded policy does not promise an optimal
+schedule or general reuse across effects. Unsupported calculations retain the
+ordinary checked realization. No new language annotation is required.
+
+Scratch reuse is an allowed physical realization, not a semantic requirement.
+Distinct storage can produce faster machine code or fewer spills even when its
+source-level frame is larger. The implementation offers bounded alternatives
+through `value_scratch_reuse` and `calculation_scratch_reuse` preferences (0 or 1,
+default 1), with binding-identity and physical-function scopes respectively.
+The global and scoped allowances both apply; a backend cannot raise a source
+constraint. Disabling reuse changes storage assignment within an interval, not
+evaluation order, guards, arithmetic, or the proof of activation exclusivity.
+Completed statements can still share their separately planned frame lanes.
+
+`value_output_schedule` (0 or 1, default 1, with binding scopes) permits a pure
+realization to write each output after computing its needed shared producers.
+Output order remains unchanged. Zero retains the schedule that computes shared
+producers before writing outputs. Mutable region transfers retain their own
+read-before-write plan. Either schedule can win on a target; shorter lifetimes
+alone do not establish lower stack use or faster generated instructions.
+
+Ordinary C can likewise share a retained producer across an ordered group of
+function results. `calculation_result_sharing` (0 or 1, default 1, with physical
+function scopes) permits this alternative. Every expression in the group must
+be total and use stable snapshots, with no intervening effect or operand
+mutation. Output stores retain their order and complete before any storage
+they read is reused. An unproved expression keeps the independent evaluation
+sites. The bounded implementation considers groups of at most 64 results;
+this is a search allowance, not a source-language result limit.
+
+`calculation_publication_reuse` (0 or 1, default 1, with physical-function
+scopes) permits ordinary public results to share a serialization snapshot.
+Each leaf is evaluated once and all of its payload bytes are written before
+reuse. The carrier normally matches the solved payload width; its final cast does not
+change the expression's arithmetic or checks. Zero retains separate carriers
+for measured targets that benefit from that layout. Both choices participate
+in local-storage accounting and preserve the existing activation rules.
+`calculation_publication_narrow` (0 or 1, default 1, with the same scopes) uses
+the solved payload width when enabled; zero retains a 32-bit carrier instead.
+This changes temporary storage, not the payload format. Together the two
+allowances expose four bounded realizations whose actual register spills,
+stack, RAM and runtime can be measured.
+Byte payloads and embedded constants require no serialization snapshot under
+either width policy.
+
+`calculation_division_sharing` and `value_division_sharing` (0 or 1, default 0,
+with physical-function and binding scopes) permit a quotient and remainder
+over the same stable operands to share the quotient. The remainder becomes
+`x-(x/d)*d` at the same integer width and signedness. Both original operations
+must already be proved total; this choice cannot remove a division-by-zero
+check or cross an effect boundary. Power-of-two divisors retain their direct
+shift/mask realization. Sharing can reduce division work while keeping a
+temporary live for longer, so a measured backend may prefer either alternative.
+The global and scoped allowances intersect as with other physical choices.
+
+`calculation_rotation_helpers` and `value_rotation_helpers` (0 or 1, default 0,
+with physical-function and pure value/case binding scopes) permit an unsigned-byte
+pair `(x >> k) | (x << (8-k))`, for `1 <= k < 8`, to use one rotation helper.
+Both shifts must remain in that expression; this does not extend a published
+temporary's lifetime or change a signed shift. The C realization asks for inline
+expansion of one-bit steps. Its effect on enclosing register allocation still
+needs measurement, so the choice remains explicit. The global
+and scoped allowances intersect, and neither changes source meaning.
+
+`calculation_division_unroll` and `value_division_unroll` (0 or 1, default 1,
+with the corresponding function/binding scopes) permit divisor-specific
+straight-line helpers. Zero selects the compact width-specific division loop;
+power-of-two divisors keep their direct shift/mask realization. These choices
+preserve the same proved domains and arithmetic results. A backend can reject
+an oversized function's unrolled realization and solve it again with that
+function's allowance reduced, leaving unrelated functions unchanged. Measured
+bank fit, execution cost and stack use are separate facts.
+
+A retained calculation can use a smaller physical integer cell when its proved
+range fits that cell. This does not change the width at which source arithmetic
+wraps, the signed interpretation of a conversion, or the result interface.
+For example, a word shifted right by eight bits can occupy one scratch byte;
+adding it to another word still uses the source operation's word semantics.
+Range transfer must account for modular wrap before narrowing. Branch premises
+cannot narrow storage shared with a branch where those premises do not hold.
+
+The operation itself can also use fewer bits when its converted operands and
+complete result fit the smaller representation with the same signedness.
+For example, two logical dwords bounded by 15 can be multiplied as bytes even
+when a caller observes the complete dword result. This proof must include every
+intermediate wrap boundary; merely observing that the final answer is small
+does not justify narrowing its producers. A shift count must remain valid at
+the selected physical width. Exact bounds can replace a total calculation by
+its known value while preserving the completion and effects of its producers.
+
+Observable result bits provide a separate reason to narrow an operation. If
+every consumer needs only the low byte of a word product, the physical
+realization may compute that byte directly. A consumer observing the complete
+product prevents this narrowing of their shared producer. This rule applies
+to modular sums, differences, products, bitwise operations and left shifts;
+comparisons, division and right shifts retain their required operand bits.
+Original wrap boundaries, signed conversions and evaluation checks remain
+part of the language semantics.
+
+This demand can cross private calls, captures and loop transfers. All callers
+and backedges join before physical interfaces are chosen; a later wider
+consumer strengthens the shared requirement. A private byte may therefore
+represent the low eight bits of a logical word whose full value does not fit
+in a byte. Such a residue is distinct from range-based storage that can
+reconstruct the complete value by zero or sign extension. Public and foreign
+interfaces keep their declared representations.
+
+A selected physical interface retains the established value envelope after
+conversion to its carrier. This permits later arithmetic realization to use
+caller, capture, returned-snapshot and loop facts already proved by the closed
+program. It does not infer completion from a successful-value range. A finite
+table only needs to agree on the admitted input domain; entries excluded by a
+retained entry check or a proved producer envelope are unreachable. Considering
+a table must not execute an undefined operation at an excluded input.
+
+Constant masks and fixed shifts refine the required bits. Observing a byte of
+`word>>8` needs the low sixteen bits of `word`; a right shift by seventeen needs
+more than sixteen and retains the supported 32-bit carrier. Unsigned division
+by powers of two has the same rule. Signed division retains the bits needed
+for its sign and truncation. Signed remainder modulo `2^k` preserves the
+numerator's low `k` bits, but observing the complete signed remainder still
+requires its sign. Trapping operations and other execution obligations remain
+independent of these value requirements.
+
+Within a total interval, bounded algebraic realization can collect repeated
+additive terms and constant coefficients at one modular width. Thus `x+x+y`
+may become `2*x+y`, and a later `+x` can combine with that coefficient. A
+narrowing or widening conversion remains an explicit boundary. The supported
+`value_linear_terms` and `calculation_linear_terms` allowances (0..64, default
+16) bound the number of distinct terms considered, with the same binding and
+physical-function scopes as scratch preferences. Zero disables this alternative.
+The optimization does not move calls, mutable reads, checks or lazy evaluation;
+it operates on their already established snapshots. Its implementation and
+generated target instructions must preserve the complete source result.
+
+A known nonzero divisor can also select a specialized arithmetic realization
+or a finite ROM table. Conversion to the operation's width precedes the domain
+check. Signed quotient truncates toward zero, remainder retains the numerator's
+sign, and minimum/-1 follows modular wrapping. A bounded analysis can derive
+result envelopes for nonzero divisor intervals and valid shift-count intervals;
+these are facts about successful values, with separate completion obligations.
+After those obligations close, a variable nonzero divisor or valid variable
+shift count can use a native realization without a redundant runtime check.
+The proof uses the original operation's converted operands and width. A
+reduced-width left shift must publish zero when its valid original count moves
+every retained bit out of the result.
+
+A backend may choose among such alternatives using validated linked artifacts.
+Its search must retain the source constraints and account for combined resource
+costs: a larger function frame may fit an existing overlay without consuming
+more RAM, while a smaller frame may cause more machine-stack spills. Measured
+sampled costs guide a bounded choice; they do not establish worst-case bounds or
+change source meaning. A cached measurement belongs to its recorded source,
+compiler, target, workload and physical preferences, and to the actual artifacts
+that were validated.
+
+Value demand and execution demand are distinct. An invocation whose results are
+unused may disappear only when its actual evaluations and execution are proved
+to complete without observable effects or traps. Another invocation of the same
+shared body can still require its results. Result demand therefore belongs to
+the invocation's snapshot, while the shared body's transported interface must
+serve every remaining caller. Captures and logical results count even when a
+physical interface would omit their storage. A constant successful value alone
+is not such an execution proof.
+
+The current implementation derives finite completion/effect certificates from
+local traces and already certified callees. Unsupported loops, recursive cycles
+without a finite anchor, foreign operations, storage effects and possible traps
+retain their execution obligations. This is a conservative realization rule;
+it introduces no purity keyword or promise that comments can override. The
+certificate includes integer division/remainder with proved nonzero divisors
+and shifts with proved valid counts, provided their operands also complete.
+Bounds of a successful value alone cannot justify dropping its producer.
+The [execution-facts example](../examples/execution_facts.vx) demonstrates an unused
+pure call alongside a required sink and a later potentially trapping call.
+
+An implementation may condition a value query on the path where that value is
+observed. Such a fact is scoped to the branch and to the identity of the values
+tested there. Sibling paths and later iterations cannot inherit it without a
+proof. A guard on a wrapping conversion constrains the converted value, not
+necessarily its original input. Result envelopes combine all feasible arms;
+conditional facts cannot bypass required execution or source-level obligations.
+The current implementation uses bounded integer branch queries across native
+calls and guarded loop transfers, without general relational or disjunctive
+constraint solving. This introduces no new syntax or runtime annotations.
+
+The input domain of a shared function may include the execution conditions of
+each invocation. Every possible caller and path must participate before selecting
+a private representation. Conditions evaluated after an invocation cannot
+constrain its input retroactively. In particular, calls that evaluate a loop
+condition must accept values from the final false test as well as true tests;
+body calls may use the current condition's true-path facts. Facts about older
+mutable snapshots require a separate preservation proof across loop boundaries.
+These implementation proofs do not narrow public source or foreign interfaces.
+
+Proved envelopes may also select a smaller private representation. A logical
+`#u32` value in 0..255 can travel through an internal call or loop cell in one
+byte. Reading it reconstructs the same value; arithmetic still follows `#u32`
+rules, including an intermediate 255+1 producing 256. Signed reconstruction is
+part of the representation contract. Every caller and every reachable transfer
+must fit the selected representation. This does not change the source type or
+authorize narrowing an externally supplied value before validating it. The C
+implementation publishes private logical/storage mappings while retaining its
+public entry, explicit binding and foreign-call interfaces.
+
 ### Optional LLM-guided search
 
 An LLM may guide difficult decisions throughout resolution. It can suggest which
@@ -279,6 +665,51 @@ revisions and recording rejected attempts for offline replay. The
 [provider protocol](search-provider.md) specifies this bounded interface.
 Broader integration is proposed in
 [realization evidence](realization-evidence.md#optional-llm-search-provider).
+
+### Comments as optimization intent
+
+Code defines what the program does. Comments may express all optimization
+intent: which costs matter, acceptable tradeoffs, expected workloads, and why
+a particular path deserves attention. Ordinary comments suffice; no reserved
+comment marker, new keyword or mandatory annotation is required. Existing
+machine-readable preferences remain available as build-policy inputs.
+
+For fixed declared inputs and target contracts, changing only comments must
+preserve the code-defined semantics: values, effects, ordering and ownership
+obligations. It may change generated code, storage placement, bank layout or
+the choice among valid implementations. Ignoring comments leaves the program's
+meaning defined. Comments cannot resolve semantic ambiguity, supply a missing
+program value, authorize approximate arithmetic or establish an otherwise
+unproved exclusion of concurrent activations.
+
+For example, an author may write:
+
+```vexel
+// Called every frame, including while standing still.
+// Keep stack use low; spending more cartridge space is acceptable.
+// Prefer good crowded-scene behavior over the best isolated benchmark.
+```
+
+An advisor may use this context to propose specialization, compare stack and
+execution-time tradeoffs, or request a more representative measurement. A
+workload claim remains a hypothesis until supported by source facts or
+observations. A comment claiming that a function is never reentered can direct
+the ownership analysis; it cannot itself establish exclusive storage ownership.
+
+The advisor records its interpretation as explicit preferences and proposed
+build constraints, with the contributing comment text and source locations.
+Physical legality, source semantics and existing explicit requirements remain
+binding. Conflicting or unattainable prose preferences do not make otherwise
+valid source contradictory. Useful alternatives may be retained when neither
+wins on every cost; their selection depends on interpreted intent and evidence,
+not a universal rule that every measured quantity must improve.
+
+Comment context, interpretations, candidate decisions and supporting evidence
+are recorded with the selected plan for replay without a new model call.
+Changes to relevant comments require reconsidering dependent optimization
+advice. They do not establish a semantic change. This comment-aware physical
+advisor is a design requirement; the current measured-selection driver still
+uses explicit candidates and fixed cost thresholds.
 
 ### Explicit finite solving
 
@@ -937,6 +1368,47 @@ possible realizations, subject to access, lifetime and reentrancy constraints.
 **Non-inlined internal functions**: `&~name(p[:Type],...)[-> Type] block`
 - Behaves like an internal function, but is an explicit lowering barrier: the frontend does not inline it by default.
 - Still internal (not ABI-visible) and may be eliminated if unused.
+- Materialization does not make every logical parameter, capture or result leaf
+  a mandatory physical slot. Consumer demand may cross a chain of materialized
+  calls, including recursive groups and loop-carried state. Required results
+  demand the inputs that produce them; required formal inputs demand actual
+  values from every caller. These relationships close together before transport
+  is chosen. A cycle that merely forwards an unobserved value supplies no demand
+  by itself. Logical types stay intact and all callers must be satisfied.
+  Omitting transport does not permit
+  omitting effects, checks, traps or a demanded invocation's completion.
+  For example, if `relay(n)` forwards `pair(n)` and the only consumer reads
+  `relay(n).__1`, both physical interfaces may transport just that leaf while
+  both functions remain materialized. Parameters and loop state used only by
+  the other result may then need no physical storage either. Required control,
+  initialization checks and argument evaluation remain obligations; eliminating
+  a parameter is not permission to skip an effectful or trapping argument.
+  Physical pruning does not invent facts or bypass source type checking.
+  Proven immutable facts may also cross the materialization boundary. A result
+  that is a constant or an unchanged input need not be returned physically when
+  the caller already has that immutable value. This does not permit replacing
+  a call-time snapshot with a later read of mutable storage, or moving arbitrary
+  computations out of a materialized function. Numeric conversions still apply.
+  A loop value is invariant only if it holds on entry and survives every
+  condition/body transfer; mutually supporting invariants require entry anchors.
+  Removing initialization flags requires proving readiness on every such path.
+  Equal changing values may share physical storage when equality holds at the
+  same observation time. Loop leaves require equal entry values and preservation
+  through every transfer; equal return/capture leaves belong to one invocation.
+  A proof can cross forwarding calls and loop state without making two separate
+  invocations interchangeable. Logical field identities and initialization
+  obligations remain intact. The current C projection requires identical scalar
+  types, total evaluations, and always-ready loop leaves for this sharing.
+  Knowing the eventual result does not prove that a call or loop completes:
+  preceding execution, traps, effects and possible divergence remain obligatory.
+  A separate proof of total, effect-free execution may discharge those
+  obligations. An invocation can then be omitted if none of its results is
+  observed and evaluating its actual arguments is also total and effect-free.
+  This is an invocation-specific fact: another call can still require the same
+  materialized body. Recursive value equations alone supply no completion
+  proof, and absence of result demand supplies no purity proof.
+  Foreign interfaces require their own
+  explicit contract; a caller ignoring a reply does not relax its validation.
 
 **Expression parameters**: Parameters prefixed with `$` capture unevaluated expressions
 - `&name($p[:Type],...)` - `$p` is substituted as expression at each use site
@@ -1220,6 +1692,26 @@ exploration order or physical optimization cost.
   explicit requirements are contradictory; source order and origin grant no
   priority. Defaults apply only in the absence of contributions. Unknown keys
   within these recognized relationships are errors, not ignored requirements.
+- For example, the C value generator accepts
+  `[[prefer(value_choice_branches,8)]]` to allow more branch specialization when
+  ROM is available. Its supported range is zero to eight, default two; multiple
+  allowances combine by their minimum. This changes realization choices only,
+  preserving values, effects and hard bank-size constraints. Zero disables this
+  optimization, and larger allowances remain subject to bounded cost heuristics.
+  The allowance is shared by selected-value expansion and joint specialization
+  of distinct values controlled by the same predicate. Established branch facts
+  may simplify their consumers without changing the integer conversions.
+- Finite value realization has two advisory budgets: `value_table_bytes`
+  (zero to 2048, default 512 bytes per realization) and `value_table_search`
+  (zero to 64, default 16 intermediate candidates). A byte budget of zero
+  disables table realization; a search budget of zero retains direct-input
+  selection tables but disables discovery through computed intermediate values.
+  Quoted keys such as `[[prefer("value_table_search.cursor",0)]]` restrict one
+  declared `c_binding` identity. The effective budget is the minimum of the
+  global and binding allowances; repeated contributions also combine by minimum.
+  Unknown binding identities are errors. Tables must reproduce every input bit
+  pattern after the selected intermediate, preserve integer conversions, and
+  remain within their consumer's bank. Neither budget changes source meaning.
 - `[[source]]` marks a requested source root. `[[stream(capacity)]]` requests
   repeated, serialized execution with a bounded pool of independently owned
   results. Capacity is a source expression. Each successful submission creates

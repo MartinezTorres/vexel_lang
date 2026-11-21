@@ -1,10 +1,89 @@
 #include "source_numeric.hpp"
 #include "floating.hpp"
 #include <algorithm>
+#include <array>
 #include <set>
 #include <boost/multiprecision/integer.hpp>
 
 namespace vx::relational {
+IntegerRange integerDomain(unsigned bits,bool sign) {
+    return {sign ? -(Integer(1)<<(bits-1)) : Integer(0),(Integer(1)<<(bits-(sign ? 1 : 0)))-1};
+}
+IntegerBound convertedIntegerRange(IntegerBound value,unsigned bits,bool sign) {
+    if(!bits || bits>32) return {};
+    const auto full=integerDomain(bits,sign);if(!value) return full;
+    const Integer modulus=Integer(1)<<bits;
+    auto floorDivide=[&](Integer n) {Integer q=n/modulus;if(n<0 && n%modulus!=0) --q;return q;};
+    const auto lo=floorDivide(value->lower-full.lower),hi=floorDivide(value->upper-full.lower);
+    // Sorting wrapped endpoints would be unsound: [250,260] converted to u8
+    // includes both 255 and 0. One ordered interval must retain [0,255].
+    if(lo!=hi) return full;
+    return IntegerRange{value->lower-lo*modulus,value->upper-hi*modulus};
+}
+IntegerBound arithmeticIntegerRange(const std::string& operation,IntegerBound left,IntegerBound right,
+                                    unsigned bits,bool sign) {
+    if(!bits || bits>32) return {};
+    const bool shift=operation=="<<" || operation==">>";
+    left=convertedIntegerRange(left,bits,sign);
+    right=convertedIntegerRange(right,shift ? 32 : bits,shift ? false : sign);
+    auto convert=[&](IntegerRange range){return convertedIntegerRange(std::move(range),bits,sign);};
+    if(operation=="+") return convert({left->lower+right->lower,left->upper+right->upper});
+    if(operation=="-") return convert({left->lower-right->upper,left->upper-right->lower});
+    if(operation=="*") {
+        std::array<Integer,4> values{left->lower*right->lower,left->lower*right->upper,
+                                     left->upper*right->lower,left->upper*right->upper};
+        const auto [lo,hi]=std::minmax_element(values.begin(),values.end());return convert({*lo,*hi});
+    }
+    if(operation=="/" || operation=="%") {
+        // Keep the full domain if zero is possible. Even a precise range of
+        // successful results would not by itself certify this evaluation.
+        if(right->lower<=0 && right->upper>=0) return integerDomain(bits,sign);
+        if(operation=="/") {
+            std::array<Integer,4> values{left->lower/right->lower,left->lower/right->upper,
+                                        left->upper/right->lower,left->upper/right->upper};
+            const auto [lo,hi]=std::minmax_element(values.begin(),values.end());return convert({*lo,*hi});
+        }
+        if(left->lower==left->upper && right->lower==right->upper) {
+            Integer value=left->lower%right->lower;return convert({value,value});
+        }
+        const Integer minimum=right->lower>0 ? right->lower : -right->upper;
+        const Integer maximum=right->lower>0 ? right->upper : -right->lower;
+        if(left->lower>-minimum && left->upper<minimum) return left;
+        return IntegerRange{left->lower<0 ? std::max(left->lower,Integer(1-maximum)) : Integer(0),
+                            left->upper>0 ? std::min(left->upper,Integer(maximum-1)) : Integer(0)};
+    }
+    if(shift) {
+        if(right->lower<0 || right->upper>=bits) return integerDomain(bits,sign);
+        auto apply=[&](const Integer& n,const Integer& count)->Integer {
+            const Integer scale=Integer(1)<<count.convert_to<unsigned>();
+            if(operation=="<<") return n*scale;
+            Integer result=n/scale;
+            if(n<0 && n%scale!=0) --result; // Arithmetic right shift rounds down.
+            return result;
+        };
+        std::array<Integer,4> values{apply(left->lower,right->lower),apply(left->lower,right->upper),
+                                    apply(left->upper,right->lower),apply(left->upper,right->upper)};
+        const auto [lo,hi]=std::minmax_element(values.begin(),values.end());return convert({*lo,*hi});
+    }
+    if(operation=="&" || operation=="|" || operation=="^") {
+        left=convertedIntegerRange(left,bits,false);right=convertedIntegerRange(right,bits,false);
+        IntegerRange raw{0,0};
+        if(left->lower==left->upper && right->lower==right->upper) {
+            if(operation=="&") raw.lower=left->lower&right->lower;
+            else if(operation=="|") raw.lower=left->lower|right->lower;
+            else raw.lower=left->lower^right->lower;
+            raw.upper=raw.lower;
+        } else if(operation=="&") raw.upper=std::min(left->upper,right->upper);
+        else {
+            const Integer largest=std::max(left->upper,right->upper);Integer mask=1;
+            while(mask<=largest) mask<<=1;
+            raw.upper=mask-1;if(operation=="|") raw.lower=std::max(left->lower,right->lower);
+        }
+        return convert(raw);
+    }
+    // Unfamiliar operations retain the complete native domain.
+    return integerDomain(bits,sign);
+}
 std::optional<ScalarFormat> scalarFormat(const Ref& type) {
     ScalarFormat f;
     if(type->name=="Exact") return f;

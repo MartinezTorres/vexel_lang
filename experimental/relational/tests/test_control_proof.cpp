@@ -103,7 +103,7 @@ void partialKnowledgeAndScopes() {
     auto now=f.terms.make("LoopReady",{f.number(1),f.number(3)}),next=f.terms.make("NextLoopReady",{f.number(1),f.number(3)});
     auto a=proof.read(now),b=proof.read(next);
     check(a==proof.read(f.runtime(now,0,1)),"readiness wrapper shares its atom");
-    check(proof.substitute(b,{{show(next),a}})==a,"loop readiness renaming");
+    check(proof.substitute(b,{{b,a}})==a,"loop readiness renaming");
     auto loop=f.runtime(f.terms.make("LoopSlotValue",{f.number(1),f.number(3),f.number(0)}));
     auto predicate=proof.read(f.compare("<",loop,f.number(7)));
     std::function<bool(const Ref&)> unstable=[&](const Ref& v){return v->name=="LoopSlotValue" || std::any_of(v->arguments.begin(),v->arguments.end(),unstable);};
@@ -201,8 +201,95 @@ void definedDivisionAndShifts() {
               "possibly invalid arithmetic remains opaque");
 }
 
+void conditionalConstantPredicates() {
+    Fixture f;ControlProof proof;auto p=f.input("p",0,1),q=f.input("q",0,1);
+    auto pb=proof.read(p),qb=proof.read(q);
+    auto choose=[&](Ref condition,Ref yes,Ref no){return f.runtime(f.terms.make("Select",{condition,yes,no}),0,0xffffffffU);};
+    for(unsigned width:{4u,8u,16u,32u}) for(bool sign:{false,true}) {
+        auto value=choose(p,f.number(0xffffffffU),choose(q,f.number(1U<<(width-1)),f.number(3)));
+        auto representation=[&](std::uint64_t bits)->std::int64_t {
+            auto modulus=std::uint64_t(1)<<width;bits&=modulus-1;
+            return sign && bits>=modulus/2 ? static_cast<std::int64_t>(bits)-static_cast<std::int64_t>(modulus) : static_cast<std::int64_t>(bits);
+        };
+        for(const std::string op:{"==","!=","<","<=",">",">="}) for(bool reverse:{false,true}) {
+            auto constant=f.number(7);
+            auto predicate=proof.read(f.compare(op,reverse ? constant : value,reverse ? value : constant,sign ? width : 0));
+            for(unsigned assignment=0;assignment<4;++assignment) {
+                std::uint64_t bits=(assignment&1) ? 0xffffffffU : (assignment&2) ? (std::uint64_t(1)<<(width-1)) : 3;
+                auto moving=sign ? representation(bits) : static_cast<std::int64_t>(bits);
+                auto fixed=sign ? representation(7) : 7;
+                auto left=reverse ? fixed : moving,right=reverse ? moving : fixed;
+                bool expected=op=="==" ? left==right : op=="!=" ? left!=right : op=="<" ? left<right : op=="<=" ? left<=right : op==">" ? left>right : left>=right;
+                check(proof.substitute(predicate,{{pb,assignment&1},{qb,(assignment>>1)&1}})==std::size_t(expected),
+                      "conditional constant predicate changed width, sign or operand order");
+            }
+        }
+    }
+    // This multiplication cannot fit the bit-proof budget. Its result affects
+    // only a low alternative; comparing against two needs neither it nor the
+    // condition that chooses between zero and one.
+    auto x=f.input("x",0,0xffffffffU),y=f.input("y",0,0xffffffffU);
+    auto hard=f.compare("==",f.op("*",32,x,y),f.number(0));
+    auto value=choose(p,f.number(2),choose(q,f.number(3),choose(hard,f.number(1),f.number(0))));
+    check(proof.read(f.compare(">=",value,f.number(2)))==proof.disjunction(pb,qb),
+          "irrelevant conditional constant branch consumed the proof budget");
+    check(proof.size()<1000,"constant-choice predicate expanded irrelevant arithmetic");
+}
+void sharedAtomIdentity() {
+    Fixture f;ControlProof proof;
+    auto shared=f.terms.make("Input",{f.terms.make("large")});
+    for(unsigned i=0;i<60;++i) shared=f.terms.make("OpaquePair",{shared,shared});
+    auto current=f.runtime(shared,0,255),next=f.runtime(f.terms.make("Next",{shared}),0,255);
+    auto rename=proof.variableRenaming(next,current);
+    check(rename.has_value(),"shared atom provenance could not be renamed");
+    auto test=proof.read(f.compare("<",next,f.number(93)));
+    check(proof.substitute(test,*rename)==proof.read(f.compare("<",current,f.number(93))),
+          "shared atom renaming changed its value");
+    check(proof.size()<1000,"compact provenance expanded the Boolean graph");
+
+    // Printing can be ambiguous, but opaque source identities cannot be.
+    auto flat=f.terms.make("Opaque(x)"),nested=f.terms.make("Opaque",{f.terms.make("x")});
+    check(show(flat)==show(nested),"display-collision fixture is not ambiguous");
+    auto a=proof.read(flat),b=proof.read(nested);
+    check(a!=b && proof.equivalent(a,b)>1,"distinct opaque structure shared a printed atom identity");
+    check(proof.substitute(proof.conjunction(a,proof.negate(b)),{{a,1},{b,0}})==1,
+          "structural atom collision lost a legal assignment");
+    auto x=f.runtime(flat,0,255),y=f.runtime(nested,0,255);
+    check(proof.read(f.compare("==",x,y))>1,"distinct word sources shared printed bit identities");
+}
+void quantifiedTruthTables() {
+    Fixture f;ControlProof proof;
+    std::array<Ref,3> values{
+        f.terms.make("LoopReady",{f.number(1),f.number(0)}),
+        f.terms.make("LoopReady",{f.number(1),f.number(1)}),
+        f.terms.make("LoopReady",{f.number(1),f.number(2)})};
+    std::array<std::size_t,3> bits{proof.read(values[0]),proof.read(values[1]),proof.read(values[2])};
+    auto expression=proof.select(bits[0],proof.equivalent(bits[1],bits[2]),proof.conjunction(bits[1],proof.negate(bits[2])));
+    auto evaluate=[](unsigned assignment) {
+        const bool a=assignment&1,b=assignment&2,c=assignment&4;
+        return a ? b==c : b && !c;
+    };
+    // Reuse one proof with different quantified sets and substitutions. Memos
+    // must belong to each operation, never to a previous variable environment.
+    for(bool inverse:{false,true}) for(unsigned removed=0;removed<8;++removed) {
+        auto quantified=proof.exists(inverse ? proof.negate(expression) : expression,[&](const Ref& atom) {
+            for(unsigned i=0;i<3;++i) if(atom==values[i]) return (removed&(1U<<i))!=0;
+            return false;
+        });
+        for(unsigned assignment=0;assignment<8;++assignment) {
+            bool expected=false;
+            for(unsigned alternative=0;alternative<8;++alternative)
+                if(((alternative^assignment)&(~removed&7U))==0) expected|=evaluate(alternative)!=inverse;
+            ControlProof::Renaming replacements;
+            for(unsigned i=0;i<3;++i) replacements[bits[i]]=(assignment>>i)&1U;
+            check(proof.substitute(quantified,replacements)==static_cast<std::size_t>(expected),
+                  "quantified Boolean relation matches independent truth table");
+        }
+        check(proof.read(proof.term(quantified,f.terms))==quantified,"quantified relation round trip");
+    }
+}
 }
 int main() {
-    byteArithmetic();pairedArithmetic();comparisonsAndWidths();partialKnowledgeAndScopes();wordVariableRenaming();definedDivisionAndShifts();
+    byteArithmetic();pairedArithmetic();comparisonsAndWidths();partialKnowledgeAndScopes();wordVariableRenaming();definedDivisionAndShifts();conditionalConstantPredicates();sharedAtomIdentity();quantifiedTruthTables();
     std::cout<<assertions<<" control proof assertions passed\n";
 }

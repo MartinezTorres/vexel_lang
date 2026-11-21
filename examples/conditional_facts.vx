@@ -1,0 +1,6 @@
+// Each arm contributes facts under its own condition. Both entry points share
+// the same native implementation and its proved one-byte return storage.
+&~bounded(n:#u32)->#u32 {n<128 ? n+1 : (#u32)0}
+&~forward(n:#u32)->#u32 {bounded(n)}
+&^entry(n:#u8) {forward((#u32)n)}
+&^wide(n:#u32) {forward(n)}

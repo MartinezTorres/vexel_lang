@@ -11,7 +11,7 @@ import unittest
 EXE=Path(sys.argv.pop(1)).resolve()
 ROOT=Path(__file__).resolve().parents[3]
 sys.path.insert(0,str(ROOT/'backends/msx-neo8/tools'))
-from stack_usage import assembly, local_usage, OpenStack
+from stack_usage import assembly, local_usage, OpenStack, analyze
 
 
 def run(args):
@@ -19,6 +19,26 @@ def run(args):
 
 
 class BackendClosureTests(unittest.TestCase):
+    def test_binding_stack_facts_distinguish_translation_units_and_unknown_calls(self):
+        with tempfile.TemporaryDirectory() as temp:
+            project=Path(temp);build=project/'build';build.mkdir()
+            for name,code in {
+                'a':'_vx_entry::\n ret\n_vx_bind_move_run::\n push hl\n call _leaf\n pop hl\n ret\n_leaf::\n push bc\n pop bc\n ret\n',
+                'b':'_vx_bind_move_run::\n ret\n_vx_bind_auto_compute::\n call _outside\n ret\n',
+            }.items():
+                (build/(name+'.rel')).touch();(build/(name+'.asm')).write_text(code)
+            plan={'source_occurrences':[{'name':'entry'}],'value_bindings':{'bindings':[
+                {'name':'move','storage':'fixed','bytes':9},
+                {'name':'auto','storage':'automatic','bytes':9},
+                {'name':'unused','storage':'fixed','bytes':4}]}}
+            result=analyze(project,plan)
+            self.assertEqual(result['bytes'],2) # binding facts do not extend the source-root scope
+            facts=result['value_bindings']
+            self.assertEqual(facts['move']['instances'],{'build/a.asm':{'bytes':8},'build/b.asm':{'bytes':2}})
+            self.assertEqual(facts['auto']['status'],'unproven')
+            self.assertIsNone(facts['auto']['instances']['build/b.asm']['bytes'])
+            self.assertEqual(facts['unused']['status'],'not-emitted')
+
     def native(self, source, oracle, mapper=False):
         with tempfile.TemporaryDirectory() as temp:
             d=Path(temp); path=d/'source.vx'; path.write_text(source); generated=d/'c'
@@ -85,6 +105,52 @@ class BackendClosureTests(unittest.TestCase):
             path.write_text('_bad::\n ld sp,hl\n ret\n')
             code,labels,functions=assembly(path)
             with self.assertRaises(OpenStack):local_usage(code,labels,functions['_bad'])
+            # A raw PUSH HL opcode must not disappear from a stack proof.
+            path.write_text('.module test\n.area _CODE\n_bad::\n .db 0xe5\n ret\n')
+            code,labels,functions=assembly(path)
+            with self.assertRaises(OpenStack):local_usage(code,labels,functions['_bad'])
+            # Unreached literal pools remain ordinary data.
+            path.write_text('_good::\n jr 00101$\n .db 0xe5\n00101$:\n ret\n')
+            code,labels,functions=assembly(path)
+            self.assertEqual(local_usage(code,labels,functions['_good']),(0,{}))
+
+
+    def test_stack_restoration_closes_only_a_known_common_frame(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'restore.asm'
+            for saved in ('ix','iy','hl'):
+                call=' call _outside\n' if saved!='hl' else ''
+                path.write_text('_frame::\n push '+saved+'\n ld '+saved+',#0\n add '+saved+',sp\n'
+                    ' jr z,00101$\n push bc\n push de\n'+call+
+                    '00101$:\n ld sp,'+saved+'\n pop '+saved+'\n ret\n')
+                code,labels,functions=assembly(path)
+                self.assertEqual(local_usage(code,labels,functions['_frame']),
+                                 (8,{'_outside':8}) if call else (6,{}))
+            for body in ('ld ixh,#0', 'dec ix', 'push hl\n00101$:\n call _outside'):
+                # An unknown/different frame address cannot become a bound.
+                # Nor may differing stack depths reach a call before cleanup.
+                middle=body+'\n' if '00101$:' in body else body+'\n00101$:\n'
+                path.write_text('_bad::\n push ix\n ld ix,#0\n add ix,sp\n'
+                    ' jr z,00101$\n'+middle+' ld sp,ix\n pop ix\n ret\n')
+                code,labels,functions=assembly(path)
+                with self.assertRaises(OpenStack):local_usage(code,labels,functions['_bad'])
+
+    def test_checked_switch_keeps_stack_restoration_but_rejects_changed_hl(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'switch.asm'
+            for width,jump in ((2,'jr'),(3,'jp')):
+                source=('_switch::\n push de\n ld de,#0\n ld hl,#00100$\n'+
+                    ' add hl,de\n'*width+' pop de\n jp (hl)\n00100$:\n '+jump+' 00101$\n '+jump+' 00102$\n'
+                    '00101$:\n push bc\n pop bc\n ret\n'
+                    '00102$:\n push bc\n push de\n pop de\n pop bc\n ret\n')
+                path.write_text(source);code,labels,functions=assembly(path)
+                self.assertEqual(local_usage(code,labels,functions['_switch']),(4,{}))
+                with self.assertRaises(OpenStack):local_usage(code,labels,functions['_switch'],False)
+                for changed in ('pop hl', 'pop de\n ld hl,#0'):
+                    path.write_text(source.replace('pop de\n jp (hl)',changed+'\n jp (hl)'))
+                    code,labels,functions=assembly(path)
+                    with self.assertRaises(OpenStack):local_usage(code,labels,functions['_switch'])
+
 
 
 if __name__=='__main__':unittest.main(verbosity=2)

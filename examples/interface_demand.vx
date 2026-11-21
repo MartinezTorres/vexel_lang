@@ -1,0 +1,13 @@
+// Only the first result reaches the source boundary. The second state travels
+// through a call and a loop, but has no observer and no execution effects.
+&~advance(position:#u8, history:#u16, ticks:#u8)->(#u8,#u16) {
+    x:#u8=position; h:#u16=history; i:#u8=0;
+    (i<ticks)!@{x+=3;h=h*5+17;i+=1;};
+    (x,h)
+}
+&~forward(position:#u8, history:#u16, ticks:#u8)->(#u8,#u16) {
+    advance(position,history,ticks)
+}
+&^entry(n:#u8) {
+    forward(n,(#u16)n*257,n&3).__0
+}

@@ -27,6 +27,12 @@ class NumericControlTests(unittest.TestCase):
         self.execute('&^entry(n:#u8){r=n;{r=1/n;(n-n)!=0?missing();};r}',lambda n:[1//n] if n else (1,))
         self.execute('&^entry(n:#u8){r=n;{((1/n)-(1/n))!=0?missing();r+=1;};r}',lambda n:[(n+1)&255] if n else (1,))
 
+    def test_conditional_constant_predicate_keeps_native_prefix(self):
+        self.execute('&~classify(n:#u8){1/n;(n&1)!=0?(#u8)2:'
+                     '((n&2)!=0?(#u8)3:((n&4)!=0?(#u8)1:(#u8)0))}'
+                     '&^entry(n:#u8){r=n;{((classify(n)>=2)!=((n&3)!=0))?missing();r+=1;};r}',
+                     lambda n:[(n+1)&255] if n else (1,))
+
     def test_first_loop_iteration_uses_initial_values(self):
         self.check('a={x:#u8=0;{[1,2]!@{x+=1;x==1?missing();};};x};',status='unresolved')
         self.check('a={data:#u8[2]=[1,2];x:#u8=0;{data!@{_==1?missing();x+=1;};};x};',status='unresolved')

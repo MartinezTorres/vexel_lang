@@ -1,0 +1,16 @@
+// Both views are observed. Their equality survives every loop transfer and
+// can travel through materialized calls without requiring duplicate storage.
+&~advance(position:#u8, ticks:#u8)->(#u8,#u8) {
+    primary:#u8=position;
+    mirrored:#u8=position;
+    i:#u8=0;
+    (i<ticks)!@{primary+=3;mirrored+=3;i+=1;};
+    (primary,mirrored)
+}
+&~forward(position:#u8, ticks:#u8)->(#u8,#u8) {
+    advance(position,ticks)
+}
+&^entry(n:#u8) {
+    a,b=forward(n,n&3);
+    (#u16)a | ((#u16)b<<8)
+}

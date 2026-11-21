@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import tempfile
 
@@ -16,11 +17,34 @@ backend = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(backend)
 
 
-def run(command):
+def run(command, timeout=None):
     env = os.environ.copy()
     for key in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKELEVEL", "BUILD"):
         env.pop(key, None)
-    result = subprocess.run([str(x) for x in command], env=env, text=True, capture_output=True, timeout=180)
+    command = [str(x) for x in command]
+    # A project can contain several individually guarded compiler invocations,
+    # and can wait for another project at the shared SDCC gate. Keep the 180 s
+    # compiler limit; give the complete build its own bounded elapsed allowance.
+    if timeout is None:
+        timeout = 600 if Path(command[0]).name == 'make' else 180
+    child = subprocess.Popen(command, env=env, text=True, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, start_new_session=True)
+    try:
+        stdout, stderr = child.communicate(timeout=timeout)
+    except BaseException:
+        # TERM lets sdcc_guard clean up its separately owned compiler group.
+        # Killing only make would leave its children running after a failed test.
+        try:
+            os.killpg(child.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            child.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGKILL)
+            child.communicate()
+        raise
+    result = subprocess.CompletedProcess(command, child.returncode, stdout, stderr)
     if result.returncode:
         raise RuntimeError(f"{command}\n{result.stdout}\n{result.stderr}")
     return result

@@ -5,12 +5,16 @@ This module has no Vexel evaluator and never invokes the established frontend.
 The source executable supplies both the checked plan and its C projection.
 """
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import shutil
 
 REPO = Path(__file__).resolve().parents[2]
 ASSETS = REPO / "backends/msx-neo8"
+_image_spec = importlib.util.spec_from_file_location("vexel_program_image", Path(__file__).with_name("program_image.py"))
+program_image = importlib.util.module_from_spec(_image_spec)
+_image_spec.loader.exec_module(program_image)
 
 
 def fingerprint(data):
@@ -25,6 +29,8 @@ def package(generated, project, source, machine):
     report = json.loads((generated / "source-plan.json").read_text())
     if report["status"] != "resolved" or not report.get("sources"):
         raise ValueError("a closed source realization is required")
+    if 'program_image' in report:
+        program_image.load(generated, report)
     def files(inputs, kind):
         digests = {}
         for item in inputs:
@@ -89,6 +95,11 @@ def package(generated, project, source, machine):
         "relational_output_contract": report["activation"],
         "relational_payload_bytes": report["extent"],
         "frame_planning": report.get("frame_planning", {}),
+        "runtime_functions": report.get("runtime_functions", []),
+        "interface_demand": report.get("interface_demand", {}),
+        "value_ranges": report.get("value_ranges", {}),
+        "program_image": report.get("program_image", {}),
+        "value_bindings": report.get("value_bindings", {}),
         "boundary_contracts": report.get("boundary_contracts", []),
         "access_order": report.get("access_order", []),
         "activation_graph": report.get("activation_graph", {}),

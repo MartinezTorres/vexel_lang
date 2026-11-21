@@ -1,6 +1,7 @@
 #include "machine.hpp"
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 
 using namespace vx::relational;
@@ -25,6 +26,15 @@ std::vector<Options> orders() {
     return result;
 }
 void structural_terms() {
+    {
+        Terms terms;auto x=terms.variable("x");
+        check(show(terms.make("F",{terms.make(""),x,terms.number(-10),terms.make("A(1)")}))==
+              "F(,?x:0,-10,A(1))","term text preserves empty names, punctuation, variables and numbers");
+        auto chain=terms.number(7);std::string expected;
+        for(unsigned i=0;i<2048;++i) {chain=terms.make("N",{chain});expected+="N(";}
+        expected+="7";expected.append(2048,')');
+        check(show(chain)==expected,"deep complete term text uses an explicit traversal");
+    }
     for (auto options : orders()) {
         Program p; auto& t = p.terms;
         auto a = t.variable("element"), n = t.variable("length"), schema = t.variable("schema");
@@ -52,6 +62,112 @@ void fresh_polymorphism() {
     for (auto options : orders()) {
         auto result = Machine(p,options).solve(r);
         value(result,0,"UInt(8)"); value(result,1,"Array(UInt(16),4)");
+    }
+}
+void shared_closed_terms() {
+    Program p; auto& t=p.terms;
+    auto tree=t.number(7);
+    for(unsigned depth=0;depth<60;++depth) tree=t.make("Fork",{tree,tree});
+    auto x=t.variable("x"),y=t.variable("y");Bindings bindings;
+    check(!bindings.occurs(x->variable,tree),"closed DAG has no variable occurrences");
+    {
+        Bindings::Transaction transaction(bindings);
+        check(bindings.unify(x,tree),"bind a shared closed DAG without expanding its paths");
+        check(bindings.resolve(x)==tree,"resolution preserves closed graph sharing");
+    }
+    check(bindings.walk(x)==x,"closed graph binding rolls back");
+    check(bindings.unify(x,t.make("Open",{y,tree})),"bind an open graph with a closed subtree");
+    check(bindings.occurs(y->variable,x),"open variable remains visible through bindings");
+    check(!bindings.unify(y,x),"closed subtree shortcut does not admit a cycle");
+    p.define("shared",1,{{{tree},{},"closed graph"}});
+    Request request;request.goals={call("shared",{x})};request.observation={x};
+    auto result=Machine(p).solve(request);status(result,Outcome::Resolved);
+    check(result.selected->observation[0]==tree,"clause freshening preserves immutable ground structure");
+}
+void shared_open_terms() {
+    Program p;auto& t=p.terms;
+    auto fork=[&](Ref leaf) {
+        for(unsigned depth=0;depth<60;++depth) leaf=t.make("Fork",{leaf,leaf});
+        return leaf;
+    };
+    auto x=t.variable("leaf"),open=fork(x),seven=fork(t.number(7)),sevenCopy=fork(t.number(7));
+    check(identical(seven,sevenCopy),"independent equal DAGs compare by their nodes, not paths");
+    check(!identical(seven,fork(t.number(8))),"independent DAG comparison sees a different leaf");
+    Bindings bindings;
+    check(bindings.resolve(open)==open,"an unresolved rewrite retains untouched shared structure");
+    check(!bindings.occurs(t.variable("absent")->variable,open),"an absent variable does not expand DAG paths");
+    {
+        Bindings::Transaction transaction(bindings);
+        check(bindings.unify(open,sevenCopy),"unify repeated open subgraphs once");
+        auto resolved=bindings.resolve(open);
+        check(ground(resolved) && identical(resolved,seven),"substitution closes every shared occurrence");
+        for(unsigned depth=0;depth<60;++depth) {
+            if(resolved->arguments[0]!=resolved->arguments[1]) throw std::runtime_error("substitution lost graph sharing");
+            resolved=resolved->arguments[0];
+        }
+        check(resolved->number==7,"shared rewrite reaches the expected leaf");
+    }
+    check(bindings.resolve(open)==open,"resolved DAG memo cannot survive rollback");
+    auto y=t.variable("second leaf");
+    {
+        Bindings::Transaction transaction(bindings);
+        check(!bindings.unify(t.make("Pair",{x,x}),t.make("Pair",{t.number(1),t.number(2)})),
+              "later narrowing still rejects conflicting repeated variables");
+    }
+    p.define("replicate",2,{{{open,x},{},"shared generic graph"}});
+    auto a=t.variable("first graph"),b=t.variable("second graph");
+    p.builders.emplace("leaf",Program::Builder{1,2,[&](const std::vector<Ref>& args) {
+        auto leaf=args[0];for(unsigned depth=0;depth<60;++depth) leaf=leaf->arguments[0];
+        return std::vector<Goal>{equal(leaf,args[1])};
+    }});
+    for(auto options:orders()) {
+        Request r;r.goals={call("replicate",{a,t.number(7)}),call("replicate",{b,t.number(9)})};
+        r.observation={a,b};auto result=Machine(p,options).solve(r);status(result,Outcome::Resolved);
+        check(identical(result.selected->observation[0],seven) && identical(result.selected->observation[1],fork(t.number(9))),
+              "fresh clauses preserve sharing and separate their variable environments");
+        r.goals={build("leaf",{open,y}),equal(x,t.number(7))};r.observation={y};
+        value(Machine(p,options).solve(r),0,"7");
+        r.goals={call("replicate",{sevenCopy,t.number(7)})};r.observation={t.number(1)};
+        value(Machine(p,options).solve(r),0,"1");
+    }
+}
+void shared_realization_order() {
+    Program p;auto& t=p.terms;
+    auto x=t.variable("realization"),y=t.variable("tail");
+    // Small independent text oracle: names can contain the same delimiters as
+    // show(), so structural tuple ordering would change historical choices.
+    std::vector<Ref> samples={t.number(-2),t.number(-10),t.number(2),t.number(10),
+        t.make(""),t.make("A"),t.make("A",{t.number(1)}),t.make("A(1)"),
+        t.make("A,",{t.make("")}),t.make("A\nB"),t.make("A",{t.number(1),t.number(2)})};
+    unsigned pair=0;
+    for(const auto& a:samples) for(const auto& b:samples) {
+        auto name="realizations_"+std::to_string(pair++);
+        p.define(name,2,{{{a,b},{},"first"},{{b,a},{},"second"}});
+        Request request;request.goals={call(name,{x,y})};
+        request.observation={t.number(42)};request.realization={x,y};
+        auto expected=std::min(show(a)+'\n'+show(b)+'\n',show(b)+'\n'+show(a)+'\n');
+        for(bool reverse:{false,true}) {
+            Options options;options.branches=reverse ? "reverse" : "forward";
+            auto result=Machine(p,options).solve(request);status(result,Outcome::Resolved);
+            const auto& chosen=result.selected->realization;
+            check(show(chosen[0])+'\n'+show(chosen[1])+'\n'==expected,"lazy tie order matches exact text ordering");
+        }
+    }
+    auto fork=[&] {
+        auto result=t.number(7);
+        for(unsigned depth=0;depth<60;++depth) result=t.make("Fork",{result,result});
+        return result;
+    };
+    auto a=t.make("Plan",{fork(),t.number(10)}),b=t.make("Plan",{fork(),t.number(2)});
+    p.domain("large_realizations",{a,b});
+    const auto& labels=p.relations.at("large_realizations").clauses;
+    check(labels[0].label.size()==259 && labels[0].label.ends_with("..."),"domain diagnostics stop before expanding a shared graph");
+    check(labels[0].label==labels[1].label,"truncated equal labels do not replace exact alternative identity");
+    Request request;request.goals={call("large_realizations",{x})};
+    request.observation={t.number(42)};request.realization={x};
+    for(auto options:orders()) {
+        auto result=Machine(p,options).solve(request);status(result,Outcome::Resolved);
+        check(identical(result.selected->realization[0],a),"equal DAG prefix is skipped and lexical 10 precedes 2");
     }
 }
 void partial_schema() {
@@ -487,6 +603,36 @@ void isolated_bundle_assumptions() {
         value(Machine(p,options).solve(original),0,"1");
     }
 }
+void streamed_term_text() {
+    Terms t;std::vector<Ref> terms{t.number(-12),t.number(2),t.number(10),t.make(""),t.make("("),
+        t.make("A"),t.make("A(x)"),t.make("A",{t.make("x")}),t.make("A",{t.number(1),t.number(2)})};
+    for(const auto& left:terms) for(const auto& right:terms) for(const auto& prefix:{"","bit:03:"}) {
+        auto expected=(std::string(prefix)+show(left)).compare(show(right));
+        auto actual=compareTermText(left,prefix,right,"");
+        check((actual<0)==(expected<0) && (actual>0)==(expected>0),"streamed ordering differs from exact display");
+    }
+    auto shared=t.make("Leaf");
+    for(unsigned i=0;i<60;++i) shared=t.make("Pair",{shared,shared});
+    auto left=t.make("Edge",{shared,t.number(1)}),right=t.make("Edge",{shared,t.number(2)});
+    check(compareTermText(left,"",right,"")<0,"shared display prefix did not compare compactly");
+    check(show(shared,32).size()==35,"bounded display did not truncate shared structure");
+    check(show(t.make("Leaf"),4)=="Leaf" && show(t.make("Leaf"),3)=="Lea...","display truncation boundary changed");
+}
+void bounded_retry_effort() {
+    RetryEffort effort;std::size_t total=0;
+    const std::vector<std::size_t> expected{10,20,10,40,10,10,10,80,10,10,10,10,10,10,10,80};
+    for(std::size_t i=0;i<expected.size();++i) {
+        auto work=effort.next(10,80);total+=work;
+        check(work==expected[i],"retry fuel must stay cheap between geometric boosts");
+        check(total*2<=(i+1)*10*5,"bounded retries spent more than 2.5 times ordinary fuel");
+    }
+    RetryEffort limited;
+    check(limited.next(20000,7)==7 && limited.next(20000,0)==0,"retry fuel exceeded the caller's limit");
+    RetryEffort huge;auto maximum=std::numeric_limits<std::size_t>::max();
+    check(huge.next(maximum/2+1,maximum)==maximum/2+1 && huge.next(maximum/2+1,maximum)==maximum,
+          "retry fuel multiplication overflowed");
+    check(huge.next(0,maximum)==0,"zero ordinary fuel acquired work");
+}
 void named_proof_inputs() {
     for(auto options:orders()) {
         Program p;auto& t=p.terms;auto x=t.variable("enclosing evidence"),y=t.variable("local answer");
@@ -514,8 +660,8 @@ void explanatory_pending_evidence() {
 int main() {
     try {
         for (auto [name,test] : std::vector<std::pair<const char*,std::function<void()>>>{
-            {"structural terms",structural_terms}, {"fresh polymorphism",fresh_polymorphism}, {"partial schemas",partial_schema}, {"pending evidence",explanatory_pending_evidence},
-            {"relational types",relational_types}, {"dependent shapes",dependent_shapes}, {"observed artifacts",observed_artifacts}, {"closed observations",closed_observations},
+            {"structural terms",structural_terms}, {"fresh polymorphism",fresh_polymorphism}, {"shared closed terms",shared_closed_terms}, {"shared open terms",shared_open_terms}, {"shared realization ordering",shared_realization_order}, {"partial schemas",partial_schema}, {"pending evidence",explanatory_pending_evidence},
+            {"retry effort",bounded_retry_effort}, {"streamed term text",streamed_term_text}, {"relational types",relational_types}, {"dependent shapes",dependent_shapes}, {"observed artifacts",observed_artifacts}, {"closed observations",closed_observations},
             {"exact arithmetic",arithmetic_relations}, {"joint linear dimensions",joint_linear_dimensions},
             {"numeric obligations",numeric_obligations_survive_simplification},
             {"linear oracle",linear_oracle}, {"closure and policy",closure_and_policy},

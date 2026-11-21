@@ -1207,3 +1207,645 @@ and leak checks: `build/relational-loop-init-sanitize.json` records 214
 reverified input hashes. It covers the preceding boundary contracts as well,
 and predates the subsequent function-interface work. The eight-milestone
 objective remains incomplete.
+
+## Shared facts and realization checkpoint (2026-11-18)
+
+The default resolves the imported program together, including pure value
+bindings and ordered execution regions. Argument/result/capture bounds, branch
+premises and native boundary lifetimes feed the shared value graph before
+representation and workspace selection. Exact structural term identities
+preserve DAG sharing; cached answers retain their owner, assumptions and input
+revision. Immutable zero/one terms are shared within their factory. Bounded
+proof-table growth reduces rehashing without changing proof keys or budgets.
+
+Finite intermediate domains can become constants, comparisons, bit tests,
+affine operations or bounded ROM tables. These realizations rejoin the value
+graph. Native widths guide arithmetic helpers, sparse products and transport.
+Known operands pass through wrapping conversions into native immediates. Zero
+products remove value work while preserving preceding effects. Case interfaces
+support invariant outputs and independent guards under one input snapshot and
+activation. Fixed workspace reuse still requires nonoverlap evidence.
+
+Estimates propose implementations. Measured search retains validated
+nondominated alternatives and rechecks their fingerprints. The Edelweiss driver
+records common inputs, tools, relevant environment settings and exact physical
+preferences before baseline reuse. Cost policy cannot weaken source semantics,
+obligation completeness or behavioral validation.
+
+The final compiler passes all 91 release groups and the same frozen ASan/UBSan
+suite, all 55 examples and 38 supported host/Z80 drivers. The known-open
+`type_equations.vx` value remains intentional; its type query resolves. Focused
+target checks cover signed/unsigned conversions, branch budgets zero/eight,
+automatic/fixed frames and effects whose entire result becomes zero.
+
+All three Edelweiss Linux/MSX profiles were rebuilt and checked during the run.
+The final zero-product change reproduces all 494 generated game code files and
+the measured optional player projection exactly, so the verified binaries and
+scenario evidence are reused. Six worklist/branch orderings preserve all checked
+game traces in both player implementations. Reversing the imports also passes
+host traces, an MSX encounter, callback, bank and RAM checks. Private generated
+names may differ across schedules; semantic order independence does not require
+identical C files.
+
+The selected production game occupies 470,986 ROM bytes and 3,912 global RAM
+bytes, with 42 fixed Vexel workspace bytes. The encounter observes 119 stack bytes. Active melee gains speed with
+four additional callback stack bytes. The optional local player region now
+observes 17 stack bytes, but remains slower than the selected 26-byte path;
+the faster default stays selected. Measured maxima are not worst-case bounds.
+
+Complete same-source generation took 240.28 seconds with the recorded early-run
+compiler and 24.37 seconds with the final compiler (9.86 times faster). Peak
+solver RSS was 3,452,328 versus 1,263,188 KiB. Both use the same recorded boundary
+offers and pre-bomb-policy options; the generated
+implementations intentionally differ. This measures solver generation, not
+SDCC compilation or game frame rate.
+
+A second comparison ran the final compiler first, then the early-run compiler,
+with the same recorded inputs. The early-run compiler took 272.01 seconds and
+the final compiler 23.70 seconds (11.48 times faster), with 3,452,508 versus
+1,263,432 KiB peak RSS. Both complete measurements are retained; elapsed time
+varies between runs.
+
+An isolated instrumented build of the final source reproduces all 484 raw
+compiler-generated C/header/include files for the benchmark. Its profile now
+concentrates on Boolean memo operations and binding traversal. In particular,
+`Session::conditionedValue` rebuilds a proof context for each ready scalar query.
+Measuring repeated contexts is the next investigation target; any answer reuse
+must retain exact premises, native-expansion dependencies, observation identity
+and revision. This is a profiling lead, not an implemented cache or a release
+timing claim. The profile and findings are under
+`tmp/eight-hour-20261118/closure/profile-final/`.
+
+The implementation is concentrated in these components:
+
+| Component | Responsibility |
+| --- | --- |
+| `experimental/relational/src/machine.cpp`, `term_index.cpp` | Shared terms, exact identities, bounded diagnostic rendering and local traversal reuse |
+| `experimental/relational/src/source_control_proof.cpp` | Compact Boolean proof storage and elimination of undemanded proof work |
+| `experimental/relational/src/source_value.cpp`, `source_value_tables.inc`, `source_value_choices.inc` | Native arithmetic, finite realizations, branch facts and shared value scheduling |
+| `backends/msx-neo8/tools/optimize.py`, `ext/edelweiss/tools/optimize_player.py` | Validated measured alternatives, input identity and artifact checks |
+
+The complete evidence is in
+`ext/edelweiss/build/eight-hour-closure/validation.json`, with compiler, input,
+test-log, generated-code and binary fingerprints. The preceding fresh game
+build is recorded in `ext/edelweiss/build/eight-hour-delivery/validation.json`.
+The run ledger is `tmp/eight-hour-20261118/run.json`. Changes are uncommitted.
+
+SDCC remains serialized with 2 GiB and 180-second limits per invocation and
+`--max-allocs-per-node 2000`. Selected modules fit their 8 KiB banks. Edelweiss
+retains its KonamiSCC mapper; separate backend examples exercise NEO8.
+Sanitizers use `detect_leaks=0`, so this is ASan/UBSan coverage, not a fresh
+leak-check result. General invariant discovery, compiled solver acceleration,
+an LLM proposal service and resolved Vexel serialization remain future work.
+
+## Scoped proof reuse and execution facts (2026-11-19)
+
+Conditional answers now retain exact ordered premises and revalidate every
+native interpretation used by the proof. Bounded Boolean graphs share pure
+subexpressions while each query rebuilds its own assumptions. A graph filled by
+earlier queries gets one fresh-graph retry. Failed or exhausted answers never
+become cached facts. Native proofs retain their constructed relationships but
+solve again with fresh bindings; occasional larger attempts avoid repeatedly
+spending the same small allowance on a difficult request.
+
+Bounded modular algebra supplies equality, constant and immutable-alias facts
+to the same function, capture and loop relationships. These are proof forms;
+the backend does not emit expanded polynomials. Conditional-constant comparisons
+can avoid constructing irrelevant bit-level predicates. Exact structural atom
+identities, complemented Boolean handles and local DAG traversals reduce proof
+storage and repeated work without changing observation or assumption scopes.
+Loop initialization preserves sharing during normalization, dependency discovery
+and changing-value classification. Source-leaf previews explicitly mark
+truncation, and the arithmetic C renderer avoids a duplicate traversal of its
+left operand while retaining identical C. A final proof-table change packs the
+bounded handles before hashing; full triples still determine equality on every
+collision. Three paired measurements of that isolated change gave medians of
+9.21 and 8.90 seconds with identical whole-game reports, including proof counters.
+
+Execution has a separate finite completion/effect certificate. Invocation demand
+can remove an unused pure call while another caller still needs the same body.
+All actual evaluations and logical return/capture leaves participate; loops,
+unanchored recursion, foreign effects and possible traps keep their obligations.
+The ordinary, value and region projections consume the same certificate before
+frame and bank planning. [The execution-facts example](../examples/execution_facts.vx)
+shows one removable call, an observable sink and a potentially trapping call
+whose execution must be preserved.
+
+Editable user C, assembly, headers and stack contracts now participate in each
+adaptive MSX build and its input identity. A changed embedding invalidates
+earlier size/resource feedback. Output inside its own input directory is rejected
+before work begins. Assembly stack analysis recognizes joins whose paths restore
+the same known stack address, while retaining each path's earlier peak; unknown
+restorations and unsupported transfers remain unproved.
+
+The final paired whole-game benchmark uses one CPU, the same inputs and options,
+two starting-compiler runs and four final-compiler runs. Median generation time
+falls from 17.17 to 9.26 seconds (46.1%), and median peak RSS from 1,264,142 to
+576,780 KiB (54.4%). Every run reproduces all 484 raw generated code files.
+These measurements cover solver generation; they do not measure SDCC compilation
+or imply a change in game frame rate. They use this run's starting compiler and
+must not be combined with the preceding checkpoint's different benchmark options.
+
+The accepted source passes all 95 release groups and all 95 ASan/UBSan groups,
+57 example checks and 39 supported host/Z80 drivers. The `type_equations.vx`
+value is still intentionally open; its selective type query passes. Sanitizers
+use `detect_leaks=0`. An independent arithmetic/capture/effect/trap oracle checks
+128 programs across all 256 byte inputs, using fatal UBSan on generated C.
+Both Edelweiss host variants pass, including all six worklist/branch orderings
+and reversal of all 28 imports. Different schedules can change private names;
+their values and effect traces agree.
+
+The normal Make release executable is byte-identical to the separately tested
+executable after removing debug/symbol information and the GNU build-id note.
+The sanitizer tests use an identical source copy; sanitizer diagnostic records
+embed its different filename. All 119 executable sections of the changed
+sanitizer object match, but linked sanitizer byte identity is not claimed.
+Both compiler fingerprints and the source overlay are retained in the report.
+
+All 494 postprocessed game code files remain identical to the selected production
+tree. The earlier Linux/MSX machine evidence is reused after checking the game
+inputs and all 863 retained machine artifacts; this checkpoint does not claim a
+fresh game ROM build. Edelweiss still uses KonamiSCC. Separate NEO8 measurements
+exercise the new unused-call certificates:
+
+| Workload | Frame allowance | Harness-inclusive Z80 ticks, before → after | Observed stack, before → after |
+| --- | ---: | ---: | ---: |
+| Identity chain | 0 bytes | 745,111 → 520,087 | 36 → 24 bytes |
+| Identity chain | 128 bytes | 714,987 → 489,963 | 32 → 22 bytes |
+| One unused call | 0 bytes | 1,016,073 → 784,649 | 44 → 42 bytes |
+| One unused call | 128 bytes | 974,513 → 750,215 | 36 → 36 bytes |
+
+Those measurements cover all 256 inputs. The final compiler reproduces the
+measured projects' compile/link inputs and semantic plans; their ROM hashes are
+checked again. These are synthetic workloads, and observed stack maxima are not
+worst-case bounds.
+
+The bank-pressure example now obtains external responses during its recurrence.
+This retains actual dynamic work after stronger value proofs showed that its
+previous pure recurrence was constant. The fixture exercises measured partition
+retries and requires an assembly stack bound; it does not disable the optimizer
+to preserve an obsolete stress case.
+
+The fresh bank-pressure run rejects a 9,020-byte continuation and retries with
+a smaller partition allowance. Its four final continuations occupy 4,376, 4,365,
+2,981 and 4,361 bytes. The required stack bound is 565 bytes, including a 64-byte
+environment allowance; the observed peak is 523 bytes. SDCC remains serialized,
+with 2 GiB, 180-second and 2,000-allocation limits per invocation. An audit of
+812 retained resource records, including rejected attempts, finds a maximum RSS
+of 1,455,348 KiB. The record count can include copies retained by example drivers.
+
+The complete checkpoint is recorded in
+`ext/edelweiss/build/eight-hour-20261119/validation.json`, with a copy at
+`tmp/eight-hour-20261119/hash-delivery-report.json`; the run ledger is
+`tmp/eight-hour-20261119/run.json`. Changes remain uncommitted. The game's tracked
+`sdcc_msx` symlink was observed as a directory during this run, changing its status
+from modified to a type change. Its origin was not established and it was left
+untouched; the observed vendor files are fingerprinted separately. The checked
+game inputs and retained artifacts still match.
+
+Shared solver terms do not yet imply shared arithmetic in every C projection.
+The ordinary emitter can still duplicate a demanded loop-transfer expression.
+Typed value and region emitters already materialize selected common values;
+extending that mechanism requires coordinated temporary lifetimes and frame/bank
+accounting. General invariant discovery, compiled solver acceleration, LLM
+proposal guidance and resolved-Vexel serialization also remain future work.
+
+An isolated profile quantifies that remaining gap without changing emitted code.
+Across 672 ordinary expression renderings in Edelweiss, 6,327 operation visits
+represent 4,343 distinct operations summed per root. The largest expression is
+17,847 bytes and visits 41 operations 569 times. Its player-weapon path, and the
+other largest fairy/melee paths, already use optimized value bindings in the
+game; these generation observations are not runtime-hotness measurements.
+
+A separate shared-arithmetic experiment compares the existing ordinary and
+region realizations of identical Vexel. At four repeated square/add steps, the
+ordinary path takes 12,696,930 harness-inclusive Z80 ticks and observes 54 stack
+bytes; the region path takes 1,043,264 ticks and observes 26 stack bytes with
+six bytes of fixed binding workspace. Both agree on every byte input.
+This compares complete realizations, including typed arithmetic and storage;
+it does not isolate the contribution of common-expression sharing. At twelve
+steps the ordinary source unit grows to 738,929 bytes, while the region header
+is 4,405 bytes plus 913 bytes of type declarations and 14 workspace bytes.
+The latter passes all 256 host inputs under fatal UBSan; that large ordinary
+unit was not sent to SDCC. Evidence is under
+`tmp/eight-hour-20261119/hash-shared-expression-regions/`. The corresponding
+ordinary-expression profile is under `tmp/eight-hour-20261119/hash-expression-profile/`.
+
+The next generalization should share the existing typed scheduling machinery
+across projections. A reusable calculation needs both its value identity and an
+evaluation interval: the guard under which it executes, the snapshot versions it
+reads, and the effects or transfers that end its validity. Candidate storage must
+then participate in activation interference, frame budgets and bank planning.
+The experiment supports that direction; automatic use of region scheduling by
+every ordinary source interface is not implemented in this checkpoint.
+
+## Ordinary calculation intervals (2026-11-20)
+
+The shared-calculation experiment above now has an ordinary-C implementation.
+The typed graph, use counting and shared-node scheduling in `source_value.cpp`
+serve ordinary expressions as well as value/region bindings. Ordinary C places
+sequenced assignments inside the original expression, preserving lazy guards,
+readiness, effects and checked operations. Each retained node has a typed
+scratch lane. Separate argument expressions use disjoint lanes, while completed
+statements can reuse storage. Projection caches retain their term roots and are
+local to one physical function in one solve.
+
+A pre-emission pass accounts for scratch before activation/frame selection.
+The final emitter checks that it stays within that closed storage/helper plan.
+Source entries, native frames, loop transfers, call arguments and resident lazy
+initializers participate. Bank continuations capture the same storage, and
+helper definitions follow each embedding's `VX_RESIDENT` contract. No new syntax
+or opt-in annotation is required. Unsupported or possibly trapping operations
+keep the ordinary checked path; children can still form smaller intervals.
+
+The paired square/add experiment uses identical source and all 256 byte inputs:
+
+| Realization | C source unit | Z80 entry code | Ticks including harness | Observed stack | Fixed locals |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Previous ordinary, 4 updates | 4,401 B | 851 B | 12,668,262 | 54 B | 8 B |
+| Scheduled ordinary, 4 updates | 3,215 B | 226 B | 1,284,733 | 30 B | 11 B |
+| Scheduled ordinary, 12 updates | 6,374 B | 356 B | 2,496,801 | 30 B | 19 B |
+
+The matching previous 12-update ordinary source is 738,801 bytes; it was not
+sent to SDCC. The improvement combines retained calculations with the existing
+typed arithmetic emitter, and does not isolate CSE or imply a game-frame-rate
+increase. Fixed locals include the original loop/result storage; the new scratch
+accounts for 3 and 11 bytes respectively. These stack numbers are observations
+of these workloads, not universal bounds. All generated bank modules pass their
+actual machine-code placement checks; C text size is not ROM section size.
+Evidence is in `tmp/shared-scheduling-20261120/benchmark.json` and the associated
+`bench-final-*` projects.
+
+Edelweiss was regenerated in one whole-program solve. Its ordinary paths retain
+14 intervals across `contact_box`, `ghost_update` and `title_step`, using 11
+scratch bytes in total. These entries already have typed game bindings, so this
+is primarily a general backend improvement. The fresh Linux executable and
+475,136-byte KonamiSCC ROM are under
+`ext/edelweiss/build/shared-scheduling-20261120/vexel/`. C/Vexel gameplay oracle,
+resource, linker and optimization-manifest checks pass. This checkpoint does not
+claim fresh full-engine emulator timing or a gamewide speedup.
+
+`make calculation-msx` reproduces the host/Z80 checks for guarded arithmetic,
+effectful result snapshots, lazy initializers, recursion, automatic/fixed locals
+and forced bank continuations. A separate host matrix checks different source
+ABI widths in a single program. The existing value/region paths retain their
+own storage policies and continue using the same shared-node machinery. General
+cross-guard/effect retention, intra-expression register allocation and globally
+optimal scheduling remain outside this bounded policy.
+
+`tools/publish_repositories.py` previews the intended changes in both repositories
+and performs commits/pushes only with `--apply`. Vexel currently needs a supplied
+remote URL. The script preserves the observed `sdcc_msx` directory/symlink
+mismatch, includes actual changes under `vendor/sdcc_msx`, and excludes unrelated
+loose files. Disposable local-repository tests cover preview, publication,
+reruns, staged-index rejection and remote-ahead rejection. No working-repository
+commits or pushes were performed during implementation.
+
+Final validation: 97 release groups and 97 ASan/UBSan groups passed
+(`ASAN_OPTIONS=detect_leaks=0`), along with 57 example checks and all 39 supported
+host/Z80 drivers. The `type_equations.vx` partial value remains a recorded open
+obligation; its selective type check passes. The six focused calculation tests
+also pass with `--msx` (the source-ABI matrix is host-only). All 494 generated
+game code files reproduce exactly in a fresh solve. A single paired game
+generation under concurrent sanitizer load took 12.78/13.02 seconds and peaked
+at 575,988/576,544 KiB before/after; this is descriptive evidence, not a
+statistical performance claim. SDCC stayed serialized with 2,048 MiB and
+180-second limits; the largest observed completed-job RSS was 673.9 MiB.
+
+The final evidence bundle is `tmp/shared-scheduling-20261120/validation.json`,
+with a copy at `ext/edelweiss/build/shared-scheduling-20261120/validation.json`.
+It fingerprints the compiler, implementation, generated code, fresh Linux/MSX
+artifacts and validation logs. The final release compiler SHA-256 is
+`c18940bdd59af1311eb04a11502abb97704abe8b6bf4f7c99e367618bdc477de`.
+
+## Scratch lifetimes across C realizations (2026-11-20)
+
+The common typed scheduler now assigns storage by last use within each emitted
+calculation block. It counts complete consumers rather than textual references,
+recycles slots only after the entire store has finished, and requires matching
+width and signedness. This covers ordinary comma expressions, pure value
+bindings and region expression scratch. Logical retained-value counts stay
+separate from physical slot counts, so frame budgets reflect actual storage.
+
+A fixed-output prefix receives the roots of later guards and branch outputs.
+These roots keep its producers live until their later consumers. Inherited
+locals remain owned by their enclosing scope; branch-local declarations are not
+shared across C lexical scopes. Finite lookups follow their physical index
+rather than assuming semantic node order. Parallel-transfer cycle storage,
+callback snapshots, activation proofs and unspecified C argument order retain
+their existing constraints. This is a conservative allocator within the existing
+scheduler, without a new intermediate language or source annotation.
+
+The bounded SDCC/Z80 square/add fixture checks all 256 byte inputs against an
+independent oracle. The paired twelve-update measurements are:
+
+| Storage policy | Scratch before / after | Declared locals before / after | Observed stack before / after | Entry code before / after | Whole harness ticks before / after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Exclusive fixed | 11 / 2 B | 19 / 10 B | 30 / 30 B | 356 / 356 B | 2,496,801 / 2,496,612 |
+| Automatic | 11 / 2 B | 19 / 10 B | 47 / 38 B | 294 / 294 B | 2,487,698 / 2,487,698 |
+
+The automatic invocation's assembly-derived stack bound also falls from 28 to
+19 bytes; its scope excludes embedding frames. Fixed RAM initialization accounts
+for the small fixed-policy timing difference. The entry instructions retain the
+same size; this change saves storage without claiming faster arithmetic. The
+four-update fixed fixture also uses two scratch bytes (previously three).
+
+In Edelweiss, `player_view` shrinks from 16 to 15 bytes and `scene_camera` from
+18 to 16 bytes. The sum of selected frames before overlay falls from 664 to
+661 bytes, while their actual shared workspace remains 42 bytes: another live
+frame still determines that allocation. Eleven of the 494 generated code files
+change, and a second complete generation reproduces all 494 files exactly.
+
+The fresh game build uses 471,084 ROM bytes in the unchanged 475,136-byte image
+and 3,912 bytes of global RAM. In the paired smoke builds, used ROM rises from
+304,535 to 304,551 bytes, with the same 311,296-byte image and 3,932-byte global
+RAM allocation. SDCC reduces the player module by 38 bytes and grows the
+camera-transition module by 54. Its camera helper also reserves two local spill
+bytes instead of one. Smaller declared frames are therefore not a guarantee of
+better register allocation; these measurements remain relevant to future
+realization selection.
+
+Both complete SDL/openMSX runs pass the quest, dialogue, scene and restoration
+checks. The comparison uses frozen pre-change Vexel output versus the new Vexel
+output, alongside the separate C/reference gameplay checks on the host. Observed
+extra stack remains 242 bytes in both runs. The measured ghost callback remains
+2,139.9 microseconds active and 602.4 microseconds skipped, including the
+trampoline and ISR; no game-wide speedup is claimed. The main game remains on
+its existing KonamiSCC mapper.
+
+Validation passed: 97 release groups, 97 ASan/UBSan groups with leak detection
+disabled, all 39 supported host/Z80 example drivers, and all 57 example checks.
+The existing `type_equations.vx` partial-value obligation remains explicitly
+open while its selective type check passes. The seven focused lifetime tests,
+the full value-projection target suite and the region target suite pass. The
+focused test's whole-project deadline permits waiting for the serialized SDCC
+queue; individual jobs remain limited to 2,048 MiB and 180 seconds. Among 1,457
+retained job records, the largest RSS was 673.6 MiB. Fresh game builds, gameplay
+oracles, resource/linker checks and deterministic regeneration also pass.
+
+Evidence is recorded in `tmp/scratch-lifetimes-20261120/validation.json` and
+`ext/edelweiss/build/scratch-lifetimes-20261120/validation.json`. The release
+compiler SHA-256 is
+`3eabd1c212fe885ddee836466a9ab48030d5c04d2f1dc5d054ee377439b57a8f`.
+Changes remain uncommitted in both repositories; the existing publication
+script continues to collect the source, documentation and generated changes.
+
+## Eight-hour optimization session, 2026-11-20
+
+This session extends the existing solver/projector boundary in three connected
+ways. First, proved integer domains and consumer bit demands survive native
+arguments, captures, results and loop snapshots. Second, the projector can use
+those facts to choose smaller arithmetic and storage representations. Third,
+linked target measurements can reject a physical choice and request a bounded
+alternative without changing source meaning. The goal remains a closed source
+solution with reviewable, replaceable C realizations.
+
+Calculation intervals now share a common integer range evaluator with completion
+checks. The proof is about converted operands: a nonzero source number can become
+zero in a smaller representation, and a valid mathematical shift count can become
+invalid after conversion. Checks that can still trap remain observable even when
+the result is discarded. A result's own completion certificate permits sharing
+only within the already certified pure region; callback order, snapshots,
+parallel assignments and activation overlap retain their existing constraints.
+
+Physical representation facts are carried across closed native interfaces.
+They are facts about the transported values, not new restrictions on the public
+source inputs. The independent formal-argument fixture drops from 13,418,404 to
+2,092,510 target ticks and from 88 to 58 observed stack bytes; its fixed-frame
+variant drops from 83 to 53 bytes. A loop-carried fixture falls from 38,960,754 to
+5,138,715 ticks and from 77 to 53 bytes. These are complete test-harness costs,
+not estimates of application frame time. The exact comparisons are retained in
+`tmp/eight-hour-20261120-0838/transport-domains-comparison.json`.
+
+Proved native-width division and shifts no longer fall back to generic checked
+32-bit operations merely because no temporary needs materializing. Constant
+non-power-of-two divisors use width-specific arithmetic; bounded variable
+divisors use compact loops that preserve the high remainder carry. The unsigned
+byte division-by-seven fixture falls from 25,998,425 to 1,342,735 target ticks
+and from 71 to 38 observed stack bytes. Signed cases include minimum/-1 wrapping,
+negative remainder, negative divisors and all supported 8/16/32-bit widths.
+These results do not justify unrolling every expression: 32 different constant
+divisors in one source expression produced a 29,520-byte function.
+
+That oversized function exercises a new measured feedback path. The backend
+identifies its owning function and retries with
+`calculation_division_unroll.OWNER=0`, before reducing statement partitions.
+The compact realization fits in 2,311 bytes and passes the independent target
+oracle in exactly two attempts, with unchanged statement partitions. Unrelated
+functions retain their original choices. Each allowance can be disabled once;
+subsequent partition reduction is also bounded. Exhausted choices still produce
+a failure rather than claiming the original request was resolved. The actual
+linked experiment is retained under
+`tmp/eight-hour-20261120-0838/division-bank-closed`.
+
+Quotient/remainder sharing is a separate opt-in alternative. It replaces a
+proved pure same-width pair with `q=x/d; r=x-q*d` and retains the original
+remainder range. For unsigned 32-bit division by seven, sharing saves roughly
+96,000 harness ticks with automatic storage but grows observed stack from 54 to
+58 bytes. Fixed storage saves roughly 101,000 ticks with the same 46-byte stack.
+The artifact-validated selector therefore rejects sharing for the automatic
+candidate and selects it for the fixed candidate under a stack-first objective.
+The feature defaults off; a smaller expression is not enough evidence to make
+it the universal choice. Edelweiss currently has no matching selected pair.
+
+Target execution also exposed two SDCC-specific correctness hazards. Wrapped
+unsigned byte shifts need explicit high-bit correction; a directly enclosing
+mask may safely absorb that correction. A stored remainder combined with
+another byte operand could compile as `r & r` instead of `d & r`. Dynamic byte
+bitwise operations crossing stored-calculation boundaries now use the same
+private register-argument barriers as the affected arithmetic operators. The
+failing mixed graph and assembly are retained, and independent mixed signed/
+unsigned host and Z80 checks cover the correction. Helper demand now follows
+individual published code units, so an embedding can place those units in
+separate translation units without accidentally relying on another file's
+static helper definitions.
+
+This work does not claim globally optimal arithmetic, a universal SDCC stack
+model, exhaustive gameplay coverage, or closure of every proposed RFC feature.
+The existing partial-value observation in `examples/type_equations.vx` remains
+explicitly open; its selective type observation still resolves. Measurement
+costs describe their recorded binary, workload and storage choice. Production
+gameplay continues to use its existing KonamiSCC mapper and hand-written engine
+and assembly boundaries.
+
+Unsigned-byte rotations provide another concrete realization choice. The
+initial private-call form saved instructions but increased automatic stack;
+composing one-bit steps eliminated SDCC's unnecessary masks and spills. Explicit
+inline expansion then removed the remaining call overhead. The final seven-count,
+256-input fixture falls from 5,396,766 to 5,092,772 target ticks with automatic
+storage and keeps the same 118-byte observed stack. Fixed storage falls from
+4,481,660 to 4,243,464 ticks with the same 48-byte stack. A second fixture checks
+derived/stored producers and materialized shift children, so recognition cannot
+extend an expired scratch lifetime. Rotation helpers remain opt-in because an
+expansion's effect on enclosing register allocation is still a physical choice.
+
+Edelweiss selects that allowance. Its weapon-selection binding falls from
+130.16 to 85.69 microseconds and from 6 to 2 observed helper stack bytes relative
+to the correct bitwise-barrier realization. Every measured input improves.
+Compared with the earlier shift-corrected code, the mean falls from 107.34 to
+85.69 microseconds with the same 2 bytes and no slower sample. All 57 full
+bindings across 63 linked instances pass the oracle; the other bindings remain
+unchanged by this choice. The production generation reproduces the measured
+candidate's 517 C/header/fragment files exactly.
+
+A separate reciprocal-expression experiment illustrates why algebraic proof
+alone is insufficient for selection. Byte division by seven can be expressed
+as `((n+1)*73)>>9` in a sufficiently wide carrier, and all 256 inputs verify.
+Emitting its shift/add form through Vexel nevertheless changes the automatic
+ordinary harness from 1,342,735 ticks / 38 stack bytes to 1,374,073 / 42; fixed
+storage changes from 1,298,615 / 30 to 1,324,363 / 32. The value-binding alternative
+also loses. This experiment was rejected and does not alter the compiler or
+game source. Its independent oracle and target artifacts remain available under
+`reciprocal-seven-baseline` and `reciprocal-seven-probe` in the session directory.
+
+Public result serialization now participates in the same storage accounting.
+The original projection retained a separate 32-bit snapshot for every
+multi-byte result. It can instead use the solved payload width and reuse one
+snapshot after each result has been completely serialized. The expression is
+still evaluated once at its original arithmetic width. Signed interpretation,
+checks, effect order and activation eligibility are unchanged.
+`calculation_publication_narrow` and `calculation_publication_reuse`, including
+physical-function scopes, expose all four alternatives. Reports include the
+effective carrier width, number of values requiring snapshots, and allocated
+snapshot bytes. Both allowances default to one and intersect their scopes.
+
+The word-arithmetic fixture gives the following measured choices. The workload
+and independent oracle are identical; ticks include the complete harness with
+ordinary and unchanged typed-binding calls, not just serialization instructions.
+All fixed-storage candidates observe the same 52-byte stack.
+
+| Carrier / slots | Snapshot bytes | Automatic ticks | Automatic stack | Fixed ticks |
+| --- | ---: | ---: | ---: | ---: |
+| 32-bit / separate | 16 | 616,170 | 96 B | 561,366 |
+| 32-bit / shared | 4 | 616,170 | 84 B | 561,114 |
+| 16-bit / separate | 8 | 599,786 | 88 B | 553,038 |
+| 16-bit / shared | 2 | 601,834 | 82 B | 552,912 |
+
+The artifact-validated selector chooses narrow/shared under a stack-first
+objective. It retains narrow/separate on the automatic-storage frontier because
+that alternative runs faster while using six more stack bytes. In the separate
+byte-arithmetic fixture, sharing saves 12 automatic stack bytes with unchanged
+ticks, but fixed sharing is 324 ticks slower over the complete workload. These
+are measured alternatives, not a claim that less local RAM always means faster
+instructions or a smaller target stack.
+
+The new defaults reproduce 1,513 C/header/fragment files across all 54 emitted
+example images, and all 517 game code files, from the independently validated
+shared-slot implementation. The additional allowance changes the selected
+realization only when explicitly disabled. The complete four-choice matrix,
+selected candidates and checked artifacts are retained as
+`publication-realization-matrix.json` and `publication-selection-*.json` in the
+session directory.
+
+The selected game configuration mixes these choices. It retains wide, separate
+publication carriers for `vx_password_decode` and uses the new defaults
+elsewhere. The ordinary frame allowance is 256 bytes, with 201 planned static
+bytes in the complete image; omitted ordinary alternatives do not become linked
+RAM. The actual full game uses 3,900 global RAM bytes and 467,375 occupied ROM
+bytes, compared with 3,912 and 468,688 in the preceding inline-rotation candidate.
+The image remains 475,136 bytes. Canonical generation reproduces all 517
+C/header/fragment files of this measured mixed candidate exactly.
+
+An independent direct probe checks 256 encoder and 256 decoder inputs in the
+actual linked game, including valid, lowercase, invalid and special passwords.
+The encoder mean falls from 1,305.19 to 1,127.52 microseconds, with every measured
+input improving and the same 24-byte observed stack. Narrow decoder carriers would improve its
+mean but increase observed stack from 65 to 71 bytes; sharing at the previous
+frame allowance increases that to 72. The selected decoder therefore retains
+its previous fragment, timing and 65-byte stack. These scopes include entry
+through return, exclude caller argument stores and result-reader calls, and
+have interrupts disabled. The reusable game tool is `tests/profile_password.py`.
+
+The complete game smoke scenario still observes 242 additional stack bytes.
+The host oracle, fresh Linux/MSX builds, all 57 full bindings across 63 linked
+instances, encounters, actor/world profiles, title flow and direct password
+checks pass. The linked ordinary-frame inventory also shows that every linked
+function with a nonzero planned local frame now uses fixed storage. Further
+stack work needs to address argument/result transport and SDCC spills, with
+separate lifetime proofs for any reusable private call frame.
+
+The bounded storage search at `run-e1wl8gsp` retained its baseline binding
+choices. Enabling the player-view output schedule increased mean time from
+174.77 to 178.96 microseconds with unchanged stack; individual samples exceeded
+the 2% slowdown allowance, so the candidate was rejected. The next candidate
+exhausted the search wall budget during its smoke run. Five remaining candidates
+were unmeasured. Input identity and retained artifact validation both pass.
+Several earlier complete-project controllers reached their outer deadlines
+while waiting in the serialized compiler queue; unfinished scenarios are not
+counted as successful validation.
+
+A final cache-assisted replay also measures the previously unfinished separate
+scratch-slot alternative. Independent 256-input probes cover all 54 full
+bindings across 60 linked instances in each smoke image. Both alternatives
+preserve values. The output schedule repeats its 174.77 to 178.96 microsecond
+regression with unchanged 2-byte stack. Disabling player-view scratch reuse
+increases its frame from 15 to 16 bytes, mean time from 174.77 to 234.36
+microseconds, and observed helper stack from 2 to 5 bytes. The other measured
+instances retain their costs. Both alternatives fail the per-input time/stack
+limits, supporting the existing scoped choices. The full probe comparison is
+retained as `final-storage-full-probe-comparison.json`.
+Both candidates also complete the comparative SDL/MSX gameplay scenario. The
+replay at `run-2l13vgpc` retains the checked baseline and closes with successful
+input-identity and artifact validation; its summary is
+`final-storage-search-summary.json`. This finishes the earlier interrupted
+player-view comparison without treating either slower realization as an
+optimization gain.
+
+The C/reference engine still provides a useful remaining target. In this
+scenario its ghost callback takes 1,707.87 microseconds when active and 415.19
+when skipped, compared with 1,931.76 and 602.36 for Vexel. The reference scenario
+observes 240 additional stack bytes versus Vexel's 242. Callback measurements
+include the trampoline and ISR, so they do not attribute the whole difference
+to the pure body or establish an application frame-rate difference. The session
+improves the selected Vexel realization without claiming parity with every C
+reference path.
+
+The compiler guard now passes its lock descriptor into the child and installs
+an inherited kernel CPU backstop. A forced supervisor termination cannot release
+the gate while the compiler continues running. A controlled interruption test
+checks this behavior, alongside memory/time failures and ordinary serialization.
+Resource feedback recognizes a CPU-limit rejection through the same emitted
+owner identities. Logs separately report queue waiting, active wall time, child
+CPU consumption and peak RSS. A real tiny SDCC job illustrates the distinction:
+it waited 55.327 seconds for the shared gate and then ran for 0.010 seconds.
+
+The final compiler passes all 111 release and 111 ASan/UBSan command groups
+(leak detection disabled), all 60 example checks and all 39 supported example
+drivers. The known partial-value observation remains open as described above.
+The complete 26-realization width suite passes on host and Z80; a fresh final
+compiler generation reproduces all 678 C/header/fragment files in that target
+suite. Focused supervision, feedback and cache-identity checks supplement these
+runs. The final compiler SHA-256 is
+`6c87cb0a9c9d48d351906e3ca398e0b139947eed08009882458524d72f8291ce`.
+
+One final experiment separates payload encoding from snapshot storage. The
+isolated password encoder can use a 10-byte, byte-element payload instead of a
+20-byte, word-element payload. Both host and Z80 runs check the same 256 vectors
+and all ten public result-reader calls per vector. Complete harness ticks fall
+from 4,660,017 to 3,525,445, with the same 77-byte observed stack; planned static
+locals fall from four to two bytes. This is an isolated NEO-8 experiment, not a
+whole-game speedup. Tightening the game's common arena to 14 bytes is infeasible
+because its mixed-width player and world outputs still require 20. A measured
+per-source encoding preference remains future work. The experiment is retained
+as `password-encoding-comparison.json` with its input, project and oracle hashes.
+
+Reference compilation now has its own artifact-validated cache. Its identity
+retains game sources, the canonical generated inputs, tools, platform resources
+and environment, while excluding the Vexel solver and pure-helper probe vectors
+that the C/reference build does not consume. A cold search spent 198.8 seconds
+building the reference profile with 276 guarded SDCC jobs. A second search with
+a different helper sample count reused that exact profile and issued no
+reference compilation commands. Both searches passed their newly executed
+comparative SDL/MSX scenarios, host checks and target probes, and both regenerated
+the canonical 517 code files exactly. A changed `PATH` correctly produced a
+cache miss; that diagnostic run was stopped and is not counted as a success.
+
+The final resource audit records a maximum SDCC RSS of 674.3 MiB and a longest
+active invocation of 105.634 seconds. Recorded compiler jobs retain the 2 GiB
+address-space and 180-second wall limits; no memory, CPU or wall-limit exhaustion
+was recorded. Outer search deadlines and superseded compiler failures are
+separately retained in the session ledger. Final artifact fingerprints and
+validation counts are in `tmp/eight-hour-20261120-0838/validation.json`, with a
+copy under `ext/edelweiss/build/eight-hour-20261120-0838/validation.json`.
+The implementation and generated game remain uncommitted for the publication
+script; that script still previews by default.

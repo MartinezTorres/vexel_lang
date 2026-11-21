@@ -38,36 +38,9 @@ Ref Session::conditionedValue(Ref type,Ref value,const std::vector<Ref>& premise
         later({kind},[this,value,premises,expandNative,result](const auto& kinds){
             if(kinds[0]->name=="Integer") {equation(result,value);return;}
             later({value,terms().make("Premises",premises)},[this,result,expandNative](const auto& facts){
-                try {
-                    ControlProof proof;std::size_t premise=1;
-                    auto meaning=[&](const Ref& input){return expandNative ? controlMeaning(input) : input;};
-                    for(const auto& condition:facts[1]->arguments) premise=proof.select(premise,proof.read(meaning(condition)),0);
-                    std::function<Ref(const Ref&)> narrow=[&](const Ref& input)->Ref {
-                        if(input->name=="Runtime") {
-                            if(auto constant=proof.constantValue(meaning(input))) return number(*constant);
-                            if(input->arguments[1]->kind==Term::Number && input->arguments[1]->number==0 &&
-                               input->arguments[2]->kind==Term::Number && input->arguments[2]->number==1) {
-                                auto condition=proof.read(meaning(input));
-                                if(proof.select(premise,condition,1)==1) return number(1);
-                                if(proof.select(premise,condition,0)==0) return number(0);
-                            }
-                            const auto& expression=input->arguments[0];
-                            if(expression->name=="Select") {
-                                auto condition=proof.read(meaning(expression->arguments[0]));
-                                if(proof.select(premise,condition,1)==1) return narrow(expression->arguments[1]);
-                                if(proof.select(premise,condition,0)==0) return narrow(expression->arguments[2]);
-                            }
-                            return input;
-                        }
-                        if(input->kind!=Term::Constructor) return input;
-                        std::vector<Ref> children;bool changed=false;
-                        for(const auto& child:input->arguments) {auto next=narrow(child);changed=changed || next!=child;children.push_back(next);}
-                        return changed ? terms().make(input->name,children) : input;
-                    };
-                    // Simplification is optional. A large bit relation may stay residual;
-                    // mandatory initialization/availability proofs still report exhaustion.
-                    equation(result,narrow(facts[0]));
-                } catch(const ConstructionLimit&) {equation(result,facts[0]);}
+                ConditionalProofs::Meaning meaning;
+                if(expandNative) meaning=[this](const Ref& input){return controlMeaning(input);};
+                equation(result,conditionalProofs.refine(terms(),facts[0],facts[1],meaning));
             });
         });
     });return result;

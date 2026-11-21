@@ -5,7 +5,23 @@
 struct FramePlanning {
     struct Node {
         Ref trace;
-        std::size_t localBytes=0;
+        std::size_t localBytes=0,calculationBytes=0,calculationIntervals=0,retainedCalculations=0;
+        bool reuseScratch=true;
+        bool shareResults=true;
+        std::size_t resultGroups=0;
+        bool reusePublication=true;
+        bool narrowPublication=true;
+        unsigned publicationBits=0;
+        std::size_t publicationValues=0,publicationBytes=0;
+        bool shareDivisions=false;
+        bool unrollDivisions=true;
+        bool rotationHelpers=false;
+        std::size_t unrolledDivisionHelpers=0;
+        std::size_t sharedDivisions=0;
+        std::size_t scratchReuses=0;
+        std::size_t narrowedValues=0,narrowedOperations=0;
+        std::size_t linearCombinations=0;
+        unsigned linearTerms=16;
         std::set<std::string> calls,sources;
         bool openBoundary=false,recursive=false,overlapping=false,staticLocals=false,allowStatic=true;
         std::string reason;
@@ -87,6 +103,10 @@ struct FramePlanning {
         }
     }
     bool shared(const std::string& name) const {return nodes.at(name).staticLocals;}
+    bool exclusive(const std::string& name) const {
+        const auto& n=nodes.at(name);
+        return !n.recursive && !n.overlapping && !n.openBoundary && !n.sources.empty() && n.allowStatic;
+    }
     std::string policy(const std::string& name) const {return shared(name) ? "static-exclusive" : "automatic";}
     void report(std::ostream& out) const {
         out<<",\"frame_planning\":{\"ram_budget\":"<<budget<<",\"static_local_bytes\":"<<used
@@ -94,6 +114,35 @@ struct FramePlanning {
         for(const auto& [name,node]:nodes) {
             if(!first) out<<',';
             first=false;out<<"{\"name\":"<<vx::quote(name)<<",\"frame_policy\":"<<vx::quote(policy(name))
+                <<",\"calculation_scratch_bytes\":"<<node.calculationBytes
+                <<",\"calculation_intervals\":"<<node.calculationIntervals
+                <<",\"result_policy\":"<<vx::quote("calculation_result_sharing."+name)
+                <<",\"result_sharing\":"<<(node.shareResults ? "true" : "false")
+                <<",\"result_groups\":"<<node.resultGroups
+                <<",\"publication_policy\":"<<vx::quote("calculation_publication_reuse."+name)
+                <<",\"publication_reuse\":"<<(node.reusePublication ? "true" : "false")
+                <<",\"publication_width_policy\":"<<vx::quote("calculation_publication_narrow."+name)
+                <<",\"publication_narrow\":"<<(node.narrowPublication ? "true" : "false")
+                <<",\"publication_carrier_bits\":"<<node.publicationBits
+                <<",\"publication_values\":"<<node.publicationValues
+                <<",\"publication_snapshot_bytes\":"<<node.publicationBytes
+                <<",\"division_policy\":"<<vx::quote("calculation_division_sharing."+name)
+                <<",\"division_sharing\":"<<(node.shareDivisions ? "true" : "false")
+                <<",\"shared_divisions\":"<<node.sharedDivisions
+                <<",\"division_unroll_policy\":"<<vx::quote("calculation_division_unroll."+name)
+                <<",\"division_unroll\":"<<(node.unrollDivisions ? "true" : "false")
+                <<",\"rotation_policy\":"<<vx::quote("calculation_rotation_helpers."+name)
+                <<",\"rotation_helpers\":"<<(node.rotationHelpers ? "true" : "false")
+                <<",\"unrolled_division_helpers\":"<<node.unrolledDivisionHelpers
+                <<",\"retained_calculations\":"<<node.retainedCalculations
+                <<",\"scratch_reuse\":"<<(node.reuseScratch ? "true" : "false")
+                <<",\"scratch_reuses\":"<<node.scratchReuses
+                <<",\"narrowed_calculations\":"<<node.narrowedValues
+                <<",\"narrowed_operations\":"<<node.narrowedOperations
+                <<",\"linear_combinations\":"<<node.linearCombinations
+                <<",\"linear_terms\":"<<node.linearTerms
+                <<",\"linear_policy\":"<<vx::quote("calculation_linear_terms."+name)
+                <<",\"scratch_policy\":"<<vx::quote("calculation_scratch_reuse."+name)
                 <<",\"projected_local_bytes\":"<<node.localBytes<<",\"recursive\":"<<(node.recursive ? "true" : "false")
                 <<",\"open_boundary\":"<<(node.openBoundary ? "true" : "false")
                 <<",\"overlapping_occurrences\":"<<(node.overlapping ? "true" : "false")<<",\"reason\":"<<vx::quote(node.reason)

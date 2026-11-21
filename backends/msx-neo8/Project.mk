@@ -1,3 +1,4 @@
+.DEFAULT_GOAL := all
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DELETE_ON_ERROR:
@@ -10,7 +11,13 @@ endif
 CXX ?= c++
 PYTHON ?= python3
 BUILD ?= build
-SDCCFLAGS ?= -mz80 --std-sdcc11 --sdcccall 0 --opt-code-size
+SDCCFLAGS ?= -mz80 --std-sdcc11 --sdcccall 0 --opt-code-size --max-allocs-per-node 2000
+SDCC_MEMORY_MB ?= 2048
+SDCC_TIMEOUT ?= 180
+SDCC_RUN = $(PYTHON) tools/sdcc_guard.py --memory-mb $(SDCC_MEMORY_MB) --timeout $(SDCC_TIMEOUT) --log $(BUILD)/sdcc-resources.jsonl $(SDCC)
+# SDCC 4.2's side-effect -MMD output omits -MP's empty header rules.
+# Its dependency-only preprocessor mode emits them, allowing header removal.
+SDCC_DEPFLAGS = -Wp-MM,-MP,-MF,$(@:.rel=.d),-MT,$@
 CPPFLAGS += -Igenerated -Iruntime
 MEGALINKER ?= $(BUILD)/megalinker
 LIBS ?=
@@ -40,7 +47,14 @@ endif
 ifneq ($(MAPPER_SEGMENTS),0)
 OBJECTS += $(BUILD)/vx_mapper.rel $(BUILD)/mapper.rel
 endif
-HEADERS := $(wildcard generated/*.h runtime/*.h user/*.h)
+ASSEMBLY_OBJECTS := $(BUILD)/crt0.rel $(BUILD)/platform.rel $(BUILD)/mapper.rel \
+    $(foreach m,$(BANK_MODULES),$(if $(filter %.s,$(call source,$(m))),$(BUILD)/$(m).rel)) \
+    $(addprefix $(BUILD)/user_,$(addsuffix .rel,$(basename $(notdir $(filter %.s,$(USER_SOURCES))))))
+C_OBJECTS := $(filter-out $(ASSEMBLY_OBJECTS),$(OBJECTS))
+UNTRACKED_C_OBJECTS := $(foreach o,$(C_OBJECTS),$(if $(wildcard $(o:.rel=.d)),,$(o)))
+ifneq ($(strip $(UNTRACKED_C_OBJECTS)),)
+$(UNTRACKED_C_OBJECTS): FORCE
+endif
 
 .PHONY: all check simulate clean FORCE
 all: $(BUILD)/game.rom
@@ -74,27 +88,35 @@ $(BUILD)/platform.rel: runtime/platform.s $(BUILD)/toolchain.txt | $(BUILD)
 	$(AS) -plosgff -o $@ $<
 $(BUILD)/mapper.rel: runtime/mapper.s $(BUILD)/toolchain.txt | $(BUILD)
 	$(AS) -plosgff -o $@ $<
-$(BUILD)/vx_mapper.rel: runtime/vx_mapper.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) --codeseg HOME -c $< -o $@
-$(BUILD)/vx_runtime.rel: runtime/vx_runtime.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
-$(BUILD)/vx_fixed.rel: runtime/vx_fixed.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
-$(BUILD)/vx_float.rel: runtime/vx_float.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
-$(BUILD)/vx_math.rel: runtime/vx_math.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
-$(BUILD)/vx_bridges.rel: $(BRIDGE_SOURCE) $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) --constseg HOME -c $< -o $@
+$(BUILD)/vx_mapper.rel: runtime/vx_mapper.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) --codeseg HOME -c $< -o $@
+$(BUILD)/vx_runtime.rel: runtime/vx_runtime.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
+$(BUILD)/vx_fixed.rel: runtime/vx_fixed.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
+$(BUILD)/vx_float.rel: runtime/vx_float.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
+$(BUILD)/vx_math.rel: runtime/vx_math.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) -c $< -o $@
+$(BUILD)/vx_bridges.rel: $(BRIDGE_SOURCE) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) --constseg HOME -c $< -o $@
 
 define BANK_RULE
-$(BUILD)/$(1).rel: $(call source,$(1)) $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(if $(filter %.s,$(call source,$(1))),$(AS) -plosgff -o $$@ $$<,$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) -c $$< -o $$@)
+$(BUILD)/$(1).rel: $(call source,$(1)) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(if $(filter %.s,$(call source,$(1))),,$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $$(SDCC_DEPFLAGS) -E $$<)
+	$(if $(filter %.s,$(call source,$(1))),$(AS) -plosgff -o $$@ $$<,$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) -c $$< -o $$@)
 endef
 $(foreach m,$(BANK_MODULES),$(eval $(call BANK_RULE,$(m))))
 
-$(BUILD)/user_%.rel: user/%.c $(HEADERS) local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
-	$(SDCC) $(SDCCFLAGS) $(CPPFLAGS) --codeseg HOME -c $< -o $@
+$(BUILD)/user_%.rel: user/%.c local.mk Makefile $(BUILD)/toolchain.txt | $(BUILD)
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) $(SDCC_DEPFLAGS) -E $<
+	$(SDCC_RUN) $(SDCCFLAGS) $(CPPFLAGS) --codeseg HOME -c $< -o $@
 $(BUILD)/user_%.rel: user/%.s $(BUILD)/toolchain.txt | $(BUILD)
 	$(AS) -plosgff -o $@ $<
 
@@ -105,3 +127,7 @@ $(BUILD)/game.rom: $(OBJECTS) $(MEGALINKER) $(LIBS) generated/plan.json generate
 
 clean:
 	rm -rf $(BUILD)
+
+# Include nested user headers and generated support components discovered by
+# the real preprocessor, including includes outside the top-level directories.
+-include $(OBJECTS:.rel=.d)
